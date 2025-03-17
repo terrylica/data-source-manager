@@ -1,4 +1,24 @@
-"""Tests for VisionDataClient cache validation with detailed integrity checks."""
+"""Tests for VisionDataClient cache validation with detailed integrity checks.
+
+System Under Test (SUT):
+- core.vision_data_client.VisionDataClient
+- core.vision_data_client.CacheMetadata
+- core.vision_constraints (indirectly)
+
+This test suite verifies the data integrity aspects of the VisionDataClient's caching system:
+
+1. Cache write and read cycle with data validation
+2. Arrow file format integrity and structure
+3. Data type consistency through cache operations
+4. Index name and timezone preservation
+5. Proper handling of timestamp formats
+
+Note on Deprecation Warnings:
+----------------------------
+These tests intentionally use the deprecated direct caching through VisionDataClient
+to ensure backward compatibility during the migration period to UnifiedCacheManager.
+The warnings are expected and indicate that the deprecation notices are working as intended.
+"""
 
 import pytest
 import pandas as pd
@@ -18,17 +38,6 @@ logger = logging.getLogger(__name__)
 
 # Mark deprecation warnings as expected - these warnings indicate proper migration path
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
-
-# Document why we're keeping the deprecated functionality in tests
-__doc__ = """
-Tests for VisionDataClient cache functionality with detailed validation.
-
-Note on Deprecation Warnings:
-----------------------------
-These tests intentionally use the deprecated direct caching through VisionDataClient
-to ensure backward compatibility during the migration period to UnifiedCacheManager.
-The warnings are expected and indicate that the deprecation notices are working as intended.
-"""
 
 # Now using the common temp_cache_dir fixture from conftest.py
 

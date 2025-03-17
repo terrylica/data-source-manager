@@ -1,5 +1,20 @@
 #!/usr/bin/env python
-"""Test cache migration and deprecation functionality."""
+"""Test cache migration and deprecation functionality.
+
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- core.vision_data_client.VisionDataClient
+- core.cache_manager.UnifiedCacheManager
+
+This test suite verifies the migration path from the legacy caching system in
+VisionDataClient to the new unified caching system in DataSourceManager. It ensures:
+
+1. Proper deprecation warnings are emitted when using the legacy caching system
+2. VisionDataClient's caching is disabled when used through DataSourceManager
+3. Original cache settings are restored after DataSourceManager exits
+4. The unified caching system works correctly with both data sources
+5. Cache files are stored in the correct locations during migration
+"""
 
 import pytest
 import warnings

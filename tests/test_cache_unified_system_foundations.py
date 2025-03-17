@@ -1,4 +1,22 @@
-"""Tests for unified caching system."""
+"""Tests for unified caching system.
+
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- core.cache_manager.UnifiedCacheManager
+- utils.cache_utils (indirectly)
+
+This test suite verifies the foundational aspects of the unified caching system:
+
+1. Basic cache operations (read/write)
+2. Cache directory structure and organization
+3. Cache file format and metadata
+4. Cache invalidation and error handling
+5. Data integrity through cache operations
+
+The unified caching system provides a consistent interface for caching market data
+across different data sources, with proper directory structure, metadata tracking,
+and data validation to ensure reliability and performance.
+"""
 
 import pytest
 import pandas as pd

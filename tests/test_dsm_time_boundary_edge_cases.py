@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """Comprehensive boundary tests for DataSourceManager with 1-second data.
 
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- utils.time_alignment (indirectly)
+
 Focuses on edge cases and temporal relationships with detailed logging.
 
 This file concentrates on specific edge case behaviors at time boundaries:
@@ -8,6 +12,15 @@ This file concentrates on specific edge case behaviors at time boundaries:
 2. Cross-minute/cross-hour boundaries
 3. Zero-duration and near-zero requests
 4. Alignment rules application in practice
+
+IMPORTANT: Time boundary behavior:
+1. All boundaries are INCLUSIVE after alignment
+2. Start times with microseconds are rounded UP to the next second
+3. End times with microseconds are rounded DOWN to the current second
+
+Example: A time range from 08:37:25.5 to 08:37:30.5 will include 5 records
+(seconds 26, 27, 28, 29, 30) after alignment, NOT 6 records as might be expected
+from naively counting seconds.
 
 Related tests:
 - For general timestamp format/precision: see test_data_source_manager_format_precision.py
@@ -72,21 +85,21 @@ async def test_boundary_conditions(manager: DataSourceManager):
             "description": "Full second alignment",
             "start": current_time.shift(seconds=-10, microseconds=-500_000),
             "end": current_time.shift(seconds=-5, microseconds=-250_000),
-            "expected_records": 5,  # 5 records: [49,50,51,52,53] inclusive after rounding
+            "expected_records": 5,  # 5 records: [26,27,28,29,30] (start_time 25.5 is rounded UP to 26)
         },
         {
             "case_number": 2,
             "description": "Microsecond-aligned start",
             "start": current_time.shift(seconds=-5, microseconds=-500_000),
             "end": current_time.shift(seconds=-2, microseconds=-250_000),
-            "expected_records": 3,  # 3 records: [54,55,56] inclusive after rounding
+            "expected_records": 3,  # 3 records: When start_time x.5s rounds UP to (x+1)s, we get [(x+1), (x+2), (x+3)]
         },
         {
             "case_number": 3,
             "description": "Cross-minute boundary",
             "start": current_time.shift(seconds=-15, microseconds=-500_000),
             "end": current_time.shift(seconds=-5, microseconds=+750_000),
-            "expected_records": 11,  # 11 records: [58,59,00,01,02,03,04,05,06,07,08] inclusive after rounding
+            "expected_records": 11,  # 11 records: start_time rounds UP because of microseconds, end_time rounds DOWN
         },
         {
             "case_number": 4,
@@ -109,12 +122,13 @@ async def test_boundary_conditions(manager: DataSourceManager):
         logger.info(f"\nExpected Behavior:")
         logger.info(f"  - Time range: {end_time - start_time} duration")
         logger.info(f"  - Expected records: {case['expected_records']}")
+        logger.info(f"  - Both start and end times are INCLUSIVE after rounding")
         logger.info(
             f"  - First record should be >= {start_time.replace(microsecond=0).isoformat()}"
         )
         logger.info(
             f"  - Last record should be <= {end_time.replace(microsecond=0).isoformat()}"
-        )  # Updated to <= instead of <
+        )
 
         try:
             # Execute data fetch

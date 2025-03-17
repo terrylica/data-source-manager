@@ -1,10 +1,22 @@
 #!/usr/bin/env python
 """Comprehensive market data testing suite.
 
-This module consolidates all market data related tests, including:
+System Under Test (SUT):
+- Binance REST API (external)
+- core.market_data_client.EnhancedRetriever
+- utils.market_constraints (indirectly)
+
+This module provides direct integration tests with the Binance REST API, verifying
+the behavior of the API itself and the EnhancedRetriever's interaction with it.
+
+The test suite consolidates all market data related tests, including:
 1. Data validation (structure, integrity, time windows)
 2. API limits and chunking behavior
 3. Client integration tests
+4. Error handling and response validation
+
+These tests provide a foundation for the higher-level components like DataSourceManager
+by ensuring the reliability and correctness of the underlying data sources.
 """
 
 import pytest

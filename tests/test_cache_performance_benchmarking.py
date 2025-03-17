@@ -1,11 +1,23 @@
 #!/usr/bin/env python
 """Integration tests for cache performance benchmarking.
 
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- core.cache_manager.UnifiedCacheManager
+- utils.cache_utils (indirectly)
+
+This test suite measures and verifies the performance characteristics of the caching system:
+
 Focus areas:
 1. Basic cache hit/miss performance
 2. Memory usage patterns
 3. Data consistency verification
 4. Cache vs. no-cache timing comparisons
+5. Scaling behavior with different data sizes
+
+The tests provide quantitative metrics on the performance benefits of caching,
+memory consumption patterns, and ensure that performance optimizations don't
+compromise data integrity.
 """
 
 import pytest

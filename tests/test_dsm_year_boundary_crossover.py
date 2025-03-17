@@ -1,12 +1,21 @@
 #!/usr/bin/env python
 """Test data source manager behavior specifically across 2024-2025 boundary.
 
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- core.vision_data_client.VisionDataClient (indirectly)
+- core.market_data_client.EnhancedRetriever (indirectly)
+
 Focus areas:
 1. Data consistency across year boundary
 2. Handling of timestamp precision changes between years
 3. Data source fallback behavior for historical data near boundaries
 
-Note: 
+This test suite verifies that the DataSourceManager correctly handles the transition
+between 2024 and 2025, where timestamp precision changes may occur. It ensures data
+integrity, proper source selection, and consistent formatting across the boundary.
+
+Note:
 - General date validation tests are in test_data_source_manager_consolidated.py
 - Recent data fallback tests are in test_data_source_manager_consolidated.py
 - Format/precision tests are in test_data_source_manager_format_precision.py

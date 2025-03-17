@@ -101,11 +101,21 @@ df = await manager.get_data(
 The system implements precise time boundary handling:
 
 - All timestamps are aligned to second boundaries
-- End time is inclusive in data retrieval
+- Start times with microseconds are rounded UP to the next interval
+- End times with microseconds are rounded DOWN to the current interval
+- Both start and end boundaries are INCLUSIVE after alignment
 - Automatic handling of market open/close times
 - Timezone conversion to UTC if needed
-- Microsecond precision support
+- Microsecond precision support in internal calculations
 - Consistent handling across data sources
+
+### Example Time Window Behavior
+
+For a time window from `2025-03-17 08:37:25.528448` to `2025-03-17 08:37:30.056345` with 1-second intervals:
+
+- Adjusted start: `2025-03-17 08:37:26.000000` (rounded UP from 25.528448)
+- Adjusted end: `2025-03-17 08:37:30.000000` (rounded DOWN from 30.056345)
+- Expected records: 5 (seconds 26, 27, 28, 29, 30 inclusive)
 
 ## Performance Characteristics
 

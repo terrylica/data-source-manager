@@ -367,7 +367,7 @@ class DataSourceManager:
             # Format DataFrame and slice to exact time range
             df = self._format_dataframe(df)
             if not df.empty:
-                mask = (df.index >= start_time) & (df.index < end_time)
+                mask = (df.index >= start_time) & (df.index <= end_time)
                 df = df.loc[mask].copy()
 
             return df
@@ -420,7 +420,7 @@ class DataSourceManager:
                     if cached_data is not None:
                         # Slice cached data to exact time range
                         mask = (cached_data.index >= start_time) & (
-                            cached_data.index < end_time
+                            cached_data.index <= end_time
                         )
                         cached_data = cached_data.loc[mask].copy()
                         if not cached_data.empty:
@@ -441,7 +441,7 @@ class DataSourceManager:
                             if cached_data is not None:
                                 # Slice repaired data to exact time range
                                 mask = (cached_data.index >= start_time) & (
-                                    cached_data.index < end_time
+                                    cached_data.index <= end_time
                                 )
                                 cached_data = cached_data.loc[mask].copy()
                                 if not cached_data.empty:

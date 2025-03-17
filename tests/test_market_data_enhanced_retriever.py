@@ -1,6 +1,18 @@
 #!/usr/bin/env python
 """Integration tests for market data client with real Binance API.
 
+System Under Test (SUT):
+- core.market_data_client.EnhancedRetriever
+- utils.market_constraints (indirectly)
+
+This test suite verifies the functionality of the EnhancedRetriever, which is
+responsible for fetching market data from the Binance REST API. It tests:
+
+1. Basic market data retrieval with validation
+2. Large dataset retrieval with chunking
+3. API limits and error handling
+4. Data structure and integrity
+
 Note: This client is specifically optimized for 1-second data retrieval.
 For other intervals, use the standard Binance client or vision client.
 """

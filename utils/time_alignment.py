@@ -5,9 +5,23 @@ Key behaviors:
 1. All units smaller than the interval are removed (e.g., for 1m, all seconds and microseconds are removed)
 2. The current incomplete interval is removed for safety
 3. Start times are rounded UP to next interval boundary if they have sub-interval units
+   (e.g., 08:37:25.528448 gets rounded UP to 08:37:26.000000 for 1-second intervals)
 4. End times are rounded DOWN to current interval boundary
-5. Both start and end timestamps are inclusive on exact interval boundaries
+   (e.g., 08:37:30.056345 gets rounded DOWN to 08:37:30.000000 for 1-second intervals)
+5. Both start and end timestamps are INCLUSIVE on exact interval boundaries
 6. Each bar has a duration of (interval - 1 microsecond)
+
+Example:
+For a time window from 2025-03-17 08:37:25.528448 to 2025-03-17 08:37:30.056345 with 1-second intervals:
+- Adjusted start: 2025-03-17 08:37:26.000000 (rounded UP from 25.528448)
+- Adjusted end: 2025-03-17 08:37:30.000000 (rounded DOWN from 30.056345)
+- Expected records: 5 (seconds 26, 27, 28, 29, 30 inclusive)
+
+IMPORTANT: When counting expected records for a time range:
+1. Both boundaries are inclusive
+2. Start times with microseconds are rounded UP to the next full second
+3. End times with microseconds are rounded DOWN to the current second
+4. For 1-second intervals with microseconds in timestamps, expected records may be fewer than naively calculated
 """
 
 from dataclasses import dataclass
@@ -237,6 +251,15 @@ def adjust_time_window(
             f"\nOriginal:  {start_time.isoformat()} -> {end_time.isoformat()}"
             f"\nAdjusted:  {adjusted_start.isoformat()} -> {adjusted_end.isoformat()}"
         )
+
+    # Calculate and log the expected number of records
+    if interval == Interval.SECOND_1:
+        # For 1-second intervals, calculate seconds difference + 1 (inclusive boundaries)
+        seconds_diff = int((adjusted_end - adjusted_start).total_seconds())
+        expected_records = seconds_diff + 1  # Add 1 for inclusive boundaries
+        logger.debug(f"Expected records with inclusive boundaries: {expected_records}")
+        logger.debug(f"Time span in seconds: {seconds_diff} seconds")
+        logger.debug(f"Boundaries: Both start and end timestamps are INCLUSIVE")
 
     return adjusted_start, adjusted_end
 

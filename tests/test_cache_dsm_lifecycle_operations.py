@@ -1,5 +1,23 @@
 #!/usr/bin/env python
-"""Tests for cache functionality in DataSourceManager."""
+"""Tests for cache functionality in DataSourceManager.
+
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- core.cache_manager.UnifiedCacheManager (indirectly)
+
+This test suite verifies the complete lifecycle of cache operations in the DataSourceManager:
+
+1. Cache initialization and configuration
+2. Cache hit/miss behavior and statistics tracking
+3. Cache validation and integrity checking
+4. Cache repair functionality for corrupted data
+5. Concurrent cache access patterns
+6. Cache disabled behavior
+7. Data integrity through cache operations with different data sources
+
+The tests ensure that the caching system maintains data consistency while providing
+performance benefits and proper error handling.
+"""
 
 import pytest
 import pandas as pd

@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 """Consolidated integration tests for DataSourceManager.
 
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- core.vision_data_client.VisionDataClient (indirectly)
+- core.market_data_client.EnhancedRetriever (indirectly)
+- core.cache_manager.UnifiedCacheManager (indirectly)
+
+This test suite provides comprehensive integration testing of the DataSourceManager,
+which serves as the central component for market data retrieval, source selection,
+and caching. It verifies the end-to-end functionality across different scenarios.
+
 Test Categories:
 1. Basic Data Retrieval - Tests basic functionality and data validation
 2. Data Source Selection - Tests source selection logic and fallback behavior

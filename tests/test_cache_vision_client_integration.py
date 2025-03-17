@@ -1,5 +1,24 @@
 #!/usr/bin/env python
-"""Test VisionDataClient caching behavior and integration with DataSourceManager."""
+"""Test VisionDataClient caching behavior and integration with DataSourceManager.
+
+System Under Test (SUT):
+- core.vision_data_client.VisionDataClient
+- core.data_source_manager.DataSourceManager
+- core.cache_manager.UnifiedCacheManager (indirectly)
+
+This test suite verifies the integration between VisionDataClient and DataSourceManager
+with a focus on caching behavior:
+
+1. Cache write and read operations through VisionDataClient
+2. Integration with DataSourceManager's unified caching system
+3. Cache persistence across client instances
+4. Cache invalidation and error handling
+5. Prefetch functionality with caching
+6. Historical data caching behavior
+
+The tests ensure that the VisionDataClient works correctly with the caching system
+while maintaining data integrity and providing performance benefits.
+"""
 
 import pytest
 import pytest_asyncio

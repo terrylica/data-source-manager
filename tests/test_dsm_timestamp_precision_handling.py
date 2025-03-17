@@ -1,6 +1,15 @@
 #!/usr/bin/env python
 """Integration tests for DataSourceManager focusing on time formats and precision.
 
+System Under Test (SUT):
+- core.data_source_manager.DataSourceManager
+- utils.time_alignment (indirectly)
+- core.vision_data_client.VisionDataClient (indirectly)
+- core.market_data_client.EnhancedRetriever (indirectly)
+
+This test suite verifies the timestamp handling behavior in the DataSourceManager
+with a focus on precision and format consistency across different data sources.
+
 Focus areas:
 1. Time boundary behaviors and alignment
 2. Input format validation and defaults

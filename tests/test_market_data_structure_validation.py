@@ -1,11 +1,21 @@
 #!/usr/bin/env python
 """Centralized market data validation tests.
 
+System Under Test (SUT):
+- Binance REST API (external)
+- Market data structures and formats
+- Data validation utilities
+
 This module consolidates all market data validation logic that was previously
 spread across multiple test files. It focuses on three key areas:
 1. Data integrity (chronological order, completeness)
 2. Data structure (columns, types)
 3. Time window validation
+
+The tests in this module serve as a foundation for other test suites by providing
+reusable validation functions and baseline tests for market data structures.
+They ensure that data from the Binance API meets the expected format and quality
+requirements before being processed by higher-level components.
 """
 
 import pytest
