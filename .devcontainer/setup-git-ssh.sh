@@ -92,17 +92,8 @@ function manage_ssh_keys() {
     set -x
   fi
   
-  # Find all SSH keys in the .ssh directory
-  echo "🔍 Scanning for SSH keys..."
-  local ssh_keys=()
-  for key in ~/.ssh/id_*; do
-    # Only include private keys (not .pub files)
-    if [[ -f "$key" && ! "$key" =~ \.pub$ && ! "$key" =~ \.bak$ ]]; then
-      ssh_keys+=("$key")
-    fi
-  done
-  
-  if [ ${#ssh_keys[@]} -eq 0 ]; then
+  # Use the pre-scanned SSH keys from the global arrays
+  if [ ${#ALL_SSH_KEYS[@]} -eq 0 ]; then
     echo "❌ No SSH keys found in ~/.ssh directory"
     echo "   You may need to set up SSH keys on your host machine"
     return 2  # Fatal error
@@ -110,10 +101,16 @@ function manage_ssh_keys() {
   
   # Display available SSH keys
   echo "📋 Available SSH keys:"
-  for i in "${!ssh_keys[@]}"; do
-    key="${ssh_keys[$i]}"
+  for i in "${!ALL_SSH_KEYS[@]}"; do
+    key="${ALL_SSH_KEYS[$i]}"
     key_name=$(basename "$key")
-    echo "   $((i+1))) $key_name"
+    comment="${KEY_COMMENTS[$i]}"
+    
+    if [ -n "$comment" ]; then
+      echo "   $((i+1))) $key_name ($comment)"
+    else
+      echo "   $((i+1))) $key_name"
+    fi
   done
   
   # Show currently loaded keys
@@ -121,7 +118,7 @@ function manage_ssh_keys() {
   echo "📋 Currently active SSH key:"
   
   # Capture ssh-add output and exit code
-  local ssh_add_output ssh_add_exit_code current_key_fingerprint current_key_name
+  local ssh_add_output ssh_add_exit_code current_key_fingerprint current_key_comment
   ssh_add_output=$(ssh-add -l 2>&1) || true
   ssh_add_exit_code=$?
   
@@ -131,12 +128,12 @@ function manage_ssh_keys() {
     echo "$ssh_add_output" | sed 's/^/   /'
     # Get the first loaded key
     current_key_fingerprint=$(echo "$ssh_add_output" | head -1 | awk '{print $2}')
-    current_key_name=$(echo "$ssh_add_output" | head -1 | awk '{print $3}')
+    current_key_comment=$(echo "$ssh_add_output" | head -1 | awk '{print $3}')
   else
     # No keys loaded or SSH agent issue
     echo "   None - no key currently active"
     current_key_fingerprint=""
-    current_key_name=""
+    current_key_comment=""
     
     # If agent isn't running, start it
     if [ $ssh_add_exit_code -eq 2 ]; then
@@ -152,16 +149,16 @@ function manage_ssh_keys() {
   echo "└────────────────────────────────────────┘"
   echo "📌 KEY ACTIVATION OPTIONS:"
   echo "   • Press ENTER to keep current key (if any)"
-  echo "   • Enter a number between 1-${#ssh_keys[@]} to activate that specific key"
+  echo "   • Enter a number between 1-${#ALL_SSH_KEYS[@]} to activate that specific key"
   echo "   • Enter 'C' to clear all keys and start fresh"
   echo ""
   echo -n "Your choice [default=keep current]: "
   read key_choice
   echo ""
   
-  if [[ "$key_choice" =~ ^[0-9]+$ ]] && [ "$key_choice" -ge 1 ] && [ "$key_choice" -le "${#ssh_keys[@]}" ]; then
+  if [[ "$key_choice" =~ ^[0-9]+$ ]] && [ "$key_choice" -ge 1 ] && [ "$key_choice" -le "${#ALL_SSH_KEYS[@]}" ]; then
     # User selected a specific key by number
-    local selected_key="${ssh_keys[$((key_choice-1))]}"
+    local selected_key="${ALL_SSH_KEYS[$((key_choice-1))]}"
     local selected_key_name=$(basename "$selected_key")
     
     # First clear any existing keys
@@ -214,22 +211,38 @@ function manage_ssh_keys() {
   else
     # Keep current key (default)
     if [ -n "$current_key_fingerprint" ]; then
-      echo "🔄 Keeping current key: $current_key_name"
-      debug_log "Key selected: current key ($current_key_name)"
+      echo "🔄 Keeping current key: $current_key_comment"
+      debug_log "Key selected: current key ($current_key_comment)"
       
       # Find the key path for later use
       local current_key_path=""
-      for key in "${ssh_keys[@]}"; do
-        key_name=$(basename "$key")
-        if [[ "$key_name" == *"$current_key_name"* ]]; then
+      for i in "${!ALL_SSH_KEYS[@]}"; do
+        key="${ALL_SSH_KEYS[$i]}"
+        comment="${KEY_COMMENTS[$i]}"
+        
+        # Match by comment if available
+        if [ -n "$comment" ] && [ "$comment" == "$current_key_comment" ]; then
           current_key_path="$key"
+          debug_log "Matched key by comment: $comment"
           break
         fi
       done
       
+      # If no match found, try matching by key filename
+      if [ -z "$current_key_path" ]; then
+        for key in "${ALL_SSH_KEYS[@]}"; do
+          key_name=$(basename "$key")
+          if [[ "$current_key_comment" == *"$key_name"* ]] || [[ "$key_name" == *"$current_key_comment"* ]]; then
+            current_key_path="$key"
+            debug_log "Matched key by filename: $key_name"
+            break
+          fi
+        done
+      fi
+      
       # Set global variables to use later
       ACTIVE_KEY_PATH="$current_key_path"
-      ACTIVE_KEY_NAME="$current_key_name"
+      ACTIVE_KEY_NAME="$current_key_comment"
       
       # Verify only one key is active
       echo ""
@@ -243,12 +256,12 @@ function manage_ssh_keys() {
       
       # Force the user to select a key since none is active
       echo ""
-      echo "👉 Please select a key number (1-${#ssh_keys[@]}):"
+      echo "👉 Please select a key number (1-${#ALL_SSH_KEYS[@]}):"
       echo -n "Enter key number: "
       read forced_key_num
       
-      if [[ "$forced_key_num" =~ ^[0-9]+$ ]] && [ "$forced_key_num" -ge 1 ] && [ "$forced_key_num" -le "${#ssh_keys[@]}" ]; then
-        local selected_key="${ssh_keys[$((forced_key_num-1))]}"
+      if [[ "$forced_key_num" =~ ^[0-9]+$ ]] && [ "$forced_key_num" -ge 1 ] && [ "$forced_key_num" -le "${#ALL_SSH_KEYS[@]}" ]; then
+        local selected_key="${ALL_SSH_KEYS[$((forced_key_num-1))]}"
         local selected_key_name=$(basename "$selected_key")
         
         # Always make sure to clear existing keys first
@@ -316,6 +329,132 @@ echo "│     🔐 GIT SSH AUTHENTICATION SETUP       │"
 echo "└───────────────────────────────────────────┘"
 echo ""
 
+# Helper variables
+ACTIVE_KEY_PATH=""
+ACTIVE_KEY_NAME=""
+
+# Scan for SSH keys once and use throughout the script
+declare -a ALL_SSH_KEYS=()    # Key paths
+declare -a KEY_COMMENTS=()    # Key comments (usually emails)
+declare -a KEY_EMAILS=()      # Extracted emails
+declare -a KEY_NAMES=()       # Extracted names
+
+# Function to scan SSH keys
+function scan_ssh_keys() {
+  echo "🔍 Scanning for SSH identities..."
+  # Debug: Show glob pattern before expansion
+  debug_log "SSH key search pattern: ~/.ssh/id_*"
+  
+  # Check if no keys exist by counting matches safely
+  ssh_key_count=0
+  if [ -d ~/.ssh ]; then
+    # Count keys in a more reliable way
+    for key_path in ~/.ssh/id_*; do
+      if [[ -f "$key_path" && ! "$key_path" =~ \.pub$ && ! "$key_path" =~ \.bak$ ]]; then
+        ((ssh_key_count++))
+      fi
+    done
+  fi
+  
+  debug_log "Found $ssh_key_count SSH private keys"
+  
+  # Handle case where no keys are found
+  if [ $ssh_key_count -eq 0 ]; then
+    debug_log "No SSH keys found matching pattern"
+    # List ~/.ssh directory content for debugging
+    if [ -d ~/.ssh ]; then
+      debug_log "Contents of ~/.ssh directory:"
+      ls -la ~/.ssh 2>/dev/null | while read line; do
+        debug_log "  $line"
+      done
+    else
+      debug_log "~/.ssh directory does not exist"
+      # Create .ssh directory
+      echo "Creating ~/.ssh directory..."
+      mkdir -p ~/.ssh
+      chmod 700 ~/.ssh
+    fi
+    
+    echo "❌ No SSH keys found"
+    echo "SSH keys must be available on your host machine."
+    echo ""
+    echo "Options:"
+    echo "1. Generate keys on host with: ssh-keygen -t ed25519 -C \"your_email@example.com\""
+    echo "2. Ensure your keys are in the ~/.ssh directory"
+    echo "3. Return to this script after keys are available"
+    echo ""
+    read -p "Press Enter to exit..."
+    exit 1
+  fi
+  
+  # Continue with key scanning now that we know keys exist
+  for key in ~/.ssh/id_*; do
+    # Skip if it's not a file or is a public key
+    if [[ ! -f "$key" || "$key" =~ \.pub$ || "$key" =~ \.bak$ ]]; then
+      debug_log "Skipping non-private key file: $key"
+      continue
+    fi
+    
+    # Debug: Show each key being processed
+    debug_log "Processing key: $key"
+    
+    # Get the public key comment (usually email)
+    local pub_key="${key}.pub"
+    local key_comment=""
+    local email=""
+    local name=""
+    
+    debug_log "  Found private key: $key"
+    debug_log "  Looking for public key: $pub_key"
+    
+    if [ -f "$pub_key" ]; then
+      debug_log "  Public key found"
+      key_comment=$(cat "$pub_key" | awk '{print $3}')
+      debug_log "  Comment extracted: '$key_comment'"
+      
+      # Extract email if comment looks like an email
+      if [[ "$key_comment" == *"@"* ]]; then
+        email="$key_comment"
+        debug_log "  Email extracted: $email"
+        
+        # Extract name from email
+        name=$(echo "$email" | cut -d@ -f1)
+        # Convert to proper case and replace dots with spaces
+        name=$(echo "$name" | sed 's/\./\ /g' | sed 's/\<./\U&/g')
+        debug_log "  Name extracted: $name"
+      else
+        debug_log "  No email format detected in comment"
+      fi
+    else
+      debug_log "  No public key found for $key"
+    fi
+    
+    ALL_SSH_KEYS+=("$key")
+    KEY_COMMENTS+=("$key_comment")
+    KEY_EMAILS+=("$email")
+    KEY_NAMES+=("$name")
+    
+    debug_log "  Added key to arrays - path: $key, comment: $key_comment"
+  done
+  
+  # Debug: Show final results
+  debug_log "Scan complete - found ${#ALL_SSH_KEYS[@]} SSH keys"
+}
+
+# Scan all SSH keys and extract identities
+scan_ssh_keys
+
+# Debug output of keys and their identities
+if [ "$DEBUG" = "1" ]; then
+  echo "DEBUG: Found ${#ALL_SSH_KEYS[@]} SSH keys"
+  for i in "${!ALL_SSH_KEYS[@]}"; do
+    echo "DEBUG: Key $((i+1)): ${ALL_SSH_KEYS[$i]}"
+    echo "DEBUG:   Comment: ${KEY_COMMENTS[$i]}"
+    echo "DEBUG:   Email: ${KEY_EMAILS[$i]}"
+    echo "DEBUG:   Name: ${KEY_NAMES[$i]}"
+  done
+fi
+
 #######################################
 # SECTION 1: GIT IDENTITY CONFIGURATION
 #######################################
@@ -323,20 +462,105 @@ echo "STEP 1: Checking Git identity..."
 
 if [ -z "$(git config --global user.name)" ] || [ -z "$(git config --global user.email)" ]; then
   echo "❌ Git identity not configured in container"
-  echo ""
-  echo "Options:"
-  echo "  Y - Configure Git identity now"
-  echo "  N - Skip (not recommended)"
-  read -p "Configure Git identity? [Y/n]: " setup_git
   
-  if [[ ! "$setup_git" =~ ^[Nn]$ ]]; then
-    read -p "Enter your Git user name: " git_username
-    read -p "Enter your Git email address: " git_email
+  # Check if we've extracted any emails from keys
+  valid_identities=0
+  for email in "${KEY_EMAILS[@]}"; do
+    if [ -n "$email" ]; then
+      ((valid_identities++))
+    fi
+  done
+  
+  if [ $valid_identities -gt 0 ]; then
+    echo "🔍 Auto-detected Git identities from SSH keys:"
+    count=0
+    for i in "${!KEY_EMAILS[@]}"; do
+      email="${KEY_EMAILS[$i]}"
+      name="${KEY_NAMES[$i]}"
+      key_path="${ALL_SSH_KEYS[$i]}"
+      key_name=$(basename "$key_path")
+      
+      if [ -n "$email" ]; then
+        ((count++))
+        echo "   $count) $name <$email> ($key_name)"
+      fi
+    done
+    
+    echo ""
+    echo "Options:"
+    echo "   • Enter a number (1-$count) to use that identity"
+    echo "   • Enter 'M' to manually configure identity"
+    echo "   • Enter 'S' to skip (not recommended)"
+    read -p "Select identity [1]: " identity_choice
+    
+    # Default to first identity if empty
+    if [ -z "$identity_choice" ]; then
+      identity_choice=1
+    fi
+    
+    # Find the selected identity
+    if [[ "$identity_choice" =~ ^[0-9]+$ ]] && [ "$identity_choice" -ge 1 ] && [ "$identity_choice" -le "$count" ]; then
+      # Find the corresponding identity
+      selected_idx=-1
+      count=0
+      for i in "${!KEY_EMAILS[@]}"; do
+        email="${KEY_EMAILS[$i]}"
+        if [ -n "$email" ]; then
+          ((count++))
+          if [ $count -eq $identity_choice ]; then
+            selected_idx=$i
+            break
+          fi
+        fi
+      done
+      
+      if [ $selected_idx -ge 0 ]; then
+        # Use selected identity
+        git_username="${KEY_NAMES[$selected_idx]}"
+        git_email="${KEY_EMAILS[$selected_idx]}"
+        echo "✅ Selected identity: $git_username <$git_email>"
+      else
+        echo "❌ Error finding selected identity"
+        read -p "Enter your Git user name: " git_username
+        read -p "Enter your Git email address: " git_email
+      fi
+    elif [[ "$identity_choice" =~ ^[Mm]$ ]]; then
+      # Manual configuration
+      read -p "Enter your Git user name: " git_username
+      read -p "Enter your Git email address: " git_email
+    elif [[ "$identity_choice" =~ ^[Ss]$ ]]; then
+      # Skip configuration
+      echo "⚠️ Skipping Git identity configuration"
+      git_username=""
+      git_email=""
+    else
+      echo "❌ Invalid selection"
+      read -p "Enter your Git user name: " git_username
+      read -p "Enter your Git email address: " git_email
+    fi
+  else
+    echo "❓ No Git identities detected from SSH keys"
+    echo ""
+    echo "Options:"
+    echo "  Y - Configure Git identity now"
+    echo "  N - Skip (not recommended)"
+    read -p "Configure Git identity? [Y/n]: " setup_git
+    
+    if [[ ! "$setup_git" =~ ^[Nn]$ ]]; then
+      read -p "Enter your Git user name: " git_username
+      read -p "Enter your Git email address: " git_email
+    else
+      echo "⚠️ Skipping Git identity configuration"
+      git_username=""
+      git_email=""
+    fi
+  fi
+  
+  # Configure Git if values are provided
+  if [ -n "$git_username" ] && [ -n "$git_email" ]; then
     git config --global user.name "$git_username"
     git config --global user.email "$git_email"
     echo "✅ Git identity configured"
-  else
-    echo "⚠️ Skipping Git identity configuration"
   fi
 else
   echo "✅ Git identity detected: $(git config --global user.name) <$(git config --global user.email)>"
@@ -486,13 +710,35 @@ echo "STEP 5: Testing & verification..."
 
 # Test SSH connection to GitHub
 echo "🔄 Testing SSH connection to GitHub..."
-if ssh -T git@github.com -o BatchMode=yes -o StrictHostKeyChecking=accept-new 2>&1 | grep -q "successfully authenticated"; then
+debug_log "Running SSH test with: git@github.com"
+
+# Capture output and exit code for better diagnosis
+ssh_test_output=$(ssh -T git@github.com -o BatchMode=yes -o StrictHostKeyChecking=accept-new 2>&1)
+ssh_test_exit_code=$?
+
+debug_log "SSH test exit code: $ssh_test_exit_code"
+debug_log "SSH test raw output: $ssh_test_output"
+
+# Check for successful authentication
+if echo "$ssh_test_output" | grep -q "successfully authenticated"; then
   echo "✅ SSH connection to GitHub successful!"
 else
   echo "⚠️ SSH connection test returned unexpected result"
   echo ""
   echo "📋 Output from SSH test:"
-  ssh -T git@github.com -o StrictHostKeyChecking=accept-new
+  
+  # Show SSH test output with optional timeout
+  if [ -n "$ssh_test_output" ]; then
+    echo "$ssh_test_output"
+  else
+    echo "   No output received from SSH test (possible timeout)"
+    
+    # Run interactive test for better visibility
+    debug_log "Running interactive SSH test"
+    echo "   Running interactive test:"
+    ssh -Tv git@github.com -o StrictHostKeyChecking=accept-new
+  fi
+
   echo ""
   echo "⚠️ If connection failed, try running with DEBUG=1 for verbose output:"
   echo "   DEBUG=1 .devcontainer/setup-git-ssh.sh"
