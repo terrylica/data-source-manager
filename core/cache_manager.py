@@ -10,7 +10,12 @@ import pyarrow as pa
 from utils.logger_setup import get_logger
 from utils.cache_validator import CacheValidator, SafeMemoryMap, CacheKeyManager
 from utils.validation import DataFrameValidator, DataValidation
-from utils.config import OUTPUT_DTYPES, CANONICAL_INDEX_NAME, DEFAULT_TIMEZONE
+from utils.config import (
+    OUTPUT_DTYPES,
+    CANONICAL_INDEX_NAME,
+    DEFAULT_TIMEZONE,
+    standardize_column_names,
+)
 
 logger = get_logger(__name__, "INFO", show_path=False, rich_tracebacks=True)
 

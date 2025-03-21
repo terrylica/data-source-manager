@@ -42,10 +42,9 @@ Benefits of using DataSourceManager:
 import httpx
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Optional, Sequence, TypeVar
+from typing import Dict, Optional, Sequence, TypeVar, Generic
 import pandas as pd
 import warnings
-from typing import Generic
 
 from utils.logger_setup import get_logger
 from utils.cache_validator import CacheKeyManager, CacheValidator, VisionCacheManager
@@ -53,7 +52,8 @@ from utils.validation import DataFrameValidator
 from utils.market_constraints import Interval
 from utils.time_alignment import TimeRangeManager
 from utils.download_handler import VisionDownloadManager
-from .vision_constraints import (
+from utils.config import create_empty_dataframe
+from core.vision_constraints import (
     TimestampedDataFrame,
     MAX_CONCURRENT_DOWNLOADS,
     FILES_PER_DAY,
@@ -292,39 +292,12 @@ class VisionDataClient(Generic[T]):
             return False
 
     def _create_empty_dataframe(self) -> pd.DataFrame:
-        """Create an empty DataFrame with correct structure."""
-        columns = [
-            "open_time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "close_time",
-            "quote_volume",
-            "trades",
-            "taker_buy_volume",
-            "taker_buy_quote_volume",
-        ]
-        df = pd.DataFrame([], columns=columns)
+        """Create an empty DataFrame with correct structure.
 
-        # Set correct data types
-        df["open"] = df["open"].astype("float64")
-        df["high"] = df["high"].astype("float64")
-        df["low"] = df["low"].astype("float64")
-        df["close"] = df["close"].astype("float64")
-        df["volume"] = df["volume"].astype("float64")
-        df["close_time"] = df["close_time"].astype("int64")
-        df["quote_volume"] = df["quote_volume"].astype("float64")
-        df["trades"] = df["trades"].astype("int64")
-        df["taker_buy_volume"] = df["taker_buy_volume"].astype("float64")
-        df["taker_buy_quote_volume"] = df["taker_buy_quote_volume"].astype("float64")
-
-        # Set index
-        df["open_time"] = pd.to_datetime(df["open_time"], utc=True)
-        df.set_index("open_time", inplace=True)
-
-        return df
+        Returns:
+            Empty DataFrame with standardized structure
+        """
+        return create_empty_dataframe()
 
     async def _download_and_cache(
         self,

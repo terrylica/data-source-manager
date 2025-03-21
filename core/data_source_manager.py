@@ -10,15 +10,13 @@ from pathlib import Path
 from utils.logger_setup import get_logger
 from utils.market_constraints import Interval, MarketType
 from utils.time_alignment import TimeRangeManager
-from utils.validation import DataFrameValidator, DataValidation
-from utils.cache_validator import SafeMemoryMap, CacheValidator
+from utils.validation import DataFrameValidator
 from utils.config import (
     OUTPUT_DTYPES,
     VISION_DATA_DELAY_HOURS,
     REST_CHUNK_SIZE,
     REST_MAX_CHUNKS,
-    DEFAULT_TIMEZONE,
-    CANONICAL_INDEX_NAME,
+    standardize_column_names,
 )
 from core.market_data_client import EnhancedRetriever
 from core.vision_data_client import VisionDataClient
@@ -345,7 +343,10 @@ class DataSourceManager:
             f"Index type before formatting: {type(df.index) if not df.empty else 'none'}"
         )
 
-        # Use the centralized formatter
+        # First standardize column names
+        df = standardize_column_names(df)
+
+        # Then use the centralized formatter
         return DataFrameValidator.format_dataframe(df, self.OUTPUT_DTYPES)
 
     async def _fetch_from_source(

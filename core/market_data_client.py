@@ -18,6 +18,13 @@ from utils.time_alignment import (
 )
 from utils.hardware_monitor import HardwareMonitor
 from utils.validation import DataValidation
+from utils.config import (
+    KLINE_COLUMNS,
+    standardize_column_names,
+    TIMESTAMP_UNIT,
+    CLOSE_TIME_ADJUSTMENT,
+    CANONICAL_INDEX_NAME,
+)
 
 logger = get_logger(__name__, "INFO", show_path=False, rich_tracebacks=True)
 
@@ -60,23 +67,8 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
     if not raw_data:
         return pd.DataFrame()
 
-    columns = [
-        "open_time",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "close_time",
-        "quote_volume",
-        "trades",
-        "taker_buy_base",
-        "taker_buy_quote",
-        "ignore",
-    ]
-
-    # Convert list to pandas Index
-    df = pd.DataFrame(raw_data, columns=pd.Index(columns))
+    # Use centralized column definitions
+    df = pd.DataFrame(raw_data, columns=pd.Index(KLINE_COLUMNS))
 
     # Add DEBUG logging for timestamp conversion
     logger.debug("\n=== Timestamp Conversion Debug ===")
@@ -88,11 +80,11 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
     for col in ["open_time", "close_time"]:
         # Convert milliseconds to microseconds by multiplying by 1000
         df[col] = df[col].astype(np.int64) * 1000
-        df[col] = pd.to_datetime(df[col], unit="us", utc=True)
+        df[col] = pd.to_datetime(df[col], unit=TIMESTAMP_UNIT, utc=True)
 
-        # For close_time, add 999 microseconds to match REST API behavior
+        # For close_time, add microseconds to match REST API behavior
         if col == "close_time":
-            df[col] = df[col] + pd.Timedelta(microseconds=999)
+            df[col] = df[col] + pd.Timedelta(microseconds=CLOSE_TIME_ADJUSTMENT)
 
         if len(raw_data) > 0:
             logger.debug(f"Converted {col}: {df[col].iloc[0]}")
@@ -106,11 +98,14 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
         "close",
         "volume",
         "quote_volume",
-        "taker_buy_base",
-        "taker_buy_quote",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
     ]
     df[numeric_cols] = df[numeric_cols].astype(np.float64)
     df["trades"] = df["trades"].astype(np.int32)
+
+    # Standardize column names using centralized function
+    df = standardize_column_names(df)
 
     # Check for duplicate timestamps and sort by open_time
     if "open_time" in df.columns:
@@ -131,6 +126,33 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
         logger.debug(
             f"open_time is monotonic: {df['open_time'].is_monotonic_increasing}"
         )
+
+    # Save close_time and open_time before setting the index
+    close_time_values = None
+    open_time_values = None
+    if "close_time" in df.columns:
+        close_time_values = df["close_time"].copy()
+    if "open_time" in df.columns:
+        open_time_values = df["open_time"].copy()
+
+    # Set the index to open_time and ensure it has the canonical name
+    if "open_time" in df.columns:
+        df = df.set_index("open_time")
+        df.index.name = CANONICAL_INDEX_NAME
+
+    # Always ensure close_time column exists
+    if "close_time" not in df.columns:
+        if close_time_values is not None:
+            # Restore from saved values if available
+            df["close_time"] = close_time_values
+        else:
+            # Calculate close_time based on open_time if we don't have the original values
+            logger.debug("Calculating close_time from index values")
+            df["close_time"] = (
+                pd.Series(df.index.to_numpy(), index=df.index)
+                + pd.Timedelta(seconds=1)
+                - pd.Timedelta(microseconds=1)
+            )
 
     return df
 
@@ -542,10 +564,23 @@ class EnhancedRetriever:
                 # Apply consistent time filtering using TimeRangeManager
                 df = TimeRangeManager.filter_dataframe(df, start_time, end_time)
 
+                # Ensure close_time is present as a column
+                if "close_time" not in df.columns:
+                    logger.debug("close_time column is missing, adding it back")
+                    # Calculate close_time based on open_time for 1-second interval
+                    df["close_time"] = (
+                        df.index
+                        + pd.Timedelta(seconds=1)
+                        - pd.Timedelta(microseconds=1)
+                    )
+
                 # Add open_time as a column (for tests that expect it)
                 if df.index.name == "open_time" and "open_time" not in df.columns:
                     logger.debug("Adding open_time as a column for compatibility")
-                    df["open_time"] = df.index.copy()
+                    # Make a copy of the dataframe before resetting the index
+                    temp_df = df.copy()
+                    # Reset index to make open_time a regular column
+                    df = temp_df.reset_index()
 
                     # Ensure the open_time column is sorted
                     if not df["open_time"].is_monotonic_increasing:

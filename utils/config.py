@@ -7,7 +7,8 @@ scattered across multiple files, creating a single source of truth for system-wi
 
 import os
 from datetime import timedelta, timezone
-from typing import Dict, Final, Any
+from typing import Dict, Final, Any, List
+import pandas as pd
 
 # Time-related constants
 DEFAULT_TIMEZONE: Final = timezone.utc
@@ -36,7 +37,26 @@ API_TIMEOUT: Final = 30  # Seconds
 API_MAX_RETRIES: Final = 3
 API_RETRY_DELAY: Final = 1  # Seconds
 
-# Standard output format for DataFrames
+# Canonical column names
+CANONICAL_CLOSE_TIME: Final[str] = "close_time"
+
+# Exhaustive list of all column names used in kline data
+KLINE_COLUMNS: Final[List[str]] = [
+    "open_time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "close_time",
+    "quote_volume",
+    "trades",
+    "taker_buy_volume",  # Also called taker_buy_base in some sources
+    "taker_buy_quote_volume",  # Also called taker_buy_quote in some sources
+    "ignore",  # Present in raw API data but ignored in processing
+]
+
+# Standard column dtypes for all market data DataFrames
 OUTPUT_DTYPES: Final[Dict[str, str]] = {
     "open": "float64",
     "high": "float64",
@@ -50,9 +70,34 @@ OUTPUT_DTYPES: Final[Dict[str, str]] = {
     "taker_buy_quote_volume": "float64",
 }
 
+# Mapping between various column name variants used in different APIs
+COLUMN_NAME_MAPPING: Final[Dict[str, str]] = {
+    "taker_buy_base": "taker_buy_volume",
+    "taker_buy_base_asset_volume": "taker_buy_volume",
+    "taker_buy_quote": "taker_buy_quote_volume",
+    "taker_buy_quote_asset_volume": "taker_buy_quote_volume",
+}
+
+# Default column order for standardized output
+DEFAULT_COLUMN_ORDER: Final[List[str]] = [
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "quote_volume",
+    "trades",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+]
+
+# Timestamp configuration
+TIMESTAMP_UNIT: Final[str] = "us"  # Microseconds for timestamps
+CLOSE_TIME_ADJUSTMENT: Final[int] = 999  # Microseconds to add to close_time
+
 # Chunk size constraints
 REST_CHUNK_SIZE: Final = 1000
-REST_MAX_CHUNKS: Final = 30
+REST_MAX_CHUNKS: Final = 5
 MAXIMUM_CONCURRENT_DOWNLOADS: Final = 13
 
 # File formats
@@ -104,3 +149,41 @@ class FeatureFlags:
         for key, value in kwargs.items():
             if hasattr(cls, key):
                 setattr(cls, key, value)
+
+
+# Create a standard empty DataFrame with proper structure
+def create_empty_dataframe() -> pd.DataFrame:
+    """Create an empty DataFrame with the standard market data structure.
+
+    Returns:
+        An empty DataFrame with correct column types and index
+    """
+    df = pd.DataFrame([], columns=DEFAULT_COLUMN_ORDER)
+
+    # Set correct data types
+    for col, dtype in OUTPUT_DTYPES.items():
+        df[col] = df[col].astype(dtype)
+
+    # Set index
+    df.index = pd.DatetimeIndex([], name=CANONICAL_INDEX_NAME)
+    df.index = df.index.tz_localize(DEFAULT_TIMEZONE)
+
+    return df
+
+
+# Function to standardize column names across different API responses
+def standardize_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardize column names in DataFrame to use canonical names.
+
+    Args:
+        df: DataFrame with potentially non-standard column names
+
+    Returns:
+        DataFrame with standardized column names
+    """
+    for old_name, new_name in COLUMN_NAME_MAPPING.items():
+        if old_name in df.columns and new_name not in df.columns:
+            df[new_name] = df[old_name]
+            df = df.drop(columns=[old_name])
+
+    return df

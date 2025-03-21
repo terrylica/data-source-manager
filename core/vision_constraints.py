@@ -20,6 +20,10 @@ from utils.cache_validator import (
     CacheValidationError,
 )
 from utils.time_alignment import TimeRangeManager
+from utils.config import (
+    CANONICAL_INDEX_NAME,
+    DEFAULT_TIMEZONE,
+)  # Import from central config
 
 # Type definitions for semantic clarity and safety
 TimeseriesIndex = NewType("TimeseriesIndex", pd.DatetimeIndex)
@@ -29,8 +33,9 @@ TimestampUnit = Literal["ms", "us"]  # Supported timestamp units
 # Constraint constants
 MAX_CONCURRENT_DOWNLOADS: Final[int] = 13
 FILES_PER_DAY: Final[int] = 2
-CANONICAL_INDEX_NAME: Final[str] = "open_time"
-CANONICAL_TIMEZONE: Final[timezone] = timezone.utc
+# Import canonical values from config instead of redefining
+# CANONICAL_INDEX_NAME: Final[str] = "open_time"  # Removed as it's now imported
+# CANONICAL_TIMEZONE: Final[timezone] = timezone.utc  # We use DEFAULT_TIMEZONE from config
 
 # Timestamp format detection thresholds
 MILLISECOND_DIGITS: Final[int] = 13
@@ -251,9 +256,9 @@ class TimestampedDataFrame(pd.DataFrame):
 
         # Ensure index is timezone-aware and in UTC
         if self.index.tz is None:
-            self.index = self.index.tz_localize(CANONICAL_TIMEZONE)
-        elif self.index.tz != CANONICAL_TIMEZONE:
-            self.index = self.index.tz_convert(CANONICAL_TIMEZONE)
+            self.index = self.index.tz_localize(DEFAULT_TIMEZONE)
+        elif self.index.tz != DEFAULT_TIMEZONE:
+            self.index = self.index.tz_convert(DEFAULT_TIMEZONE)
 
         # Ensure index is named correctly
         if self.index.name != CANONICAL_INDEX_NAME:
