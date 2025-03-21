@@ -305,16 +305,20 @@ function configure_git_identity() {
   fi
 }
 
+# Main Git identity configuration code
+valid_identities=0
+git_username=""
+git_email=""
+
 if [ -z "$(git config --global user.name)" ] || [ -z "$(git config --global user.email)" ]; then
   print_msg error "Git identity not configured in container"
   
   # Check if we've extracted any emails from keys
-  local valid_identities=0 git_username="" git_email=""
   for email in "${KEY_EMAILS[@]}"; do [ -n "$email" ] && ((valid_identities++)); done
   
   if [ $valid_identities -gt 0 ]; then
     print_msg info "Auto-detected Git identities from SSH keys:"
-    local count=0
+    count=0
     for i in "${!KEY_EMAILS[@]}"; do
       email="${KEY_EMAILS[$i]}"
       [ -n "$email" ] && { 
@@ -332,12 +336,13 @@ if [ -z "$(git config --global user.name)" ] || [ -z "$(git config --global user
     # Find the selected identity
     if [[ "$identity_choice" =~ ^[0-9]+$ ]] && [ "$identity_choice" -ge 1 ] && [ "$identity_choice" -le "$count" ]; then
       # Find the corresponding identity
-      local selected_idx=-1 count=0
+      selected_idx=-1
+      current_count=0
       for i in "${!KEY_EMAILS[@]}"; do
         email="${KEY_EMAILS[$i]}"
         if [ -n "$email" ]; then
-          ((count++))
-          [ $count -eq $identity_choice ] && { selected_idx=$i; break; }
+          ((current_count++))
+          [ $current_count -eq $identity_choice ] && { selected_idx=$i; break; }
         fi
       done
       
