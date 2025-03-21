@@ -55,7 +55,9 @@ import warnings
 
 from utils.logger_setup import get_logger
 from utils.cache_validator import CacheKeyManager, SafeMemoryMap, CacheValidator
-from utils.validation import DataValidation
+from utils.validation import DataValidation, DataFrameValidator
+from utils.market_constraints import Interval
+from utils.time_alignment import get_time_boundaries, filter_time_range
 from .vision_constraints import (
     TimestampedDataFrame,
     validate_cache_path,
@@ -63,10 +65,6 @@ from .vision_constraints import (
     validate_time_range,
     validate_data_availability,
     is_data_likely_available,
-    validate_cache_checksum,
-    validate_cache_records,
-    validate_cache_metadata,
-    get_cache_path,
     get_vision_url,
     FileType,
     classify_error,
@@ -74,15 +72,9 @@ from .vision_constraints import (
     FILES_PER_DAY,
     CANONICAL_INDEX_NAME,
     validate_time_boundaries,
-    validate_dataframe_integrity,
     detect_timestamp_unit,
 )
 from utils.download_handler import DownloadHandler
-from utils.market_constraints import Interval, MarketType
-from utils.time_alignment import (
-    get_time_boundaries,
-    filter_time_range,
-)
 
 # Type variables for generic type hints
 T = TypeVar("T", bound=TimestampedDataFrame)
@@ -233,9 +225,10 @@ class VisionDataClient(Generic[T]):
                 stacklevel=2,
             )
             try:
-                # Create symbol-specific cache directory
-                self.symbol_cache_dir = get_cache_path(
-                    cache_dir, self.symbol, self.interval, datetime.now(timezone.utc)
+                # Get symbol-specific cache directory using CacheKeyManager
+                sample_date = datetime.now(timezone.utc)
+                self.symbol_cache_dir = CacheKeyManager.get_cache_path(
+                    cache_dir, self.symbol, self.interval, sample_date
                 ).parent
                 self.symbol_cache_dir.mkdir(parents=True, exist_ok=True)
                 logger.info(
@@ -289,11 +282,21 @@ class VisionDataClient(Generic[T]):
         exc_tb: Optional[object],
     ) -> None:
         """Async context manager exit."""
+        # Clean up memory map resources
         if self._current_mmap is not None:
-            self._current_mmap.close()
-            self._current_mmap = None
-            self._current_mmap_path = None
-        await self.client.aclose()
+            try:
+                self._current_mmap.close()
+            except Exception as e:
+                logger.warning(f"Error closing memory map: {e}")
+            finally:
+                self._current_mmap = None
+                self._current_mmap_path = None
+
+        # Close HTTP client
+        try:
+            await self.client.aclose()
+        except Exception as e:
+            logger.warning(f"Error closing HTTP client: {e}")
 
     def _get_cache_path(self, date: datetime) -> Path:
         """Get cache file path for a specific date.
@@ -398,10 +401,7 @@ class VisionDataClient(Generic[T]):
             with open(checksum_path, "r") as f:
                 expected = f.read().strip().split()[0]
 
-            with open(file_path, "rb") as f:
-                actual = hashlib.sha256(f.read()).hexdigest()
-
-            return expected == actual
+            return CacheValidator.validate_cache_checksum(file_path, expected)
         except Exception as e:
             logger.error(f"Error verifying checksum: {e}")
             return False
@@ -462,13 +462,9 @@ class VisionDataClient(Generic[T]):
                 logger.error(f"Failed to write Arrow file: {e}")
                 raise
 
-            try:
-                # Calculate checksum and record count
-                checksum = hashlib.sha256(cache_path.read_bytes()).hexdigest()
-                record_count = len(df)
-            except OSError as e:
-                logger.error(f"Failed to calculate checksum: {e}")
-                raise
+            # Calculate checksum using the centralized utility
+            checksum = CacheValidator.calculate_checksum(cache_path)
+            record_count = len(df)
 
             logger.info(f"Saved {record_count} records to {cache_path}")
             return checksum, record_count
@@ -484,56 +480,23 @@ class VisionDataClient(Generic[T]):
         start_time_perf = time.perf_counter()
 
         try:
-            # Use memory mapping with zero-copy reads
-            t0 = time.perf_counter()
-            if self._current_mmap is None or self._current_mmap_path != cache_path:
-                if self._current_mmap is not None:
-                    self._current_mmap.close()
-                self._current_mmap = pa.memory_map(str(cache_path), "r")
-                self._current_mmap_path = cache_path
-            logger.info(f"Memory map setup took: {time.perf_counter() - t0:.6f}s")
+            # Use the centralized SafeMemoryMap utility to read Arrow file
+            logger.debug(f"Loading cached data from {cache_path}")
+            df = SafeMemoryMap.safely_read_arrow_file(cache_path, columns)
 
-            # Read only required columns
-            t0 = time.perf_counter()
-            with pa.ipc.open_file(self._current_mmap) as reader:
-                if columns:
-                    cols_to_read = [CANONICAL_INDEX_NAME] + list(columns)
-                    table = reader.read_all().select(cols_to_read)
-                else:
-                    table = reader.read_all()
-            logger.info(f"Arrow table read took: {time.perf_counter() - t0:.6f}s")
+            if df is None:
+                raise ValueError(f"Failed to read data from {cache_path}")
 
-            # Convert to pandas with zero-copy if possible
-            t0 = time.perf_counter()
-            df = table.to_pandas(
-                zero_copy_only=True,
-                date_as_object=False,
-                use_threads=True,
-                split_blocks=True,
-                self_destruct=True,
-            )
-            logger.info(
-                f"Arrow to pandas conversion took: {time.perf_counter() - t0:.6f}s"
-            )
-
-            # Set index and validate
-            if CANONICAL_INDEX_NAME not in df.columns:
-                raise ValueError(
-                    f"Required index column {CANONICAL_INDEX_NAME} not found in data"
+            # Remove duplicates efficiently if needed
+            if df.index.has_duplicates:
+                t0 = time.perf_counter()
+                # Use drop_duplicates method instead of boolean indexing
+                df = (
+                    df.reset_index()
+                    .drop_duplicates(subset=[CANONICAL_INDEX_NAME], keep="first")
+                    .set_index(CANONICAL_INDEX_NAME)
                 )
-
-            df.set_index(CANONICAL_INDEX_NAME, inplace=True)
-            df.index = pd.to_datetime(df.index, utc=True)
-
-            # Remove duplicates efficiently
-            t0 = time.perf_counter()
-            # Use drop_duplicates method instead of boolean indexing
-            df = (
-                df.reset_index()
-                .drop_duplicates(subset=[CANONICAL_INDEX_NAME], keep="first")
-                .set_index(CANONICAL_INDEX_NAME)
-            )
-            logger.info(f"Duplicate removal took: {time.perf_counter() - t0:.6f}s")
+                logger.info(f"Duplicate removal took: {time.perf_counter() - t0:.6f}s")
 
             total_time = time.perf_counter() - start_time_perf
             logger.info(f"Total cache loading time: {total_time:.6f}s")
@@ -551,46 +514,56 @@ class VisionDataClient(Generic[T]):
             end_time: End of time range to validate
 
         Returns:
-            True if cache exists, is valid, and contains required data
-
-        Note:
-            - Verifies cache directory existence
-            - Validates metadata completeness
-            - Checks cache file integrity
-            - Verifies record count
-            - Classifies and logs any validation errors
+            True if cache is valid and complete, False otherwise
         """
+        if not self.cache_dir or not self.use_cache or not self.metadata:
+            return False
+
         try:
-            if not self.cache_dir:
-                return False
+            # Validate cache for each day in range
+            current_day = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            last_day = end_time.replace(hour=0, minute=0, second=0, microsecond=0)
 
-            cache_path = get_cache_path(
-                self.cache_dir, self.symbol, self.interval, start_time
-            )
+            while current_day <= last_day:
+                # Get cache information
+                cache_info = self.metadata.get_cache_info(
+                    symbol=self.symbol, interval=self.interval, date=current_day
+                )
+                cache_path = self._get_cache_path(current_day)
 
-            # Check if we have metadata
-            cache_info = self.metadata.get_cache_info(
-                self.symbol, self.interval, start_time
-            )
-            if not validate_cache_metadata(cache_info):
-                logger.warning("Invalid cache metadata")
-                return False
-            # Validate cache integrity
-            if not validate_cache_checksum(
-                cache_path, str(cache_info["checksum"] if cache_info else "")
-            ):
-                logger.warning("Cache checksum validation failed")
-                return False
-            # Check if cache contains required data
-            record_count = cache_info["record_count"] if cache_info else 0
-            if not validate_cache_records(int(record_count)):
-                logger.warning("Cache contains no valid records")
-                return False
+                # Check if cache exists and has metadata
+                if not CacheValidator.validate_cache_metadata(cache_info):
+                    logger.debug(f"Cache metadata missing for {current_day}")
+                    return False
+
+                # Validate record count
+                if not CacheValidator.validate_cache_records(
+                    cache_info["record_count"]
+                ):
+                    logger.debug(f"Cache empty for {current_day}")
+                    return False
+
+                # Validate file integrity
+                error = CacheValidator.validate_cache_integrity(cache_path)
+                if error:
+                    logger.debug(
+                        f"Cache file corrupted for {current_day}: {error.message}"
+                    )
+                    return False
+
+                # Validate checksum
+                if not CacheValidator.validate_cache_checksum(
+                    cache_path, cache_info["checksum"]
+                ):
+                    logger.debug(f"Cache checksum mismatch for {current_day}")
+                    return False
+
+                current_day += timedelta(days=1)
 
             return True
+
         except Exception as e:
-            error_type = classify_error(e)
-            logger.error(f"{error_type.value} validating cache: {e}")
+            logger.error(f"Error validating cache: {e}")
             return False
 
     def _validate_symbol(self) -> None:
@@ -598,59 +571,32 @@ class VisionDataClient(Generic[T]):
         DataValidation.validate_symbol_format(self.symbol)
 
     def _validate_data(self, df: pd.DataFrame) -> None:
-        """Validate DataFrame meets all data integrity requirements.
+        """Validate DataFrame structure and content.
 
         Args:
             df: DataFrame to validate
 
         Raises:
-            ValueError: If DataFrame fails integrity checks
-
-        Note:
-            - Validates through vision_constraints framework
-            - Checks data structure
-            - Verifies column types
-            - Ensures index integrity
+            ValueError: If validation fails
         """
-        validate_dataframe_integrity(df)
-        self._validate_timestamp_ordering(df)  # Add timestamp validation
+        # Use centralized DataFrameValidator
+        DataFrameValidator.validate_dataframe(df)
 
     def _validate_time_boundaries(
         self, df: pd.DataFrame, start_time: datetime, end_time: datetime
     ) -> None:
-        """Validate data completeness at time boundaries.
+        """Validate DataFrame covers requested time range.
 
         Args:
             df: DataFrame to validate
-            start_time: Start time of requested range
-            end_time: End time of requested range
+            start_time: Requested start time
+            end_time: Requested end time
 
         Raises:
-            ValueError: If data is missing at critical boundaries
+            ValueError: If DataFrame doesn't cover requested time range
         """
-        # Use centralized validation first
+        # Use centralized DataValidation
         DataValidation.validate_time_boundaries(df, start_time, end_time)
-
-        # Additional Vision-specific validations
-        if df.empty:
-            return
-
-        # Validate day boundaries
-        if start_time.time() == datetime.min.time():  # Day start (00:00:00)
-            if df.index[0].time() != datetime.min.time():
-                raise ValueError(f"Data missing at day boundary: {start_time}")
-
-        # Validate hour boundaries
-        hour_start = df[df.index.hour == start_time.hour].index
-        if not hour_start.empty and hour_start[0].minute != start_time.minute:
-            raise ValueError(f"Data missing at hour boundary: {start_time}")
-
-        # Validate minimal intervals
-        if (end_time - start_time) <= timedelta(seconds=1):
-            if len(df) < 1:
-                raise ValueError(
-                    f"Insufficient data for minimal interval: {start_time} to {end_time}"
-                )
 
     def _validate_timestamp_ordering(self, df: pd.DataFrame) -> None:
         """Validate timestamp ordering and uniqueness.
