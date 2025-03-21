@@ -202,9 +202,9 @@ def adjust_time_window(
     Key behaviors:
     1. All units smaller than the interval are removed
     2. The current incomplete interval is removed for safety
-    3. Start times are rounded UP to next interval if they have sub-interval units
-    4. End times are rounded DOWN to current interval
-    5. Both start and end timestamps are inclusive on interval boundaries
+    3. Start times are ALWAYS rounded DOWN to include the full interval
+    4. End times are rounded DOWN to the current interval (exclusive - the end interval is not included)
+    5. Start timestamp is inclusive, end timestamp is exclusive
 
     Args:
         start_time: Start time
@@ -223,26 +223,23 @@ def adjust_time_window(
     end_time = end_time.astimezone(timezone.utc)
     current_time = current_time.astimezone(timezone.utc)
 
-    # Get floor times
+    # Get floor times - always floor the start time
     start_floor = get_interval_floor(start_time, interval)
     end_floor = get_interval_floor(end_time, interval)
 
-    # For start time: round UP if there are any sub-interval units
-    adjusted_start = (
-        get_interval_ceiling(start_time, interval)
-        if start_time > start_floor
-        else start_floor
-    )
+    # For start time: ALWAYS use floor time
+    adjusted_start = start_floor
 
-    # For end time: check if we're in an incomplete interval
+    # Check if we're in an incomplete interval
     interval_td = get_interval_timedelta(interval)
     time_since_floor = current_time - end_floor
     if time_since_floor < interval_td:
         # We're in an incomplete interval, move back one interval
         end_floor = end_floor - interval_td
 
-    # Set end time to end of the interval (minus 1 microsecond)
-    adjusted_end = get_bar_close_time(end_floor, interval)
+    # End time is exclusive (the end interval is not included)
+    # So we use the floor time exactly (not the close time of the interval)
+    adjusted_end = end_floor
 
     # Log adjustments if they were made
     if adjusted_start != start_time or adjusted_end != end_time:
@@ -254,12 +251,16 @@ def adjust_time_window(
 
     # Calculate and log the expected number of records
     if interval == Interval.SECOND_1:
-        # For 1-second intervals, calculate seconds difference + 1 (inclusive boundaries)
+        # For 1-second intervals, calculate seconds difference (exclusive end)
         seconds_diff = int((adjusted_end - adjusted_start).total_seconds())
-        expected_records = seconds_diff + 1  # Add 1 for inclusive boundaries
-        logger.debug(f"Expected records with inclusive boundaries: {expected_records}")
+        expected_records = seconds_diff  # Exclusive end boundary
+        logger.debug(
+            f"Expected records with exclusive end boundary: {expected_records}"
+        )
         logger.debug(f"Time span in seconds: {seconds_diff} seconds")
-        logger.debug(f"Boundaries: Both start and end timestamps are INCLUSIVE")
+        logger.debug(
+            f"Boundaries: Start timestamp is INCLUSIVE, end timestamp is EXCLUSIVE"
+        )
 
     return adjusted_start, adjusted_end
 

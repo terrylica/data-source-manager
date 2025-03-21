@@ -376,8 +376,8 @@ def validate_time_boundaries(
 
     Args:
         df: DataFrame to validate
-        start_time: Start time
-        end_time: End time
+        start_time: Start time (inclusive)
+        end_time: End time (exclusive)
 
     Raises:
         ValueError: If data doesn't cover requested time range
@@ -412,14 +412,22 @@ def validate_time_boundaries(
     start_time_floor = start_time.replace(microsecond=0)  # type: ignore
     end_time_floor = end_time.replace(microsecond=0)  # type: ignore
 
+    # Adjust end_time_floor for exclusive comparison
+    # We need data up to but not including the end time
+    adjusted_end_time_floor = end_time_floor - timedelta(seconds=1)
+
     if data_start_floor > start_time_floor:
         logger.error(f"Data starts later than requested: {data_start} > {start_time}")
         raise ValueError(
             f"Data starts later than requested: {data_start} > {start_time}"
         )
-    if data_end_floor < end_time_floor:
-        logger.error(f"Data ends earlier than requested: {data_end} < {end_time}")
-        raise ValueError(f"Data ends earlier than requested: {data_end} < {end_time}")
+    if data_end_floor < adjusted_end_time_floor:
+        logger.error(
+            f"Data ends earlier than requested: {data_end} < {adjusted_end_time_floor}"
+        )
+        raise ValueError(
+            f"Data ends earlier than requested: {data_end} < {adjusted_end_time_floor}"
+        )
 
     # Check for gaps in data
     timestamps = df.index.to_series()  # type: ignore

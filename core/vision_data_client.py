@@ -713,7 +713,7 @@ class VisionDataClient(Generic[T]):
                     df = await self._load_from_cache(cache_path, columns)
 
                     # Filter to requested time range
-                    mask = (df.index >= start_time) & (df.index <= end_time)  # type: ignore
+                    mask = (df.index >= start_time) & (df.index < end_time)  # type: ignore
                     df = df[mask]  # type: ignore
 
                     # Validate the filtered data
@@ -791,7 +791,7 @@ class VisionDataClient(Generic[T]):
         # Get list of dates to download
         current_date = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
         dates = []
-        while current_date <= end_time:  # type: ignore
+        while current_date < end_time:  # type: ignore
             dates.append(current_date)  # type: ignore
             current_date += timedelta(days=1)  # type: ignore
 
@@ -803,7 +803,7 @@ class VisionDataClient(Generic[T]):
             df = await self._download_date(date)  # type: ignore
             if df is not None:  # type: ignore
                 # Filter to requested time range
-                mask = (df.index >= start_time) & (df.index <= end_time)  # type: ignore
+                mask = (df.index >= start_time) & (df.index < end_time)  # type: ignore
                 filtered_df = df[mask]  # type: ignore
                 if not filtered_df.empty:  # type: ignore
                     dfs.append(filtered_df)  # type: ignore
