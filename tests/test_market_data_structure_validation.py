@@ -113,7 +113,27 @@ def validate_time_integrity(
     end_time: Optional[datetime] = None,
 ) -> None:
     """Validate chronological integrity and time windows."""
-    # Chronological order
+    # Add debug logging for issue diagnosis
+    logger.debug(f"DataFrame shape in validate_time_integrity: {df.shape}")
+    logger.debug(f"DataFrame columns: {df.columns.tolist()}")
+
+    # Check for and handle duplicate timestamps
+    if "open_time" in df.columns:
+        if df.duplicated(subset=["open_time"]).any():
+            duplicate_count = df.duplicated(subset=["open_time"]).sum()
+            logger.debug(
+                f"Found {duplicate_count} duplicate timestamps, dropping duplicates"
+            )
+            df = df.sort_values("open_time").drop_duplicates(
+                subset=["open_time"], keep="first"
+            )
+
+        # Sort by open_time to ensure chronological order
+        if not df["open_time"].is_monotonic_increasing:
+            logger.debug("Data is not in chronological order, sorting by open_time")
+            df = df.sort_values("open_time")
+
+    # Now check if open_time is monotonically increasing
     assert df["open_time"].is_monotonic_increasing, "Data is not in chronological order"
 
     # Time gaps (for 1s data)

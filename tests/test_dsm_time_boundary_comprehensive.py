@@ -22,12 +22,11 @@ from typing import (
     AsyncGenerator,
 )
 import pytest_asyncio
-from _pytest.fixtures import FixtureRequest
 
 from utils.logger_setup import get_logger
 from core.data_source_manager import DataSourceManager, DataSource
 from utils.market_constraints import Interval, MarketType
-from utils.time_alignment import adjust_time_window
+from utils.time_alignment import adjust_time_window, get_time_boundaries
 
 # Configure logging
 logger = get_logger(__name__, level="INFO", show_path=False)
@@ -155,19 +154,21 @@ async def test_time_boundary_comprehensive(manager: DataSourceManager) -> None:
                 f"Original window: {start_time.isoformat()} → {end_time.isoformat()}"
             )
 
-            # Get adjusted times
-            adjusted_start, adjusted_end = adjust_time_window(
-                start_time, end_time, TEST_INTERVAL
-            )
+            # Get time boundaries using the centralized utility
+            time_boundaries = get_time_boundaries(start_time, end_time, TEST_INTERVAL)
+            adjusted_start = time_boundaries["adjusted_start"]
+            adjusted_end = time_boundaries["adjusted_end"]
+            expected_records = time_boundaries["expected_records"]
 
             logger.info(
                 f"Adjusted window: {adjusted_start.isoformat()} → {adjusted_end.isoformat()}"
             )
 
-            # Calculate expected records
-            seconds_diff = int((adjusted_end - adjusted_start).total_seconds())
-            logger.info(f"Time difference: {seconds_diff} seconds")
-            logger.info(f"Expected records: {seconds_diff} (with exclusive end)")
+            # Use expected records from time boundaries
+            logger.info(
+                f"Time difference: {(adjusted_end - adjusted_start).total_seconds()} seconds"
+            )
+            logger.info(f"Expected records: {expected_records} (with exclusive end)")
 
             # Test both REST and Vision APIs
             results = {}
@@ -186,17 +187,17 @@ async def test_time_boundary_comprehensive(manager: DataSourceManager) -> None:
                     )
 
                     record_count = len(df)
-                    result = "PASS" if record_count == seconds_diff else "FAIL"
+                    result = "PASS" if record_count == expected_records else "FAIL"
 
                     results[source_name] = {
                         "count": record_count,
-                        "expected": seconds_diff,
+                        "expected": expected_records,
                         "result": result,
                         "timeline": visualize_records(window, df, source_name),
                     }
 
                     logger.info(
-                        f"{source_name} API: {record_count} records (expected {seconds_diff}) - {result}"
+                        f"{source_name} API: {record_count} records (expected {expected_records}) - {result}"
                     )
 
                     if not df.empty:

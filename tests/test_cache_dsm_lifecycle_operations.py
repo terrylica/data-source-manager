@@ -22,7 +22,6 @@ performance benefits and proper error handling.
 import pytest
 import pandas as pd
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 import asyncio
 
 from core.data_source_manager import DataSourceManager, DataSource
