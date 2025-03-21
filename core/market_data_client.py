@@ -14,8 +14,7 @@ from utils.time_alignment import (
     get_bar_close_time,
     get_interval_floor,
     is_bar_complete,
-    get_time_boundaries,
-    filter_time_range,
+    TimeRangeManager,
 )
 from utils.hardware_monitor import HardwareMonitor
 from utils.validation import DataValidation
@@ -306,8 +305,8 @@ class EnhancedRetriever:
             start_time: Start time
             end_time: End time
         """
-        # Use validation utilities
-        DataValidation.validate_dates(start_time, end_time)
+        # Use validation utilities through TimeRangeManager
+        TimeRangeManager.validate_dates(start_time, end_time)
         DataValidation.validate_interval(interval.value, self.market_type.name)
         DataValidation.validate_symbol_format(symbol, self.market_type.name)
 
@@ -482,8 +481,10 @@ class EnhancedRetriever:
         df = pd.DataFrame()
 
         try:
-            # Get time boundaries with standard handling
-            time_boundaries = get_time_boundaries(start_time, end_time, interval)
+            # Get time boundaries with standard handling through TimeRangeManager
+            time_boundaries = TimeRangeManager.get_time_boundaries(
+                start_time, end_time, interval
+            )
             start_time = time_boundaries["adjusted_start"]
             end_time = time_boundaries["adjusted_end"]
             start_ms = time_boundaries["start_ms"]
@@ -538,8 +539,8 @@ class EnhancedRetriever:
                 df = pd.concat(dfs)
                 df = df.sort_index()
 
-                # Apply consistent time filtering to ensure exact bounds
-                df = filter_time_range(df, start_time, end_time)
+                # Apply consistent time filtering using TimeRangeManager
+                df = TimeRangeManager.filter_dataframe(df, start_time, end_time)
 
                 # Add open_time as a column (for tests that expect it)
                 if df.index.name == "open_time" and "open_time" not in df.columns:

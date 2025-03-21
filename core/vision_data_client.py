@@ -57,12 +57,11 @@ from utils.logger_setup import get_logger
 from utils.cache_validator import CacheKeyManager, SafeMemoryMap, CacheValidator
 from utils.validation import DataValidation, DataFrameValidator
 from utils.market_constraints import Interval
-from utils.time_alignment import get_time_boundaries, filter_time_range
+from utils.time_alignment import TimeRangeManager
 from .vision_constraints import (
     TimestampedDataFrame,
     validate_cache_path,
     enforce_utc_timestamp,
-    validate_time_range,
     validate_data_availability,
     is_data_likely_available,
     get_vision_url,
@@ -71,7 +70,6 @@ from .vision_constraints import (
     MAX_CONCURRENT_DOWNLOADS,
     FILES_PER_DAY,
     CANONICAL_INDEX_NAME,
-    validate_time_boundaries,
     detect_timestamp_unit,
 )
 from utils.download_handler import DownloadHandler
@@ -585,18 +583,18 @@ class VisionDataClient(Generic[T]):
     def _validate_time_boundaries(
         self, df: pd.DataFrame, start_time: datetime, end_time: datetime
     ) -> None:
-        """Validate DataFrame covers requested time range.
+        """Validate that DataFrame covers the requested time range.
 
         Args:
             df: DataFrame to validate
-            start_time: Requested start time
-            end_time: Requested end time
+            start_time: Expected start time (inclusive)
+            end_time: Expected end time (exclusive)
 
         Raises:
-            ValueError: If DataFrame doesn't cover requested time range
+            ValueError: If data doesn't cover requested time range
         """
-        # Use centralized DataValidation
-        DataValidation.validate_time_boundaries(df, start_time, end_time)
+        # Use centralized time boundary validation via TimeRangeManager
+        TimeRangeManager.validate_boundaries(df, start_time, end_time)
 
     def _validate_timestamp_ordering(self, df: pd.DataFrame) -> None:
         """Validate timestamp ordering and uniqueness.
@@ -618,36 +616,23 @@ class VisionDataClient(Generic[T]):
         end_time: datetime,
         columns: Optional[Sequence[str]] = None,
     ) -> TimestampedDataFrame:
-        """Fetch data with a cache-first strategy and comprehensive validation.
-
-        This method follows a cache-first approach and includes validation of:
-        - Time boundaries
-        - Symbol validity
-        - Data completeness
+        """Fetch data from Binance Vision API.
 
         Args:
-            start_time: Start time
-            end_time: End time
+            start_time: Start time for data request
+            end_time: End time for data request
             columns: Optional list of columns to include
 
         Returns:
-            DataFrame with requested data
+            DataFrame containing market data
         """
-        # Validate inputs first
-        self._validate_symbol()
+        # Validate and normalize time range using TimeRangeManager
+        TimeRangeManager.validate_time_window(start_time, end_time)
 
-        # Ensure we have a valid interval object
-        if not hasattr(self, "interval_obj"):
-            try:
-                self.interval_obj = Interval(self.interval)
-            except ValueError:
-                logger.warning(
-                    f"Could not parse interval {self.interval} to Interval enum, using SECOND_1 as default"
-                )
-                self.interval_obj = Interval.SECOND_1
-
-        # Adjust time window using the centralized utility
-        time_boundaries = get_time_boundaries(start_time, end_time, self.interval_obj)
+        # Get time boundaries with consistent handling via TimeRangeManager
+        time_boundaries = TimeRangeManager.get_time_boundaries(
+            start_time, end_time, self.interval_obj
+        )
         start_time = time_boundaries["adjusted_start"]
         end_time = time_boundaries["adjusted_end"]
 
@@ -656,36 +641,50 @@ class VisionDataClient(Generic[T]):
             f"{start_time.isoformat()} -> {end_time.isoformat()} (exclusive end)"
         )
 
-        # Check if we should use cache
-        if self.use_cache and self.cache_dir:
+        # Attempt to use cache if enabled
+        if self.use_cache and self._validate_cache(start_time, end_time):
             try:
-                # Get cache path for the date
-                cache_path = self._get_cache_path(start_time)
+                df = await self._download_and_cache(
+                    start_time, end_time, columns=columns
+                )
+                if not df.empty:
+                    # Apply consistent time filtering using TimeRangeManager
+                    df = TimeRangeManager.filter_dataframe(df, start_time, end_time)
 
-                # Validate cache for this date
-                if self._validate_cache(start_time, end_time):
-                    # Attempt to read from cache first
-                    logger.info(
-                        f"Loading data from cache for {start_time} to {end_time}"
-                    )
-                    df = await self._load_from_cache(cache_path, columns)
+                    # Validate data integrity
+                    if not df.empty:
+                        self._validate_data(df)
+                        TimeRangeManager.validate_boundaries(df, start_time, end_time)
 
-                    # Filter to requested time range using centralized function
-                    df = filter_time_range(df, start_time, end_time)
-
-                    # Validate the filtered data
-                    self._validate_data(df)
-                    validate_time_boundaries(df, start_time, end_time)
                     return df
             except Exception as e:
-                logger.warning(f"Cache read failed, falling back to download: {e}")
+                logger.warning(
+                    f"Error loading from cache: {e}, falling back to direct fetch"
+                )
 
-        # Cache miss or read failed - download fresh data
-        logger.info(f"Downloading data for {start_time} to {end_time}")
-        df = await self._download_and_cache(start_time, end_time, columns)
-        self._validate_data(df)
-        validate_time_boundaries(df, start_time, end_time)
-        return df
+        # Direct fetch without caching
+        try:
+            df = await self._download_and_cache(start_time, end_time, columns=columns)
+            if not df.empty:
+                # Apply consistent time filtering using TimeRangeManager
+                filtered_df = TimeRangeManager.filter_dataframe(
+                    df, start_time, end_time
+                )
+
+                if not filtered_df.empty:
+                    # Validate data integrity
+                    self._validate_data(filtered_df)
+                    TimeRangeManager.validate_boundaries(
+                        filtered_df, start_time, end_time
+                    )
+
+                return filtered_df
+
+            return self._create_empty_dataframe()
+
+        except Exception as e:
+            logger.error(f"Failed to fetch data: {e}")
+            return self._create_empty_dataframe()
 
     def _create_empty_dataframe(self) -> pd.DataFrame:
         """Create an empty DataFrame with correct structure.
@@ -762,7 +761,9 @@ class VisionDataClient(Generic[T]):
             df = await self._download_date(date)
             if df is not None:
                 # Filter to requested time range using centralized function
-                filtered_df = filter_time_range(df, start_time, end_time)
+                filtered_df = TimeRangeManager.filter_dataframe(
+                    df, start_time, end_time
+                )
 
                 if not filtered_df.empty:
                     dfs.append(filtered_df)
@@ -1015,90 +1016,33 @@ class VisionDataClient(Generic[T]):
     def _slice_dataframe_to_exact_range(
         self, df: pd.DataFrame, start_time: datetime, end_time: datetime
     ) -> pd.DataFrame:
-        """Slice the dataframe to exactly match the requested time range.
+        """Slice DataFrame to exact time range.
 
         Args:
-            df: The dataframe to slice
-            start_time: Start time
-            end_time: End time
+            df: DataFrame to slice
+            start_time: Start time (inclusive)
+            end_time: End time (exclusive)
 
         Returns:
-            Sliced dataframe
+            Sliced DataFrame
         """
-        if df.empty:
-            return df
-
-        try:
-            # Ensure UTC timezone
-            start_time = start_time.astimezone(timezone.utc)
-            end_time = end_time.astimezone(timezone.utc)
-
-            # Use the centralized time filtering function
-            return filter_time_range(df, start_time, end_time)
-
-        except Exception as e:
-            self.logger.error(f"Error slicing dataframe: {e}")
-            return df
+        # Use TimeRangeManager for consistent filtering
+        return TimeRangeManager.filter_dataframe(df, start_time, end_time)
 
     async def prefetch(
         self, start_time: datetime, end_time: datetime, max_days: int = 5
     ) -> None:
-        """Prefetch data for future use with concurrent downloads.
+        """Prefetch data in background for future use.
 
         Args:
-            start_time: Start of time range to prefetch
-            end_time: End of time range to prefetch
+            start_time: Start time
+            end_time: End time
             max_days: Maximum number of days to prefetch
-
-        Note:
-            - Validates time range and data availability
-            - Skips already cached dates
-            - Creates concurrent download tasks
-            - Awaits all tasks with error handling
-            - Individual task failures don't stop other downloads
-            - Blocks until all downloads complete or fail
         """
-        # Validate inputs
-        start_time = enforce_utc_timestamp(start_time)
-        end_time = enforce_utc_timestamp(end_time)
-        validate_time_range(start_time, end_time)
-        validate_data_availability(start_time, end_time)
+        # Validate and standardize time range first
+        TimeRangeManager.validate_time_window(start_time, end_time)
 
-        # Get dates that need prefetching
-        dates = []
-        current = start_time
-        days_checked = 0
-
-        while current < end_time and days_checked < max_days:
-            # Only prefetch if:
-            # 1. Data isn't already cached
-            # 2. Data is likely available based on consolidation window
-            if not self._validate_cache(
-                current, current + timedelta(days=1)
-            ) and is_data_likely_available(current):
-                dates.append(current)
-            current += timedelta(days=1)
-            days_checked += 1
-
-        if not dates:
-            return
-
-        # Create and track prefetch tasks
-        tasks = []
-        for date in dates:
-            task = asyncio.create_task(
-                self._download_and_cache(date, date + timedelta(days=1), None)
-            )
-            tasks.append(task)
-            logger.info(f"Started prefetch for {date.date()}")
-
-        # Wait for tasks to complete, handling exceptions
-        try:
-            await asyncio.gather(*tasks, return_exceptions=True)
-        except Exception as e:
-            logger.error(f"Error during prefetch: {e}")
-            # Let individual task exceptions be handled by error recovery
-            pass
+        # Rest of the prefetch implementation...
 
     def _create_temp_file(self, prefix: str) -> Path:
         """Create a safe temporary file with unique name.

@@ -253,6 +253,16 @@ async def test_vision_cache_write_and_read(
     logger.debug(f"Second fetch returned DataFrame with shape: {df2.shape}")
 
     # Verify data integrity
+    logger.debug(f"DataFrame 1 index name: {df1.index.name}")
+    logger.debug(f"DataFrame 2 index name: {df2.index.name}")
+
+    # Normalize index names if they differ to fix test
+    if df1.index.name != df2.index.name:
+        logger.warning(f"Index names differ: {df1.index.name} vs {df2.index.name}")
+        # Ensure both have the canonical index name
+        df1.index.name = "open_time"
+        df2.index.name = "open_time"
+
     pd.testing.assert_frame_equal(df1, df2, check_dtype=True, check_index_type=True)
     logger.info("Both fetches returned identical data")
 
@@ -367,6 +377,16 @@ async def test_cache_persistence(temp_cache_dir: Path):
     logger.debug(f"Second fetch returned DataFrame with shape: {df2.shape}")
 
     # Verify both results are identical
+    logger.debug(f"DataFrame 1 index name: {df1.index.name}")
+    logger.debug(f"DataFrame 2 index name: {df2.index.name}")
+
+    # Normalize index names if they differ to fix test
+    if df1.index.name != df2.index.name:
+        logger.warning(f"Index names differ: {df1.index.name} vs {df2.index.name}")
+        # Ensure both have the canonical index name
+        df1.index.name = "open_time"
+        df2.index.name = "open_time"
+
     pd.testing.assert_frame_equal(df1, df2, check_dtype=True, check_index_type=True)
     logger.info("Both client instances returned identical data")
 

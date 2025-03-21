@@ -19,6 +19,7 @@ from utils.cache_validator import (
     SafeMemoryMap,
     CacheValidationError,
 )
+from utils.time_alignment import TimeRangeManager
 
 # Type definitions for semantic clarity and safety
 TimeseriesIndex = NewType("TimeseriesIndex", pd.DatetimeIndex)
@@ -303,16 +304,16 @@ def validate_time_range(
     start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
 ) -> tuple[Optional[datetime], Optional[datetime]]:
     """Validate and normalize time range parameters."""
-    # Use centralized utility
-    return DataValidation.validate_time_range(start_time, end_time)
+    # Use centralized utility via TimeRangeManager
+    return TimeRangeManager.validate_time_range(start_time, end_time)
 
 
 def validate_time_boundaries(
     df: pd.DataFrame, start_time: datetime, end_time: datetime
 ) -> None:
     """Validate that DataFrame covers the requested time range."""
-    # Use centralized utility
-    DataValidation.validate_time_boundaries(df, start_time, end_time)
+    # Use centralized utility via TimeRangeManager
+    TimeRangeManager.validate_boundaries(df, start_time, end_time)
 
 
 def validate_symbol_format(symbol: str) -> None:

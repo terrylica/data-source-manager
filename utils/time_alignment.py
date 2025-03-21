@@ -433,3 +433,135 @@ def is_bar_complete(
 
     # Bar is complete if we're past its close time
     return current_time > close_time
+
+
+class TimeRangeManager:
+    """Centralized manager for time range validation and adjustment across the codebase.
+
+    This class implements the DRY principle by providing a single source of truth
+    for time range operations, including:
+
+    1. Time window validation
+    2. Boundary alignment for intervals
+    3. Consistent filtering of DataFrames based on time ranges
+    4. Utilities for time zone standardization
+
+    Each method in this class follows consistent behavior:
+    - Start times are INCLUSIVE
+    - End times are EXCLUSIVE
+    - All timestamps are converted to UTC
+    - Timestamps are aligned to interval boundaries
+    """
+
+    @staticmethod
+    def validate_dates(start_time: datetime, end_time: datetime) -> None:
+        """Validate date inputs.
+
+        Args:
+            start_time: Start time
+            end_time: End time
+
+        Raises:
+            ValueError: If dates are invalid
+        """
+        from utils.validation import DataValidation
+
+        DataValidation.validate_dates(start_time, end_time)
+
+    @staticmethod
+    def validate_time_window(start_time: datetime, end_time: datetime) -> None:
+        """Validate time window for market data requests.
+
+        Args:
+            start_time: Start time
+            end_time: End time
+
+        Raises:
+            ValueError: If time window is invalid
+        """
+        from utils.validation import DataValidation
+
+        DataValidation.validate_time_window(start_time, end_time)
+
+    @staticmethod
+    def enforce_utc_timezone(dt: datetime) -> datetime:
+        """Ensure a datetime is UTC timezone-aware.
+
+        Args:
+            dt: Input datetime
+
+        Returns:
+            UTC timezone-aware datetime
+        """
+        from utils.validation import DataValidation
+
+        return DataValidation.enforce_utc_timestamp(dt)
+
+    @staticmethod
+    def get_adjusted_boundaries(
+        start_time: datetime, end_time: datetime, interval: Interval
+    ) -> Tuple[datetime, datetime]:
+        """Get adjusted time boundaries for data retrieval.
+
+        Args:
+            start_time: Original start time
+            end_time: Original end time
+            interval: Time interval
+
+        Returns:
+            Tuple of (adjusted_start, adjusted_end)
+        """
+        return adjust_time_window(start_time, end_time, interval)
+
+    @staticmethod
+    def get_time_boundaries(
+        start_time: datetime, end_time: datetime, interval: Interval
+    ) -> Dict[str, Any]:
+        """Get complete time boundary information.
+
+        Creates a standardized dictionary with all boundary information
+        needed across different parts of the application.
+
+        Args:
+            start_time: Original start time
+            end_time: Original end time
+            interval: Time interval
+
+        Returns:
+            Dictionary of boundary information
+        """
+        return get_time_boundaries(start_time, end_time, interval)
+
+    @staticmethod
+    def filter_dataframe(
+        df: pd.DataFrame, start_time: datetime, end_time: datetime
+    ) -> pd.DataFrame:
+        """Filter DataFrame by time range with consistent boundary behavior.
+
+        Args:
+            df: DataFrame to filter
+            start_time: Inclusive start time
+            end_time: Exclusive end time
+
+        Returns:
+            Filtered DataFrame
+        """
+        return filter_time_range(df, start_time, end_time)
+
+    @staticmethod
+    def validate_boundaries(
+        df: pd.DataFrame, start_time: datetime, end_time: datetime
+    ) -> None:
+        """Validate that DataFrame covers requested time range.
+
+        Args:
+            df: DataFrame to validate
+            start_time: Expected start time
+            end_time: Expected end time
+
+        Raises:
+            ValueError: If data doesn't cover the requested range
+        """
+        from utils.validation import DataValidation
+
+        DataValidation.validate_time_boundaries(df, start_time, end_time)

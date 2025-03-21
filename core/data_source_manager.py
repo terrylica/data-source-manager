@@ -9,10 +9,7 @@ from pathlib import Path
 
 from utils.logger_setup import get_logger
 from utils.market_constraints import Interval, MarketType
-from utils.time_alignment import (
-    get_time_boundaries,
-    filter_time_range,
-)
+from utils.time_alignment import TimeRangeManager
 from utils.validation import DataFrameValidator, DataValidation
 from utils.cache_validator import SafeMemoryMap, CacheValidator
 from utils.config import (
@@ -326,8 +323,8 @@ class DataSourceManager:
             logger.debug("Converting end_time from Pandas Timestamp to datetime")
             end_time = end_time.to_pydatetime()
 
-        # Use the standard validation utility from utils.validation
-        DataValidation.validate_time_window(start_time, end_time)
+        # Use the centralized validation manager
+        TimeRangeManager.validate_time_window(start_time, end_time)
 
     def _format_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Format DataFrame to ensure consistent structure.
@@ -401,8 +398,8 @@ class DataSourceManager:
             # Format DataFrame and slice to exact time range
             df = self._format_dataframe(df)
             if not df.empty:
-                # Use centralized time filtering function
-                df = filter_time_range(df, start_time, end_time)
+                # Use centralized time filtering function via manager
+                df = TimeRangeManager.filter_dataframe(df, start_time, end_time)
 
             return df
 
@@ -435,8 +432,10 @@ class DataSourceManager:
         # Validate dates using centralized utility
         self._validate_dates(start_time, end_time)
 
-        # Get time boundaries using the centralized utility
-        time_boundaries = get_time_boundaries(start_time, end_time, interval)
+        # Get time boundaries using the centralized manager
+        time_boundaries = TimeRangeManager.get_time_boundaries(
+            start_time, end_time, interval
+        )
         start_time = time_boundaries["adjusted_start"]
         end_time = time_boundaries["adjusted_end"]
 
@@ -458,8 +457,8 @@ class DataSourceManager:
                         symbol=symbol, interval=interval.value, date=start_time
                     )
                     if cached_data is not None:
-                        # Use centralized time filtering function for consistent boundary handling
-                        cached_data = filter_time_range(
+                        # Use centralized time filtering function via manager
+                        cached_data = TimeRangeManager.filter_dataframe(
                             cached_data, start_time, end_time
                         )
 
@@ -479,8 +478,8 @@ class DataSourceManager:
                                 symbol=symbol, interval=interval.value, date=start_time
                             )
                             if cached_data is not None:
-                                # Use centralized time filtering function
-                                cached_data = filter_time_range(
+                                # Use centralized time filtering function via manager
+                                cached_data = TimeRangeManager.filter_dataframe(
                                     cached_data, start_time, end_time
                                 )
 
