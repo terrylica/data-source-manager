@@ -265,8 +265,8 @@ class UnifiedCacheManager:
             logger.warning(f"Cache checksum mismatch: {cache_path}")
             return None
 
-        # Use the unified safe reader for Arrow files
-        df = CacheValidator.safely_read_arrow_file(cache_path, columns)
+        # Use the async version of the safe reader for Arrow files for better performance
+        df = await CacheValidator.safely_read_arrow_file_async(cache_path, columns)
         if df is None:
             return None
 

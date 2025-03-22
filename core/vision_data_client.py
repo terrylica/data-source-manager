@@ -39,10 +39,9 @@ Benefits of using DataSourceManager:
 - Optimized memory usage with MMAP
 """
 
-import httpx
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Optional, Sequence, TypeVar, Generic
+from typing import Optional, Sequence, TypeVar, Generic
 import pandas as pd
 import warnings
 
@@ -57,7 +56,6 @@ from utils.http_client_factory import create_client
 from core.vision_constraints import (
     TimestampedDataFrame,
     MAX_CONCURRENT_DOWNLOADS,
-    FILES_PER_DAY,
 )
 from core.cache_manager import UnifiedCacheManager
 

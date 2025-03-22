@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 from typing import Dict, Optional, List, Coroutine, Any
 from dataclasses import dataclass
+from utils.http_client_factory import create_client
 
 from utils.logger_setup import get_logger
 
@@ -50,7 +51,11 @@ class HardwareMonitor:
         try:
             bandwidths = []
             # Test multiple endpoints in parallel
-            async with aiohttp.ClientSession() as session:
+            async with create_client(
+                client_type="aiohttp",
+                timeout=2.0,
+                headers={"User-Agent": "BinanceDataServices/BandwidthTest"},
+            ) as session:
                 tasks: List[Coroutine[Any, Any, float]] = []
                 for endpoint in self._endpoints:
                     for _ in range(2):  # 2 requests per endpoint

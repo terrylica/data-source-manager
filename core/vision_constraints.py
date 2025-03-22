@@ -7,23 +7,21 @@ from pathlib import Path
 from enum import Enum, auto
 import httpx
 import pyarrow as pa
-import hashlib
 import logging
-import numpy as np
 
 # Import centralized validation utilities
 from utils.validation import DataValidation, DataFrameValidator
 from utils.cache_validator import (
     CacheValidator,
     CacheKeyManager,
-    SafeMemoryMap,
     CacheValidationError,
 )
 from utils.time_alignment import TimeRangeManager
 from utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_TIMEZONE,
-)  # Import from central config
+    ERROR_TYPES,
+)  # Import ERROR_TYPES from central config
 
 # Type definitions for semantic clarity and safety
 TimeseriesIndex = NewType("TimeseriesIndex", pd.DatetimeIndex)
@@ -124,36 +122,25 @@ METADATA_UPDATE_INTERVAL: Final[timedelta] = timedelta(minutes=5)
 
 
 # Error classification
-class VisionErrorType(Enum):
-    """Classification of Vision client errors."""
-
-    NETWORK = "network_error"
-    FILE_SYSTEM = "file_system_error"
-    DATA_INTEGRITY = "data_integrity_error"
-    CACHE_INVALID = "cache_invalid"
-    VALIDATION = "validation_error"
-    AVAILABILITY = "availability_error"
-
-
-def classify_error(error: Exception) -> VisionErrorType:
-    """Classify an error into a standard Vision error type.
+def classify_error(error: Exception) -> str:
+    """Classify an error into a standard error type.
 
     Args:
         error: Exception to classify
 
     Returns:
-        Standardized error type
+        Standardized error type string
     """
     if isinstance(error, (httpx.RequestError, httpx.HTTPStatusError)):
-        return VisionErrorType.NETWORK
+        return ERROR_TYPES["NETWORK"]
     elif isinstance(error, OSError):
-        return VisionErrorType.FILE_SYSTEM
+        return ERROR_TYPES["FILE_SYSTEM"]
     elif isinstance(error, (ValueError, TypeError)):
-        return VisionErrorType.VALIDATION
+        return ERROR_TYPES["VALIDATION"]
     elif isinstance(error, pa.ArrowInvalid):
-        return VisionErrorType.DATA_INTEGRITY
+        return ERROR_TYPES["DATA_INTEGRITY"]
     else:
-        return VisionErrorType.VALIDATION
+        return ERROR_TYPES["VALIDATION"]
 
 
 def validate_cache_integrity(
@@ -264,11 +251,28 @@ class TimestampedDataFrame(pd.DataFrame):
         if self.index.name != CANONICAL_INDEX_NAME:
             self.index.name = CANONICAL_INDEX_NAME
 
-        # Validate index properties
-        if not self.index.is_monotonic_increasing:
-            raise ValueError("Index must be monotonically increasing")
-        if self.index.has_duplicates:
-            raise ValueError("Index must not contain duplicates")
+        # Use the DataFrameValidator for index validation
+        # This avoids duplicating validation logic
+        try:
+            DataFrameValidator.validate_dataframe(self)
+        except ValueError as e:
+            # If there are duplicates or non-monotonic indices, handle them
+            if self.index.has_duplicates:
+                # Instead of just raising an error, we'll fix it
+                logger.warning("Found duplicate indices, keeping first occurrence")
+                # Create a new index without duplicates
+                self.reset_index(inplace=True)
+                self.drop_duplicates(
+                    subset=[CANONICAL_INDEX_NAME], keep="first", inplace=True
+                )
+                self.set_index(CANONICAL_INDEX_NAME, inplace=True)
+
+            if not self.index.is_monotonic_increasing:
+                logger.warning("Index not monotonically increasing, sorting")
+                self.sort_index(inplace=True)
+
+            # After fixing, validate again to ensure it's correct
+            DataFrameValidator.validate_dataframe(self)
 
     def __setitem__(self, key, value):
         """Override to prevent modification of index."""

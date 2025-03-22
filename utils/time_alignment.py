@@ -38,13 +38,21 @@ import pandas as pd
 from utils.logger_setup import get_logger
 from utils.market_constraints import Interval
 
+# Import the canonical TimeUnit implementation to highlight we should use this one instead
+from utils.deprecation_rules import TimeUnit as DeprecationTimeUnit
+
 # Ensure we use a consistent logger with INFO level
 logger = get_logger(__name__, "INFO", show_path=False, rich_tracebacks=True)
 
 
+# DEPRECATION WARNING: This TimeUnit implementation is deprecated
+# Use utils.deprecation_rules.TimeUnit instead
 @dataclass(frozen=True)
 class TimeUnit:
-    """Represents a time unit with conversion to microseconds."""
+    """Represents a time unit with conversion to microseconds.
+
+    DEPRECATED: Use utils.deprecation_rules.TimeUnit instead
+    """
 
     name: str
     micros: int
@@ -82,13 +90,13 @@ class TimeUnit:
     def get_all_units(cls) -> List["TimeUnit"]:
         """Get all available units in descending order of size."""
         return [
-            cls.WEEK(),
-            cls.DAY(),
-            cls.HOUR(),
-            cls.MINUTE(),
-            cls.SECOND(),
-            cls.MILLI(),
             cls.MICRO(),
+            cls.MILLI(),
+            cls.SECOND(),
+            cls.MINUTE(),
+            cls.HOUR(),
+            cls.DAY(),
+            cls.WEEK(),
         ]
 
 

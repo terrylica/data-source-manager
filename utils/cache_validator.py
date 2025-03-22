@@ -297,38 +297,44 @@ class CacheValidator:
     def safely_read_arrow_file(
         file_path: Path, columns: Optional[list] = None
     ) -> Optional[pd.DataFrame]:
-        """Safely read an Arrow file with error handling.
-
-        This method forwards to the centralized implementation in SafeMemoryMap.
-        For async contexts, use the async version.
+        """Safely read Arrow file using the async implementation with a sync wrapper.
 
         Args:
             file_path: Path to Arrow file
-            columns: Optional columns to read
+            columns: Optional list of columns to select
 
         Returns:
-            DataFrame if successful, None if failed
+            DataFrame or None if read fails
         """
         try:
-            return SafeMemoryMap._read_arrow_file_impl(file_path, columns)
+            # Use the existing async implementation to reduce duplication
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(
+                CacheValidator.safely_read_arrow_file_async(file_path, columns)
+            )
         except Exception as e:
-            logger.error(f"Error reading Arrow file {file_path}: {e}")
+            logger.error(f"Error in safely_read_arrow_file: {e}")
             return None
 
     @staticmethod
     async def safely_read_arrow_file_async(
         file_path: Path, columns: Optional[list] = None
     ) -> Optional[pd.DataFrame]:
-        """Async version of safely_read_arrow_file.
+        """Safely read Arrow file with error handling (async version).
 
         Args:
             file_path: Path to Arrow file
-            columns: Optional columns to read
+            columns: Optional list of columns to select
 
         Returns:
-            DataFrame if successful, None if failed
+            DataFrame or None if read fails
         """
-        return await SafeMemoryMap.safely_read_arrow_file(file_path, columns)
+        try:
+            # Use SafeMemoryMap for safe memory-mapped file reading
+            return await SafeMemoryMap.safely_read_arrow_file(file_path, columns)
+        except Exception as e:
+            logger.error(f"Error reading Arrow file: {e}")
+            return None
 
 
 class CacheKeyManager:
