@@ -8,7 +8,7 @@ This guide explains the migration path from the deprecated direct caching mechan
 
 The direct caching mechanism in `VisionDataClient` is now deprecated and will be removed in a future version. When using the deprecated approach, you will see the following warning:
 
-```
+```text
 DeprecationWarning: Direct caching through VisionDataClient is deprecated. Please use DataSourceManager with UnifiedCacheManager for caching. This will be removed in a future version.
 ```
 
@@ -25,7 +25,7 @@ DeprecationWarning: Direct caching through VisionDataClient is deprecated. Pleas
 
 Replace all direct usage of `VisionDataClient` with `DataSourceManager`. This is the recommended approach for all new and existing code.
 
-#### Before:
+#### Before
 
 ```python
 from core.vision_data_client import VisionDataClient
@@ -43,7 +43,7 @@ async with client:
     data = await client.fetch(start_time, end_time)
 ```
 
-#### After:
+#### After
 
 ```python
 from core.data_source_manager import DataSourceManager

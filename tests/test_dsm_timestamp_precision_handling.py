@@ -260,7 +260,7 @@ async def test_input_format_handling(manager: DataSourceManager, now: arrow.Arro
         expectations=[
             "Accepts datetime objects",
             "Accepts pandas Timestamps",
-            "Accepts Arrow objects",
+            "Accepts Arrow objects (converted to datetime)",
             "Consistent timezone handling",
         ],
         implications=[
@@ -284,7 +284,7 @@ async def test_input_format_handling(manager: DataSourceManager, now: arrow.Arro
             pd.Timestamp((base_time + time_window).datetime),
         ),
         # Arrow object (converted to datetime)
-        (base_time, base_time.shift(minutes=5)),
+        (base_time.datetime, base_time.shift(minutes=5).datetime),
     ]
 
     for start_time, end_time in test_cases:

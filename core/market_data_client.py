@@ -503,6 +503,9 @@ class EnhancedRetriever:
         df = pd.DataFrame()
 
         try:
+            # Validate time window using centralized utility
+            TimeRangeManager.validate_time_window(start_time, end_time)
+
             # Get time boundaries with standard handling through TimeRangeManager
             time_boundaries = TimeRangeManager.get_time_boundaries(
                 start_time, end_time, interval

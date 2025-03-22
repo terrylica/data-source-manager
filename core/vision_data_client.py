@@ -383,10 +383,10 @@ class VisionDataClient(Generic[T]):
         columns: Optional[Sequence[str]] = None,
     ) -> TimestampedDataFrame:
         """Fetch data from Binance Vision API."""
-        # Validate and normalize time range
+        # Validate and normalize time range using centralized utility
         TimeRangeManager.validate_time_window(start_time, end_time)
 
-        # Get time boundaries
+        # Get time boundaries using the centralized manager
         time_boundaries = TimeRangeManager.get_time_boundaries(
             start_time, end_time, self.interval_obj
         )
