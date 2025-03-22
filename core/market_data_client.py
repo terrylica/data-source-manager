@@ -394,6 +394,7 @@ class EnhancedRetriever:
         Returns:
             Bar duration in seconds
         """
+        # Use get_bar_close_time through TimeRangeManager if it's available there
         close_time = get_bar_close_time(open_time, interval)
         duration = (close_time - open_time).total_seconds()
         expected_duration = interval.to_seconds()

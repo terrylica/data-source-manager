@@ -237,6 +237,10 @@ class VisionDataClient(Generic[T]):
         columns: Optional[Sequence[str]] = None,
     ) -> TimestampedDataFrame:
         """Download and cache data for the specified time range."""
+        # Use TimeRangeManager to validate and normalize time range
+        start_time = TimeRangeManager.enforce_utc_timezone(start_time)
+        end_time = TimeRangeManager.enforce_utc_timezone(end_time)
+
         # Get list of dates to download
         current_date = start_time.replace(hour=0, minute=0, second=0, microsecond=0)
         dates = []
@@ -255,7 +259,7 @@ class VisionDataClient(Generic[T]):
             df = await self._download_manager.download_date(date)
 
             if df is not None:
-                # Filter to requested time range
+                # Filter to requested time range using TimeRangeManager
                 filtered_df = TimeRangeManager.filter_dataframe(
                     df, start_time, end_time
                 )
@@ -372,7 +376,9 @@ class VisionDataClient(Generic[T]):
             end_time: End time for prefetch
             max_days: Maximum number of days to prefetch
         """
-        # Validate time range
+        # Validate time range and enforce UTC timezone using TimeRangeManager
+        start_time = TimeRangeManager.enforce_utc_timezone(start_time)
+        end_time = TimeRangeManager.enforce_utc_timezone(end_time)
         TimeRangeManager.validate_time_window(start_time, end_time)
 
         # Limit prefetch to max_days
@@ -398,6 +404,9 @@ class VisionDataClient(Generic[T]):
         """
         if not self.cache_dir or not self.use_cache or not self.cache_manager:
             return None
+
+        # Ensure date has proper timezone using TimeRangeManager
+        date_to_check = TimeRangeManager.enforce_utc_timezone(date_to_check)
 
         try:
             # Get cache information from the cache manager
@@ -439,6 +448,9 @@ class VisionDataClient(Generic[T]):
         """
         if not self.cache_dir or not self.use_cache or not self.cache_manager:
             return
+
+        # Ensure date has proper timezone using TimeRangeManager
+        date = TimeRangeManager.enforce_utc_timezone(date)
 
         try:
             logger.debug(f"Saving data to cache for {date.date()}")

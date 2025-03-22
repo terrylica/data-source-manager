@@ -5,13 +5,13 @@ import asyncio
 import logging
 import time
 import tempfile
+import numpy as np
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
 import httpx
 import pandas as pd
-import numpy as np
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -21,6 +21,7 @@ from tenacity import (
 )
 
 from utils.logger_setup import get_logger
+from utils.time_alignment import TimeRangeManager
 
 logger = get_logger(__name__, "INFO", show_path=False, rich_tracebacks=True)
 
@@ -226,6 +227,9 @@ class VisionDownloadManager:
         Returns:
             URL for the checksum file
         """
+        # Import and use TimeRangeManager for consistent timezone handling
+        date = TimeRangeManager.enforce_utc_timezone(date)
+
         # Note: This assumes the vision_constraints module has this function
         from core.vision_constraints import get_vision_url, FileType
 
@@ -240,6 +244,9 @@ class VisionDownloadManager:
         Returns:
             URL for the data file
         """
+        # Import and use TimeRangeManager for consistent timezone handling
+        date = TimeRangeManager.enforce_utc_timezone(date)
+
         # Note: This assumes the vision_constraints module has this function
         from core.vision_constraints import get_vision_url, FileType
 
@@ -291,6 +298,9 @@ class VisionDownloadManager:
         Returns:
             DataFrame with data or None if download failed
         """
+        # Ensure date has proper timezone using TimeRangeManager
+        date = TimeRangeManager.enforce_utc_timezone(date)
+
         # Create temporary directory for downloads
         temp_dir = Path(tempfile.mkdtemp())
         data_file = (
@@ -375,10 +385,20 @@ class VisionDownloadManager:
                 df.set_index("open_time", inplace=True)
                 df = df.drop(columns=["ignored"])
 
-                # Ensure UTC timezone
+                # Ensure UTC timezone using TimeRangeManager
                 if df.index.tz is None:
-                    df.index = df.index.tz_localize("UTC")
-                df.index = df.index.map(lambda x: x.replace(microsecond=0))
+                    df.index = pd.DatetimeIndex(
+                        [TimeRangeManager.enforce_utc_timezone(dt) for dt in df.index],
+                        name=df.index.name,
+                    )
+                else:
+                    df.index = pd.DatetimeIndex(
+                        [
+                            TimeRangeManager.enforce_utc_timezone(dt)
+                            for dt in df.index.to_pydatetime()
+                        ],
+                        name=df.index.name,
+                    )
 
                 return df
 

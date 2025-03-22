@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from typing import TypeVar, NewType, Final, Optional, NamedTuple, Literal
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import pandas as pd
 from pathlib import Path
 from enum import Enum, auto
@@ -292,23 +292,6 @@ def validate_cache_path(path: Path) -> CachePath:
     return CachePath(path)
 
 
-def enforce_utc_timestamp(dt: datetime) -> datetime:
-    """Ensure timestamp is UTC."""
-    # Use centralized utility
-    return DataValidation.enforce_utc_timestamp(dt)
-
-
-def validate_column_names(columns: list[str]) -> list[str]:
-    """Validate column names don't conflict with index."""
-    if not isinstance(columns, list):
-        raise TypeError(f"Expected list of strings, got {type(columns)}")
-    if not all(isinstance(col, str) for col in columns):
-        raise TypeError("All column names must be strings")
-    if CANONICAL_INDEX_NAME in columns:
-        raise ValueError(f"{CANONICAL_INDEX_NAME} is reserved for index")
-    return columns
-
-
 def validate_time_range(
     start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
 ) -> tuple[Optional[datetime], Optional[datetime]]:
@@ -362,6 +345,23 @@ def get_cache_path(cache_dir: Path, symbol: str, interval: str, date: datetime) 
     """Generate standardized cache file path."""
     # Use centralized CacheKeyManager
     return CacheKeyManager.get_cache_path(cache_dir, symbol, interval, date)
+
+
+def enforce_utc_timestamp(dt: datetime) -> datetime:
+    """Ensure timestamp is UTC."""
+    # Use TimeRangeManager directly instead of DataValidation
+    return TimeRangeManager.enforce_utc_timezone(dt)
+
+
+def validate_column_names(columns: list[str]) -> list[str]:
+    """Validate column names don't conflict with index."""
+    if not isinstance(columns, list):
+        raise TypeError(f"Expected list of strings, got {type(columns)}")
+    if not all(isinstance(col, str) for col in columns):
+        raise TypeError("All column names must be strings")
+    if CANONICAL_INDEX_NAME in columns:
+        raise ValueError(f"{CANONICAL_INDEX_NAME} is reserved for index")
+    return columns
 
 
 logger = logging.getLogger(__name__)

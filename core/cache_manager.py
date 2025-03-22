@@ -16,6 +16,7 @@ from utils.config import (
     DEFAULT_TIMEZONE,
     standardize_column_names,
 )
+from utils.time_alignment import TimeRangeManager
 
 logger = get_logger(__name__, "INFO", show_path=False, rich_tracebacks=True)
 
@@ -127,6 +128,9 @@ class UnifiedCacheManager:
         Returns:
             Tuple of (checksum, record_count)
         """
+        # Ensure date has proper timezone using TimeRangeManager
+        date = TimeRangeManager.enforce_utc_timezone(date)
+
         # Log input data for debugging
         logger.debug(
             f"Attempting to cache data for {symbol} {interval} {date.strftime('%Y-%m-%d')}"
@@ -270,11 +274,8 @@ class UnifiedCacheManager:
         if df is None:
             return None
 
-        # Ensure index has correct timezone using centralized utility
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is not None:
-            # Convert to Python datetime objects with timezone.utc using centralized approach
-            from utils.time_alignment import TimeRangeManager
-
+        # Ensure index has correct timezone using TimeRangeManager
+        if isinstance(df.index, pd.DatetimeIndex):
             new_index = pd.DatetimeIndex(
                 [
                     TimeRangeManager.enforce_utc_timezone(dt)
