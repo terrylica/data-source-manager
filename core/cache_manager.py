@@ -9,7 +9,7 @@ import pyarrow as pa
 
 from utils.logger_setup import get_logger
 from utils.cache_validator import CacheValidator, SafeMemoryMap, CacheKeyManager
-from utils.validation import DataFrameValidator, DataValidation
+from utils.validation import DataFrameValidator
 from utils.config import (
     OUTPUT_DTYPES,
     CANONICAL_INDEX_NAME,
@@ -269,6 +269,15 @@ class UnifiedCacheManager:
         df = SafeMemoryMap.safely_read_arrow_file(cache_path, columns)
         if df is None:
             return None
+
+        # Ensure index has correct timezone
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is not None:
+            # Convert to Python datetime objects with timezone.utc
+            new_index = pd.DatetimeIndex(
+                [dt.replace(tzinfo=timezone.utc) for dt in df.index.to_pydatetime()],
+                name=df.index.name,
+            )
+            df.index = new_index
 
         # Perform validation on loaded data
         try:

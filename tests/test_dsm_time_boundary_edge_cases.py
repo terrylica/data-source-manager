@@ -78,6 +78,7 @@ async def manager():
 @pytest.mark.asyncio
 async def test_boundary_conditions(manager: DataSourceManager):
     """Test various temporal boundary conditions with detailed explanations."""
+    logger.info("\nTesting Time Boundary Handling in DSM")
     current_time = arrow.utcnow()
     test_cases = [
         {
@@ -86,6 +87,12 @@ async def test_boundary_conditions(manager: DataSourceManager):
             "start": current_time.shift(seconds=-10, microseconds=-500_000),
             "end": current_time.shift(seconds=-5, microseconds=-250_000),
             "expected_records": 6,  # 6 records: From start to just before end (inclusive start, exclusive end)
+            "expected_start": current_time.shift(seconds=-10, microseconds=-500_000)
+            .replace(microsecond=0)
+            .isoformat(),
+            "expected_end": current_time.shift(seconds=-5, microseconds=-250_000)
+            .replace(microsecond=0)
+            .isoformat(),
         },
         {
             "case_number": 2,
@@ -93,6 +100,12 @@ async def test_boundary_conditions(manager: DataSourceManager):
             "start": current_time.shift(seconds=-5, microseconds=-500_000),
             "end": current_time.shift(seconds=-2, microseconds=-250_000),
             "expected_records": 3,  # 3 records: When start_time x.5s is floored to x, with exclusive end we get [x, (x+1), (x+2)]
+            "expected_start": current_time.shift(seconds=-5, microseconds=-500_000)
+            .replace(microsecond=0)
+            .isoformat(),
+            "expected_end": current_time.shift(seconds=-2, microseconds=-250_000)
+            .replace(microsecond=0)
+            .isoformat(),
         },
         {
             "case_number": 3,
@@ -100,6 +113,12 @@ async def test_boundary_conditions(manager: DataSourceManager):
             "start": current_time.shift(seconds=-15, microseconds=-500_000),
             "end": current_time.shift(seconds=-5, microseconds=+750_000),
             "expected_records": 11,  # 11 records: Adjusted based on actual behavior, with millisecond boundary at end
+            "expected_start": current_time.shift(seconds=-15, microseconds=-500_000)
+            .replace(microsecond=0)
+            .isoformat(),
+            "expected_end": current_time.shift(seconds=-5, microseconds=+750_000)
+            .replace(microsecond=0)
+            .isoformat(),
         },
         {
             "case_number": 4,
@@ -107,6 +126,12 @@ async def test_boundary_conditions(manager: DataSourceManager):
             "start": current_time.shift(seconds=-1),
             "end": current_time.shift(seconds=-1),
             "expected_records": 0,
+            "expected_start": current_time.shift(seconds=-1)
+            .replace(microsecond=0)
+            .isoformat(),
+            "expected_end": current_time.shift(seconds=-1)
+            .replace(microsecond=0)
+            .isoformat(),
         },
     ]
 
@@ -125,17 +150,50 @@ async def test_boundary_conditions(manager: DataSourceManager):
         logger.info(
             f"  - Start time is INCLUSIVE, end time is EXCLUSIVE after rounding"
         )
-        logger.info(
-            f"  - First record should be >= {start_time.replace(microsecond=0).isoformat()}"
-        )
-        logger.info(
-            f"  - Last record should be < {end_time.replace(microsecond=0).isoformat()}"
-        )
+        logger.info(f"  - First record should be >= {case['expected_start']}")
+        logger.info(f"  - Last record should be < {case['expected_end']}")
+
+        # For case 1, add more debug logging
+        if case["case_number"] == 1:
+            logger.info("DEBUG: Inspecting case 1 issue")
+            logger.info(f"DEBUG: Original start: {start_time.isoformat()}")
+            logger.info(f"DEBUG: Original end: {end_time.isoformat()}")
+
+            # Calculate expected time range after flooring
+            floored_start = start_time.replace(microsecond=0)
+            floored_end = end_time.replace(microsecond=0)
+            logger.info(f"DEBUG: Expected floored start: {floored_start.isoformat()}")
+            logger.info(f"DEBUG: Expected floored end: {floored_end.isoformat()}")
+            logger.info(
+                f"DEBUG: Expected seconds diff: {int((floored_end - floored_start).total_seconds())} seconds"
+            )
+            logger.info(
+                f"DEBUG: Expected records with inclusive start, exclusive end: {int((floored_end - floored_start).total_seconds())} records"
+            )
+
+        # For case 3, add detailed debug logging
+        if case["case_number"] == 3:
+            logger.info("DEBUG: Inspecting case 3 issue")
+            logger.info(f"DEBUG: Original start: {start_time.isoformat()}")
+            logger.info(f"DEBUG: Original end: {end_time.isoformat()}")
+
+            # Calculate expected time range after flooring
+            floored_start = start_time.replace(microsecond=0)
+            floored_end = end_time.replace(microsecond=0)
+            logger.info(f"DEBUG: Expected floored start: {floored_start.isoformat()}")
+            logger.info(f"DEBUG: Expected floored end: {floored_end.isoformat()}")
+            logger.info(
+                f"DEBUG: Expected seconds diff: {int((floored_end - floored_start).total_seconds())} seconds"
+            )
 
         try:
-            # Execute data fetch
-            if case["case_number"] == 4:  # Zero-duration request
-                with pytest.raises(ValueError, match="Start time .* is after end time"):
+            # Skip fetching data for zero-duration request (case 4)
+            if case["case_number"] == 4:
+                # For zero-duration request, we expect a ValueError
+                with pytest.raises(
+                    ValueError,
+                    match="Invalid time range: start_time .* must be before end_time",
+                ):
                     df = await manager.get_data(
                         symbol=TEST_SYMBOL,
                         start_time=start_time,
@@ -143,44 +201,7 @@ async def test_boundary_conditions(manager: DataSourceManager):
                         use_cache=False,
                     )
                 logger.info("Zero-duration request correctly raised ValueError")
-                continue  # Skip the rest of the validation for this case
-
-            # For case 1, add more debug logging
-            if case["case_number"] == 1:
-                logger.info("DEBUG: Inspecting case 1 issue")
-                logger.info(f"DEBUG: Original start: {start_time.isoformat()}")
-                logger.info(f"DEBUG: Original end: {end_time.isoformat()}")
-
-                # Calculate expected time range after flooring
-                floored_start = start_time.replace(microsecond=0)
-                floored_end = end_time.replace(microsecond=0)
-                logger.info(
-                    f"DEBUG: Expected floored start: {floored_start.isoformat()}"
-                )
-                logger.info(f"DEBUG: Expected floored end: {floored_end.isoformat()}")
-                logger.info(
-                    f"DEBUG: Expected seconds diff: {int((floored_end - floored_start).total_seconds())} seconds"
-                )
-                logger.info(
-                    f"DEBUG: Expected records with inclusive start, exclusive end: {int((floored_end - floored_start).total_seconds())} records"
-                )
-
-            # For case 3, add detailed debug logging
-            if case["case_number"] == 3:
-                logger.info("DEBUG: Inspecting case 3 issue")
-                logger.info(f"DEBUG: Original start: {start_time.isoformat()}")
-                logger.info(f"DEBUG: Original end: {end_time.isoformat()}")
-
-                # Calculate expected time range after flooring
-                floored_start = start_time.replace(microsecond=0)
-                floored_end = end_time.replace(microsecond=0)
-                logger.info(
-                    f"DEBUG: Expected floored start: {floored_start.isoformat()}"
-                )
-                logger.info(f"DEBUG: Expected floored end: {floored_end.isoformat()}")
-                logger.info(
-                    f"DEBUG: Expected seconds diff: {int((floored_end - floored_start).total_seconds())} seconds"
-                )
+                continue
 
             # Execute data fetch
             df = await manager.get_data(
@@ -196,21 +217,13 @@ async def test_boundary_conditions(manager: DataSourceManager):
                 logger.info(f"DEBUG: Number of records: {len(df)}")
                 logger.info(f"DEBUG: First timestamp: {df.index[0].isoformat()}")
                 logger.info(f"DEBUG: Last timestamp: {df.index[-1].isoformat()}")
-                all_timestamps = [ts.isoformat() for ts in df.index]
-                logger.info(f"DEBUG: All timestamps: {all_timestamps}")
-
-                # What time is missing?
-                expected_next = df.index[-1] + timedelta(seconds=1)
+                # Remove verbose timestamp listing
                 logger.info(
-                    f"DEBUG: Expected next timestamp: {expected_next.isoformat()}"
+                    f"DEBUG: Expected next timestamp: {(df.index[-1] + timedelta(seconds=1)).isoformat()}"
                 )
                 logger.info(
                     f"DEBUG: End time boundary (exclusive): {end_time.replace(microsecond=0).isoformat()}"
                 )
-                if expected_next < end_time.replace(microsecond=0):
-                    logger.info(
-                        f"DEBUG: MISSING the timestamp at {expected_next.isoformat()}"
-                    )
 
             # Enhanced logging for case 3
             if case["case_number"] == 3 and not df.empty:
@@ -218,10 +231,7 @@ async def test_boundary_conditions(manager: DataSourceManager):
                 logger.info(f"DEBUG: Number of records: {len(df)}")
                 logger.info(f"DEBUG: First timestamp: {df.index[0].isoformat()}")
                 logger.info(f"DEBUG: Last timestamp: {df.index[-1].isoformat()}")
-                all_timestamps = [ts.isoformat() for ts in df.index]
-                logger.info(f"DEBUG: All timestamps: {all_timestamps}")
-
-                # Expected time range
+                # Remove verbose timestamp listing
                 logger.info(
                     f"DEBUG: Adjusted start time: {start_time.replace(microsecond=0).isoformat()}"
                 )
@@ -334,8 +344,8 @@ async def test_boundary_conditions(manager: DataSourceManager):
             if (
                 case["case_number"] == 4
                 and isinstance(e, ValueError)
-                and "Start time" in str(e)
-                and "is after end time" in str(e)
+                and "Invalid time range" in str(e)
+                and "must be before end_time" in str(e)
             ):
                 logger.info("Zero-duration request correctly raised ValueError")
                 continue  # Skip the rest of the validation for this case
@@ -348,7 +358,9 @@ async def test_boundary_conditions(manager: DataSourceManager):
     start_time = empty_case["start"].datetime
     end_time = empty_case["end"].datetime
 
-    with pytest.raises(ValueError, match="Start time .* is after end time"):
+    with pytest.raises(
+        ValueError, match="Invalid time range: start_time .* must be before end_time"
+    ):
         df = await manager.get_data(
             symbol=TEST_SYMBOL,
             start_time=start_time,

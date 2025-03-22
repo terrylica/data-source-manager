@@ -405,15 +405,11 @@ class VisionDataClient(Generic[T]):
                     start_time, end_time, columns=columns
                 )
                 if not df.empty:
-                    # Apply consistent time filtering
-                    df = TimeRangeManager.filter_dataframe(df, start_time, end_time)
-
                     # Validate data integrity
-                    if not df.empty:
-                        DataFrameValidator.validate_dataframe(df)
-                        TimeRangeManager.validate_boundaries(df, start_time, end_time)
+                    DataFrameValidator.validate_dataframe(df)
+                    TimeRangeManager.validate_boundaries(df, start_time, end_time)
 
-                    return df
+                return df
             except Exception as e:
                 logger.warning(
                     f"Error loading from cache: {e}, falling back to direct fetch"
@@ -423,19 +419,11 @@ class VisionDataClient(Generic[T]):
         try:
             df = await self._download_and_cache(start_time, end_time, columns=columns)
             if not df.empty:
-                # Apply consistent time filtering
-                filtered_df = TimeRangeManager.filter_dataframe(
-                    df, start_time, end_time
-                )
+                # Validate data integrity
+                DataFrameValidator.validate_dataframe(df)
+                TimeRangeManager.validate_boundaries(df, start_time, end_time)
 
-                if not filtered_df.empty:
-                    # Validate data integrity
-                    DataFrameValidator.validate_dataframe(filtered_df)
-                    TimeRangeManager.validate_boundaries(
-                        filtered_df, start_time, end_time
-                    )
-
-                return filtered_df
+                return df
 
             return self._create_empty_dataframe()
 

@@ -543,7 +543,9 @@ async def test_date_validation(manager: DataSourceManager, now: arrow.Arrow) -> 
         start_time.datetime, end_time.datetime, "start_time", "end_time"
     )
 
-    with pytest.raises(ValueError, match="is after end time"):
+    with pytest.raises(
+        ValueError, match="Invalid time range: start_time .* must be before end_time"
+    ):
         await manager.get_data(
             symbol=TEST_SYMBOL,
             interval=TEST_INTERVAL,

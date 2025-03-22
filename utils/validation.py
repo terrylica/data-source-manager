@@ -13,7 +13,7 @@ from utils.config import (
     MAX_CACHE_AGE,
     OUTPUT_DTYPES,
 )
-import logging
+import numpy as np
 
 
 class ValidationError(Exception):
@@ -23,36 +23,39 @@ class ValidationError(Exception):
 
 
 class DataValidation:
-    """Data validation utilities."""
+    """Centralized data validation utilities."""
 
     @staticmethod
     def validate_dates(start_time: datetime, end_time: datetime) -> None:
-        """Validate date time window.
+        """Validate dates for market data requests.
 
         Args:
             start_time: Start time
             end_time: End time
 
         Raises:
-            ValueError: If date inputs are invalid
+            ValueError: If the time range is invalid
         """
         if not isinstance(start_time, datetime) or not isinstance(end_time, datetime):
-            raise ValueError("Start and end times must be datetime objects")
+            raise ValueError(
+                f"Invalid date types: start_time={type(start_time)}, end_time={type(end_time)}. "
+                "Both must be datetime objects."
+            )
 
-        # Ensure timezone awareness
-        if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=timezone.utc)
-        if end_time.tzinfo is None:
-            end_time = end_time.replace(tzinfo=timezone.utc)
+        # Convert to UTC for consistent comparison
+        start_utc = DataValidation.enforce_utc_timestamp(start_time)
+        end_utc = DataValidation.enforce_utc_timestamp(end_time)
 
-        # Validate time range
-        if start_time >= end_time:
-            raise ValueError(f"Start time {start_time} is after end time {end_time}")
+        # Check if the end time is in the future
+        now_utc = datetime.now(timezone.utc)
+        if end_utc > now_utc:
+            raise ValueError(f"End time {end_utc.isoformat()} is in the future")
 
-        # Check for future dates
-        now = datetime.now(timezone.utc)
-        if end_time > now:
-            raise ValueError(f"End time {end_time} is in the future")
+        if start_utc >= end_utc:
+            raise ValueError(
+                f"Invalid time range: start_time ({start_utc.isoformat()}) must be before "
+                f"end_time ({end_utc.isoformat()})."
+            )
 
     @staticmethod
     def validate_time_window(start_time: datetime, end_time: datetime) -> None:
@@ -81,19 +84,26 @@ class DataValidation:
         """Ensure timestamp is UTC.
 
         Args:
-            dt: Input datetime
+            dt: Datetime object
 
         Returns:
-            UTC-aware datetime
-
-        Raises:
-            TypeError: If input is not a datetime object
+            UTC timezone-aware datetime
         """
-        if not isinstance(dt, datetime):
-            raise TypeError(f"Expected datetime object, got {type(dt)}")
         if dt.tzinfo is None:
             return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+        elif dt.tzinfo != timezone.utc:
+            # Create a new datetime with timezone.utc instead of just converting
+            return datetime(
+                dt.year,
+                dt.month,
+                dt.day,
+                dt.hour,
+                dt.minute,
+                dt.second,
+                dt.microsecond,
+                tzinfo=timezone.utc,
+            )
+        return dt
 
     @staticmethod
     def validate_time_range(
@@ -121,44 +131,62 @@ class DataValidation:
 
     @staticmethod
     def validate_interval(interval: str, market_type: str = "SPOT") -> None:
-        """Validate interval parameter.
+        """Validate interval string format.
 
         Args:
-            interval: Time interval
-            market_type: Market type
+            interval: Time interval string (e.g., '1s', '1m')
+            market_type: Market type for context-specific validation
 
         Raises:
-            ValueError: If interval is invalid
+            ValueError: If interval format is invalid
         """
-        valid_intervals = [
-            "1s",
-            "1m",
-            "3m",
-            "5m",
-            "15m",
-            "30m",
-            "1h",
-            "2h",
-            "4h",
-            "6h",
-            "8h",
-            "12h",
-            "1d",
-            "3d",
-            "1w",
-            "1M",
-        ]
+        # Add market-specific interval validation
+        supported_intervals = {
+            "SPOT": [
+                "1s",
+                "1m",
+                "3m",
+                "5m",
+                "15m",
+                "30m",
+                "1h",
+                "2h",
+                "4h",
+                "6h",
+                "8h",
+                "12h",
+                "1d",
+                "3d",
+                "1w",
+                "1M",
+            ],
+            "FUTURES": [
+                "1m",
+                "3m",
+                "5m",
+                "15m",
+                "30m",
+                "1h",
+                "2h",
+                "4h",
+                "6h",
+                "8h",
+                "12h",
+                "1d",
+                "3d",
+                "1w",
+                "1M",
+            ],
+        }
 
-        if interval not in valid_intervals:
+        market = market_type.upper()
+        if market not in supported_intervals:
+            market = "SPOT"  # Default to SPOT intervals
+
+        if interval not in supported_intervals[market]:
             raise ValueError(
                 f"Invalid interval: {interval}. "
-                f"Must be one of {', '.join(valid_intervals)}"
-            )
-
-        # 1-second data is only available for spot market
-        if interval == "1s" and market_type != "SPOT":
-            raise ValueError(
-                f"1-second data is only available for SPOT market, not {market_type}"
+                f"Supported intervals for {market}: {supported_intervals[market]}"
             )
 
     @staticmethod
@@ -166,24 +194,21 @@ class DataValidation:
         """Validate trading pair symbol format.
 
         Args:
-            symbol: Trading pair symbol to validate
-            market_type: Type of market (default: SPOT)
+            symbol: Trading pair symbol
+            market_type: Market type for context-specific validation
 
         Raises:
             ValueError: If symbol format is invalid
         """
-        if not symbol or not isinstance(symbol, str):
-            raise ValueError(f"Invalid symbol: {symbol}")
-
-        # Basic validation - could be expanded for more specific rules
-        if len(symbol) < 5:  # Minimum valid symbol length (e.g., "BTCUSDT")
-            raise ValueError(f"Symbol too short: {symbol}")
-
-        # Add market-specific validation if needed
-        if market_type == "FUTURES" and not (
-            symbol.endswith("USDT") or symbol.endswith("BUSD")
-        ):
-            logger.warning(f"Unusual futures symbol format: {symbol}")
+        if not isinstance(symbol, str) or not symbol:
+            raise ValueError(
+                f"Invalid {market_type} symbol format: Symbol must be a non-empty string."
+            )
+        if not symbol.isupper():
+            raise ValueError(
+                f"Invalid {market_type} symbol format: {symbol}. "
+                "Symbols should be uppercase (e.g., BTCUSDT)."
+            )
 
     @staticmethod
     def validate_data_availability(
@@ -196,46 +221,36 @@ class DataValidation:
         Args:
             start_time: Start of time range
             end_time: End of time range
-            consolidation_delay: Required delay after day completion for data availability
+            consolidation_delay: Delay after which data is considered available
 
         Raises:
             ValueError: If data is definitely not available for the time range
         """
-        if not DataValidation.is_data_likely_available(start_time, consolidation_delay):
+        cutoff_date = datetime.now(timezone.utc) - consolidation_delay
+        if end_time > cutoff_date:
             raise ValueError(
-                f"Data for {start_time.date()} is not yet available. "
-                f"Binance Vision requires {consolidation_delay} after day completion."
+                "Requested end time is too recent. "
+                f"Data is only reliably available up to {cutoff_date.isoformat()} "
+                f"due to consolidation delays (delay={consolidation_delay})."
             )
-        if end_time.date() > datetime.now(timezone.utc).date():
-            raise ValueError(f"Cannot request future data: {end_time.date()}")
+        if start_time > end_time:
+            raise ValueError("Start time cannot be after end time.")
 
     @staticmethod
     def is_data_likely_available(
         target_date: datetime, consolidation_delay: timedelta = timedelta(hours=48)
     ) -> bool:
-        """Check if data is likely to be available from Binance Vision.
+        """Check if data is likely to be available based on consolidation delay.
 
         Args:
             target_date: Date to check for data availability
-            consolidation_delay: Required delay after day completion for data availability
+            consolidation_delay: Delay after which data is considered available
 
         Returns:
-            True if data is likely available based on Binance Vision's constraints
+            True if data is likely available
         """
-        now = datetime.now(timezone.utc)
-
-        # Convert target_date to start of day in UTC for consistent comparison
-        target_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
-
-        if target_day.date() < now.date():
-            # Past dates are always available
-            return True
-        elif target_day.date() == now.date():
-            # Today's data is only available after consolidation delay
-            return now - target_day > consolidation_delay
-        else:
-            # Future dates are never available
-            return False
+        cutoff_date = datetime.now(timezone.utc) - consolidation_delay
+        return target_date <= cutoff_date
 
     @staticmethod
     def validate_time_boundaries(
@@ -298,159 +313,154 @@ class DataValidation:
 
 
 class DataFrameValidator:
-    """Static methods for DataFrame validation."""
+    """Validation and standardization for DataFrames."""
 
     @staticmethod
     def validate_dataframe(df: pd.DataFrame) -> None:
-        """Validate DataFrame structure and content.
+        """Validate DataFrame structure and integrity.
 
         Args:
             df: DataFrame to validate
 
         Raises:
-            ValueError: If DataFrame is invalid
+            ValueError: If DataFrame structure is invalid
         """
-        # Empty DataFrame is allowed but must have correct structure
         if df.empty:
-            if not isinstance(df.index, pd.DatetimeIndex):
-                raise ValueError("Empty DataFrame must have DatetimeIndex")
-            if df.index.name != CANONICAL_INDEX_NAME:
-                raise ValueError(
-                    f"DataFrame index must be named {CANONICAL_INDEX_NAME}"
-                )
             return
 
-        # Check index
+        # Check if index is DatetimeIndex
         if not isinstance(df.index, pd.DatetimeIndex):
-            raise ValueError("DataFrame index must be DatetimeIndex")
+            raise ValueError(
+                f"DataFrame index must be DatetimeIndex, got {type(df.index).__name__}"
+            )
 
-        # Check index name
-        if df.index.name != CANONICAL_INDEX_NAME:
-            raise ValueError(f"DataFrame index must be named {CANONICAL_INDEX_NAME}")
-
-        # Check timezone
+        # Check if index is timezone-aware
         if df.index.tz is None:
             raise ValueError("DataFrame index must be timezone-aware")
 
-        # Convert timezone if needed
-        if df.index.tz != DEFAULT_TIMEZONE:
-            df.index = df.index.tz_convert(DEFAULT_TIMEZONE)
+        # Log timezone information for debugging
+        logger.debug(f"DataFrame index timezone: {df.index.tz}")
+        logger.debug(f"timezone.utc: {timezone.utc}")
+        logger.debug(f"DEFAULT_TIMEZONE: {DEFAULT_TIMEZONE}")
+        logger.debug(f"Are they equal? {df.index.tz == timezone.utc}")
+        logger.debug(f"Are they the same object? {df.index.tz is timezone.utc}")
+
+        # Check if index is named correctly
+        if df.index.name != CANONICAL_INDEX_NAME:
+            raise ValueError(
+                f"DataFrame index must be named '{CANONICAL_INDEX_NAME}', "
+                f"got '{df.index.name}'"
+            )
 
         # Check for duplicate indices
         if df.index.has_duplicates:
-            duplicates = df.index[df.index.duplicated()].tolist()
-            if len(duplicates) > 5:
-                duplicate_sample = duplicates[:5]
-                raise ValueError(
-                    f"DataFrame has {len(duplicates)} duplicate indices. "
-                    f"First 5: {duplicate_sample}"
-                )
-            else:
-                raise ValueError(f"DataFrame has duplicate indices: {duplicates}")
+            raise ValueError("DataFrame index contains duplicate timestamps")
 
-        # Check for sorted index
+        # Check if index is sorted
         if not df.index.is_monotonic_increasing:
-            raise ValueError("DataFrame index is not monotonically increasing")
+            raise ValueError("DataFrame index must be monotonically increasing")
+
+        # Check for required columns
+        required_columns = ["open", "high", "low", "close", "volume"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"DataFrame missing required columns: {missing_columns}")
 
     @staticmethod
     def format_dataframe(
-        df: pd.DataFrame, output_dtypes: Dict[str, str]
+        df: pd.DataFrame, output_dtypes: Dict[str, str] = OUTPUT_DTYPES
     ) -> pd.DataFrame:
         """Format DataFrame to ensure consistent structure.
 
         Args:
             df: Input DataFrame
-            output_dtypes: Dictionary mapping column names to expected data types
+            output_dtypes: Dictionary mapping column names to dtypes
 
         Returns:
-            Formatted DataFrame with consistent structure
+            Formatted DataFrame
         """
-        logger = logging.getLogger(__name__)
-        logger.debug(
-            f"Formatting DataFrame with shape: {df.shape if not df.empty else 'empty'}"
-        )
+        logger.debug("Formatting DataFrame - Starting timezone analysis")
+        logger.debug(f"timezone.utc id: {id(timezone.utc)}")
+        logger.debug(f"DEFAULT_TIMEZONE id: {id(DEFAULT_TIMEZONE)}")
 
         if df.empty:
+            logger.debug("Creating empty DataFrame with timezone.utc timezone")
             # Create empty DataFrame with correct structure
-            empty_df = pd.DataFrame(
-                columns=list(output_dtypes.keys()),
-                index=pd.DatetimeIndex(
-                    [], name=CANONICAL_INDEX_NAME, tz=DEFAULT_TIMEZONE
-                ),
-            )
-
-            # Apply proper data types
+            empty_df = pd.DataFrame(columns=list(output_dtypes.keys()))
             for col, dtype in output_dtypes.items():
                 empty_df[col] = empty_df[col].astype(dtype)
-
+            empty_df.index = pd.DatetimeIndex(
+                [], name=CANONICAL_INDEX_NAME, tz=timezone.utc
+            )
+            logger.debug(f"Empty DataFrame index timezone: {empty_df.index.tz}")
+            logger.debug(f"Is timezone.utc? {empty_df.index.tz is timezone.utc}")
             return empty_df
 
-        # Check if we have an open_time column that will remain after indexing
-        has_separate_open_time = False
-        if "open_time" in df.columns and df.index.name != "open_time":
-            has_separate_open_time = True
-            # If open_time is not already the index, save a copy before indexing
-            original_open_time = df["open_time"].copy()
+        # Copy to avoid modifying original
+        formatted_df = df.copy()
 
-        # Ensure open_time is the index and in UTC
-        if "open_time" in df.columns:
-            df.set_index("open_time", inplace=True)
+        if (
+            isinstance(formatted_df.index, pd.DatetimeIndex)
+            and formatted_df.index.tz is not None
+        ):
+            logger.debug(
+                f"Input DataFrame timezone before processing: {formatted_df.index.tz}"
+            )
+            logger.debug(f"Is timezone.utc? {formatted_df.index.tz is timezone.utc}")
 
-        if df.index.tz is None:
-            df.index = df.index.tz_localize(DEFAULT_TIMEZONE)
-        elif df.index.tz != DEFAULT_TIMEZONE:
-            df.index = df.index.tz_convert(DEFAULT_TIMEZONE)
-
-        # Set correct index name
-        df.index.name = CANONICAL_INDEX_NAME
-
-        # Normalize column names for consistency
-        column_mapping = {
-            "taker_buy_base": "taker_buy_volume",
-            "taker_buy_quote": "taker_buy_quote_volume",
-        }
-        df = df.rename(columns=column_mapping)
-
-        # Ensure correct columns and types
-        required_columns = list(output_dtypes.keys())
-
-        # Filter to required columns if they exist
-        existing_columns = [col for col in required_columns if col in df.columns]
-        df = df[existing_columns]
-
-        # Add any missing columns with default values
-        for col in set(required_columns) - set(existing_columns):
-            if output_dtypes[col].startswith("float"):
-                df[col] = 0.0
-            elif output_dtypes[col].startswith("int"):
-                df[col] = 0
+        # Ensure index is DatetimeIndex in UTC
+        if not isinstance(formatted_df.index, pd.DatetimeIndex):
+            logger.debug("Converting non-DatetimeIndex to DatetimeIndex")
+            if "open_time" in formatted_df.columns:
+                formatted_df = formatted_df.set_index("open_time")
             else:
-                df[col] = None
+                raise ValueError(
+                    "DataFrame must have 'open_time' column or DatetimeIndex"
+                )
 
-        # Ensure correct column order
-        df = df[required_columns]
+        # Ensure index is named correctly
+        formatted_df.index.name = CANONICAL_INDEX_NAME
 
-        # Set correct dtypes
+        # Ensure index is timezone-aware and in UTC
+        # Use timezone.utc directly instead of DEFAULT_TIMEZONE
+        if formatted_df.index.tz is None:
+            logger.debug("Localizing naive DatetimeIndex to timezone.utc")
+            formatted_df.index = formatted_df.index.tz_localize(timezone.utc)
+        elif formatted_df.index.tz != timezone.utc:
+            logger.debug(f"Converting from {formatted_df.index.tz} to timezone.utc")
+            # Create a new DatetimeIndex with timezone.utc explicitly
+            new_index = pd.DatetimeIndex(
+                [
+                    dt.replace(tzinfo=timezone.utc)
+                    for dt in formatted_df.index.to_pydatetime()
+                ],
+                name=formatted_df.index.name,
+            )
+            formatted_df.index = new_index
+
+        logger.debug(f"Final DataFrame timezone: {formatted_df.index.tz}")
+        logger.debug(f"Is timezone.utc? {formatted_df.index.tz is timezone.utc}")
+
+        # Convert columns to specified dtypes
         for col, dtype in output_dtypes.items():
-            df[col] = df[col].astype(dtype)
+            if col in formatted_df.columns:
+                try:
+                    formatted_df[col] = formatted_df[col].astype(dtype)
+                except (ValueError, TypeError) as e:
+                    # Handle conversion errors gracefully
+                    formatted_df[col] = pd.Series(
+                        np.nan, index=formatted_df.index, dtype=dtype
+                    )
 
-        # Handle duplicate timestamps by keeping the first occurrence
-        if df.index.has_duplicates:
-            logger.debug(f"Removing {df.index.duplicated().sum()} duplicate timestamps")
-            df = df[~df.index.duplicated(keep="first")]
+        # Sort by index
+        if not formatted_df.index.is_monotonic_increasing:
+            formatted_df = formatted_df.sort_index()
 
-        # Sort by index if it's not monotonically increasing
-        if not df.index.is_monotonic_increasing:
-            logger.debug("Sorting DataFrame by index to ensure monotonic order")
-            df = df.sort_index()
+        # Remove duplicates if any
+        if formatted_df.index.has_duplicates:
+            formatted_df = formatted_df[~formatted_df.index.duplicated(keep="first")]
 
-        # If there was a separate open_time column, restore it and ensure it's sorted
-        if has_separate_open_time:
-            # Restore original open_time as a column (now sorted)
-            df["open_time"] = df.index.copy()
-            logger.debug("Restored open_time as a column (now sorted)")
-
-        return df
+        return formatted_df
 
     @staticmethod
     def validate_cache_integrity(

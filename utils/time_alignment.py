@@ -38,6 +38,7 @@ import pandas as pd
 from utils.logger_setup import get_logger
 from utils.market_constraints import Interval
 
+# Ensure we use a consistent logger with INFO level
 logger = get_logger(__name__, "INFO", show_path=False, rich_tracebacks=True)
 
 
@@ -183,17 +184,8 @@ def get_bar_close_time(open_time: datetime, interval: Interval) -> datetime:
     Returns:
         datetime: Close time (interval - 1 microsecond after open time)
     """
-    logger.debug("\n=== Bar Close Time Calculation ===")
-    logger.debug(f"Input open_time: {open_time}")
-    logger.debug(f"Input interval: {interval}")
-
     interval_delta = get_interval_timedelta(interval)
-    logger.debug(f"Interval timedelta: {interval_delta}")
-
     close_time = open_time + interval_delta - timedelta(microseconds=1)
-    logger.debug(f"Calculated close_time: {close_time}")
-    logger.debug(f"Close time microseconds: {close_time.microsecond}")
-
     return close_time
 
 
@@ -224,10 +216,48 @@ def adjust_time_window(
     if current_time is None:
         current_time = datetime.now(timezone.utc)
 
-    # Ensure UTC timezone
-    start_time = start_time.astimezone(timezone.utc)
-    end_time = end_time.astimezone(timezone.utc)
-    current_time = current_time.astimezone(timezone.utc)
+    # Ensure using exact timezone.utc object
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    elif start_time.tzinfo != timezone.utc:
+        start_time = datetime(
+            start_time.year,
+            start_time.month,
+            start_time.day,
+            start_time.hour,
+            start_time.minute,
+            start_time.second,
+            start_time.microsecond,
+            tzinfo=timezone.utc,
+        )
+
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+    elif end_time.tzinfo != timezone.utc:
+        end_time = datetime(
+            end_time.year,
+            end_time.month,
+            end_time.day,
+            end_time.hour,
+            end_time.minute,
+            end_time.second,
+            end_time.microsecond,
+            tzinfo=timezone.utc,
+        )
+
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+    elif current_time.tzinfo != timezone.utc:
+        current_time = datetime(
+            current_time.year,
+            current_time.month,
+            current_time.day,
+            current_time.hour,
+            current_time.minute,
+            current_time.second,
+            current_time.microsecond,
+            tzinfo=timezone.utc,
+        )
 
     # Get floor times - always floor the start time
     start_floor = get_interval_floor(start_time, interval)
@@ -247,54 +277,35 @@ def adjust_time_window(
     # So we use the floor time exactly (not the close time of the interval)
     adjusted_end = end_floor
 
+    # Make sure the returned values use timezone.utc
+    if adjusted_start.tzinfo != timezone.utc:
+        adjusted_start = datetime(
+            adjusted_start.year,
+            adjusted_start.month,
+            adjusted_start.day,
+            adjusted_start.hour,
+            adjusted_start.minute,
+            adjusted_start.second,
+            adjusted_start.microsecond,
+            tzinfo=timezone.utc,
+        )
+
+    if adjusted_end.tzinfo != timezone.utc:
+        adjusted_end = datetime(
+            adjusted_end.year,
+            adjusted_end.month,
+            adjusted_end.day,
+            adjusted_end.hour,
+            adjusted_end.minute,
+            adjusted_end.second,
+            adjusted_end.microsecond,
+            tzinfo=timezone.utc,
+        )
+
     # Calculate expected number of records
     expected_records = (
         int((adjusted_end - adjusted_start).total_seconds()) // interval.to_seconds()
     )
-
-    # Create detailed debug information
-    logger.debug("\n=== Time Window Adjustment Details ===")
-    logger.debug(
-        f"Original Start: {start_time.isoformat()} (microseconds: {start_time.microsecond})"
-    )
-    logger.debug(
-        f"Original End: {end_time.isoformat()} (microseconds: {end_time.microsecond})"
-    )
-    logger.debug(f"Floored Start: {start_floor.isoformat()}")
-    logger.debug(f"Floored End: {end_floor.isoformat()}")
-    logger.debug(f"Interval: {interval.value} ({interval.to_seconds()} seconds)")
-    logger.debug(f"Current Time: {current_time.isoformat()}")
-    logger.debug(f"Is end interval incomplete? {time_since_floor < interval_td}")
-    logger.debug(f"Adjusted Start: {adjusted_start.isoformat()} (INCLUSIVE)")
-    logger.debug(f"Adjusted End: {adjusted_end.isoformat()} (EXCLUSIVE)")
-    logger.debug(f"Expected Records: {expected_records}")
-    logger.debug(
-        f"Time Span (seconds): {int((adjusted_end - adjusted_start).total_seconds())}"
-    )
-    logger.debug(
-        f"Boundary Behavior: Start timestamp is INCLUSIVE, end timestamp is EXCLUSIVE"
-    )
-
-    # Log adjustments if they were made
-    if adjusted_start != start_time or adjusted_end != end_time:
-        logger.debug(
-            "Time window adjusted:"
-            f"\nOriginal:  {start_time.isoformat()} -> {end_time.isoformat()}"
-            f"\nAdjusted:  {adjusted_start.isoformat()} -> {adjusted_end.isoformat()}"
-        )
-
-    # Calculate and log the expected number of records
-    if interval == Interval.SECOND_1:
-        # For 1-second intervals, calculate seconds difference (exclusive end)
-        seconds_diff = int((adjusted_end - adjusted_start).total_seconds())
-        expected_records = seconds_diff  # Exclusive end boundary
-        logger.debug(
-            f"Expected records with exclusive end boundary: {expected_records}"
-        )
-        logger.debug(f"Time span in seconds: {seconds_diff} seconds")
-        logger.debug(
-            f"Boundaries: Start timestamp is INCLUSIVE, end timestamp is EXCLUSIVE"
-        )
 
     return adjusted_start, adjusted_end
 
@@ -370,26 +381,44 @@ def filter_time_range(
     if df.empty:
         return df
 
-    # Ensure both timestamps are in UTC
-    start_time = start_time.astimezone(timezone.utc)
-    end_time = end_time.astimezone(timezone.utc)
+    # Ensure both timestamps are UTC using timezone.utc specifically
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    elif start_time.tzinfo != timezone.utc:
+        start_time = datetime(
+            start_time.year,
+            start_time.month,
+            start_time.day,
+            start_time.hour,
+            start_time.minute,
+            start_time.second,
+            start_time.microsecond,
+            tzinfo=timezone.utc,
+        )
 
-    # Debug information about DataFrame
-    logger.debug(f"DataFrame index type: {type(df.index)}")
-    logger.debug(f"DataFrame index dtype: {df.index.dtype}")
-    logger.debug(f"DataFrame shape: {df.shape}")
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+    elif end_time.tzinfo != timezone.utc:
+        end_time = datetime(
+            end_time.year,
+            end_time.month,
+            end_time.day,
+            end_time.hour,
+            end_time.minute,
+            end_time.second,
+            end_time.microsecond,
+            tzinfo=timezone.utc,
+        )
 
     # Check if index is datetime type
     if pd.api.types.is_datetime64_any_dtype(df.index):
         # Case 1: DataFrame has a datetime index
-        logger.debug("Filtering with datetime index")
         mask = (df.index >= start_time) & (df.index < end_time)
         return df[mask]
 
     # Case 2: Try to use open_time column if it exists
     elif "open_time" in df.columns:
         if pd.api.types.is_datetime64_any_dtype(df["open_time"]):
-            logger.debug("Filtering with open_time column")
             mask = (df["open_time"] >= start_time) & (df["open_time"] < end_time)
             return df[mask]
         else:
