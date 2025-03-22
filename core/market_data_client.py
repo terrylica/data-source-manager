@@ -18,6 +18,7 @@ from utils.time_alignment import (
 )
 from utils.hardware_monitor import HardwareMonitor
 from utils.validation import DataValidation
+from utils.http_client_factory import create_aiohttp_client
 from utils.config import (
     KLINE_COLUMNS,
     standardize_column_names,
@@ -42,17 +43,7 @@ def create_http_client(
     Returns:
         Configured aiohttp ClientSession
     """
-    timeout = aiohttp.ClientTimeout(
-        total=timeout, connect=3, sock_connect=3, sock_read=5
-    )
-
-    connector = aiohttp.TCPConnector(limit=max_connections, force_close=False)
-
-    return aiohttp.ClientSession(
-        timeout=timeout,
-        connector=connector,
-        headers={"Accept": "application/json", "User-Agent": "EnhancedRetriever/2.0"},
-    )
+    return create_aiohttp_client(timeout=timeout, max_connections=max_connections)
 
 
 def process_kline_data(raw_data: List[List]) -> pd.DataFrame:

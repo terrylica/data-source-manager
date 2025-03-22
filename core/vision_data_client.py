@@ -53,6 +53,7 @@ from utils.market_constraints import Interval
 from utils.time_alignment import TimeRangeManager
 from utils.download_handler import VisionDownloadManager
 from utils.config import create_empty_dataframe
+from utils.http_client_factory import create_httpx_client
 from core.vision_constraints import (
     TimestampedDataFrame,
     MAX_CONCURRENT_DOWNLOADS,
@@ -201,13 +202,7 @@ class VisionDataClient(Generic[T]):
 
         # Initialize HTTP client
         max_connections = MAX_CONCURRENT_DOWNLOADS * FILES_PER_DAY
-        self.client = httpx.AsyncClient(
-            limits=httpx.Limits(
-                max_connections=max_connections,
-                max_keepalive_connections=max_connections,
-            ),
-            timeout=httpx.Timeout(10.0),
-        )
+        self.client = create_httpx_client(max_connections=max_connections)
 
         # Initialize utility managers
         self.download_manager = VisionDownloadManager(

@@ -95,6 +95,11 @@ DEFAULT_COLUMN_ORDER: Final[List[str]] = [
 TIMESTAMP_UNIT: Final[str] = "us"  # Microseconds for timestamps
 CLOSE_TIME_ADJUSTMENT: Final[int] = 999  # Microseconds to add to close_time
 
+# HTTP Client configuration
+DEFAULT_USER_AGENT: Final[str] = "EnhancedRetriever/2.0"
+DEFAULT_ACCEPT_HEADER: Final[str] = "application/json"
+DEFAULT_HTTP_TIMEOUT_SECONDS: Final[float] = 10.0
+
 # Chunk size constraints
 REST_CHUNK_SIZE: Final = 1000
 REST_MAX_CHUNKS: Final = 5
