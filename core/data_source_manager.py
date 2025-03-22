@@ -321,6 +321,10 @@ class DataSourceManager:
             logger.debug("Converting end_time from Pandas Timestamp to datetime")
             end_time = end_time.to_pydatetime()
 
+        # Ensure UTC timezone using the centralized utility
+        start_time = TimeRangeManager.enforce_utc_timezone(start_time)
+        end_time = TimeRangeManager.enforce_utc_timezone(end_time)
+
         # Use the centralized validation manager
         TimeRangeManager.validate_time_window(start_time, end_time)
 

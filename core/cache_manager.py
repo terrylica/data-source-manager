@@ -270,11 +270,16 @@ class UnifiedCacheManager:
         if df is None:
             return None
 
-        # Ensure index has correct timezone
+        # Ensure index has correct timezone using centralized utility
         if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is not None:
-            # Convert to Python datetime objects with timezone.utc
+            # Convert to Python datetime objects with timezone.utc using centralized approach
+            from utils.time_alignment import TimeRangeManager
+
             new_index = pd.DatetimeIndex(
-                [dt.replace(tzinfo=timezone.utc) for dt in df.index.to_pydatetime()],
+                [
+                    TimeRangeManager.enforce_utc_timezone(dt)
+                    for dt in df.index.to_pydatetime()
+                ],
                 name=df.index.name,
             )
             df.index = new_index
