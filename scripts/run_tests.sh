@@ -108,25 +108,37 @@ if [ $# -eq 0 ]; then
   # Find all test files for selection
   mapfile -t TEST_FILES < <(find tests -name "test_*.py" | sort)
   
-  # Add options for directories and all tests - excluding tests/utils/
-  TEST_OPTIONS=("All tests (tests/)" "${TEST_FILES[@]}")
+  # Define test directories based on the new folder structure
+  TEST_DIRS=(
+    "All tests (tests/)"
+    "1-second interval tests (tests/interval_1s/)"
+    "New intervals tests (tests/interval_new/)"
+  )
   
-  # Display test file options
+  # Display test selection options
   print_header "TEST SELECTION"
-  print_options "${TEST_OPTIONS[@]}"
+  print_options "${TEST_DIRS[@]}"
   
-  read -rp "$(echo -e "${YELLOW}Enter selection (1-${#TEST_OPTIONS[@]}, default: 1): ${RESET}")" test_selection
+  # Then add each test file as an option
+  for i in "${!TEST_FILES[@]}"; do
+    echo -e "  ${BOLD}$((i+1+${#TEST_DIRS[@]})).${RESET} ${TEST_FILES[$i]}"
+  done
+  
+  read -rp "$(echo -e "${YELLOW}Enter selection (1-$((${#TEST_DIRS[@]}+${#TEST_FILES[@]})), default: 1): ${RESET}")" test_selection
   
   if [[ -z "$test_selection" ]]; then
     echo -e "${GREEN}Using default: All tests (tests/)${RESET}"
     TEST_PATH="tests/"
-  elif [[ $test_selection -ge 1 && $test_selection -le ${#TEST_OPTIONS[@]} ]]; then
-    selected_option="${TEST_OPTIONS[$((test_selection-1))]}"
-    if [ "$selected_option" = "All tests (tests/)" ]; then
-      TEST_PATH="tests/"
-    else
-      TEST_PATH="$selected_option"
-    fi
+  elif [[ $test_selection -ge 1 && $test_selection -le ${#TEST_DIRS[@]} ]]; then
+    case $test_selection in
+      1) TEST_PATH="tests/" ;;
+      2) TEST_PATH="tests/interval_1s/" ;;
+      3) TEST_PATH="tests/interval_new/" ;;
+    esac
+    echo -e "${GREEN}Selected: ${TEST_DIRS[$((test_selection-1))]}${RESET}"
+  elif [[ $test_selection -gt ${#TEST_DIRS[@]} && $test_selection -le $((${#TEST_DIRS[@]}+${#TEST_FILES[@]})) ]]; then
+    TEST_PATH="${TEST_FILES[$((test_selection-${#TEST_DIRS[@]}-1))]}"
+    echo -e "${GREEN}Selected: ${TEST_PATH}${RESET}"
   else
     echo -e "${RED}Invalid selection. Using default: tests/${RESET}"
     TEST_PATH="tests/"
