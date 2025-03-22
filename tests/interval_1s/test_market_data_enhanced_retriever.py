@@ -31,7 +31,7 @@ from utils.market_constraints import (
     get_endpoint_url,
     get_market_capabilities,
 )
-from tests.test_market_data_structure_validation import (
+from tests.interval_1s.test_market_data_structure_validation import (
     validate_market_data_structure,
     validate_time_integrity,
 )
