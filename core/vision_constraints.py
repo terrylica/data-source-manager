@@ -142,7 +142,11 @@ def classify_error(error: Exception) -> str:
 
 
 def get_vision_url(
-    symbol: str, interval: str, date: datetime, file_type: FileType
+    symbol: str,
+    interval: str,
+    date: datetime,
+    file_type: FileType,
+    market_type: str = "spot",
 ) -> str:
     """Generate standard Vision URLs.
 
@@ -151,11 +155,27 @@ def get_vision_url(
         interval: Time interval
         date: Target date
         file_type: Type of file to generate URL for
+        market_type: Market type (spot, futures_usdt, futures_coin)
 
     Returns:
         Formatted Vision URL
     """
-    base_url = "https://data.binance.vision/data/spot/daily/klines"
+    # Normalize market_type
+    market_type = market_type.lower()
+
+    # Map market types to URL paths
+    market_path_mapping = {
+        "spot": "spot",
+        "futures_usdt": "futures/um",
+        "futures_coin": "futures/cm",
+    }
+
+    if market_type not in market_path_mapping:
+        raise ValueError(f"Invalid market type: {market_type}")
+
+    market_path = market_path_mapping[market_type]
+
+    base_url = f"https://data.binance.vision/data/{market_path}/daily/klines"
     date_str = date.strftime("%Y-%m-%d")
     file_name = f"{symbol}-{interval}-{date_str}"
 

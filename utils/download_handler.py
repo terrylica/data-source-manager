@@ -203,17 +203,25 @@ class DownloadHandler:
 class VisionDownloadManager:
     """Handles downloading Vision data files with validation and processing."""
 
-    def __init__(self, client: httpx.AsyncClient, symbol: str, interval: str):
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        symbol: str,
+        interval: str,
+        market_type: str = "spot",
+    ):
         """Initialize the download manager.
 
         Args:
             client: HTTP client for downloads
             symbol: Trading pair symbol
             interval: Time interval
+            market_type: Market type (spot, futures_usdt, futures_coin)
         """
         self.client = client
         self.symbol = symbol
         self.interval = interval
+        self.market_type = market_type
         self.download_handler = DownloadHandler(
             client, max_retries=5, min_wait=4, max_wait=60
         )
@@ -233,7 +241,9 @@ class VisionDownloadManager:
         # Note: This assumes the vision_constraints module has this function
         from core.vision_constraints import get_vision_url, FileType
 
-        return get_vision_url(self.symbol, self.interval, date, FileType.CHECKSUM)
+        return get_vision_url(
+            self.symbol, self.interval, date, FileType.CHECKSUM, self.market_type
+        )
 
     def _get_data_url(self, date: datetime) -> str:
         """Get data URL for a specific date.
@@ -250,7 +260,9 @@ class VisionDownloadManager:
         # Note: This assumes the vision_constraints module has this function
         from core.vision_constraints import get_vision_url, FileType
 
-        return get_vision_url(self.symbol, self.interval, date, FileType.DATA)
+        return get_vision_url(
+            self.symbol, self.interval, date, FileType.DATA, self.market_type
+        )
 
     def _verify_checksum(self, file_path: Path, checksum_path: Path) -> bool:
         """Verify file checksum.
@@ -301,6 +313,12 @@ class VisionDownloadManager:
         # Ensure date has proper timezone using TimeRangeManager
         date = TimeRangeManager.enforce_utc_timezone(date)
 
+        # Add debugging timestamp
+        debug_id = f"{self.symbol}_{self.interval}_{date.strftime('%Y%m%d')}_{int(time.time())}"
+        logger.info(
+            f"[{debug_id}] Starting download for {self.symbol} {self.interval} on {date.strftime('%Y-%m-%d')}"
+        )
+
         # Create temporary directory for downloads
         temp_dir = Path(tempfile.mkdtemp())
         data_file = (
@@ -317,27 +335,77 @@ class VisionDownloadManager:
             data_url = self._get_data_url(date)
             checksum_url = self._get_checksum_url(date)
 
-            logger.info(f"Downloading data for {date.strftime('%Y-%m-%d')} from:")
-            logger.info(f"Data: {data_url}")
-            logger.info(f"Checksum: {checksum_url}")
+            logger.info(
+                f"[{debug_id}] Downloading data for {date.strftime('%Y-%m-%d')} from:"
+            )
+            logger.info(f"[{debug_id}] Data URL: {data_url}")
+            logger.info(f"[{debug_id}] Checksum URL: {checksum_url}")
 
+            download_start = time.time()
             success = await asyncio.gather(
                 self.download_file(data_url, data_file),
                 self.download_file(checksum_url, checksum_file),
             )
+            download_time = time.time() - download_start
+
+            logger.info(
+                f"[{debug_id}] Download completed in {download_time:.2f}s, success: {success}"
+            )
 
             if not all(success):
-                logger.error(f"Failed to download files for {date}")
+                logger.error(f"[{debug_id}] Failed to download files for {date}")
                 return None
 
+            # Log file sizes for diagnosis
+            try:
+                data_size = data_file.stat().st_size if data_file.exists() else 0
+                checksum_size = (
+                    checksum_file.stat().st_size if checksum_file.exists() else 0
+                )
+                logger.info(
+                    f"[{debug_id}] Data file size: {data_size} bytes, Checksum file size: {checksum_size} bytes"
+                )
+
+                if data_size == 0:
+                    logger.error(f"[{debug_id}] Downloaded data file is empty")
+                    return None
+            except Exception as e:
+                logger.error(f"[{debug_id}] Error checking file sizes: {e}")
+
             # Verify checksum
+            checksum_start = time.time()
             if not self._verify_checksum(data_file, checksum_file):
-                logger.error(f"Checksum verification failed for {date}")
+                logger.error(f"[{debug_id}] Checksum verification failed for {date}")
                 return None
+            logger.info(
+                f"[{debug_id}] Checksum verification completed in {time.time() - checksum_start:.2f}s"
+            )
 
             # Read CSV data with detailed error handling
             try:
-                logger.info(f"Reading CSV data from {data_file}")
+                logger.info(f"[{debug_id}] Reading CSV data from {data_file}")
+                csv_start = time.time()
+
+                # Log zip file contents for diagnosis
+                try:
+                    import zipfile
+
+                    with zipfile.ZipFile(data_file, "r") as zip_ref:
+                        file_list = zip_ref.namelist()
+                        logger.info(f"[{debug_id}] Zip file contents: {file_list}")
+
+                        # Log first few lines of the CSV file for diagnosis
+                        if file_list:
+                            with zip_ref.open(file_list[0], "r") as f:
+                                sample_lines = [
+                                    next(f).decode("utf-8").strip() for _ in range(5)
+                                ]
+                                logger.info(
+                                    f"[{debug_id}] Sample CSV lines: {sample_lines}"
+                                )
+                except Exception as e:
+                    logger.error(f"[{debug_id}] Error examining zip contents: {e}")
+
                 df = pd.read_csv(
                     data_file,
                     compression="zip",
@@ -356,21 +424,37 @@ class VisionDownloadManager:
                         "ignored",
                     ],
                 )
+                logger.info(
+                    f"[{debug_id}] CSV reading completed in {time.time() - csv_start:.2f}s"
+                )
 
                 if df.empty:
-                    logger.error(f"Empty DataFrame after reading CSV for {date}")
+                    logger.error(
+                        f"[{debug_id}] Empty DataFrame after reading CSV for {date}"
+                    )
                     return None
+
+                logger.info(
+                    f"[{debug_id}] Raw DataFrame shape: {df.shape}, head: {df.head(2).to_dict('records')}"
+                )
 
                 # Detect timestamp format and convert
                 from core.vision_constraints import detect_timestamp_unit
 
                 sample_ts = df["open_time"].iloc[0]
                 ts_unit = detect_timestamp_unit(sample_ts)
+                logger.info(
+                    f"[{debug_id}] Detected timestamp unit: {ts_unit} for sample value: {sample_ts}"
+                )
 
                 # Convert timestamps
+                processing_start = time.time()
                 df["open_time"] = pd.to_datetime(df["open_time"], unit=ts_unit)
                 df["open_time"] = df["open_time"].dt.floor("s") + pd.Timedelta(
                     microseconds=0
+                )
+                logger.info(
+                    f"[{debug_id}] Converted open_time, first value: {df['open_time'].iloc[0]}"
                 )
 
                 # Handle close_time
@@ -380,18 +464,32 @@ class VisionDownloadManager:
                         df["close_time"] // 1000
                     )  # Convert to microseconds
                 df["close_time"] = (df["close_time"].astype(np.int64) + 999) * 1000
+                logger.info(
+                    f"[{debug_id}] Converted close_time, first value: {df['close_time'].iloc[0]}"
+                )
 
                 # Set index
                 df.set_index("open_time", inplace=True)
                 df = df.drop(columns=["ignored"])
 
+                # Log shape after processing
+                logger.info(
+                    f"[{debug_id}] Processed DataFrame shape: {df.shape}, index range: {df.index.min()} to {df.index.max()}"
+                )
+
                 # Ensure UTC timezone using TimeRangeManager
                 if df.index.tz is None:
+                    logger.info(
+                        f"[{debug_id}] Setting timezone for DatetimeIndex without timezone"
+                    )
                     df.index = pd.DatetimeIndex(
                         [TimeRangeManager.enforce_utc_timezone(dt) for dt in df.index],
                         name=df.index.name,
                     )
                 else:
+                    logger.info(
+                        f"[{debug_id}] Converting existing timezone to UTC: {df.index.tz}"
+                    )
                     df.index = pd.DatetimeIndex(
                         [
                             TimeRangeManager.enforce_utc_timezone(dt)
@@ -399,27 +497,39 @@ class VisionDownloadManager:
                         ],
                         name=df.index.name,
                     )
+                logger.info(
+                    f"[{debug_id}] Final DataFrame processing completed in {time.time() - processing_start:.2f}s"
+                )
+                logger.info(
+                    f"[{debug_id}] Total processing completed in {time.time() - download_start:.2f}s"
+                )
+                logger.info(
+                    f"[{debug_id}] Final DataFrame shape: {df.shape}, columns: {list(df.columns)}"
+                )
 
                 return df
 
             except pd.errors.EmptyDataError:
-                logger.error(f"Empty data file for {date}")
+                logger.error(f"[{debug_id}] Empty data file for {date}")
                 return None
             except Exception as e:
-                logger.error(f"Error processing data for {date}: {str(e)}")
-                logger.error("Error details:", exc_info=True)
+                logger.error(f"[{debug_id}] Error processing data for {date}: {str(e)}")
+                logger.error(f"[{debug_id}] Error details:", exc_info=True)
                 return None
 
         except Exception as e:
-            logger.error(f"Error downloading data for {date}: {str(e)}")
-            logger.error("Error details:", exc_info=True)
+            logger.error(f"[{debug_id}] Error downloading data for {date}: {str(e)}")
+            logger.error(f"[{debug_id}] Error details:", exc_info=True)
             return None
 
         finally:
             # Cleanup temporary files
             try:
+                logger.info(f"[{debug_id}] Cleaning up temporary files")
                 data_file.unlink(missing_ok=True)
                 checksum_file.unlink(missing_ok=True)
                 temp_dir.rmdir()
             except Exception as e:
-                logger.error(f"Error cleaning up temporary files: {str(e)}")
+                logger.error(
+                    f"[{debug_id}] Error cleaning up temporary files: {str(e)}"
+                )

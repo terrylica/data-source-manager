@@ -77,6 +77,6 @@
 - **Timestamp Precision:** Ensure proper handling of timestamp precision, including support for both millisecond (13 digits) and microsecond (16 digits) timestamps as mentioned in the documentation.
 - **Backward Compatibility:** All enhancements must maintain backward compatibility with the existing `vision_data_client.py` interface to prevent disruptions to dependent systems, especially `data_source_manager.py`.
 - **Error Handling:** Ensure all enhancements include appropriate error handling and logging to maintain the robustness of the client in production environments.
-- **Testing:** Implement comprehensive tests for each enhancement to ensure reliability and prevent regressions.
+- **Testing:** Implement comprehensive tests for each enhancement to ensure reliability and prevent regressions. All new interval support features should be tested in the `interval_new` test folder, while preserving the `interval_1s` folder exclusively for 1-second interval testing.
 
 By prioritizing the low-hanging fruit first (interval support, URL handling, CSV parsing), you can quickly improve the Vision API integration capabilities of `vision_data_client.py` while maintaining compatibility with the existing ecosystem. The medium-priority items (cache management, batch processing, additional data types) can be implemented iteratively to further enhance the client's capabilities and performance in working with the Binance Vision API.

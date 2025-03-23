@@ -60,4 +60,10 @@
 - **Vision API Data Lag:** Remember that Vision API data is typically delayed by 48+ hours. Real-time or very recent data from the REST API will naturally be fresher than Vision API. The alignment should focus on historical data consistency.
 - **Data Granularity Limits:** Ensure that when fetching data using `market_data_client.py`, you are not attempting to get data at a finer granularity or for a longer historical period than what is available in the Vision API for the same market type (spot). The goal is to be _consistent_ with Vision API's data availability, not to exceed it.
 
-By prioritizing tee low-hanging fruit first (interval expansion, schema validation, documentation), you can quickly make `market_data_client.py` more versatile and better aligned with the Binance Vision API data landscape. The medium-priority items (consistency checks, enhanced error handling) can be implemented iteratively to further improve data quality and robustness.
+By prioritizing the low-hanging fruit first (interval expansion, schema validation, documentation), you can quickly make `market_data_client.py` more versatile and better aligned with the Binance Vision API data landscape. The medium-priority items (consistency checks, enhanced error handling) can be implemented iteratively to further improve data quality and robustness.
+
+**Testing Structure:**
+
+- All new interval support features (1m, 3m, 5m, 15m, 30m, 1h, etc.) should be tested in the `interval_new` test folder.
+- The existing `interval_1s` test folder should be preserved exclusively for 1-second interval testing.
+- When implementing new tests, use the fixtures and utilities already defined in the `interval_new/conftest.py` file, updating them as needed for specific interval requirements.

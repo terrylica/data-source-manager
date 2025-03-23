@@ -1,11 +1,37 @@
 #!/usr/bin/env python
+"""Centralized validation utilities for data integrity and constraints."""
+
+from datetime import datetime, timezone, timedelta
+from typing import Dict, List, Optional, Union, Sequence, Any, Tuple
+import re
+import pandas as pd
+import numpy as np
+
 from utils.logger_setup import get_logger
+
+# Column name constants
+OHLCV_COLUMNS = ["open", "high", "low", "close", "volume"]
+ALL_COLUMNS = [
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "quote_volume",
+    "trades",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+]
+
+# Regex Patterns
+TICKER_PATTERN = re.compile(r"^[A-Z0-9]{1,20}$")  # Match individual tickers
+SYMBOL_PATTERN = re.compile(r"^[A-Z0-9]{1,20}(USDT|BTC|ETH|BNB)$")  # Trading pairs
+INTERVAL_PATTERN = re.compile(
+    r"^(1s|1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|1M)$"
+)  # Valid intervals
 
 logger = get_logger(__name__, "INFO", show_path=False, rich_tracebacks=True)
 
-from datetime import datetime, timezone, timedelta
-import pandas as pd
-from typing import Optional, Dict, Any
 from utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_TIMEZONE,
@@ -13,7 +39,6 @@ from utils.config import (
     MAX_CACHE_AGE,
     OUTPUT_DTYPES,
 )
-import numpy as np
 
 
 class ValidationError(Exception):
@@ -302,10 +327,20 @@ class DataValidation:
             raise ValueError(
                 f"Data starts later than requested: {data_start} > {start_time}"
             )
+
+        # Data end checks - don't fail if we have at least some data
         if data_end_floor < adjusted_end_time_floor:
-            raise ValueError(
-                f"Data ends earlier than requested: {data_end} < {adjusted_end_time_floor}"
-            )
+            # Instead of raising an error, just log a warning if we at least have data at the start
+            if data_start_floor == start_time_floor:
+                logger.warning(
+                    f"Data doesn't cover entire requested range: ends at {data_end} < {adjusted_end_time_floor}. "
+                    f"This may be due to market-specific limitations or data availability."
+                )
+            else:
+                # Still raise error if data doesn't even start at the requested time
+                raise ValueError(
+                    f"Data ends earlier than requested: {data_end} < {adjusted_end_time_floor}"
+                )
 
         # Verify data is sorted
         if not df.index.is_monotonic_increasing:

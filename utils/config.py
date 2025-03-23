@@ -85,6 +85,7 @@ DEFAULT_COLUMN_ORDER: Final[List[str]] = [
     "low",
     "close",
     "volume",
+    "close_time",
     "quote_volume",
     "trades",
     "taker_buy_volume",

@@ -100,4 +100,9 @@ After reviewing all the code files (`cache_manager.py`, `data_source_manager.py`
 
 5. **Gradual Integration:** Implement changes in small, testable increments to minimize risk of disruption.
 
+6. **Testing Structure Separation:** Maintain a clear separation between testing environments:
+   - All new interval support features (1m, 3m, 5m, 15m, 30m, 1h, etc.) must be tested in the `interval_new` test folder
+   - The existing `interval_1s` test folder must be preserved exclusively for 1-second interval testing
+   - When implementing new tests, use the fixtures and utilities already defined in the `interval_new/conftest.py` file
+
 This enhanced roadmap focuses specifically on making the market data client more versatile while strictly adhering to Vision API's data availability constraints, exactly as you requested.

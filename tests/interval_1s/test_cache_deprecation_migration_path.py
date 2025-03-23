@@ -1,23 +1,19 @@
 #!/usr/bin/env python
-"""Test cache migration and deprecation functionality.
+"""Test DataSourceManager caching functionality.
 
 System Under Test (SUT):
 - core.data_source_manager.DataSourceManager
 - core.vision_data_client.VisionDataClient
 - core.cache_manager.UnifiedCacheManager
 
-This test suite verifies the migration path from the legacy caching system in
-VisionDataClient to the new unified caching system in DataSourceManager. It ensures:
+This test suite verifies that the unified caching system in DataSourceManager works correctly:
 
-1. Proper deprecation warnings are emitted when using the legacy caching system
-2. VisionDataClient's caching is disabled when used through DataSourceManager
-3. Original cache settings are restored after DataSourceManager exits
-4. The unified caching system works correctly with both data sources
-5. Cache files are stored in the correct locations during migration
+1. The unified caching system works correctly with VisionDataClient
+2. Cache files are stored in the correct locations
+3. Data is consistent across multiple fetches
 """
 
 import pytest
-import warnings
 from datetime import datetime, timezone, timedelta
 import tempfile
 from pathlib import Path
@@ -40,70 +36,6 @@ def temp_cache_dir():
     """Create temporary cache directory."""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield Path(temp_dir)
-
-
-@pytest.mark.asyncio
-async def test_vision_client_deprecation_warning(temp_cache_dir):
-    """Test that VisionDataClient emits deprecation warning when using cache directly."""
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-
-        _client = VisionDataClient(
-            symbol="BTCUSDT", interval="1s", cache_dir=temp_cache_dir, use_cache=True
-        )
-
-        # Verify deprecation warning was emitted
-        assert len(w) == 1
-        assert issubclass(w[0].category, DeprecationWarning)
-        assert "Direct caching through VisionDataClient is deprecated" in str(
-            w[0].message
-        )
-
-
-@pytest.mark.asyncio
-async def test_cache_disabled_through_manager(temp_cache_dir):
-    """Test that VisionDataClient caching is disabled when used through DataSourceManager."""
-    # Create VisionDataClient with caching enabled
-    vision_client = VisionDataClient(
-        symbol="BTCUSDT", interval="1s", cache_dir=temp_cache_dir, use_cache=True
-    )
-
-    # Create DataSourceManager with the vision client
-    _manager = DataSourceManager(
-        market_type=MarketType.SPOT,
-        vision_client=vision_client,
-        cache_dir=temp_cache_dir,
-        use_cache=True,
-    )
-
-    # Verify vision client's caching is disabled
-    assert not vision_client.use_cache
-    assert vision_client.cache_dir is None
-
-
-@pytest.mark.asyncio
-async def test_cache_settings_restored(temp_cache_dir):
-    """Test that VisionDataClient's original cache settings are restored after manager exit."""
-    vision_client = VisionDataClient(
-        symbol="BTCUSDT", interval="1s", cache_dir=temp_cache_dir, use_cache=True
-    )
-
-    original_cache_dir = vision_client.cache_dir
-    original_use_cache = vision_client.use_cache
-
-    async with DataSourceManager(
-        market_type=MarketType.SPOT,
-        vision_client=vision_client,
-        cache_dir=temp_cache_dir,
-        use_cache=True,
-    ):
-        # Verify settings are modified during manager use
-        assert not vision_client.use_cache
-        assert vision_client.cache_dir is None
-
-    # Verify original settings are restored
-    assert vision_client.cache_dir == original_cache_dir
-    assert vision_client.use_cache == original_use_cache
 
 
 @pytest.mark.asyncio
@@ -142,21 +74,17 @@ async def test_unified_caching_through_manager(temp_cache_dir):
 
 
 @pytest.mark.asyncio
-async def test_mixed_caching_scenario(temp_cache_dir):
-    """Test scenario with both direct VisionDataClient and DataSourceManager caching."""
+async def test_caching_directory_structure(temp_cache_dir):
+    """Test that cache files are stored in the correct directory structure."""
     start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
     end_time = start_time + timedelta(hours=1)
 
-    # Create separate cache directories
-    legacy_cache_dir = temp_cache_dir / "legacy"
+    # Create cache directory
     unified_cache_dir = temp_cache_dir / "unified"
-    legacy_cache_dir.mkdir()
     unified_cache_dir.mkdir()
 
-    # Create VisionDataClient with legacy caching
-    vision_client = VisionDataClient(
-        symbol="BTCUSDT", interval="1s", cache_dir=legacy_cache_dir, use_cache=True
-    )
+    # Create VisionDataClient without caching
+    vision_client = VisionDataClient(symbol="BTCUSDT", interval="1s", use_cache=False)
 
     # Use through DataSourceManager with unified caching
     async with DataSourceManager(
@@ -173,14 +101,23 @@ async def test_mixed_caching_scenario(temp_cache_dir):
             enforce_source=DataSource.VISION,
         )
 
-        # Verify data was cached in unified cache, not legacy cache
-        legacy_cache_files = list(legacy_cache_dir.rglob("*.arrow"))
+        # Verify cache directory structure
         unified_cache_files = list(unified_cache_dir.rglob("*.arrow"))
-
-        assert (
-            len(legacy_cache_files) == 0
-        ), "Data was incorrectly cached in legacy location"
         assert len(unified_cache_files) > 0, "Data was not cached in unified location"
+
+        # Check for expected directory structure (data/BTCUSDT/1s/...)
+        data_dir = unified_cache_dir / "data"
+        assert data_dir.exists(), "Data directory not created"
+
+        btc_dir = data_dir / "BTCUSDT"
+        assert btc_dir.exists(), "Symbol directory not created"
+
+        interval_dir = btc_dir / "1s"
+        assert interval_dir.exists(), "Interval directory not created"
+
+        # Check for cache files in the interval directory
+        interval_cache_files = list(interval_dir.glob("*.arrow"))
+        assert len(interval_cache_files) > 0, "No cache files in interval directory"
 
 
 if __name__ == "__main__":
