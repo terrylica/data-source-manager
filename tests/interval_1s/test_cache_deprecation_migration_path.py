@@ -86,38 +86,45 @@ async def test_caching_directory_structure(temp_cache_dir):
     # Create VisionDataClient without caching
     vision_client = VisionDataClient(symbol="BTCUSDT", interval="1s", use_cache=False)
 
-    # Use through DataSourceManager with unified caching
-    async with DataSourceManager(
-        market_type=MarketType.SPOT,
-        vision_client=vision_client,
-        cache_dir=unified_cache_dir,
-        use_cache=True,
-    ) as manager:
-        _df = await manager.get_data(
-            symbol="BTCUSDT",
-            start_time=start_time,
-            end_time=end_time,
-            interval=Interval.SECOND_1,
-            enforce_source=DataSource.VISION,
-        )
+    try:
+        # Use through DataSourceManager with unified caching
+        async with DataSourceManager(
+            market_type=MarketType.SPOT,
+            vision_client=vision_client,
+            cache_dir=unified_cache_dir,
+            use_cache=True,
+        ) as manager:
+            _df = await manager.get_data(
+                symbol="BTCUSDT",
+                start_time=start_time,
+                end_time=end_time,
+                interval=Interval.SECOND_1,
+                enforce_source=DataSource.VISION,
+            )
 
-        # Verify cache directory structure
-        unified_cache_files = list(unified_cache_dir.rglob("*.arrow"))
-        assert len(unified_cache_files) > 0, "Data was not cached in unified location"
+            # Verify cache directory structure
+            unified_cache_files = list(unified_cache_dir.rglob("*.arrow"))
+            assert (
+                len(unified_cache_files) > 0
+            ), "Data was not cached in unified location"
 
-        # Check for expected directory structure (data/BTCUSDT/1s/...)
-        data_dir = unified_cache_dir / "data"
-        assert data_dir.exists(), "Data directory not created"
+            # Check for expected directory structure (data/BTCUSDT/1s/...)
+            data_dir = unified_cache_dir / "data"
+            assert data_dir.exists(), "Data directory not created"
 
-        btc_dir = data_dir / "BTCUSDT"
-        assert btc_dir.exists(), "Symbol directory not created"
+            btc_dir = data_dir / "BTCUSDT"
+            assert btc_dir.exists(), "Symbol directory not created"
 
-        interval_dir = btc_dir / "1s"
-        assert interval_dir.exists(), "Interval directory not created"
+            interval_dir = btc_dir / "1s"
+            assert interval_dir.exists(), "Interval directory not created"
 
-        # Check for cache files in the interval directory
-        interval_cache_files = list(interval_dir.glob("*.arrow"))
-        assert len(interval_cache_files) > 0, "No cache files in interval directory"
+            # Check for cache files in the interval directory
+            interval_cache_files = list(interval_dir.glob("*.arrow"))
+            assert len(interval_cache_files) > 0, "No cache files in interval directory"
+    finally:
+        # Ensure we properly close the client to avoid ResourceWarning
+        # Directly call the __aexit__ method to clean up resources
+        await vision_client.__aexit__(None, None, None)
 
 
 if __name__ == "__main__":

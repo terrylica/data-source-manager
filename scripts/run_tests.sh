@@ -8,10 +8,11 @@
 # Coverage examples:
 #   ./scripts/run_tests.sh tests/ INFO --cov=. --cov-report=term
 #   ./scripts/run_tests.sh tests/test_vision_api_core_functionality.py DEBUG --cov=.
+#
+# Special modes:
+#   ./scripts/run_tests.sh --warnings-summary [test_path]  # Run with Warnings Summary mode
 
 set -e
-
-clear
 
 # Define colors
 CYAN='\033[0;36m'
@@ -83,6 +84,9 @@ usage() {
     echo "  log_level:       Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) (optional)"
     echo "  additional_args: Additional arguments to pass to pytest (optional)"
     echo ""
+    echo "Special modes:"
+    echo "  $0 --warnings-summary [test_path]  # Run with Warnings Summary mode"
+    echo ""
     echo "  Coverage flags:"
     echo "    --cov=.                 Enable coverage for all modules"
     echo "    --cov-report=term       Show coverage report in terminal"
@@ -109,8 +113,51 @@ check_pytest_plugin() {
     fi
 }
 
-# Interactive mode if no arguments provided
-if [ $# -eq 0 ]; then
+# Check for special modes
+if [ "$1" = "--warnings-summary" ]; then
+  echo -e "\n${BOLD}${YELLOW}Running in Warnings Summary mode${RESET}"
+  
+  # Add a background progress indicator to ensure the AI sees continuous output
+  (
+    for i in {1..60}; do
+      echo -n "."
+      sleep 0.5
+    done
+    echo "Test is running, please wait..."
+  ) &
+  PROGRESS_PID=$!
+
+  # Create a cleanup function to ensure we kill the progress indicator
+  cleanup_progress() {
+    if [ -n "$PROGRESS_PID" ]; then
+      kill $PROGRESS_PID 2>/dev/null || true
+    fi
+  }
+  
+  # Set up trap to ensure we clean up the progress indicator on exit
+  trap cleanup_progress EXIT
+
+  # Shift to remove the --warnings-summary flag
+  shift
+  # Use the next argument as the test path if provided, otherwise default to tests/
+  TEST_PATH=${1:-tests}
+  LOG_LEVEL="WARNING"
+  ADDITIONAL_ARGS="-v --showlocals -W error --tb=short -x --no-header -W ignore::ResourceWarning"
+  CAPTURE_FLAG="--capture=fd"
+  USE_CUSTOM_FORMAT=true
+  
+  # Shift again if a test path was provided
+  if [ $# -gt 0 ]; then
+    shift
+  fi
+  
+  # Add any remaining args to ADDITIONAL_ARGS
+  if [ $# -gt 0 ]; then
+    ADDITIONAL_ARGS="$ADDITIONAL_ARGS $*"
+  fi
+  
+# Interactive mode if no arguments provided or if first arg is not a special mode
+elif [ $# -eq 0 ]; then
   echo -e "\n${BOLD}${GREEN}==================== PYTEST RUNNER ====================${RESET}"
   echo -e "${YELLOW}Running in interactive mode${RESET}"
   echo -e "${GREEN}=====================================================${RESET}\n"
@@ -473,8 +520,13 @@ echo
 # Run pytest with the recommended flags
 echo -e "${YELLOW}Running tests...${RESET}\n"
 
+# Add a clear starting message with newlines to ensure AI can track execution
+echo -e "\n${BOLD}${GREEN}▶ STARTING TEST EXECUTION${RESET}"
+echo -e "${GREEN}This might take a moment...${RESET}"
+echo -e "${CYAN}----------------------------------------------------${RESET}\n"
+
 # Create a temporary pytest.ini for the warnings summary option
-if [ "$mode_selection" = "8" ] && [ "$USE_CUSTOM_FORMAT" = "true" ]; then
+if ([ "$mode_selection" = "8" ] || [ "$USE_CUSTOM_FORMAT" = "true" ]); then
   echo -e "${MAGENTA}[DEBUG] Setting up custom log format for Warnings Summary mode${RESET}"
   
   # Create a temporary pytest.ini with the desired log format
@@ -482,6 +534,12 @@ if [ "$mode_selection" = "8" ] && [ "$USE_CUSTOM_FORMAT" = "true" ]; then
   cat_cmd="cat > pytest.ini << EOF
 [pytest]
 log_format = %(levelname)s %(message)s
+filterwarnings =
+    ignore::ResourceWarning
+
+markers =
+    real: mark tests that run against real data/resources rather than mocks
+    integration: mark tests that integrate with external services
 EOF"
   print_command "$cat_cmd"
   eval "$cat_cmd"
@@ -507,14 +565,49 @@ PYTEST_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" -vv --log-cli-lev
 # Print the command before running it
 print_command "$PYTEST_CMD"
 
+# Start a background process to print heartbeat messages during test execution
+if [ "$USE_CUSTOM_FORMAT" = "true" ]; then
+  (
+    # Wait a bit for the test to start
+    sleep 2
+    
+    # Print a heartbeat message every 3 seconds until killed
+    counter=0
+    while true; do
+      counter=$((counter + 1))
+      echo -e "${CYAN}[Heartbeat $counter] Test is still running...${RESET}"
+      sleep 3
+    done
+  ) &
+  HEARTBEAT_PID=$!
+  
+  # Update the cleanup function to also kill the heartbeat process
+  cleanup_progress() {
+    if [ -n "$PROGRESS_PID" ]; then
+      kill $PROGRESS_PID 2>/dev/null || true
+    fi
+    if [ -n "$HEARTBEAT_PID" ]; then
+      kill $HEARTBEAT_PID 2>/dev/null || true
+    fi
+  }
+  
+  # Set up trap to ensure we clean up processes on exit
+  trap cleanup_progress EXIT
+fi
+
 # Run the command
 eval "$PYTEST_CMD"
+
+# Kill the heartbeat process if it's running
+if [ -n "$HEARTBEAT_PID" ]; then
+  kill $HEARTBEAT_PID 2>/dev/null || true
+fi
 
 PYTEST_EXIT_CODE=$?
 debug_log "pytest exited with code $PYTEST_EXIT_CODE"
 
 # Remove temporary pytest.ini if we created one
-if [ "$mode_selection" = "8" ] && [ "$USE_CUSTOM_FORMAT" = "true" ]; then
+if ([ "$mode_selection" = "8" ] || [ "$USE_CUSTOM_FORMAT" = "true" ]); then
   rm_cmd="rm -f pytest.ini"
   print_command "$rm_cmd"
   eval "$rm_cmd"
