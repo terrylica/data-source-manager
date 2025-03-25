@@ -9,7 +9,7 @@
   Example:
 
   ```bash
-  scripts/run_tests_parallel.sh tests/interval_1s
+  scripts/run_tests_parallel.sh tests/cache_structure
   ```
 
 - Try not to resolve any Python type linting error using type ignore.

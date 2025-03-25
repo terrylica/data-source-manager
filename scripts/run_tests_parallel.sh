@@ -3,45 +3,110 @@
 #
 # DESCRIPTION:
 #   This script runs pytest tests in parallel mode using pytest-xdist to speed up
-#   test execution. It automatically uses 8 worker processes for parallelization.
-#   Use this script when you want to run tests faster by utilizing multiple CPU cores.
+#   test execution. It automatically utilizes 8 worker processes for parallelization.
+#   Key features and configurations include:
+#
+#   - Parallel Test Execution: Leverages pytest-xdist to run tests in parallel,
+#     significantly reducing test execution time, especially for large test suites.
+#   - Interactive Test Selection: Supports an interactive mode where users can
+#     choose specific test directories or files to run, enhancing flexibility
+#     for focused testing sessions.
+#   - Comprehensive Test Path Discovery: Automatically discovers test files and
+#     directories, including both Git-tracked and untracked files, ensuring
+#     all relevant tests are included in the selection menu in interactive mode.
+#   - asyncio Configuration: Explicitly sets the `asyncio_default_fixture_loop_scope`
+#     to 'function' to prevent pytest-asyncio deprecation warnings and ensure
+#     consistent event loop behavior for asynchronous tests. This setting is
+#     crucial for avoiding future compatibility issues with pytest-asyncio.
+#   - Flexible Logging: Allows users to control the verbosity of test output
+#     through a log level argument, enabling detailed debugging or reduced output
+#     noise as needed.
+#   - Custom Pytest Arguments: Supports passing additional pytest arguments,
+#     providing advanced users with the ability to further customize test execution.
 #
 # USAGE:
-#   ./scripts/run_tests_parallel.sh [test_path] [log_level] [additional_pytest_args]
+#   ./scripts/run_tests_parallel.sh [options] [test_path] [log_level] [additional_pytest_args]
+#   ./scripts/run_tests_parallel.sh -i|--interactive [log_level] [additional_pytest_args]
+#
+# OPTIONS:
+#   -i, --interactive:  Enable interactive test selection mode. When this option is
+#                       used, the script will present a menu of available test
+#                       directories and files, allowing the user to choose which
+#                       tests to run. This is particularly useful for focusing on
+#                       specific test areas or exploring the test suite.
 #
 # ARGUMENTS:
-#   test_path: (Optional) Path to specific test file or directory to run
-#              Default: tests/interval_1s
+#   test_path: (Optional) Path to specific test file or directory to run.
+#              Default: tests/interval_1s (runs tests in the interval_1s directory).
 #              Examples: tests/, tests/interval_1s/, tests/test_specific.py
+#              If -i or --interactive is used, this argument is ignored, and the
+#              test path is selected interactively.
 #
-#   log_level: (Optional) Controls verbosity of test output
-#              Default: INFO
-#              Options: DEBUG (most verbose), INFO (normal), WARNING, ERROR (least verbose)
-#              - Use DEBUG when you need to see detailed logging information
-#              - Use INFO for standard test output
-#              - Use WARNING or ERROR to reduce output noise
+#   log_level: (Optional) Controls verbosity of test output.
+#              Default: INFO (standard level of detail).
+#              Options: DEBUG (most verbose, for detailed debugging),
+#                       INFO (normal output),
+#                       WARNING (reduced output),
+#                       ERROR (least verbose, only errors).
+#              Use DEBUG for detailed logs, INFO for standard test progress, and
+#              WARNING or ERROR to minimize output noise, especially in CI environments.
 #
-#   additional_pytest_args: (Optional) Any extra pytest arguments
-#                          These are passed directly to pytest
+#   additional_pytest_args: (Optional) Any extra pytest command-line arguments.
+#                           These arguments are passed directly to pytest, allowing
+#                           for further customization of test execution.
+#                           Examples: --tb=short (shorter tracebacks), -k "pattern"
+#                           (run tests matching a pattern), -m "marker" (run tests
+#                           with specific markers).
 #
 # EXAMPLES:
-#   # Run all tests in the tests/interval_1s directory with standard logging:
+#   # 1. Run all tests in the tests/interval_1s directory with standard logging:
+#   #    (Default behavior if no arguments are provided)
 #   ./scripts/run_tests_parallel.sh
 #
-#   # Run all tests with normal output:
+#   # 2. Run tests interactively, allowing selection from a menu:
+#   ./scripts/run_tests_parallel.sh -i
+#   ./scripts/run_tests_parallel.sh --interactive
+#
+#   # 3. Run all tests under the 'tests/' directory with normal output:
 #   ./scripts/run_tests_parallel.sh tests/
 #
-#   # Run 1-second interval tests with very verbose output (useful for debugging):
+#   # 4. Run 1-second interval tests with very verbose output (for debugging):
 #   ./scripts/run_tests_parallel.sh tests/interval_1s/ DEBUG
 #
-#   # Run a specific test file with shorter tracebacks:
+#   # 5. Run a specific test file with shorter tracebacks:
 #   ./scripts/run_tests_parallel.sh tests/test_file.py --tb=short
 #
-#   # Run tests matching a specific pattern:
+#   # 6. Run tests matching a specific pattern with INFO log level:
 #   ./scripts/run_tests_parallel.sh tests/ INFO -k "test_pattern"
 #
-#   # Run tests with specific markers:
-#   ./scripts/run_tests_parallel.sh tests/ INFO -m "real"
+#   # 7. Run tests with specific markers and WARNING log level:
+#   ./scripts/run_tests_parallel.sh tests/ WARNING -m "real"
+#
+#   # 8. Run tests interactively with DEBUG log level and additional arguments:
+#   ./scripts/run_tests_parallel.sh -i DEBUG -k "some_test"
+#
+# BEST PRACTICES and NOTES:
+#   - Interactive Mode Discovery: The interactive mode intelligently lists test
+#     directories and files by scanning both Git-tracked files and all files
+#     within the 'tests/' directory. This ensures that even newly created,
+#     untracked test files are available for selection.
+#   - asyncio Configuration: The script enforces `asyncio_default_fixture_loop_scope=function`
+#     to address pytest-asyncio deprecation warnings and ensure consistent behavior
+#     for asynchronous fixtures. This setting is applied via the pytest command-line
+#     option `-o asyncio_default_fixture_loop_scope=function`, making the script
+#     self-contained and configuration-independent of `pytest.ini`.
+#   - Log Level Flexibility: Utilizing different log levels can significantly
+#     aid in debugging (DEBUG) or provide cleaner outputs for routine test runs
+#     (INFO, WARNING, ERROR). Choose the log level that best suits your testing needs.
+#   - Parallel Execution: Running tests in parallel with `-n8` (8 worker processes)
+#     can drastically reduce test times. Adjust the number of workers (`-n`) as
+#     needed based on your CPU core count and system resources.
+#   - Error Handling: The script includes basic error handling to check if pytest-xdist
+#     is installed and provides informative messages for test completion status
+#     (success or failure).
+#
+# LICENSE:
+#   This script is provided as is, without warranty. Use it at your own risk.
 
 set -e
 
@@ -50,10 +115,96 @@ SCRIPT_DIR=$(dirname "$0")
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 
+# Function to get all test paths (tracked and untracked)
+get_test_paths() {
+  # Array to hold all paths
+  local all_dirs=()
+  local all_files=()
+  
+  # First get Git-tracked files
+  while IFS= read -r file; do
+    if [[ "$file" == tests/* && "$file" == *test_*.py ]]; then
+      all_files+=("$file")
+      dir=$(dirname "$file")
+      all_dirs+=("$dir")
+    fi
+  done < <(git ls-files "tests/**/*" | sort)
+  
+  # Then find all test files in the filesystem, including untracked ones
+  # but exclude __pycache__ directories
+  while IFS= read -r file; do
+    if [[ "$file" == *test_*.py && "$file" != *__pycache__* ]]; then
+      # Check if file is already in array
+      if ! [[ " ${all_files[*]} " =~ " ${file} " ]]; then
+        all_files+=("$file")
+        dir=$(dirname "$file")
+        all_dirs+=("$dir")
+      fi
+    fi
+  done < <(find tests -type f -name "test_*.py" | sort)
+  
+  # Add the base tests directory
+  all_dirs+=("tests")
+  
+  # Remove duplicates from directories
+  all_dirs=($(printf '%s\n' "${all_dirs[@]}" | sort -u))
+  
+  # Return all paths as an array
+  printf '%s\n' "${all_dirs[@]}" "${all_files[@]}"
+}
+
+# Check for interactive mode
+INTERACTIVE=false
+if [[ "$1" == "-i" || "$1" == "--interactive" ]]; then
+  INTERACTIVE=true
+  shift
+fi
+
 # Set default values
-TEST_PATH=${1:-tests/interval_1s}  # Default to interval_1s tests if not specified
-LOG_LEVEL=${2:-INFO}               # Default to INFO log level
-shift 2 2>/dev/null || shift $# 2>/dev/null || true
+if $INTERACTIVE; then
+  echo "Scanning for test directories and files..."
+  
+  # Get all test paths
+  readarray -t ALL_TEST_PATHS < <(get_test_paths)
+  
+  # Display options with numbers
+  echo "Available test paths:"
+  for i in "${!ALL_TEST_PATHS[@]}"; do
+    printf "%3d) %s\n" $((i+1)) "${ALL_TEST_PATHS[$i]}"
+  done
+  
+  # Custom path option
+  CUSTOM_PATH_INDEX=$((${#ALL_TEST_PATHS[@]}+1))
+  EXIT_INDEX=$((${#ALL_TEST_PATHS[@]}+2))
+  printf "%3d) %s\n" $CUSTOM_PATH_INDEX "Custom Path"
+  printf "%3d) %s\n" $EXIT_INDEX "Exit"
+  
+  # Get user selection
+  while true; do
+    read -p "Select a number: " selection_num
+    
+    if [[ "$selection_num" == "$EXIT_INDEX" ]]; then
+      echo "Exiting..."
+      exit 0
+    elif [[ "$selection_num" == "$CUSTOM_PATH_INDEX" ]]; then
+      read -p "Enter custom test path: " TEST_PATH
+      break
+    elif [[ "$selection_num" -ge 1 && "$selection_num" -le "${#ALL_TEST_PATHS[@]}" ]]; then
+      TEST_PATH="${ALL_TEST_PATHS[$((selection_num-1))]}"
+      break
+    else
+      echo "Invalid selection. Please try again."
+    fi
+  done
+  
+  LOG_LEVEL=${1:-INFO}
+  shift 1 2>/dev/null || shift $# 2>/dev/null || true
+else
+  TEST_PATH=${1:-tests/interval_1s}  # Default to interval_1s tests if not specified
+  LOG_LEVEL=${2:-INFO}               # Default to INFO log level
+  shift 2 2>/dev/null || shift $# 2>/dev/null || true
+fi
+
 ADDITIONAL_ARGS="$* -n8"           # Always run with 8 parallel workers
 
 # Install pytest-xdist if not installed
@@ -73,8 +224,9 @@ echo "---------------------------------------------------"
 # -vv: Increases verbosity
 # --log-cli-level: Controls logging detail level
 # --asyncio-mode=auto: Manages asyncio behavior
+# -o asyncio_default_fixture_loop_scope=function: Sets fixture loop scope to function via ini option
 # -n8: Runs tests in 8 parallel processes
-PYTEST_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" -vv --log-cli-level=${LOG_LEVEL} --asyncio-mode=auto ${ADDITIONAL_ARGS}"
+PYTEST_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" -vv --log-cli-level=${LOG_LEVEL} --asyncio-mode=auto -o asyncio_default_fixture_loop_scope=function ${ADDITIONAL_ARGS}"
 echo "Running: $PYTEST_CMD"
 echo "---------------------------------------------------"
 
