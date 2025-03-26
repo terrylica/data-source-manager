@@ -1,24 +1,22 @@
 # New Interval Tests
 
-## Status
+## Overview
 
-Several tests that previously depended on the deprecated `vision_data_client_enhanced.py` file have been moved to `tests/deprecated/interval_new/`.
+This directory contains tests for interval-based data retrieval functionality.
 
-The following files have been moved to the deprecated directory:
+The tests focus on:
 
-- `test_vision_client_batch.py`
-- `test_vision_client_enhanced.py`
-- `test_vision_client_intervals.py`
-- `test_vision_client_markets.py`
-- `test_vision_client_schema.py`
+- Direct data filtering from Binance Vision API
+- Basic API session handling
+- Sample tests for interval functionality
 
-The tests that remain in this directory:
+## Tests in this Directory
 
-- `test_time_filtering.py` - Tests direct data filtering without the enhanced client
-- `test_sample.py` - Contains sample tests that do not depend on the enhanced client
-- `conftest.py` - Contains fixtures for the remaining tests
+The tests in this directory:
 
-This is part of the effort to remove dependency on `vision_data_client_enhanced.py` as described in the migration plan.
+- `test_time_filtering.py` - Tests direct data filtering without relying on internal filtering functions
+- `test_sample.py` - Contains sample tests for verification
+- `conftest.py` - Contains fixtures for the tests
 
 ## Running Tests
 
