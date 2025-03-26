@@ -1,5 +1,36 @@
 #!/usr/bin/env python
-"""Enhanced Vision Data Client with comprehensive interval support.
+"""
+DEPRECATED: This file is deprecated and will be removed in a future update.
+
+Please use DataSourceManager from core.data_source_manager instead. This client is redundant
+as the functionality is now covered by the core.vision_data_client and core.data_source_manager modules.
+
+Example migration:
+```python
+# Old code using VisionDataClient
+from core.vision_data_client_enhanced import VisionDataClient
+client = VisionDataClient(symbol="BTCUSDT", interval="1m")
+df = await client.fetch(start_time, end_time)
+
+# New code using DataSourceManager
+from core.data_source_manager import DataSourceManager
+from core.cache_manager import UnifiedCacheManager
+from utils.market_constraints import MarketType, DataSource
+
+manager = DataSourceManager(
+    cache_manager=UnifiedCacheManager(use_cache=True),
+    market_type=MarketType.SPOT
+)
+df = await manager.get_data(
+    symbol="BTCUSDT",
+    interval="1m",
+    start_time=start_time,
+    end_time=end_time,
+    enforce_source=DataSource.VISION  # If Vision API is specifically needed
+)
+```
+
+Enhanced Vision Data Client with comprehensive interval support.
 
 This client implements a high-performance data fetching system with:
 - Comprehensive error classification and recovery
