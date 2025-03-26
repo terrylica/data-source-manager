@@ -34,7 +34,11 @@ import pytest_asyncio
 from utils.logger_setup import get_logger
 from core.data_source_manager import DataSourceManager, DataSource
 from utils.market_constraints import Interval, MarketType
-from utils.time_alignment import adjust_time_window, TimeRangeManager
+from utils.time_alignment import (
+    adjust_time_window,
+    TimeRangeManager,
+    get_interval_timedelta,
+)
 
 # Configure logging
 logger = get_logger(__name__, level="INFO", show_path=False)
@@ -191,12 +195,17 @@ async def test_time_boundary_comprehensive(manager: DataSourceManager) -> None:
             )
 
             # Get time boundaries using the centralized utility
-            time_boundaries = TimeRangeManager.get_time_boundaries(
+            time_boundaries = TimeRangeManager.align_vision_api_to_rest(
                 start_time, end_time, TEST_INTERVAL
             )
             adjusted_start = time_boundaries["adjusted_start"]
             adjusted_end = time_boundaries["adjusted_end"]
-            expected_records = time_boundaries["expected_records"]
+
+            # Calculate expected records based on adjusted times and interval
+            interval_seconds = get_interval_timedelta(TEST_INTERVAL).total_seconds()
+            expected_records = int(
+                (adjusted_end - adjusted_start).total_seconds() / interval_seconds
+            )
 
             logger.info(
                 f"Adjusted window: {adjusted_start.isoformat()} → {adjusted_end.isoformat()}"
