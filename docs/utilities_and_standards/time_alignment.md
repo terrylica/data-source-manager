@@ -65,5 +65,4 @@ All time alignment logic is tested via integration tests against the actual Bina
 ## References
 
 - [Binance REST API Boundary Behavior](../api/binance_rest_api_boundary_behaviour.md)
-- [Time Alignment Roadmap](../roadmap/revamp_time_alignment.md)
 - [API Boundary Validator](../../utils/api_boundary_validator.py)
