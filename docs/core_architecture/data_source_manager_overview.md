@@ -1,13 +1,76 @@
 # Overview of DataSourceManager
 
-Let's overview the data retrieval process initiated by the `DataSourceManager`, particularly when a cache miss or invalidation necessitates fetching fresh data, it is crucial to dissect the distinct pathways for Vision API and REST API data sources. When the decision logic within `DataSourceManager`—specifically the `_should_use_vision_api` method—determines that the Vision API is the appropriate source—or when it is explicitly enforced—the `VisionDataClient` comes into play—orchestrating the download, validation, and caching of historical data from Binance Vision. This pathway is initiated when the `_fetch_from_source` method of `DataSourceManager` invokes the `fetch` method of `VisionDataClient`—passing the temporal parameters and column specifications.
+## Data Retrieval Process
 
-Upon invocation of `VisionDataClient.fetch`, and in scenarios where cached data is unavailable or invalid, the process transitions to downloading data from Binance Vision—a task managed by the `_download_and_cache` method. This method strategically breaks down the requested time range into daily segments—iterating through each day to download daily data files—as Binance Vision organizes data on a daily basis. For each day, the `_download_date` method is invoked—responsible for fetching both the data file—a ZIP archive containing CSV data—and its corresponding checksum file. The download process itself leverages the `_download_file` method—which uses `httpx` to perform asynchronous HTTP GET requests—retrieving the data and checksum files to temporary storage. Following successful download, the integrity of the data file is rigorously verified using the `_verify_checksum` method—comparing the calculated checksum of the downloaded data against the checksum provided in the checksum file—ensuring data authenticity and preventing data corruption from propagating further into the system. This checksum verification step is paramount for maintaining data reliability and trust.
+The `DataSourceManager` orchestrates the data retrieval process, intelligently navigating between cache and live data sources (Vision API and REST API). This overview focuses on how the manager handles time alignment in accordance with our revised approach.
 
-Subsequently, after successful checksum verification, the `_download_date` method proceeds to parse the CSV data from within the downloaded ZIP archive. This involves using `pandas.read_csv` to ingest the data into a DataFrame—handling potential `EmptyDataError` exceptions—and performing initial data inspection—logging sample data and data types for debugging and quality assurance. A critical step in this parsing phase is the detection and handling of timestamps—as Binance Vision has evolved its timestamp precision over time. The `detect_timestamp_unit` function—defined in `vision_constraints.py`—is employed to dynamically determine whether the timestamps are in milliseconds or microseconds based on the number of digits—adapting the timestamp conversion process accordingly. The timestamps are then converted to `pandas` `DatetimeIndex`—ensuring they are timezone-aware and in UTC—and adjusted to match the microsecond precision of the REST API—maintaining consistency across data sources. Furthermore, the `_download_date` method performs data validation—invoking `_validate_data` and `_validate_time_boundaries` within `VisionDataClient`—which in turn utilize validation functions from `vision_constraints.py`—to ensure the DataFrame adheres to strict data integrity rules—covering data types, column presence, index properties, and time range coverage. Finally, if caching is enabled, the validated DataFrame—representing a day's worth of data—is saved to the cache using `_save_to_cache`—which converts the DataFrame to the efficient Arrow format and calculates a checksum—and metadata is registered using the `CacheMetadata` class—recording file paths, checksums, and record counts for future cache lookups—before the data for the day is aggregated with data from other days within the requested range.
+### Core Principles of Time Alignment
 
-Conversely, when the REST API is selected as the data source—typically for more recent data or when Vision API is not preferred—the `DataSourceManager` interacts with the `EnhancedRetriever`. In this scenario, the `_fetch_from_source` method of `DataSourceManager` invokes the `fetch` method of `EnhancedRetriever`—again passing temporal parameters and interval specifications. The `EnhancedRetriever.fetch` method employs a sophisticated chunking mechanism—implemented in `_calculate_chunks`—to divide the requested time range into smaller, manageable chunks—optimizing API requests and respecting API rate limits. This chunking strategy considers the number of available API endpoints and the maximum record limit per request—aiming to maximize concurrency and efficiency. For each chunk, the `_fetch_chunk_with_retry` method is invoked—which handles the actual API request using `aiohttp`—incorporating retry logic and endpoint failover to enhance resilience against network issues or temporary API unavailability. Concurrency is managed using `asyncio.Semaphore`—limiting the number of concurrent API requests to optimize hardware utilization and avoid overwhelming the API servers. The raw data received from the REST API—typically in JSON format—is then processed by the `process_kline_data` function—converting it into a `pandas` DataFrame with standardized column names and data types. Data validation within `EnhancedRetriever` primarily focuses on bar alignment and completeness—using methods like `_validate_bar_alignment`—ensuring that the retrieved data is temporally consistent and correctly formatted.
+Following our roadmap to revamp time alignment:
 
-In both the Vision API and REST API pathways, once the data is fetched and validated by either `VisionDataClient` or `EnhancedRetriever` respectively, the `DataSourceManager` applies a final formatting step using the `_format_dataframe` method. This step standardizes the DataFrame—ensuring consistent column names, data types—as defined in `DataSourceManager.OUTPUT_DTYPES`—and index structures—regardless of the original data source. This standardization is crucial for providing a uniform data interface to the user—abstracting away the complexities of different data sources and formats. Finally, the formatted DataFrame is returned by the `get_data` method of `DataSourceManager`—completing the data retrieval operation and providing the requested market data in a consistent and reliable manner—thereby fulfilling the initial data request and ensuring a seamless data access experience.
+1. **REST API Behavior is the Source of Truth** - The Binance REST API's boundary behavior is our definitive standard
+2. **No Manual Alignment for REST API Calls** - For REST API calls, we pass timestamps directly without manual alignment
+3. **Manual Alignment for Vision API and Cache** - We implement manual time alignment for Vision API and cache to match REST API behavior
 
-Conclusively, the data retrieval process orchestrated by `DataSourceManager` is a multi-faceted operation—intelligently navigating between cache and live data sources—Vision API and REST API—with each pathway involving distinct steps for data download, validation, and processing—yet converging towards a unified and standardized data output. The Vision API pathway emphasizes historical data retrieval with robust checksum verification and timestamp handling—while the REST API pathway focuses on efficient and resilient real-time or recent data fetching with chunking and retry mechanisms. Both pathways are underpinned by comprehensive validation frameworks—defined in `vision_constraints.py` and implemented within `VisionDataClient` and `EnhancedRetriever`—and integrated with a unified caching system—managed by `UnifiedCacheManager`—to ensure data integrity, consistency, and optimal performance—thereby providing a robust and versatile data access layer for market data applications.
+### REST API Pathway
+
+When the `DataSourceManager` determines that the REST API is the appropriate source:
+
+1. The `get_data` method passes timestamps directly to the REST API without manual alignment
+2. The `_fetch_from_source` method invokes the `fetch` method of `EnhancedRetriever` with original timestamps
+3. The REST API handles time boundary alignment according to its documented behavior:
+
+   - Ignores millisecond precision
+   - Rounds start timestamps UP to the next interval boundary if not exact
+   - Rounds end timestamps DOWN to the previous interval boundary if not exact
+   - Treats both boundaries as inclusive after alignment
+
+4. The `EnhancedRetriever` employs a chunking mechanism to divide the requested time range into manageable chunks, respecting the original time boundaries
+5. Each chunk is fetched with retry logic and endpoint failover for resilience
+6. The raw API response is processed into a standardized DataFrame
+
+### Vision API Pathway
+
+When Vision API is the appropriate source:
+
+1. The `get_data` method passes timestamps to the `VisionDataClient`
+2. The `VisionDataClient.fetch` method applies manual time alignment to mirror REST API behavior
+3. This manual alignment is validated using `ApiBoundaryValidator` to ensure it matches REST API behavior
+4. The aligned timestamps are used for:
+
+   - Cache key generation
+   - Data downloading from Vision API
+   - Time boundary validation
+
+5. The `_download_and_cache` method breaks down the requested time range into daily segments
+6. For each day, data is downloaded, verified, and parsed
+7. The timestamps are processed to maintain consistency with REST API behavior
+
+### Validation and Verification
+
+The `ApiBoundaryValidator` is used throughout the process to:
+
+1. Validate if a given time range and interval are valid according to REST API boundaries
+2. Determine actual boundaries that would be returned by the REST API
+3. Verify that Vision API and cache data ranges match what the REST API would return
+
+This ensures consistent behavior across all data sources.
+
+### Data Standardization and Return
+
+For both pathways, once data is fetched and validated, the `DataSourceManager`:
+
+1. Applies final formatting using the `_format_dataframe` method
+2. Standardizes the DataFrame with consistent column names, data types, and index structures
+3. Returns the formatted DataFrame via the `get_data` method
+
+## Conclusion
+
+The revised `DataSourceManager` architecture adopts a cleaner approach to time alignment by:
+
+1. Using the Binance REST API's boundary behavior as the definitive standard
+2. Passing timestamps directly to REST API without manual adjustment
+3. Implementing manual alignment for Vision API and cache that mirrors REST API behavior
+4. Validating all time boundary handling against real REST API responses using `ApiBoundaryValidator`
+
+This approach ensures consistent data retrieval across sources while simplifying the codebase by removing unnecessary manual alignment for REST API calls.

@@ -1,6 +1,6 @@
 # Overview
 
-This document details the timestamp behavior of the Binance API, specifically focusing on 1-second kline data retrieval. Understanding these behaviors is crucial for accurate data collection and processing.
+This document details the timestamp behavior of the Binance API. Understanding these behaviors is crucial for accurate data collection and processing.
 
 ## Key Behaviors
 
@@ -8,143 +8,102 @@ This document details the timestamp behavior of the Binance API, specifically fo
 
 #### Timestamp Alignment
 
-- The API automatically aligns timestamps to second boundaries
-- Start timestamps are rounded up to the next second
-- End timestamps are rounded down to the last complete second
-- Millisecond components are handled as follows:
-  - `000` ms: Exact second boundary
-  - `001-999` ms: Rounded to nearest second
+- The API completely ignores millisecond precision in timestamps
+- It operates exclusively on interval boundaries
+- Start timestamps are rounded UP to the next interval boundary if not exactly on a boundary
+- End timestamps are rounded DOWN to the previous interval boundary if not exactly on a boundary
+- For 1-second intervals: aligned to whole seconds
+- For 1-minute intervals: aligned to whole minutes
+- For other intervals: aligned to their respective boundaries
 
 #### Bar Boundaries
 
-- Open time: Always at exact second boundary (`.000` ms)
-- Close time: Always at `.999` ms of the same second
-- Example:
-
-  ```python
-  bar_open = "2024-01-01 00:00:00.000"
-  bar_close = "2024-01-01 00:00:00.999"
-  ```
+- Each bar represents exactly one complete interval
+- For 1-second intervals:
+  - Bar open: Always at exact second boundary (`.000` ms)
+  - Bar close: 999ms after the open time
+  - Example: Open: `2024-01-01 00:00:00.000`, Close: `2024-01-01 00:00:00.999`
 
 ### 2. Timestamp Inclusivity
 
 #### Request Windows
 
-- Start time is inclusive (`>=`)
-- End time is inclusive (`<=`)
-- Minimum window: 1 second
-- Zero-length windows (start = end) return no data
+- After API boundary alignment:
+  - Start time is inclusive (`>=`)
+  - End time is inclusive (`<=`)
+- This behavior is consistent across all interval types
+- The API treats both boundaries as inclusive after its internal alignment
 
 #### Edge Cases
 
-- Single millisecond before second: Included in next second's bar
-- Single millisecond after second: Included in current second's bar
-- Consecutive milliseconds across second boundary: Split into separate bars
+- A timestamp of `23:59:59.999` as startTime will be treated as the next second (`00:00:00`)
+- A timestamp of `00:00:00.001` as endTime will be treated as the current second (`00:00:00`)
+- The API maintains perfect continuity across all time boundaries (second, minute, hour, day, month, year)
 
-### 3. Bar Duration
+### 3. Cross-Boundary Behavior
 
-#### Standard Behavior
+- The API handles data queries that cross significant time boundaries (midnight, year) with complete continuity
+- No special handling or gaps occur at any boundary
+- Millisecond precision is handled consistently with the same rounding rules
+- The behavior is identical across day, month, and year boundaries
 
-- Each bar represents exactly 1 second
-- Bar duration = 999 milliseconds (from `.000` to `.999`)
-- No gaps between consecutive bars
-- Example sequence:
+### 4. Record Counting Logic
 
-   ```csv
-   Bar 1: 00:00:00.000 -> 00:00:00.999
-   Bar 2: 00:00:01.000 -> 00:00:01.999
-   Bar 3: 00:00:02.000 -> 00:00:02.999
-   ```
+For a given time range with start time `S` and end time `E` for interval `I`:
 
-#### Special Cases
-
-- Last bar of request window may be incomplete
-- Real-time data may have partial bars
-- Historical data always has complete bars
-
-### 4. Chunk Handling
-
-#### Chunk Size Calculation
-
-- Standard chunk: 1000 records
-- Last chunk may be partial
-- Chunk boundaries must align with second boundaries
-- Example:
-
-  ```python
-  # For a 2500-second window:
-  chunk1 = records[0:1000]     # 1000 records
-  chunk2 = records[1000:2000]  # 1000 records
-  chunk3 = records[2000:2500]  # 500 records
-  ```
+1. After boundary alignment (rounding up start, rounding down end)
+2. The API will return approximately `(E - S)/I + 1` records
+3. The exact count may differ due to:
+   - Missing data points (no trading during certain intervals)
+   - API limits (default 500 records per request, maximum 1000 with `limit` parameter)
+   - Boundary rounding effects
 
 ## Implementation Considerations
 
 ### 1. Time Window Validation
 
-```python
-def validate_time_window(start_time: datetime, end_time: datetime) -> Tuple[datetime, datetime]:
-    # Ensure UTC timezone
-    start_time = start_time.astimezone(timezone.utc)
-    end_time = end_time.astimezone(timezone.utc)
-    
-    # Align to second boundaries
-    aligned_start = start_time.replace(microsecond=0) + timedelta(seconds=1)
-    aligned_end = end_time.replace(microsecond=0)
-    
-    return aligned_start, aligned_end
-```
+- **For REST API calls**: Do not perform manual time alignment. The API handles this automatically.
+- **For Vision API and cache operations**: Implement manual time alignment that mirrors the REST API behavior.
 
 ### 2. Chunk Size Calculation
 
 ```python
-def calculate_chunk_size(start_ms: int, end_ms: int) -> int:
-    time_span = end_ms - start_ms
-    return min(1000, time_span // 1000)  # Convert ms to seconds
+def calculate_chunks(start_ms: int, end_ms: int, interval: Interval) -> List[Tuple[int, int]]:
+    """Calculate chunk ranges based on start and end times."""
+    chunks = []
+    current_start = start_ms
+    while current_start < end_ms:
+        chunk_end = min(current_start + CHUNK_SIZE_MS - 1, end_ms)
+        chunks.append((current_start, chunk_end))
+        current_start = chunk_end + 1
+    return chunks
 ```
 
 ## Best Practices
 
-1. **Time Alignment**
-   - Always align request windows to second boundaries
-   - Account for millisecond rounding behavior
-   - Validate aligned timestamps before requests
+1. **API Calls**
 
-2. **Chunk Management**
-   - Calculate exact chunk sizes including partial chunks
-   - Verify chunk boundaries align with seconds
-   - Handle last chunk separately
+   - For REST API: Pass timestamps directly without manual alignment
+   - For Vision API and cache: Implement manual time alignment to match REST API behavior
 
-3. **Data Validation**
-   - Verify bar completeness
-   - Check for gaps between bars
-   - Validate open/close time relationships
+2. **Time Validation**
 
-4. **Error Handling**
-   - Handle timezone conversions explicitly
-   - Account for partial bars in real-time data
-   - Validate timestamp ranges before requests
+   - Use `ApiBoundaryValidator` to validate time boundaries and data ranges
+   - Verify all alignment logic through integration tests against the REST API
 
-## Common Pitfalls
+3. **Data Processing**
 
-1. **Incorrect Time Window Calculation**
-   - Not accounting for inclusive end times
-   - Ignoring millisecond precision
-   - Assuming zero-length windows return data
+   - Parse API responses with the understanding of the API's boundary behavior
+   - First timestamp will be >= aligned start time (possibly rounded up by API)
+   - Last timestamp will be <= aligned end time (rounded down by API)
 
-2. **Chunk Size Miscalculation**
-   - Not handling partial last chunks
-   - Incorrect boundary calculations
-   - Ignoring millisecond components
-
-3. **Data Quality Issues**
-   - Not validating bar completeness
-   - Missing gaps in data
-   - Incorrect timestamp comparisons
+4. **API Limits**
+   - Default limit: 500 candles per request
+   - Maximum limit: 1000 candles (use `limit=1000` parameter)
+   - Plan data retrieval with appropriate chunking for larger ranges
 
 ## References
 
+- [Binance REST API Boundary Behavior](binance_rest_api_boundary_behaviour.md)
+- [Time Alignment Roadmap](../roadmap/revamp_time_alignment.md)
 - [Binance API Documentation](https://binance-docs.github.io/apidocs/spot/en/)
-- [Time Alignment Utilities](../utils/time_alignment.py)
-- [Market Constraints](../utils/market_constraints.py)
-- [Timestamp Behavior Tests](../tests/test_binance_timestamp_behavior.py)

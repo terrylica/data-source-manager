@@ -6,65 +6,64 @@ This document explains the standardized approach to time alignment in the data s
 
 ## Core Principles
 
-1. **Start time is inclusive** - Records at the start time are included in results
-2. **End time is exclusive** - Records at the end time are NOT included in results
-3. **Timestamps with microseconds are floored** - All units smaller than the interval are removed
-4. **Consistent behavior across components** - All components use the same utilities for time handling
+1. **REST API Behavior is the Source of Truth** - The Binance REST API's boundary behavior is our definitive standard
+2. **No Manual Alignment for REST API Calls** - We rely on the REST API's documented boundary behavior instead of manual alignment
+3. **Manual Alignment for Vision API and Cache** - We implement manual time alignment for Vision API and cache to match REST API behavior
+4. **Validation Against Real API** - All alignment logic is verified through integration tests against the actual Binance REST API
 
-## Centralized Utility Functions
+## Alignment Rules (As per Binance REST API)
 
-To enforce consistency, we've implemented the following utility functions in `utils/time_alignment.py`:
+1. **The API completely ignores millisecond precision** - It operates exclusively on interval boundaries
+2. **Start time boundary rounding** - Start timestamps are rounded UP to the next interval boundary if not exactly on a boundary
+3. **End time boundary rounding** - End timestamps are rounded DOWN to the previous interval boundary if not exactly on a boundary
+4. **Both boundaries are inclusive** - After API boundary alignment, both start and end times are inclusive
+5. **No special handling at time boundaries** - The API maintains perfect continuity across all time boundaries (second, minute, hour, day, month, year)
 
-### `adjust_time_window(start_time, end_time, interval)`
+## Centralized Validation Class
 
-This function adjusts input timestamps to ensure consistent handling:
+The `ApiBoundaryValidator` class in `utils/api_boundary_validator.py` is responsible for validating time boundaries and data ranges against the Binance REST API. It provides methods to:
 
-- Rounds start and end times down to interval boundaries
-- Removes incomplete intervals at the end of the range
-- Returns a tuple of `(adjusted_start, adjusted_end)`
+- Validate if a given time range and interval are valid
+- Determine actual boundaries returned by the API
+- Validate if a DataFrame's time range matches what is expected from the API
 
-### `get_time_boundaries(start_time, end_time, interval)`
+## Implementation Strategy
 
-This comprehensive function provides all necessary time boundary information:
+### For REST API Calls
 
-- Calls `adjust_time_window` to get properly aligned timestamps
-- Calculates millisecond versions for API calls
-- Calculates expected record counts
-- Returns a dictionary with all relevant boundary information
+- Pass timestamps directly to the API without manual alignment
+- Let the API handle boundary alignment according to its rules
 
-### `filter_time_range(df, start_time, end_time)`
+### For Vision API and Cache Operations
 
-This function filters a DataFrame to a specific time range:
-
-- Implements the inclusive start, exclusive end boundary behavior
-- Handles timezone conversion
-- Provides detailed debug logs for understanding the filtering operation
-
-## Time Boundary Rules
-
-The system follows these rules when handling time boundaries:
-
-1. **Record at time X belongs to interval X** - A record with timestamp X belongs to the interval starting at X
-2. **Intervals are aligned to seconds** - For 1-second intervals, timestamps are aligned to whole seconds
-3. **Time windowing logic is consistent** - All components use the same window calculation
+- Implement manual time alignment that mirrors REST API behavior
+- Use `ApiBoundaryValidator` to verify alignment correctness
+- Ensure caching strategy aligns with API boundary behavior
 
 ## Example
 
-For a time window from `2025-03-17 08:37:25.528448` to `2025-03-17 08:37:30.056345` with 1-second intervals:
+For a query requesting data from `2023-01-01T10:15:30.123Z` to `2023-01-01T10:25:45.789Z` with 1-minute interval:
 
-- Adjusted start: `2025-03-17 08:37:25.000000` (rounded DOWN from 25.528448)
-- Adjusted end: `2025-03-17 08:37:30.000000` (rounded DOWN from 30.056345)
-- Expected records: 5 seconds (25, 26, 27, 28, 29), NOT including 30
+1. **API Aligned timestamps**:
 
-## Usage in Codebase
+   - Aligned start: `2023-01-01T10:16:00.000Z` (rounded UP from 10:15:30.123)
+   - Aligned end: `2023-01-01T10:25:00.000Z` (rounded DOWN from 10:25:45.789)
 
-The unified time boundary utilities are used in:
+2. **Records returned by API**: 10 candles (inclusive of both boundaries)
+   - First candle: `10:16:00`
+   - Last candle: `10:25:00`
 
-1. **DataSourceManager** - For fetching data with adjusted time windows
-2. **Market Data Client** - For calculating chunk boundaries
-3. **Vision Data Client** - For filtering and validating time ranges
-4. **Test Suite** - For verifying time boundary behavior
+## Testing and Verification
 
-## Testing
+All time alignment logic is tested via integration tests against the actual Binance REST API to ensure accuracy. These tests verify:
 
-A dedicated test suite `tests/test_time_alignment_utils.py` verifies the behavior of the time alignment utilities, ensuring consistent behavior across various edge cases.
+1. **Exact boundary handling** - Tests timestamps at exact interval boundaries
+2. **Millisecond precision** - Tests timestamps with millisecond components
+3. **Cross-boundary behavior** - Tests timestamps that cross day, month, and year boundaries
+4. **Vision API and cache alignment** - Tests that manual alignment matches REST API behavior
+
+## References
+
+- [Binance REST API Boundary Behavior](../api/binance_rest_api_boundary_behaviour.md)
+- [Time Alignment Roadmap](../roadmap/revamp_time_alignment.md)
+- [API Boundary Validator](../../utils/api_boundary_validator.py)

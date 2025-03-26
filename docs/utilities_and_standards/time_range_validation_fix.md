@@ -21,150 +21,98 @@ A series of tests began to fail with empty DataFrames returned, despite:
 
 The primary issue manifested in tests like `test_batch_fetch_multiple_symbols` and various time filtering tests. When requesting data for a time range like `2023-01-15T00:00:00+00:00` to `2023-01-15T01:00:00+00:00`, the client would correctly download the data but return an empty DataFrame.
 
-## Investigation Process
+## Updated Approach with REST API Boundary Alignment
 
-### Initial Diagnostic Approach
+Following our roadmap to revamp time alignment, we are shifting to a new approach where:
 
-Our initial approach was to enhance logging throughout the data pipeline to trace the flow of data and identify where the data was being lost. We added detailed logging to:
+1. **REST API Boundary Behavior is the Source of Truth** - We now align with the documented Binance REST API behavior
+2. **ApiBoundaryValidator** - A new validator class is used to validate time boundaries against actual REST API behavior
 
-1. The `download_date` method in `VisionDownloadManager` to trace the data downloading process
-2. The `test_batch_fetch_multiple_symbols` function to capture HTTP request logs and DataFrame processing steps
-3. The time filtering logic to understand how data was being filtered
+Under this approach, our validation logic needs to be updated to understand that:
 
-This diagnostic logging revealed that:
+- The API completely ignores millisecond precision in timestamps
+- Start timestamps are rounded UP to the next interval boundary if not exactly on a boundary
+- End timestamps are rounded DOWN to the previous interval boundary if not exactly on a boundary
+- After alignment, both boundaries are inclusive in the API's perspective
 
-1. The data was successfully being downloaded from Binance
-2. The CSV files contained valid kline data
-3. The data was correctly parsed into a DataFrame
-4. The data was correctly transformed to have a UTC timezone-aware DatetimeIndex
-5. The data was being lost during time range validation
+### Root Issue Revisited
 
-### Pinpointing the Issue
+The original issue occurred because our validation logic was not correctly aligned with the Binance REST API's boundary handling. When we requested a time range like `2023-01-15T00:00:00` to `2023-01-15T01:00:00`, and the only available data point was at exactly `2023-01-15T00:00:00`:
 
-Through a series of focused tests, we discovered that the issue occurred in the `TimeRangeManager.validate_boundaries` method, which in turn called `DataValidation.validate_time_boundaries`. When comparing the actual data boundaries against the requested time range, the validation was failing when the `data_end_floor` was equal to the `start_time_floor`.
+1. Using the Binance REST API directly, this data point would be included in the results
+2. Our Vision API client should also include this data point to maintain consistency
 
-Testing with a temporary modification to the `VisionDataClient` that disabled validation confirmed this hypothesis. We created a test function `test_vision_client_with_validation_disabled` that overrode the `fetch` method to skip the validation step, and this successfully returned the expected data.
+## The Updated Solution
 
-### Root Cause Analysis
+### Modified Validation Logic with API Boundary Validation
 
-The root cause was found in the `validate_time_boundaries` method in `utils/validation.py`:
+We are moving away from manual time alignment for REST API calls and implementing manual alignment for Vision API and cache to match REST API behavior. The key changes include:
 
-```python
-# Data end checks - don't fail if we have at least some data
-if data_end_floor < adjusted_end_time_floor:
-    # Instead of raising an error, just log a warning if we at least have data at the start
-    if data_start_floor == start_time_floor:
-        logger.warning(
-            f"Data doesn't cover entire requested range: ends at {data_end} < {adjusted_end_time_floor}. "
-            f"This may be due to market-specific limitations or data availability."
-        )
-    else:
-        # Still raise error if data doesn't even start at the requested time
-        raise ValueError(
-            f"Data ends earlier than requested: {data_end} < {adjusted_end_time_floor}"
-        )
-```
+1. **For REST API Calls**: Pass timestamps directly to the API without manual alignment
+2. **For Vision API and Cache**: Implement manual time alignment that mirrors REST API behavior
+3. **Validation**: Use `ApiBoundaryValidator` to validate time boundaries and data ranges
 
-The problem was that when requesting a time range like `2023-01-15T00:00:00` to `2023-01-15T01:00:00`, and when the only available data point was at exactly `2023-01-15T00:00:00`, the validation would fail because:
-
-1. `data_start_floor` (2023-01-15 00:00:00) equals `start_time_floor` (2023-01-15 00:00:00)
-2. `data_end_floor` (2023-01-15 00:00:00) is less than `adjusted_end_time_floor` (2023-01-15 00:59:59)
-
-In this scenario, the validation would log a warning but allow the data to pass. However, subsequent code in the pipeline was treating this warning as an error condition, resulting in an empty DataFrame being returned.
-
-## The Solution
-
-### Modified Validation Logic
-
-We modified the validation logic to handle the edge case where data exists only at the start of the requested time range. The key change was in the `validate_time_boundaries` method:
-
-1. We ensured that if data exists at the start of the requested time range, the validation would pass even if the data doesn't cover the entire requested range.
-2. We clarified the logic to distinguish between a complete failure (no data in the requested range) and a partial success (some data in the requested range).
-
-The modified logic looks like this:
+For the specific issue documented here, we can use `ApiBoundaryValidator` to determine if a given data range matches what would be expected from the REST API:
 
 ```python
-# Data end checks - don't fail if we have at least some data
-if data_end_floor < adjusted_end_time_floor:
-    # Instead of raising an error, just log a warning if we at least have data at the start
-    if data_start_floor <= start_time_floor:
-        logger.warning(
-            f"Data doesn't cover entire requested range: ends at {data_end} < {adjusted_end_time_floor}. "
-            f"This may be due to market-specific limitations or data availability."
-        )
-    else:
-        # Still raise error if data doesn't even start at the requested time
-        raise ValueError(
-            f"Data ends earlier than requested: {data_end} < {adjusted_end_time_floor}"
-        )
+# Using ApiBoundaryValidator for validation
+api_boundary_validator = ApiBoundaryValidator()
+is_valid = api_boundary_validator.does_data_range_match_api_response(
+    df, start_time, end_time, interval
+)
+
+if not is_valid:
+    # Handle invalid data range
+    logger.warning(
+        f"Data range does not match expected API behavior for time range: {start_time} to {end_time}."
+    )
 ```
 
-The critical change was from `data_start_floor == start_time_floor` to `data_start_floor <= start_time_floor`, ensuring that data starting at or before the requested start time would be considered valid.
+### Integration with Existing Fix
 
-### Additional Improvement
+The previous fix modified the condition from `data_start_floor == start_time_floor` to `data_start_floor <= start_time_floor`. This remains valid, but we are now integrating it with the new `ApiBoundaryValidator` approach:
 
-We also enhanced the error messaging to provide more diagnostic information when validation fails, making it easier to troubleshoot future issues.
-
-## Validation and Testing
-
-We created a series of tests to validate our fix:
-
-1. `test_vision_client_with_validation_disabled` - Confirmed our hypothesis about the validation issue
-2. `test_vision_client_with_validation_fixed` - Verified the fix works correctly
-3. `test_batch_fetch_with_fixed_validation` - Ensured that batch fetching works correctly with the fixed validation
-
-Additionally, we verified that all previously failing tests now pass, including:
-
-1. `test_batch_fetch_multiple_symbols`
-2. `test_direct_filtering`
-3. `test_vision_client_direct`
-
-The comprehensive test suite includes 164 tests that now all pass successfully.
+1. For REST API calls: No manual time alignment is needed, as the API handles boundaries
+2. For Vision API and cache operations:
+   - Implement manual time alignment to match REST API behavior
+   - Use `ApiBoundaryValidator` to validate the results match what the REST API would return
 
 ## Implementation Details
 
-### TimeRangeManager Modification
+### Using ApiBoundaryValidator
 
-The `TimeRangeManager` class is responsible for managing time range operations including validation, alignment, and filtering. The fix primarily focused on its validation logic.
+The new `ApiBoundaryValidator` class will be used to:
 
-Key changes:
+1. Validate if a given time range and interval are valid according to Binance API boundaries
+2. Determine the actual boundaries returned by the API for given parameters
+3. Validate if a DataFrame's time range matches what is expected from the API
 
-1. Modified the condition for accepting data that starts at the requested time but doesn't cover the entire range
-2. Enhanced error messaging to provide more diagnostic information
-3. Ensured consistent timezone handling throughout the validation process
-
-### Testing Strategy
-
-Our testing strategy focused on:
-
-1. **Isolated Tests**: Creating focused tests that specifically targeted the validation issue
-2. **Comprehensive Testing**: Running the entire test suite to ensure no regressions
-3. **Edge Cases**: Testing various edge cases like:
-   - Data only available at the start of the requested range
-   - Data spanning multiple days
-   - Data with different intervals
-   - Batch fetching with multiple symbols
+This ensures consistent behavior across all data sources (REST API, Vision API, cache).
 
 ### Logging Enhancements
 
-Throughout this process, we significantly enhanced the logging in our data pipeline to provide better diagnostics for future issues:
+We have enhanced logging to provide better diagnostics, particularly around API boundary validation:
 
-1. Added unique identifiers to log messages for easier tracing
-2. Added detailed logging around HTTP requests and responses
-3. Added logging for DataFrame shapes, index ranges, and content at various pipeline stages
-4. Enhanced error messages to include more context
+1. Added logging to show the REST API's actual boundaries for a given request
+2. Added logging to compare Vision API and cache data ranges with expected REST API results
+3. Enhanced error messages to include API boundary information for better debugging
 
-## Lessons Learned
+## Testing Strategy
 
-1. **Validation Logic Complexity**: Time range validation is complex, especially with timezone-aware timestamps and various edge cases.
-2. **Test Edge Cases**: Testing edge cases like single-point data ranges is crucial.
-3. **Diagnostics First**: Enhanced logging and diagnostics were key to identifying the root cause.
-4. **Real-world Data**: Using real-world data (actual Binance Vision API data) in tests helped identify issues that might not be apparent with synthetic data.
+Our testing strategy now focuses on integration tests against the real Binance REST API:
+
+1. **REST API Integration Tests**: Direct tests against the Binance REST API to verify boundary behavior
+2. **Vision API Alignment Tests**: Tests to verify Vision API manual alignment matches REST API behavior
+3. **Cache Alignment Tests**: Tests to verify cache operations align with REST API behavior
+4. **Edge Cases**: Testing various edge cases including:
+   - Millisecond precision timestamps
+   - Cross-boundary timestamps (day, month, year)
+   - Single data point scenarios
 
 ## Conclusion
 
-The time range validation issue was successfully resolved by modifying the validation logic to handle edge cases where data exists only at the start of a requested time range. This fix ensures that the `VisionDataClient` correctly returns available data even when it doesn't cover the entire requested range, which is a common scenario with financial market data.
+The time range validation issue has been addressed within our broader strategy to revamp time alignment. By shifting to REST API behavior as the source of truth and implementing the `ApiBoundaryValidator`, we ensure consistent handling of time boundaries across all components.
 
-The fix has been thoroughly tested and all tests now pass successfully, confirming the robustness of our solution.
+This approach not only resolves the specific issue documented here but also provides a robust foundation for handling time boundaries throughout our system, with direct validation against the actual API behavior.
 
-By documenting this issue and its resolution in detail, we aim to provide context for future development and prevent similar issues from recurring.
+For detailed information on the Binance REST API's boundary behavior, please refer to [Binance REST API Boundary Behavior](../api/binance_rest_api_boundary_behaviour.md). For the complete roadmap on time alignment revamping, see [Revamping Time Alignment](../roadmap/revamp_time_alignment.md).
