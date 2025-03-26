@@ -11,13 +11,13 @@ All tests should be run using the `scripts/run_tests_parallel.sh` script, which 
 scripts/run_tests_parallel.sh tests/
 
 # Run specific test directory
-scripts/run_tests_parallel.sh tests/interval_1s
+scripts/run_tests_parallel.sh tests/time_boundary
 
 # Run with specific log level
 scripts/run_tests_parallel.sh tests/api_boundary DEBUG
 
 # Run with additional pytest parameters
-scripts/run_tests_parallel.sh tests/interval_1s INFO "-k 'test_cache' --tb=short"
+scripts/run_tests_parallel.sh tests/time_boundary INFO "-k 'test_cache' --tb=short"
 ```
 
 ## Test Organization
@@ -35,7 +35,7 @@ The tests are organized by category:
 
 ### Market Data Tests
 
-`tests/interval_1s/test_market_data_validation.py` - Market data validation:
+`tests/time_boundary/test_market_data_validation.py` - Market data validation:
 
 - Data structure validation
 - Data integrity
@@ -44,7 +44,7 @@ The tests are organized by category:
 
 ### Cache Tests
 
-`tests/interval_1s/test_cache_unified.py` - Cache testing:
+`tests/time_boundary/test_cache_unified.py` - Cache testing:
 
 - Core cache operations
 - Directory structure

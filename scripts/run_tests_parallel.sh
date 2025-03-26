@@ -37,8 +37,8 @@
 #
 # ARGUMENTS:
 #   test_path: (Optional) Path to specific test file or directory to run.
-#              Default: tests/interval_1s (runs tests in the interval_1s directory).
-#              Examples: tests/, tests/interval_1s/, tests/test_specific.py
+#              Default: tests/time_boundary (runs tests in the time_boundary directory).
+#              Examples: tests/, tests/time_boundary/, tests/test_specific.py
 #              If -i or --interactive is used, this argument is ignored, and the
 #              test path is selected interactively.
 #
@@ -59,7 +59,7 @@
 #                           with specific markers).
 #
 # EXAMPLES:
-#   # 1. Run all tests in the tests/interval_1s directory with standard logging:
+#   # 1. Run all tests in the tests/time_boundary directory with standard logging:
 #   #    (Default behavior if no arguments are provided)
 #   ./scripts/run_tests_parallel.sh
 #
@@ -71,7 +71,7 @@
 #   ./scripts/run_tests_parallel.sh tests/
 #
 #   # 4. Run 1-second interval tests with very verbose output (for debugging):
-#   ./scripts/run_tests_parallel.sh tests/interval_1s/ DEBUG
+#   ./scripts/run_tests_parallel.sh tests/time_boundary/ DEBUG
 #
 #   # 5. Run a specific test file with shorter tracebacks:
 #   ./scripts/run_tests_parallel.sh tests/test_file.py --tb=short
@@ -200,7 +200,7 @@ if $INTERACTIVE; then
   LOG_LEVEL=${1:-INFO}
   shift 1 2>/dev/null || shift $# 2>/dev/null || true
 else
-  TEST_PATH=${1:-tests/interval_1s}  # Default to interval_1s tests if not specified
+  TEST_PATH=${1:-tests/time_boundary}  # Default to time_boundary tests if not specified
   LOG_LEVEL=${2:-INFO}               # Default to INFO log level
   shift 2 2>/dev/null || shift $# 2>/dev/null || true
 fi

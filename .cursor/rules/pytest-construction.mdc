@@ -47,7 +47,7 @@ On API related issues, always use `CURL` from terminal to find the root causes f
 ## `scripts/run_tests_parallel.sh` Argument Handling
 
 - **Positional Arguments**: The script uses positional arguments in the following order:
-    1.  `test_path` (Optional): Path to test directory or file. Defaults to `tests/interval_1s`.
+    1.  `test_path` (Optional): Path to test directory or file. Defaults to `tests/time_boundary`.
     2.  `log_level` (Optional):  Controls logging verbosity. Options: `DEBUG`, `INFO`, `WARNING`, `ERROR`. Defaults to `INFO`.
     3.  `additional_pytest_args` (Optional):  A string containing any additional pytest command-line arguments.
 
@@ -64,7 +64,7 @@ On API related issues, always use `CURL` from terminal to find the root causes f
 
 - **Run default tests with verbose output**:
   ```bash
-  scripts/run_tests_parallel.sh tests/interval_1s DEBUG
+  scripts/run_tests_parallel.sh tests/time_boundary DEBUG
   ```
 
 - **Run tests in `tests/` directory with keyword matching and short tracebacks**:

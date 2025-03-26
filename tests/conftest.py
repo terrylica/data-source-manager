@@ -1,14 +1,14 @@
 #!/usr/bin/env python
-"""Root conftest.py that imports fixtures from interval_1s for backwards compatibility."""
+"""Root conftest.py that imports fixtures from time_boundary for backwards compatibility."""
 
 import sys
 from pathlib import Path
 
-# Import fixtures from interval_1s
+# Import fixtures from time_boundary
 try:
     # Using explicit import with full path
     sys.path.insert(0, str(Path(__file__).parent))
-    from tests.interval_1s.conftest import (
+    from tests.time_boundary.conftest import (
         time_window,
         default_symbol,
         api_session,
@@ -20,7 +20,7 @@ try:
 except ImportError:
     # Fallback approach for import
     try:
-        from .interval_1s.conftest import (
+        from .time_boundary.conftest import (
             time_window,
             default_symbol,
             api_session,
@@ -30,7 +30,7 @@ except ImportError:
             # sample_ohlcv_data,  # Removed to avoid import error
         )
     except ImportError as e:
-        print(f"Warning: Could not import fixtures from interval_1s: {e}")
+        print(f"Warning: Could not import fixtures from time_boundary: {e}")
 
 # Also import root level conftest functionality
 sys.path.insert(0, str(Path(__file__).parent.parent))
