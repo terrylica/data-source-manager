@@ -1,4 +1,13 @@
+# DEPRECATED: This file has been consolidated into test_cache_unified.py
+# Please use the consolidated test file instead
+
 #!/usr/bin/env python
+"""
+DEPRECATED: This file has been consolidated into test_cache_unified.py.
+
+It will be removed in a future update. Please use test_cache_unified.py instead.
+"""
+
 """Tests for cache functionality in DataSourceManager.
 
 System Under Test (SUT):

@@ -1,4 +1,13 @@
+# DEPRECATED: This file has been consolidated into test_api_boundary.py
+# Please use the consolidated test file instead
+
 #!/usr/bin/env python
+"""
+DEPRECATED: This file has been consolidated into test_api_boundary.py.
+
+It will be removed in a future update. Please use test_api_boundary.py instead.
+"""
+
 """Tests for boundary alignment functionality in ApiBoundaryValidator.
 
 These tests verify that the boundary alignment methods in ApiBoundaryValidator correctly

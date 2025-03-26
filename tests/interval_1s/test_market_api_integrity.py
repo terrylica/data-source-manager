@@ -1,4 +1,13 @@
+# DEPRECATED: This file has been consolidated into test_market_data_validation.py
+# Please use the consolidated test file instead
+
 #!/usr/bin/env python
+"""
+DEPRECATED: This file has been consolidated into test_market_data_validation.py.
+
+It will be removed in a future update. Please use test_market_data_validation.py instead.
+"""
+
 """Comprehensive market data testing suite.
 
 System Under Test (SUT):
