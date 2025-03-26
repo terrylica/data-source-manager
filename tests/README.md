@@ -26,7 +26,7 @@ The tests are organized by category:
 
 ### API Boundary Tests
 
-`tests/api_boundary/test_api_boundary.py` - Consolidated tests for the ApiBoundaryValidator:
+`tests/api_boundary/test_api_boundary.py` - Tests for the ApiBoundaryValidator:
 
 - Core validation functionality
 - Boundary alignment
@@ -35,7 +35,7 @@ The tests are organized by category:
 
 ### Market Data Tests
 
-`tests/interval_1s/test_market_data_validation.py` - Consolidated market data validation:
+`tests/interval_1s/test_market_data_validation.py` - Market data validation:
 
 - Data structure validation
 - Data integrity
@@ -44,7 +44,7 @@ The tests are organized by category:
 
 ### Cache Tests
 
-`tests/interval_1s/test_cache_unified.py` - Unified cache testing:
+`tests/interval_1s/test_cache_unified.py` - Cache testing:
 
 - Core cache operations
 - Directory structure
