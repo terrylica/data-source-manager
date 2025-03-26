@@ -214,10 +214,9 @@ async def test_vision_cache_write_and_read(
     """
     logger.debug("Entering async context for test_vision_cache_write_and_read")
 
-    # Get current timestamp for time-based test
-    now = datetime.now(timezone.utc)
-    start_time = now - timedelta(days=1)
-    end_time = start_time + timedelta(hours=1)
+    # Use a known historical date range that should be available in Binance Vision API
+    # Using the get_safe_test_time_range helper function that's already defined in the test file
+    start_time, end_time = get_safe_test_time_range(timedelta(hours=1))
     symbol = "BTCUSDT"
     interval = Interval.SECOND_1
 
@@ -305,8 +304,8 @@ async def test_data_source_manager_vision_cache(
 @pytest.mark.asyncio
 async def test_cache_persistence(temp_cache_dir: Path):
     """Test that cache persists between different DataSourceManager instances."""
-    start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    end_time = start_time + timedelta(hours=1)
+    # Use a known historical date range that should be available in Binance Vision API
+    start_time, end_time = get_safe_test_time_range(timedelta(hours=1))
     symbol = "BTCUSDT"
     interval = Interval.SECOND_1
 
@@ -366,8 +365,8 @@ async def test_cache_persistence(temp_cache_dir: Path):
 @pytest.mark.asyncio
 async def test_cache_invalidation(temp_cache_dir: Path):
     """Test that cache invalidation works correctly through DataSourceManager."""
-    start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    end_time = start_time + timedelta(hours=1)
+    # Use a known historical date range that should be available in Binance Vision API
+    start_time, end_time = get_safe_test_time_range(timedelta(hours=1))
 
     # Create VisionDataClient without caching
     vision_client = VisionDataClient(symbol="BTCUSDT", interval="1s", use_cache=False)
@@ -426,8 +425,7 @@ async def test_cache_invalidation(temp_cache_dir: Path):
 async def test_prefetch_with_data_source_manager(temp_cache_dir):
     """Test that prefetching works with DataSourceManager."""
     # Setup test variables
-    start_time = datetime.now(timezone.utc) - timedelta(days=1, hours=2)
-    end_time = start_time + timedelta(hours=2)
+    start_time, end_time = get_safe_test_time_range(timedelta(hours=2))
     interval = Interval.SECOND_1
     symbol = "BTCUSDT"
 

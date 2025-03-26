@@ -43,16 +43,29 @@ async def test_unified_caching_through_manager(temp_cache_dir, caplog):
     """Test that caching works through DataSourceManager with UnifiedCacheManager."""
     start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
     end_time = start_time + timedelta(hours=1)
+    symbol = "BTCUSDT"
+    interval = Interval.SECOND_1
 
+    # First create and configure a VisionDataClient
+    vision_client = VisionDataClient(
+        symbol=symbol,
+        interval=interval.value,
+        use_cache=False,  # VisionDataClient's own cache will be disabled
+    )
+
+    # Now create the DataSourceManager with the configured VisionDataClient
     async with DataSourceManager(
-        market_type=MarketType.SPOT, cache_dir=temp_cache_dir, use_cache=True
+        market_type=MarketType.SPOT,
+        cache_dir=temp_cache_dir,
+        use_cache=True,
+        vision_client=vision_client,
     ) as manager:
         # First fetch - should download and cache
         df1 = await manager.get_data(
-            symbol="BTCUSDT",
+            symbol=symbol,
             start_time=start_time,
             end_time=end_time,
-            interval=Interval.SECOND_1,
+            interval=interval,
             enforce_source=DataSource.VISION,
         )
 
@@ -71,10 +84,10 @@ async def test_unified_caching_through_manager(temp_cache_dir, caplog):
 
         # Second fetch - should use cache
         df2 = await manager.get_data(
-            symbol="BTCUSDT",
+            symbol=symbol,
             start_time=start_time,
             end_time=end_time,
-            interval=Interval.SECOND_1,
+            interval=interval,
             enforce_source=DataSource.VISION,
         )
 

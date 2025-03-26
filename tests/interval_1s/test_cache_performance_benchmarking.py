@@ -33,6 +33,7 @@ import pytest_asyncio
 from utils.logger_setup import get_logger
 from core.data_source_manager import DataSourceManager
 from utils.market_constraints import Interval, MarketType
+from utils.test_utils import get_safe_test_time_range
 
 logger = get_logger(__name__, "INFO", show_path=False)
 
@@ -62,6 +63,7 @@ def log_performance_metrics(
     """Log detailed performance metrics for an operation."""
     duration = end_time - start_time
     memory_change = end_memory - start_memory
+    record_count = len(df)
 
     logger.info(
         "╔════════════════════════════════════════════════════════════════════════════════════════════════════════"
@@ -72,7 +74,14 @@ def log_performance_metrics(
     )
     logger.info("║ ⏱️  Timing Metrics:")
     logger.info(f"║   • Total Duration: {duration:.4f} seconds")
-    logger.info(f"║   • Per Record: {(duration * 1000 / len(df)):.4f} ms/record")
+
+    if record_count > 0:
+        logger.info(
+            f"║   • Per Record: {(duration * 1000 / record_count):.4f} ms/record"
+        )
+    else:
+        logger.info(f"║   • Per Record: N/A (empty DataFrame)")
+
     logger.info("║")
     logger.info("║ 💾 Memory Metrics:")
     logger.info(f"║   • Initial Memory: {start_memory:.2f} MB")
@@ -80,8 +89,15 @@ def log_performance_metrics(
     logger.info(f"║   • Memory Change: {memory_change:+.2f} MB")
     logger.info("║")
     logger.info("║ 📈 Data Metrics:")
-    logger.info(f"║   • Records Processed: {len(df):,}")
-    logger.info(f"║   • Memory per Record: {(memory_change / len(df)):.4f} MB/record")
+    logger.info(f"║   • Records Processed: {record_count:,}")
+
+    if record_count > 0:
+        logger.info(
+            f"║   • Memory per Record: {(memory_change / record_count):.4f} MB/record"
+        )
+    else:
+        logger.info(f"║   • Memory per Record: N/A (empty DataFrame)")
+
     logger.info(
         "╚════════════════════════════════════════════════════════════════════════════════════════════════════════"
     )
@@ -147,9 +163,7 @@ async def test_basic_cache_performance(manager: DataSourceManager) -> None:
     )
 
     # Test parameters
-    base_time = arrow.utcnow().shift(days=-2)
-    start_time = base_time.datetime
-    end_time = base_time.shift(minutes=5).datetime
+    start_time, end_time = get_safe_test_time_range(timedelta(minutes=5))
 
     # Cold cache fetch (cache miss)
     logger.info("Performing cold cache fetch (cache miss)...")
@@ -234,9 +248,7 @@ async def test_cache_vs_no_cache_comparison(manager: DataSourceManager) -> None:
     )
 
     # Test parameters
-    base_time = arrow.utcnow().shift(days=-2)
-    start_time = base_time.datetime
-    end_time = base_time.shift(minutes=5).datetime
+    start_time, end_time = get_safe_test_time_range(timedelta(minutes=5))
 
     # No-cache fetch
     logger.info("Performing no-cache fetch...")
@@ -329,13 +341,14 @@ async def test_geometric_range_performance(manager: DataSourceManager) -> None:
 
     # Test ranges in minutes
     ranges = [5, 15, 30, 60]
-    base_time = arrow.utcnow().shift(days=-2)
+    # Get a base start time that will work for all ranges
+    base_start_time, _ = get_safe_test_time_range(timedelta(hours=2))
     results: List[Dict[str, Any]] = []
 
     for minutes in ranges:
         logger.info(f"\nTesting {minutes}-minute range...")
-        start_time = base_time.datetime
-        end_time = base_time.shift(minutes=minutes).datetime
+        start_time = base_start_time
+        end_time = base_start_time + timedelta(minutes=minutes)
 
         # Cold cache fetch
         logger.info(f"Performing cold cache fetch for {minutes}-minute range...")
