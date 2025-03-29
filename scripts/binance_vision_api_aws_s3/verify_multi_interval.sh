@@ -28,7 +28,7 @@ SYMBOLS="BTCUSDT ETHUSDT BNBUSDT LTCUSDT ADAUSDT XRPUSDT EOSUSDT XLMUSDT TRXUSDT
 INTERVALS="1s 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d"
 
 # Test mode - process a shorter date range for testing
-TEST_MODE=true
+TEST_MODE=false
 
 # Date range to process
 if [ "$TEST_MODE" = true ]; then
