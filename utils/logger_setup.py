@@ -6,6 +6,11 @@ import traceback
 # Default log level from environment
 console_log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 
+# Force colors in container environments
+os.environ["FORCE_COLOR"] = "1"
+os.environ["PYTHONUNBUFFERED"] = "1"
+os.environ["CLICOLOR_FORCE"] = "1"  # Force colors even in non-TTY environments
+
 # Do not configure root logger with basicConfig as it can interfere with pytest
 
 
@@ -31,13 +36,17 @@ def get_logger(name: str, level: str = None, show_path: bool = None) -> logging.
         # Create a handler that writes log messages to stderr
         handler = logging.StreamHandler()
 
+        # Enable colors in the handler
+        handler.terminator = "\n"
+        handler.stream.isatty = lambda: True  # Force color output
+
         # Create colored formatter for console output
-        console_format = "%(levelname)-8s"
+        console_format = "%(log_color)s%(levelname)-8s%(reset)s"
         if show_path is None or show_path:
             console_format += " %(name)s:"
         console_format += " %(message)s"
 
-        # Create a ColoredFormatter
+        # Create a ColoredFormatter with enhanced colors
         formatter = ColoredFormatter(
             console_format,
             datefmt="[%X]",
@@ -48,6 +57,7 @@ def get_logger(name: str, level: str = None, show_path: bool = None) -> logging.
                 "ERROR": "red",
                 "CRITICAL": "red,bg_white",
             },
+            reset=True,
             style="%",
         )
 
