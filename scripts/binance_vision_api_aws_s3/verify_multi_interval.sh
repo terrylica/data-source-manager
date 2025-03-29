@@ -16,7 +16,8 @@ MARKET_TYPE="spot"
 # Trading pair to process
 # - For SPOT and UM: typically like "BTCUSDT", "ETHUSDT", etc.
 # - For CM: typically like "BTCUSD_PERP", "ETHUSD_PERP" or "BCHUSD_PERP", etc.
-SYMBOL="ETCUSDT"
+# For multiple symbols, use space-separated list: "BTCUSDT ETHUSDT XRPUSDT"
+SYMBOLS="BTCUSDT ETHUSDT BNBUSDT LTCUSDT ADAUSDT XRPUSDT EOSUSDT XLMUSDT TRXUSDT ETCUSDT ICXUSDT VETUSDT LINKUSDT ZILUSDT XMRUSDT THETAUSDT MATICUSDT ATOMUSDT FTMUSDT ALGOUSDT DOGEUSDT CHZUSDT XTZUSDT BCHUSDT KNCUSDT MANAUSDT SOLUSDT SANDUSDT CRVUSDT DOTUSDT LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
 
 # Time intervals to process (space-separated list)
 # Available intervals:
@@ -24,18 +25,18 @@ SYMBOL="ETCUSDT"
 # - "1m", "3m", "5m", "15m", "30m"
 # - "1h", "2h", "4h", "6h", "8h", "12h"
 # - "1d"
-INTERVALS="1s 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d"  # All available intervals
+INTERVALS="1s 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d"
 
 # Test mode - process a shorter date range for testing
-TEST_MODE=false
+TEST_MODE=true
 
 # Date range to process
 if [ "$TEST_MODE" = true ]; then
-    # Test mode - just process 7 days of data
-    START_DATE=$(date -d "7 days ago" +"%Y-%m-%d" 2>/dev/null || date -j -v-7d +"%Y-%m-%d" 2>/dev/null)
-    END_DATE=$(date -d "yesterday" +"%Y-%m-%d" 2>/dev/null || date -j -v-1d +"%Y-%m-%d" 2>/dev/null)
-    START_DATE_AUTO=false
-    END_DATE_AUTO=false
+    # Test mode - just process 3 days of data to be faster
+    START_DATE=$(date -d "3 days ago" +"%Y-%m-%d" 2>/dev/null || date -j -v-3d +"%Y-%m-%d" 2>/dev/null)
+    END_DATE=$(date -d "5 days ago" +"%Y-%m-%d" 2>/dev/null || date -j -v-5d +"%Y-%m-%d" 2>/dev/null)
+    START_DATE_AUTO=true     # Auto-detect latest available date
+    END_DATE_AUTO=false      # Use fixed end date for faster testing
 else
     # Full mode - process all available data
     START_DATE="2025-03-27"  # Start date (YYYY-MM-DD) - Not used when START_DATE_AUTO=true
@@ -195,44 +196,46 @@ auto_detect_latest_date() {
     
     echo "Auto-detecting the latest available date for ${market_type}/${symbol}/${interval}..." >&2
     
-    # Try today's date
-    local today=$(date +"%Y-%m-%d")
-    local yesterday=$(adjust_date "${today}" "-1")
-    local day_before_yesterday=$(adjust_date "${today}" "-2")
-    
     # Get base URL
     local base_url=$(get_base_url "${market_type}" "${symbol}")
     
-    # Check if today's data is available
-    local today_url=$(get_file_url "${base_url}" "${interval}" "${today}")
+    # Start from today and search backward up to 10 days
+    local current_date=$(date +"%Y-%m-%d")
+    local max_days_back=10
     
-    if check_file_exists "${today_url}"; then
-        echo "✅ Using today's date as START_DATE: ${today}" >&2
-        echo "${today}"
-        return 0
-    else
-        # Check if yesterday's data is available
-        local yesterday_url=$(get_file_url "${base_url}" "${interval}" "${yesterday}")
-        
-        if check_file_exists "${yesterday_url}"; then
-            echo "✅ Using yesterday's date as START_DATE: ${yesterday}" >&2
-            echo "${yesterday}"
-            return 0
+    echo -n "Checking dates: " >&2
+    
+    for days_back in $(seq 0 ${max_days_back}); do
+        # Calculate the date to check
+        local check_date=""
+        if [ ${days_back} -eq 0 ]; then
+            check_date="${current_date}"
         else
-            # Check day before yesterday as last resort
-            local before_yesterday_url=$(get_file_url "${base_url}" "${interval}" "${day_before_yesterday}")
-            
-            if check_file_exists "${before_yesterday_url}"; then
-                echo "✅ Using day before yesterday as START_DATE: ${day_before_yesterday}" >&2
-                echo "${day_before_yesterday}"
-                return 0
-            else
-                echo "⚠️ Could not find recent data. Using default START_DATE: ${default_date}" >&2
-                echo "${default_date}"
-                return 1
-            fi
+            # Use direct date command with the specific format needed
+            check_date=$(date -d "${current_date} -${days_back} days" +"%Y-%m-%d" 2>/dev/null || date -j -v-${days_back}d -f "%Y-%m-%d" "${current_date}" +"%Y-%m-%d" 2>/dev/null)
         fi
-    fi
+        
+        echo -n "${check_date} " >&2
+        
+        # Use direct curl command
+        local filename="${symbol}-${interval}-${check_date}.zip"
+        local url="${base_url}/${interval}/${filename}"
+        local status=$(curl -s -o /dev/null -w "%{http_code}" -I "${url}")
+        
+        if [ "${status}" = "200" ] || [ "${status}" = "302" ]; then
+            echo "" >&2
+            echo "✅ Found latest available date: ${check_date}" >&2
+            echo "${check_date}"
+            return 0
+        fi
+        
+        echo -n "→ " >&2
+    done
+    
+    echo "" >&2
+    echo "⚠️ Could not find recent data within last ${max_days_back} days. Using default START_DATE: ${default_date}" >&2
+    echo "${default_date}"
+    return 1
 }
 
 # Auto-detect the earliest date if END_DATE_AUTO is true
@@ -265,11 +268,12 @@ find_earliest_date() {
 
 # Function to generate standardized file names
 get_file_names() {
-    local interval=$1
-    local start_date=$2
-    local end_date=$3
+    local symbol=$1
+    local interval=$2
+    local start_date=$3
+    local end_date=$4
     local timestamp=$(date +%Y%m%d_%H%M%S)
-    local base_name="${MARKET_TYPE}_${SYMBOL}_${interval}_${start_date}_to_${end_date}"
+    local base_name="${MARKET_TYPE}_${symbol}_${interval}_${start_date}_to_${end_date}"
     local retry_info=""
     
     # If this is a retry run, add information about which file we're retrying from
@@ -381,13 +385,15 @@ analyze_file() {
     local date=$1
     local interval=$2
     local index=$3
-    local result_file="${RESULTS_DIR}/${interval}_${index}.csv"
+    local symbol=$4
+    local result_file="${RESULTS_DIR}/${symbol}_${interval}_${index}.csv"
     local url_date=$(date -d "${date}" +"%Y-%m-%d" 2>/dev/null || date -j -f "%Y-%m-%d" "${date}" +"%Y-%m-%d" 2>/dev/null)
-    local filename="${SYMBOL}-${interval}-${url_date}.zip"
+    local filename="${symbol}-${interval}-${url_date}.zip"
     local checksum_file="${filename}.CHECKSUM"
-    local url="${BASE_URL}/${interval}/${filename}"
+    local base_url=$(get_base_url "${MARKET_TYPE}" "${symbol}")
+    local url="${base_url}/${interval}/${filename}"
     local checksum_url="${url}.CHECKSUM"
-    local work_dir="${TEMP_DIR}/work_${interval}_${date}"
+    local work_dir="${TEMP_DIR}/work_${symbol}_${interval}_${date}"
     local expected_lines=$(get_expected_lines "${interval}")
     
     # Create work directory
@@ -525,14 +531,15 @@ process_interval() {
     local interval=$1
     local start_date=$2
     local end_date=$3
+    local symbol=$4
     
     # Get expected line count for this interval
     local expected_line_count=$(get_expected_lines "${interval}")
-    echo "Processing ${interval} data (${expected_line_count} expected lines per file)"
+    echo "Processing ${symbol} - ${interval} data (${expected_line_count} expected lines per file)"
     
     # If auto-detect is enabled for this interval, detect latest date
     if [ "${START_DATE_AUTO}" = true ]; then
-        local auto_start=$(auto_detect_latest_date "${MARKET_TYPE}" "${SYMBOL}" "${interval}" "${start_date}" | tail -n 1)
+        local auto_start=$(auto_detect_latest_date "${MARKET_TYPE}" "${symbol}" "${interval}" "${start_date}" | tail -n 1)
         if [ -n "${auto_start}" ]; then
             start_date="${auto_start}"
         fi
@@ -540,16 +547,16 @@ process_interval() {
     
     # If auto-detect for earliest date is enabled, detect earliest date
     if [ "${END_DATE_AUTO}" = true ]; then
-        local auto_end=$(find_earliest_date "${MARKET_TYPE}" "${SYMBOL}" "${interval}")
+        local auto_end=$(find_earliest_date "${MARKET_TYPE}" "${symbol}" "${interval}")
         if [ -n "${auto_end}" ]; then
             end_date="${auto_end}"
         fi
     fi
     
-    echo "Date range for ${interval}: ${start_date} to ${end_date}"
+    echo "Date range for ${symbol} - ${interval}: ${start_date} to ${end_date}"
     
     # Create main CSV file for this interval
-    local main_csv=$(get_file_names "${interval}" "${start_date}" "${end_date}")
+    local main_csv=$(get_file_names "${symbol}" "${interval}" "${start_date}" "${end_date}")
     local failed_csv="${main_csv%.csv}_failed.csv"
     
     # Create CSV header
@@ -575,7 +582,7 @@ process_interval() {
     fi
     
     if [ "${SHOW_DATES}" = true ]; then
-        echo "Number of dates to process for ${interval}: ${#dates[@]}"
+        echo "Number of dates to process for ${symbol} - ${interval}: ${#dates[@]}"
         echo "Dates to process:"
         printf '%s\n' "${dates[@]}"
         echo "----------------------------------------"
@@ -584,7 +591,7 @@ process_interval() {
     echo "Results will be saved to: $(basename "${main_csv}")"
     
     if [ "${SHOW_PROGRESS}" = true ]; then
-        echo -n "Progress for ${interval}: "
+        echo -n "Progress for ${symbol} - ${interval}: "
     fi
     
     # Process dates in parallel with controlled concurrency
@@ -596,7 +603,7 @@ process_interval() {
         done
         
         # Start a new background process
-        analyze_file "$date" "${interval}" "$index" &
+        analyze_file "$date" "${interval}" "$index" "${symbol}" &
         
         ((index++))
     done
@@ -606,13 +613,13 @@ process_interval() {
     
     # Combine results in order
     for i in $(seq 0 $((index-1))); do
-        if [ -f "${RESULTS_DIR}/${interval}_${i}.csv" ]; then
+        if [ -f "${RESULTS_DIR}/${symbol}_${interval}_${i}.csv" ]; then
             # Add to main results file
-            cat "${RESULTS_DIR}/${interval}_${i}.csv" >> "${main_csv}"
+            cat "${RESULTS_DIR}/${symbol}_${interval}_${i}.csv" >> "${main_csv}"
             
             # If checksum_match is 0 and failures saving is enabled, add to failures file
-            if [ "${SAVE_FAILURES}" = true ] && grep -q "^0," "${RESULTS_DIR}/${interval}_${i}.csv"; then
-                cat "${RESULTS_DIR}/${interval}_${i}.csv" >> "${failed_csv}"
+            if [ "${SAVE_FAILURES}" = true ] && grep -q "^0," "${RESULTS_DIR}/${symbol}_${interval}_${i}.csv"; then
+                cat "${RESULTS_DIR}/${symbol}_${interval}_${i}.csv" >> "${failed_csv}"
             fi
         fi
     done
@@ -621,7 +628,7 @@ process_interval() {
         echo  # New line after progress dots
     fi
     
-    echo "Completed processing ${interval}. Results saved to: ${main_csv}"
+    echo "Completed processing ${symbol} - ${interval}. Results saved to: ${main_csv}"
     if [ "${SAVE_FAILURES}" = true ]; then
         local failure_count=$(wc -l < "${failed_csv}")
         if [ "${failure_count}" -gt 1 ]; then  # More than just the header line
@@ -631,14 +638,14 @@ process_interval() {
             
             if [ -n "${failed_earliest}" ] && [ -n "${failed_latest}" ]; then
                 local timestamp=$(date +%Y%m%d_%H%M%S)
-                local new_failed_name="${LOG_DIR}/${MARKET_TYPE}_${SYMBOL}_${interval}_${failed_latest}_to_${failed_earliest}_${RUN_LABEL}_failed_${timestamp}.csv"
+                local new_failed_name="${LOG_DIR}/${MARKET_TYPE}_${symbol}_${interval}_${failed_latest}_to_${failed_earliest}_${RUN_LABEL}_failed_${timestamp}.csv"
                 mv "${failed_csv}" "${new_failed_name}"
-                echo "Failed downloads for ${interval} saved to: $(basename "${new_failed_name}")"
+                echo "Failed downloads for ${symbol} - ${interval} saved to: $(basename "${new_failed_name}")"
             else
-                echo "Failed downloads for ${interval} saved to: $(basename "${failed_csv}")"
+                echo "Failed downloads for ${symbol} - ${interval} saved to: $(basename "${failed_csv}")"
             fi
         else
-            echo "No failures detected for ${interval}! All files processed successfully."
+            echo "No failures detected for ${symbol} - ${interval}! All files processed successfully."
             rm -f "${failed_csv}"  # Remove empty failures file
         fi
     fi
@@ -650,8 +657,16 @@ process_interval() {
 mkdir -p "${LOG_DIR}" "${RESULTS_DIR}"
 chmod 777 "${LOG_DIR}" "${RESULTS_DIR}"
 
-# Determine BASE_URL
-BASE_URL=$(get_base_url "${MARKET_TYPE}" "${SYMBOL}")
+# Set retry mode flag
+RETRY_MODE=false
+if [ -n "${RETRY_FROM}" ]; then
+    RETRY_MODE=true
+    if [ ! -f "${RETRY_FROM}" ]; then
+        echo "Error: Retry file ${RETRY_FROM} not found."
+        exit 1
+    fi
+    echo "Retry mode: Processing failed downloads from ${RETRY_FROM}"
+fi
 
 # Validate intervals against market type
 VALIDATED_INTERVALS=$(validate_intervals "${MARKET_TYPE}" "${INTERVALS}")
@@ -662,10 +677,10 @@ if [ -z "${VALIDATED_INTERVALS}" ]; then
 fi
 
 echo "=========================================="
-echo " Multi-Interval Verification Tool"
+echo " Multi-Symbol & Interval Verification Tool"
 echo "=========================================="
 echo "Market: ${MARKET_TYPE}"
-echo "Symbol: ${SYMBOL}"
+echo "Symbols: ${SYMBOLS}"
 echo "Valid intervals to process: ${VALIDATED_INTERVALS}"
 if [ "$TEST_MODE" = true ]; then
     echo "MODE: TEST (short date range)"
@@ -677,16 +692,24 @@ echo "==========================================
 
 "
 
-# Process each valid interval
-for interval in ${VALIDATED_INTERVALS}; do
-    process_interval "${interval}" "${START_DATE}" "${END_DATE}"
+# Process each symbol and interval
+for symbol in ${SYMBOLS}; do
+    echo "Processing symbol: ${symbol}"
+    echo "--------------------"
+    
+    for interval in ${VALIDATED_INTERVALS}; do
+        process_interval "${interval}" "${START_DATE}" "${END_DATE}" "${symbol}"
+    done
+    
+    echo "Completed processing symbol: ${symbol}"
+    echo ""
 done
 
 # Clean up the main temporary directory
 fast_remove_dir "${TEMP_DIR}"
 
 echo ""
-echo "All interval verification completed."
+echo "All symbol and interval verification completed."
 echo ""
 echo "REFERENCE INFORMATION:"
 echo "--------------------"
