@@ -342,7 +342,6 @@ class DownloadHandler:
             httpx.TimeoutException: If request times out
             httpx.NetworkError: If network error occurs
         """
-        temp_path = local_path.with_suffix(".tmp")
         progress_tracker_kwargs = progress_tracker_kwargs or {}
 
         try:
@@ -362,7 +361,7 @@ class DownloadHandler:
                     total_size, **progress_tracker_kwargs
                 )
 
-                with open(temp_path, "wb") as f:
+                with open(local_path, "wb") as f:
                     async for chunk in response.aiter_bytes(self.chunk_size):
                         if not progress.update(len(chunk)):
                             msg = f"Download stalled at {progress.bytes_received}/{total_size} bytes"
@@ -370,8 +369,6 @@ class DownloadHandler:
                             raise DownloadStalledException(msg)
                         f.write(chunk)
 
-            # Only move to final location if download completed successfully
-            temp_path.rename(local_path)
             return True
 
         except (
@@ -386,10 +383,6 @@ class DownloadHandler:
         except Exception as e:
             logger.error(f"Unexpected error during download: {str(e)}")
             return False
-
-        finally:
-            # Cleanup temp file if it exists
-            temp_path.unlink(missing_ok=True)
 
 
 # ----- Batch Download Handling -----
@@ -612,28 +605,57 @@ class VisionDownloadManager:
         )
 
     def _verify_checksum(self, file_path: Path, checksum_path: Path) -> bool:
-        """Verify file checksum.
+        """Verify file checksum against expected value.
 
         Args:
-            file_path: Path to data file
+            file_path: Path to data file (zip file)
             checksum_path: Path to checksum file
 
         Returns:
             Verification status
         """
         try:
+            # Read checksum file and normalize whitespace
             with open(checksum_path, "r") as f:
-                expected = f.read().strip().split()[0]
+                content = f.read().strip()
+                # Split on whitespace and take first part (the checksum)
+                expected = content.split()[0]
+                logger.debug(f"Raw checksum file content: '{content}'")
+                logger.debug(f"Expected checksum: '{expected}'")
 
             from utils.validation_utils import (
                 validate_cache_integrity,
                 calculate_checksum,
             )
 
+            # Log file details
+            logger.debug(f"Verifying checksum for file: {file_path}")
+            logger.debug(f"File exists: {file_path.exists()}")
+            logger.debug(f"File size: {file_path.stat().st_size} bytes")
+
+            # Read first few bytes of the file
+            with open(file_path, "rb") as f:
+                header = f.read(16)
+                logger.debug(f"File header (hex): {header.hex()}")
+
+            # Calculate checksum of the zip file directly
             actual = calculate_checksum(file_path)
-            return actual == expected
+            logger.debug(f"Calculated checksum: '{actual}'")
+
+            if actual != expected:
+                logger.error(f"Checksum mismatch:")
+                logger.error(f"Expected: '{expected}'")
+                logger.error(f"Actual  : '{actual}'")
+                # Try normalizing both checksums
+                expected_norm = expected.lower().strip()
+                actual_norm = actual.lower().strip()
+                logger.debug(f"Normalized expected: '{expected_norm}'")
+                logger.debug(f"Normalized actual  : '{actual_norm}'")
+                return expected_norm == actual_norm
+            return True
         except Exception as e:
             logger.error(f"Error verifying checksum: {e}")
+            logger.debug(f"Full traceback: {traceback.format_exc()}")
             return False
 
     async def download_file(self, url: str, local_path: Path) -> bool:
@@ -663,6 +685,7 @@ class VisionDownloadManager:
         """
         # Ensure date has proper timezone
         from utils.time_utils import enforce_utc_timezone
+        from urllib.parse import urlparse
 
         date = enforce_utc_timezone(date)
 
@@ -674,20 +697,21 @@ class VisionDownloadManager:
 
         # Create temporary directory for downloads
         temp_dir = Path(tempfile.mkdtemp())
-        data_file = (
-            temp_dir
-            / f"{self.symbol}_{self.interval}_{date.strftime('%Y%m%d')}_data.zip"
-        )
-        checksum_file = (
-            temp_dir
-            / f"{self.symbol}_{self.interval}_{date.strftime('%Y%m%d')}_checksum"
-        )
+
+        # Get URLs first to extract original filenames
+        data_url = self._get_data_url(date)
+        checksum_url = self._get_checksum_url(date)
+
+        # Extract original filenames from URLs
+        data_filename = Path(urlparse(data_url).path).name
+        checksum_filename = Path(urlparse(checksum_url).path).name
+
+        # Use original filenames in temp directory
+        data_file = temp_dir / data_filename
+        checksum_file = temp_dir / checksum_filename
 
         try:
-            # Download data and checksum files
-            data_url = self._get_data_url(date)
-            checksum_url = self._get_checksum_url(date)
-
+            # Download data and checksum files sequentially
             logger.info(
                 f"[{debug_id}] Downloading data for {date.strftime('%Y-%m-%d')} from:"
             )
@@ -695,19 +719,23 @@ class VisionDownloadManager:
             logger.info(f"[{debug_id}] Checksum URL: {checksum_url}")
 
             download_start = time.time()
-            success = await asyncio.gather(
-                self.download_file(data_url, data_file),
-                self.download_file(checksum_url, checksum_file),
-            )
-            download_time = time.time() - download_start
 
-            logger.info(
-                f"[{debug_id}] Download completed in {download_time:.2f}s, success: {success}"
-            )
-
-            if not all(success):
-                logger.error(f"[{debug_id}] Failed to download files for {date}")
+            # Download data file first
+            data_success = await self.download_file(data_url, data_file)
+            if not data_success:
+                logger.error(f"[{debug_id}] Failed to download data file for {date}")
                 return None
+
+            # Then download checksum file
+            checksum_success = await self.download_file(checksum_url, checksum_file)
+            if not checksum_success:
+                logger.error(
+                    f"[{debug_id}] Failed to download checksum file for {date}"
+                )
+                return None
+
+            download_time = time.time() - download_start
+            logger.info(f"[{debug_id}] Download completed in {download_time:.2f}s")
 
             # Log file sizes for diagnosis
             try:
