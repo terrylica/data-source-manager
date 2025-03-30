@@ -95,7 +95,7 @@ async def test_client_factory_dsm_integration():
     which may occur due to the more stringent time boundary handling.
     """
     from core.data_source_manager import DataSourceManager, DataSource
-    from core.market_data_client import EnhancedRetriever
+    from core.rest_data_client import EnhancedRetriever
     from core.vision_data_client import VisionDataClient
     from utils.market_constraints import MarketType
     from datetime import datetime, timezone, timedelta

@@ -45,9 +45,9 @@ def detect_timestamp_unit(sample_ts: int | str) -> TimestampUnit:
 - It analyzes the number of digits in a sample timestamp to differentiate between the two formats (13 digits for milliseconds, 16 digits for microseconds).
 - This function is critical for adapting to the format change expected in 2025 and beyond.
 
-### 2. Microsecond Precision Processing and `close_time` Adjustment (`market_data_client.py`)
+### 2. Microsecond Precision Processing and `close_time` Adjustment (`rest_data_client.py`)
 
-```python:core/market_data_client.py
+```python:core/rest_data_client.py
 def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
     # ...
     for col in ["open_time", "close_time"]:
@@ -61,7 +61,7 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
     # ...
 ```
 
-- The `process_kline_data` function in `market_data_client.py` is responsible for processing raw kline data and converting timestamps to `datetime` objects.
+- The `process_kline_data` function in `rest_data_client.py` is responsible for processing raw kline data and converting timestamps to `datetime` objects.
 - **Microsecond Conversion**: It explicitly converts all timestamps to microsecond precision by multiplying millisecond timestamps by 1000 before using `pd.to_datetime`. This ensures consistent microsecond resolution regardless of the input format.
 - **`close_time` Adjustment**: It adds a `CLOSE_TIME_ADJUSTMENT` (likely 999999 microseconds) to the `close_time` values. This adjustment directly addresses the observed pattern of `close_time` ending in `.999999`, ensuring accurate representation of the intended timestamp precision.
 

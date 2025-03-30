@@ -4,7 +4,7 @@
 System Under Test (SUT):
 - core.data_source_manager.DataSourceManager
 - core.vision_data_client.VisionDataClient (indirectly)
-- core.market_data_client.EnhancedRetriever (indirectly)
+- core.rest_data_client.EnhancedRetriever (indirectly)
 - core.cache_manager.UnifiedCacheManager (indirectly)
 
 This test suite provides comprehensive integration testing of the DataSourceManager,

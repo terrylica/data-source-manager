@@ -22,7 +22,7 @@ from utils.config import (
     REST_MAX_CHUNKS,
     standardize_column_names,
 )
-from core.market_data_client import EnhancedRetriever
+from core.rest_data_client import EnhancedRetriever
 from core.vision_data_client import VisionDataClient
 from core.cache_manager import UnifiedCacheManager
 

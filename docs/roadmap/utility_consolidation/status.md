@@ -60,7 +60,7 @@ The following core modules have been updated to use consolidated utility modules
    - `core/cache_manager.py` - Now uses consolidated utility modules directly
    - `utils/download_handler.py` - Now uses consolidated utility modules directly
    - `core/vision_constraints.py` - Now uses consolidated utility modules directly
-   - `core/market_data_client.py` - Now uses consolidated utility modules directly
+   - `core/rest_data_client.py` - Now uses consolidated utility modules directly
 
 2. **Test Modules**
    - `tests/time_boundary/test_dsm_time_boundary_comprehensive.py` - Now uses consolidated utility modules directly
@@ -221,7 +221,7 @@ scripts/run_tests_parallel.sh tests/time_utils
    - Successfully addressed deprecation warnings in core modules and test files
 
 4. **Core Module Updates**:
-   - Updated `vision_data_client.py`, `data_source_manager.py`, `cache_manager.py`, `download_handler.py`, `vision_constraints.py`, and `market_data_client.py` to use consolidated modules directly
+   - Updated `vision_data_client.py`, `data_source_manager.py`, `cache_manager.py`, `download_handler.py`, `vision_constraints.py`, and `rest_data_client.py` to use consolidated modules directly
    - Updated key test files to use consolidated functions instead of deprecated wrappers
    - Significantly reduced deprecation warnings throughout the codebase
    - Maintained backward compatibility while promoting cleaner code practices

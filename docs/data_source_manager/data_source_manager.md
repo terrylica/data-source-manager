@@ -25,12 +25,13 @@ from utils.market_constraints import Interval, MarketType
 #### Key Components
 
 - `DataSource` Enum:
+
   - `AUTO`: Automatically select best source
   - `REST`: Force REST API usage
   - `VISION`: Force Vision API usage
 
 - Dependencies:
-  - `EnhancedRetriever` from `market_data_client.py`
+  - `EnhancedRetriever` from `rest_data_client.py`
   - `VisionDataClient` from `vision_data_client.py`
   - `UnifiedCacheManager` from `cache_manager.py`
   - `Interval`, `MarketType` from `market_constraints.py`
@@ -67,6 +68,7 @@ OUTPUT_DTYPES = {
 #### Data Requirements
 
 1. Index Properties:
+
    - pd.DatetimeIndex in UTC timezone
    - Monotonically increasing
    - No duplicates
@@ -109,7 +111,7 @@ Features:
 # Cache Statistics
 async def get_cache_stats() -> Dict[str, int]:
     """Get cache performance metrics.
-    
+
     Returns:
         {
             "hits": int,    # Successful cache retrievals
@@ -125,7 +127,7 @@ async def validate_cache_integrity(
     date: datetime
 ) -> Tuple[bool, Optional[str]]:
     """Validate cache integrity for specific data.
-    
+
     Validates:
     1. Cache existence
     2. Data format and structure
@@ -140,7 +142,7 @@ async def repair_cache(
     date: datetime
 ) -> bool:
     """Attempt to repair corrupted cache entry.
-    
+
     Process:
     1. Invalidate corrupted entry
     2. Refetch from source
@@ -164,7 +166,7 @@ The system employs strict **inclusive start** and **inclusive end** timing for 1
 ```python
 def _validate_dates(self, start_time: datetime, end_time: datetime) -> None:
     """Validate date ranges for data retrieval.
-    
+
     Validations:
     1. End time must not be in the future
     2. Start time must be before end time
@@ -177,7 +179,7 @@ def _validate_dates(self, start_time: datetime, end_time: datetime) -> None:
 
 def _estimate_data_points(self, start_time: datetime, end_time: datetime, interval: Interval) -> int:
     """Estimate number of data points for a time range.
-    
+
     Rules:
     - SECOND_1: total_seconds
     - MINUTE_1: total_seconds // 60
@@ -240,7 +242,7 @@ async def get_data(
 ```python
 def _should_use_vision_api(self, start_time: datetime, end_time: datetime, interval: Interval) -> bool:
     """Determine if Vision API should be used based on request parameters.
-    
+
     Decision Factors:
     1. Data size: Use Vision for requests > REST_CHUNK_SIZE * REST_MAX_CHUNKS
     2. Default: Try Vision first with REST fallback
@@ -264,7 +266,7 @@ def _should_use_vision_api(self, start_time: datetime, end_time: datetime, inter
 - Limitations:
   - 36-hour data delay (VISION_DATA_DELAY_HOURS)
   - Potential gaps in data
-  - Different column naming (handled by _format_dataframe)
+  - Different column naming (handled by \_format_dataframe)
 
 #### REST API Characteristics
 
@@ -274,7 +276,7 @@ def _should_use_vision_api(self, start_time: datetime, end_time: datetime, inter
   - Direct from source
 - Limitations:
   - Rate limits apply
-  - Max 10,000 points per request (REST_CHUNK_SIZE * REST_MAX_CHUNKS)
+  - Max 10,000 points per request (REST_CHUNK_SIZE \* REST_MAX_CHUNKS)
   - Higher failure rate for large requests
 
 #### Fallback Mechanism
@@ -289,7 +291,7 @@ async def _fetch_from_source(
     use_vision: bool = True
 ) -> pd.DataFrame:
     """Fetch data with automatic fallback.
-    
+
     Process:
     1. Try Vision API if use_vision=True
     2. Fall back to REST API if:
@@ -303,11 +305,13 @@ async def _fetch_from_source(
 ### 3. Best Practices
 
 1. Source Selection:
+
    - Use AUTO for optimal selection
    - Force REST for real-time needs
    - Force Vision for large historical
 
 2. Performance:
+
    - Enable caching for repeats
    - Use appropriate time windows
    - Mind chunk size limits
@@ -405,11 +409,13 @@ TEST_WINDOWS = [
 ## Future Improvements
 
 1. Caching Enhancements:
+
    - Implement expiration
    - Add LRU implementation
    - Optimize disk caching
 
 2. Performance Optimization:
+
    - Dynamic chunk sizing
    - Parallel fetching
    - Progress tracking

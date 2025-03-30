@@ -3,7 +3,7 @@
 
 System Under Test (SUT):
 - Binance REST API (external)
-- core.market_data_client.EnhancedRetriever
+- core.rest_data_client.EnhancedRetriever
 - Market data structures and formats
 
 This module consolidates all market data validation logic that was previously
@@ -26,7 +26,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 
-from core.market_data_client import EnhancedRetriever
+from core.rest_data_client import EnhancedRetriever
 from utils.market_constraints import (
     Interval,
     MarketType,
