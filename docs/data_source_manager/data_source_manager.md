@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `DataSourceManager` serves as a mediator between different Binance data sources, primarily the REST API (`EnhancedRetriever`) and Vision API (`VisionDataClient`). It provides intelligent source selection, caching, and fallback mechanisms to optimize data retrieval.
+The `DataSourceManager` serves as a mediator between different Binance data sources, primarily the REST API (`RestDataClient`) and Vision API (`VisionDataClient`). It provides intelligent source selection, caching, and fallback mechanisms to optimize data retrieval.
 
 ### Core Responsibilities
 
@@ -31,7 +31,7 @@ from utils.market_constraints import Interval, MarketType
   - `VISION`: Force Vision API usage
 
 - Dependencies:
-  - `EnhancedRetriever` from `rest_data_client.py`
+  - `RestDataClient` from `rest_data_client.py`
   - `VisionDataClient` from `vision_data_client.py`
   - `UnifiedCacheManager` from `cache_manager.py`
   - `Interval`, `MarketType` from `market_constraints.py`
@@ -214,7 +214,7 @@ end_adjusted = datetime(2024, 3, 15, 12, 35, 2, tzinfo=timezone.utc)     # Round
 ```python
 def __init__(
     market_type: MarketType = MarketType.SPOT,  # Type of market (SPOT, FUTURES, etc.)
-    rest_client: Optional[EnhancedRetriever] = None,  # Optional pre-configured REST client
+    rest_client: Optional[RestDataClient] = None,  # Optional pre-configured REST client
     vision_client: Optional[VisionDataClient] = None,  # Optional pre-configured Vision client
     cache_dir: Optional[Path] = None,  # Directory for caching data
     use_cache: bool = True,  # Whether to use caching

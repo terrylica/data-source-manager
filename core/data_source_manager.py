@@ -22,7 +22,7 @@ from utils.config import (
     REST_MAX_CHUNKS,
     standardize_column_names,
 )
-from core.rest_data_client import EnhancedRetriever
+from core.rest_data_client import RestDataClient
 from core.vision_data_client import VisionDataClient
 from core.cache_manager import UnifiedCacheManager
 
@@ -75,7 +75,7 @@ class DataSourceManager:
     def __init__(
         self,
         market_type: MarketType = MarketType.SPOT,
-        rest_client: Optional[EnhancedRetriever] = None,
+        rest_client: Optional[RestDataClient] = None,
         vision_client: Optional[VisionDataClient] = None,
         cache_dir: Optional[Path] = None,
         use_cache: bool = True,
@@ -90,7 +90,7 @@ class DataSourceManager:
             use_cache: Whether to use caching
         """
         self.market_type = market_type
-        self.rest_client = rest_client or EnhancedRetriever(market_type=market_type)
+        self.rest_client = rest_client or RestDataClient(market_type=market_type)
 
         # Store original vision client cache settings and disable its caching
         self._vision_original_cache = None

@@ -36,7 +36,7 @@ To illustrate the relationship, consider a restaurant kitchen:
 
 - **`DataSourceManager`:** The **Head Chef** - Manages the entire kitchen, plans menus (data requests), decides on ingredients (data sources), directs cooking processes (data retrieval workflow), and manages the pantry (caching).
 - **`UnifiedCacheManager`:** The **Pantry & Inventory Manager** - A critical service for not just storing and retrieving ingredients (cached data), but also for managing their quality and freshness (data integrity checks). The Pantry Manager, under the Head Chef's direction, ensures ingredients are properly stored, checks for spoilage (cache invalidation), and verifies inventory (metadata management). However, the pantry doesn't decide what dishes to cook or when to use ingredients; it simply provides storage, retrieval, and basic quality control as directed by the Head Chef.
-- **`VisionDataClient` & `EnhancedRetriever`:** The **Sous Chefs/Line Cooks** - Skilled at preparing specific dishes (fetching data from specific APIs) under the Head Chef's direction.
+- **`VisionDataClient` & `RestDataClient`:** The **Sous Chefs/Line Cooks** - Skilled at preparing specific dishes (fetching data from specific APIs) under the Head Chef's direction.
 
 ## Conclusion
 

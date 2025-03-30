@@ -35,7 +35,7 @@ The tests are organized by category:
 
 ### Market Data Tests
 
-`tests/time_boundary/test_market_data_validation.py` - Market data validation:
+`tests/time_boundary/test_rest_data_validation.py` - Market data validation:
 
 - Data structure validation
 - Data integrity

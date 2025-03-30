@@ -8,10 +8,10 @@ graph LR
     C -- Yes --> E["**Load Data from Cache**<br/>UnifiedCacheManager.load_from_cache<br/><br/><sup>Fast daily retrieval</sup><br/><sup>REST API boundary aligned</sup>"] --> F["Return Data<br/>DataFrame from Cache"]
     C -- No --> D
     D --> D1["**Vision API (Primary)**<br/>VisionDataClient.fetch<br/><br/><sup>Uses ApiBoundaryValidator</sup><br/><sup>to align boundaries to REST API</sup>"]
-    D --> D2["**REST API (Fallback)**<br/>EnhancedRetriever.fetch<br/><br/><sup>No manual time alignment</sup><br/><sup>Relies on API's boundary handling</sup>"]
+    D --> D2["**REST API (Fallback)**<br/>RestDataClient.fetch<br/><br/><sup>No manual time alignment</sup><br/><sup>Relies on API's boundary handling</sup>"]
     D1 --> G{"**Vision API Fetch**<br/>VisionDataClient._download_and_cache<br/><br/><sup>Applies boundary alignment via</sup><br/><sup>ApiBoundaryValidator.align_time_boundaries</sup><br/><sup>Downloads daily files & combines</sup>"}
     G -- Success --> I{"**Save to Cache (Daily)?**<br/>UnifiedCacheManager.save_to_cache<br/><br/><sup>Saves with REST API-aligned boundaries</sup><br/><sup>using TimeRangeManager.align_vision_api_to_rest</sup>"}
-    G -- Fail --> H["**REST API Fetch**<br/>EnhancedRetriever.fetch<br/><br/><sup>Passes timestamps directly to API</sup><br/><sup>API handles boundary alignment</sup><br/><sup>Chunking with original time boundaries</sup>"]
+    G -- Fail --> H["**REST API Fetch**<br/>RestDataClient.fetch<br/><br/><sup>Passes timestamps directly to API</sup><br/><sup>API handles boundary alignment</sup><br/><sup>Chunking with original time boundaries</sup>"]
     H -- Success --> K{"**Save to Cache (Daily)?**<br/>UnifiedCacheManager.save_to_cache<br/><br/><sup>Caches with REST API boundaries</sup>"}
     H -- Fail --> M["**Error Handling**<br/>raise Exception<br/><br/><sup>Retrieval failure</sup><br/><sup>Logged error details</sup>"]
     I --> J["Return Data<br/>DataFrame from Vision API<br/><br/><sup>Aligned with REST API boundaries</sup>"]

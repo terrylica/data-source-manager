@@ -95,7 +95,7 @@ async def test_client_factory_dsm_integration():
     which may occur due to the more stringent time boundary handling.
     """
     from core.data_source_manager import DataSourceManager, DataSource
-    from core.rest_data_client import EnhancedRetriever
+    from core.rest_data_client import RestDataClient
     from core.vision_data_client import VisionDataClient
     from utils.market_constraints import MarketType
     from datetime import datetime, timezone, timedelta
@@ -123,9 +123,7 @@ async def test_client_factory_dsm_integration():
         vision_client = create_client()
 
         # Wrap them in their respective domain clients
-        market_client = EnhancedRetriever(
-            market_type=MarketType.SPOT, client=rest_client
-        )
+        market_client = RestDataClient(market_type=MarketType.SPOT, client=rest_client)
         data_client = VisionDataClient(symbol="BTCUSDT", interval="1s", use_cache=False)
         data_client._client = vision_client  # Replace the internal client
 

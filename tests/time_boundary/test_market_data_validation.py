@@ -3,7 +3,7 @@
 
 System Under Test (SUT):
 - Binance REST API (external)
-- core.rest_data_client.EnhancedRetriever
+- core.rest_data_client.RestDataClient
 - Market data structures and formats
 
 This module consolidates all market data validation logic that was previously
@@ -26,7 +26,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 
-from core.rest_data_client import EnhancedRetriever
+from core.rest_data_client import RestDataClient
 from utils.market_constraints import (
     Interval,
     MarketType,
@@ -68,11 +68,11 @@ async def api_session():
 
 @pytest_asyncio.fixture
 async def retriever():
-    """Fixture providing an EnhancedRetriever instance."""
+    """Fixture providing an RestDataClient instance."""
     client = None
     try:
         # Initialize the retriever with proper error handling
-        client = EnhancedRetriever(market_type=MarketType.SPOT)
+        client = RestDataClient(market_type=MarketType.SPOT)
         await client.__aenter__()
 
         # Test the retriever minimally before yielding
@@ -92,8 +92,8 @@ async def retriever():
 
         yield client
     except Exception as e:
-        logger.error(f"Failed to initialize EnhancedRetriever: {e}")
-        pytest.skip(f"Could not initialize EnhancedRetriever: {e}")
+        logger.error(f"Failed to initialize RestDataClient: {e}")
+        pytest.skip(f"Could not initialize RestDataClient: {e}")
         yield None  # Yield None to avoid breaking test flow
     finally:
         # Clean up the client if it was created
@@ -101,7 +101,7 @@ async def retriever():
             try:
                 await client.__aexit__(None, None, None)
             except Exception as e:
-                logger.error(f"Error during EnhancedRetriever cleanup: {e}")
+                logger.error(f"Error during RestDataClient cleanup: {e}")
 
 
 @pytest.fixture
@@ -111,7 +111,7 @@ def reference_time():
 
 
 # Shared validation functions
-def validate_market_data_structure(df: pd.DataFrame) -> None:
+def validate_rest_data_structure(df: pd.DataFrame) -> None:
     """Validate market data structure and types.
 
     Args:
@@ -127,7 +127,7 @@ def validate_market_data_structure(df: pd.DataFrame) -> None:
         )
         return
 
-    # Column presence and types - support both raw API and market data client formats
+    # Column presence and types - support both raw API and REST API data client formats
     required_columns_raw = [
         "open_time",
         "open",
@@ -156,7 +156,7 @@ def validate_market_data_structure(df: pd.DataFrame) -> None:
         "taker_buy_quote",
     ]
 
-    # Add support for the actual format returned by EnhancedRetriever
+    # Add support for the actual format returned by RestDataClient
     required_columns_enhanced = [
         "open",
         "high",
@@ -285,7 +285,7 @@ def validate_time_integrity(
         logger.debug(f"Using DatetimeIndex for time integrity validation")
     else:
         # If neither open_time column nor DatetimeIndex is available, convert index to DatetimeIndex
-        # This handles DataFrames from EnhancedRetriever that may not have open_time in columns
+        # This handles DataFrames from RestDataClient that may not have open_time in columns
         logger.debug(f"Converting index to DatetimeIndex for validation")
         df.index = pd.to_datetime(df.index)
         time_series = df.index
@@ -436,7 +436,7 @@ async def fetch_klines(
 
 
 @pytest.mark.real
-async def test_market_data_integrity(api_session, reference_time: datetime, caplog):
+async def test_rest_data_integrity(api_session, reference_time: datetime, caplog):
     """Test market data integrity with real API data."""
     start_time = reference_time - FIVE_MINUTES
     end_time = reference_time
@@ -482,14 +482,14 @@ async def test_market_data_integrity(api_session, reference_time: datetime, capl
     df["trades"] = pd.to_numeric(df["trades"], errors="coerce").astype("int64")
 
     # Validate data
-    validate_market_data_structure(df)
+    validate_rest_data_structure(df)
     validate_time_integrity(df, start_time, end_time)
 
     logger.info(f"Market data integrity validation passed for {len(df)} records")
 
 
 @pytest.mark.real
-async def test_market_data_consistency(api_session, reference_time: datetime, caplog):
+async def test_rest_data_consistency(api_session, reference_time: datetime, caplog):
     """Test consistency of market data structure between fetches."""
     # Use historical data to avoid live data changes
     start_time = reference_time - timedelta(hours=1)
@@ -562,7 +562,7 @@ async def test_market_data_consistency(api_session, reference_time: datetime, ca
 @pytest.mark.real
 async def test_api_limits_and_chunking(
     api_session,
-    retriever: EnhancedRetriever,
+    retriever: RestDataClient,
     reference_time: datetime,
     caplog,
 ):
@@ -588,7 +588,7 @@ async def test_api_limits_and_chunking(
     assert actual_records > 0, "Should get some records"
     assert actual_records <= API_LIMIT, f"Should respect API limit of {API_LIMIT}"
 
-    # Now request more than the limit to test chunking in EnhancedRetriever
+    # Now request more than the limit to test chunking in RestDataClient
     logger.info("Testing request that exceeds API limit")
 
     # Request double the API limit
@@ -606,7 +606,7 @@ async def test_api_limits_and_chunking(
 
         # Validate result only if we got data
         if not df.empty:
-            validate_market_data_structure(df)
+            validate_rest_data_structure(df)
             validate_time_integrity(df, start_time, end_time)
 
             # Check records count - should be more than API_LIMIT if chunking works
@@ -623,7 +623,7 @@ async def test_api_limits_and_chunking(
     except AttributeError as e:
         if "_endpoint_lock" in str(e):
             logger.warning(f"Skipping chunking test due to endpoint_lock issue: {e}")
-            pytest.skip(f"EnhancedRetriever has missing attribute: {e}")
+            pytest.skip(f"RestDataClient has missing attribute: {e}")
         else:
             raise
 
@@ -634,14 +634,14 @@ async def test_api_limits_and_chunking(
 
 
 @pytest.mark.real
-async def test_market_data_retrieval(
-    retriever: EnhancedRetriever, reference_time: datetime, caplog
+async def test_rest_data_retrieval(
+    retriever: RestDataClient, reference_time: datetime, caplog
 ):
-    """Test EnhancedRetriever data retrieval functionality."""
+    """Test RestDataClient data retrieval functionality."""
     start_time = reference_time - FIVE_MINUTES
     end_time = reference_time
 
-    logger.info(f"Testing EnhancedRetriever from {start_time} to {end_time}")
+    logger.info(f"Testing RestDataClient from {start_time} to {end_time}")
 
     try:
         # Use fetch method with the retriever (not get_klines)
@@ -653,7 +653,7 @@ async def test_market_data_retrieval(
         )
 
         # Validate result
-        validate_market_data_structure(df)
+        validate_rest_data_structure(df)
 
         # Only perform additional validations if DataFrame is not empty
         if not df.empty:
@@ -665,22 +665,22 @@ async def test_market_data_retrieval(
             ), "Index should be DatetimeIndex"
             assert df.index.name == "open_time", "Index name should be 'open_time'"
 
-            logger.info(f"EnhancedRetriever returned {len(df)} records")
+            logger.info(f"RestDataClient returned {len(df)} records")
         else:
             logger.warning(
-                "EnhancedRetriever returned empty DataFrame - basic validation only"
+                "RestDataClient returned empty DataFrame - basic validation only"
             )
     except AttributeError as e:
         if "_endpoint_lock" in str(e):
             logger.warning(f"Skipping retrieval test due to endpoint_lock issue: {e}")
-            pytest.skip(f"EnhancedRetriever has missing attribute: {e}")
+            pytest.skip(f"RestDataClient has missing attribute: {e}")
         else:
             raise
 
 
 @pytest.mark.real
 async def test_large_data_retrieval(
-    retriever: EnhancedRetriever, reference_time: datetime, caplog
+    retriever: RestDataClient, reference_time: datetime, caplog
 ):
     """Test retrieval of large data sets with automatic chunking."""
     # Request 2 hours of data (requires multiple API calls)
@@ -699,7 +699,7 @@ async def test_large_data_retrieval(
         )
 
         # Validate result
-        validate_market_data_structure(df)
+        validate_rest_data_structure(df)
 
         # Only perform additional validations if DataFrame is not empty
         if not df.empty:
@@ -725,7 +725,7 @@ async def test_large_data_retrieval(
     except AttributeError as e:
         if "_endpoint_lock" in str(e):
             logger.warning(f"Skipping large data test due to endpoint_lock issue: {e}")
-            pytest.skip(f"EnhancedRetriever has missing attribute: {e}")
+            pytest.skip(f"RestDataClient has missing attribute: {e}")
         else:
             raise
 

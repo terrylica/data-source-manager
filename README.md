@@ -186,7 +186,7 @@ The system implements a layered architecture with a mediator pattern at its core
 
 2. Data Source Layer:
 
-   - REST API Client (`EnhancedRetriever`):
+   - REST API Client (`RestDataClient`):
 
      - Optimized for recent data (< 36 hours)
      - Chunk-based retrieval (1000 records/chunk)

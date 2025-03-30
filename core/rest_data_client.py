@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Unified market data client with optimized 1-second data handling."""
+"""Unified REST API data client with optimized 1-second data handling."""
 
 import asyncio
 from datetime import datetime, timedelta
@@ -136,8 +136,8 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
     return df
 
 
-class EnhancedRetriever:
-    """Enhanced retriever for market data with chunking, retries, and rate limiting.
+class RestDataClient:
+    """RestDataClient for market data with chunking, retries, and rate limiting.
 
     This class handles fetching klines data with proper rate limit handling,
     automatical chunking for large time ranges, and endpoint rotation for
@@ -151,7 +151,7 @@ class EnhancedRetriever:
         retry_count: int = 5,
         client: Optional[AsyncSession] = None,
     ):
-        """Initialize the enhanced retriever.
+        """Initialize the RestDataClient.
 
         Args:
             market_type: Market type (spot, futures, etc.)
@@ -189,7 +189,7 @@ class EnhancedRetriever:
 
         # Log initialization
         logger.debug(
-            f"Initialized EnhancedRetriever with market_type={market_type}, "
+            f"Initialized RestDataClient with market_type={market_type}, "
             f"max_concurrent={max_concurrent}, retry_count={retry_count}"
         )
 

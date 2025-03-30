@@ -513,7 +513,7 @@ class WeightBasedThrottler:
 When using multiple markets (spot, futures), implement validation for cross-market data consistency.
 
 ```python
-def validate_cross_market_data(spot_price, futures_price, threshold_percent=0.5):
+def validate_cross_rest_data(spot_price, futures_price, threshold_percent=0.5):
     """
     Validate that spot and futures prices are within a reasonable threshold.
     Returns True if within threshold, False otherwise.

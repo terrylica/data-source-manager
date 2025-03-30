@@ -17,7 +17,7 @@ Following our roadmap to revamp time alignment:
 When the `DataSourceManager` determines that the REST API is the appropriate source:
 
 1. The `get_data` method passes timestamps directly to the REST API without manual alignment
-2. The `_fetch_from_source` method invokes the `fetch` method of `EnhancedRetriever` with original timestamps
+2. The `_fetch_from_source` method invokes the `fetch` method of `RestDataClient` with original timestamps
 3. The REST API handles time boundary alignment according to its documented behavior:
 
    - Ignores millisecond precision
@@ -25,7 +25,7 @@ When the `DataSourceManager` determines that the REST API is the appropriate sou
    - Rounds end timestamps DOWN to the previous interval boundary if not exact
    - Treats both boundaries as inclusive after alignment
 
-4. The `EnhancedRetriever` employs a chunking mechanism to divide the requested time range into manageable chunks, respecting the original time boundaries
+4. The `RestDataClient` employs a chunking mechanism to divide the requested time range into manageable chunks, respecting the original time boundaries
 5. Each chunk is fetched with retry logic and endpoint failover for resilience
 6. The raw API response is processed into a standardized DataFrame
 
