@@ -21,7 +21,6 @@ compromise data integrity.
 """
 
 import pytest
-import arrow
 import pandas as pd
 import time
 import psutil

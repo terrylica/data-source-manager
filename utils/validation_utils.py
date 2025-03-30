@@ -54,7 +54,6 @@ logger = get_logger(__name__, "INFO", show_path=False)
 # Import configuration constants
 from utils.config import (
     CANONICAL_INDEX_NAME,
-    DEFAULT_TIMEZONE,
     MIN_VALID_FILE_SIZE,
     MAX_CACHE_AGE,
     OUTPUT_DTYPES,
@@ -77,7 +76,6 @@ ERROR_TYPES = {
 class ValidationError(Exception):
     """Custom exception for validation errors."""
 
-    pass
 
 
 class CacheValidationError(NamedTuple):

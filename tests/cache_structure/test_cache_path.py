@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 """Unit tests for the updated CacheKeyManager.get_cache_path method."""
 
-import os
 from datetime import datetime, timezone
 from pathlib import Path
-import pytest
 import tempfile
 
 from utils.cache_validator import CacheKeyManager

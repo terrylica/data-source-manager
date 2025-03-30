@@ -3,14 +3,14 @@
 
 import pytest
 from datetime import datetime, timedelta, timezone
-import aiohttp
-import httpx
+
 from typing import AsyncGenerator
 import tempfile
 from pathlib import Path
 import shutil
 import pandas as pd
 import logging
+from utils.network_utils import create_client
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -31,11 +31,16 @@ def default_symbol():
 
 
 @pytest.fixture
-async def api_session() -> AsyncGenerator[aiohttp.ClientSession, None]:
-    """Fixture to provide an aiohttp ClientSession for API tests."""
-    timeout = aiohttp.ClientTimeout(total=10)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        yield session
+async def api_session() -> AsyncGenerator:
+    """Fixture to provide a HTTP client for API tests."""
+    client = create_client(timeout=10.0)  # This will default to curl_cffi
+    try:
+        yield client
+    finally:
+        if hasattr(client, "aclose"):
+            await client.aclose()
+        else:
+            await client.close()
 
 
 @pytest.fixture
@@ -142,27 +147,39 @@ async def sample_ohlcv_data():
 
     try:
         # Make the API call to get real data
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        client = create_client(timeout=10.0)  # Use curl_cffi by default
+
+        try:
             response = await client.get(api_endpoint, params=params)
-            response.raise_for_status()
+
+            # Use curl_cffi style response handling
+            if response.status_code != 200:
+                raise Exception(f"HTTP error {response.status_code}: {response.text}")
             api_data = response.json()
 
-        if not api_data:
-            # If no data is available for the specified period, try a slightly older period
-            end_time = datetime.now(timezone.utc) - timedelta(days=3)
-            end_time = end_time.replace(second=0, microsecond=0)
-            start_time = end_time - timedelta(minutes=1)
+            if not api_data:
+                # If no data is available for the specified period, try a slightly older period
+                end_time = datetime.now(timezone.utc) - timedelta(days=3)
+                end_time = end_time.replace(second=0, microsecond=0)
+                start_time = end_time - timedelta(minutes=1)
 
-            start_ms = int(start_time.timestamp() * 1000)
-            end_ms = int(end_time.timestamp() * 1000)
+                start_ms = int(start_time.timestamp() * 1000)
+                end_ms = int(end_time.timestamp() * 1000)
 
-            params["startTime"] = start_ms
-            params["endTime"] = end_ms
+                params["startTime"] = start_ms
+                params["endTime"] = end_ms
 
-            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(api_endpoint, params=params)
-                response.raise_for_status()
+
+                # Use curl_cffi style response handling
+                if response.status_code != 200:
+                    raise Exception(
+                        f"HTTP error {response.status_code}: {response.text}"
+                    )
                 api_data = response.json()
+        finally:
+            # Close the client
+            await client.aclose()
 
         # Convert to DataFrame
         columns = [

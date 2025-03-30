@@ -1,14 +1,21 @@
 #!/usr/bin/env python
+"""Hardware monitoring for optimizing network requests.
+
+This module provides utilities for measuring system resources and network performance
+to adjust concurrency parameters for optimal data retrieval.
+"""
 
 import os
-import psutil
 import asyncio
-import aiohttp
-from typing import Dict, Optional, List, Coroutine, Any
+import psutil
 from dataclasses import dataclass
-from utils.network_utils import create_client
+from typing import Optional, List, Dict, Any, Coroutine
+
+# Import curl_cffi for HTTP client implementation
+from curl_cffi.requests import AsyncSession
 
 from utils.logger_setup import get_logger
+from utils.network_utils import create_client, safely_close_client
 
 logger = get_logger(__name__, "INFO", show_path=False)
 
@@ -24,44 +31,47 @@ class HardwareMetrics:
 
 
 class HardwareMonitor:
-    """Monitor hardware resources and optimize for maximum Binance API utilization."""
+    """Monitors hardware resources and network performance."""
 
     def __init__(self):
-        self._metrics: Optional[HardwareMetrics] = None
-        self._last_update = 0
-        self._update_interval = 1  # 1 second updates for responsive scaling
-        self._bandwidth_requirement = (
-            0.05  # Reduced to 0.05MB per connection (more realistic)
-        )
-        self._binance_rate_limit = 1200  # Binance's rate limit per minute
+        """Initialize hardware monitor with default settings."""
+        # Use multiple endpoints for network tests to avoid rate limiting
         self._endpoints = [
-            "https://api.binance.com",
             "https://api1.binance.com",
             "https://api2.binance.com",
             "https://api3.binance.com",
-            "https://api4.binance.com",
-            "https://api-gcp.binance.com",
         ]
+        self._metrics: Optional[HardwareMetrics] = None
+        self._last_update = 0
+        self._bandwidth_requirement = 0.5  # MB per request
+        self._binance_rate_limit = 1200  # Requests per minute
 
     async def measure_network_speed(self, test_url: Optional[str] = None) -> float:
-        """Measure network bandwidth using parallel requests across multiple endpoints.
+        """Measure network speed to Binance API endpoints.
 
-        Makes concurrent requests to multiple Binance endpoints for better bandwidth estimation.
+        Args:
+            test_url: Optional URL to test instead of default endpoints
+
+        Returns:
+            Network speed in Mbps
         """
         try:
             bandwidths = []
             # Test multiple endpoints in parallel
-            async with create_client(
-                client_type="aiohttp",
+            client = create_client(
                 timeout=2.0,
                 headers={"User-Agent": "BinanceDataServices/BandwidthTest"},
-            ) as session:
+            )
+            try:
                 tasks: List[Coroutine[Any, Any, float]] = []
                 for endpoint in self._endpoints:
                     for _ in range(2):  # 2 requests per endpoint
-                        tasks.append(self._measure_single_endpoint(session, endpoint))
+                        tasks.append(self._measure_single_endpoint(client, endpoint))
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 bandwidths = [r for r in results if isinstance(r, float)]
+            finally:
+                # Ensure client is properly closed
+                await safely_close_client(client)
 
             if not bandwidths:
                 return 50.0  # Default to 50 Mbps if all measurements fail
@@ -74,21 +84,24 @@ class HardwareMonitor:
             return 50.0  # Default to 50 Mbps
 
     async def _measure_single_endpoint(
-        self, session: aiohttp.ClientSession, endpoint: str
+        self, session: AsyncSession, endpoint: str
     ) -> float:
-        """Measure bandwidth for a single endpoint."""
+        """Measure bandwidth for a single endpoint using curl_cffi."""
         try:
             start_time = asyncio.get_event_loop().time()
-            async with session.get(
+
+            # Use curl_cffi AsyncSession
+            response = await session.get(
                 f"{endpoint}/api/v3/klines",
                 params={"symbol": "BTCUSDT", "interval": "1s", "limit": 100},
-                timeout=2.0,
-            ) as response:
-                data = await response.read()
-                duration = asyncio.get_event_loop().time() - start_time
-                size_mb = len(data) / (1024 * 1024)  # Convert to MB
-                return (size_mb * 8) / duration  # Convert to Mbps
-        except Exception:
+            )
+            data = response.content
+
+            duration = asyncio.get_event_loop().time() - start_time
+            size_mb = len(data) / (1024 * 1024)  # Convert to MB
+            return (size_mb * 8) / duration  # Convert to Mbps
+        except Exception as e:
+            logger.debug(f"Failed to measure endpoint {endpoint}: {e}")
             return 0.0
 
     def get_hardware_metrics(self) -> HardwareMetrics:

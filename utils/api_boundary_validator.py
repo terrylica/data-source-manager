@@ -10,18 +10,21 @@ data boundaries for given time ranges, ensuring alignment with real API response
 import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Tuple, List, Any
-import httpx
+import random
+
 import pandas as pd
+
+# Import curl_cffi for HTTP client implementation
 
 from utils.logger_setup import get_logger
 from utils.market_constraints import MarketType, Interval, get_endpoint_url
-from utils.config import DEFAULT_TIMEZONE
 from utils.time_utils import (
     enforce_utc_timezone,
     align_time_boundaries as time_utils_align_time_boundaries,
 )
+from utils.network_utils import create_client, safely_close_client
 
-logger = get_logger(__name__, "INFO")
+logger = get_logger(__name__, "INFO", show_path=False)
 
 # Constants for API interaction
 MAX_RETRIES = 3
@@ -55,7 +58,8 @@ class ApiBoundaryValidator:
             raise ValueError(f"Unsupported market type: {market_type}")
 
         self.market_type = market_type
-        self.http_client = httpx.AsyncClient(timeout=10.0)
+        # Use curl_cffi by default through create_client function
+        self.http_client = create_client(timeout=10.0)
         logger.info(f"Initialized ApiBoundaryValidator for {market_type} market")
 
     async def __aenter__(self):
@@ -69,7 +73,7 @@ class ApiBoundaryValidator:
 
     async def close(self):
         """Close the HTTP client."""
-        await self.http_client.aclose()
+        await safely_close_client(self.http_client)
 
     async def is_valid_time_range(
         self,
@@ -432,30 +436,28 @@ class ApiBoundaryValidator:
         limit: int = 1000,
         symbol: str = "BTCUSDT",
     ) -> List[List[Any]]:
-        """Call Binance REST API to get kline data.
-
-        This is the internal method that directly interacts with the Binance API.
-        It handles retries, rate limiting, and extracting the raw API response.
+        """Call the Binance API with retry logic.
 
         Args:
-            start_time: Start time for the request
-            end_time: End time for the request
-            interval: Data interval
+            start_time: The start time for data retrieval
+            end_time: The end time for data retrieval
+            interval: The data interval
             limit: Maximum number of records to retrieve
-            symbol: Trading pair symbol
+            symbol: The trading pair symbol
 
         Returns:
-            List of kline data records from the API
+            List of klines data
+
+        Raises:
+            Exception: If API call fails after retries
         """
-        # Ensure timezone awareness
+        # Ensure timezone awareness and convert to milliseconds
         start_time = enforce_utc_timezone(start_time)
         end_time = enforce_utc_timezone(end_time)
-
-        # Convert to milliseconds for Binance API
         start_time_ms = int(start_time.timestamp() * 1000)
         end_time_ms = int(end_time.timestamp() * 1000)
 
-        # Prepare request parameters
+        # Prepare API parameters
         params = {
             "symbol": symbol,
             "interval": interval.value,
@@ -464,49 +466,70 @@ class ApiBoundaryValidator:
             "limit": limit,
         }
 
-        # Get endpoint URL
-        endpoint = get_endpoint_url(self.market_type)
+        # Determine base URL based on market type
+        base_url = get_endpoint_url(self.market_type)
 
-        # Make request with retry logic
-        for retry in range(MAX_RETRIES):
+        # Retry logic
+        retries = 0
+        while retries <= MAX_RETRIES:
             try:
-                response = await self.http_client.get(endpoint, params=params)
+                # Fetch data from API
+                logger.debug(
+                    f"Calling API: {base_url} with params {params}, retry {retries}/{MAX_RETRIES}"
+                )
 
-                # Handle rate limiting
-                if response.status_code == RATE_LIMIT_STATUS:
-                    retry_after = int(response.headers.get("Retry-After", RETRY_DELAY))
-                    logger.warning(
-                        f"Rate limited by API, retrying after {retry_after}s (attempt {retry+1}/{MAX_RETRIES})"
-                    )
-                    await asyncio.sleep(retry_after)
-                    continue
+                response = await self.http_client.get(base_url, params=params)
 
-                # Handle other errors
-                if response.status_code != 200:
-                    logger.warning(
-                        f"API error: {response.status_code} - {response.text}, "
-                        f"retrying (attempt {retry+1}/{MAX_RETRIES})"
-                    )
-                    await asyncio.sleep(RETRY_DELAY * (retry + 1))
-                    continue
+                # Handle different client types
+                if hasattr(response, "json") and callable(response.json):
+                    # curl_cffi style response
+                    if response.status_code == RATE_LIMIT_STATUS:
+                        retry_after = int(response.headers.get("Retry-After", 1))
+                        logger.warning(
+                            f"Rate limited by API. Retry after {retry_after}s"
+                        )
+                        await asyncio.sleep(retry_after)
+                        retries += 1
+                        continue
 
-                # Process successful response
-                data = response.json()
+                    if response.status_code >= 400:
+                        logger.error(
+                            f"API error {response.status_code}: {response.text}"
+                        )
+                        raise Exception(
+                            f"API error {response.status_code}: {response.text}"
+                        )
+
+                    # Parse the data from curl_cffi response
+                    data = response.json()
+
+                else:
+                    # This shouldn't happen as we only use curl_cffi now
+                    logger.error("Invalid response type from HTTP client")
+                    raise TypeError("Invalid response type from HTTP client")
+
                 logger.debug(f"API returned {len(data)} records")
                 return data
 
-            except httpx.TimeoutException:
-                logger.warning(
-                    f"Request timed out, retrying (attempt {retry+1}/{MAX_RETRIES})"
-                )
-                await asyncio.sleep(RETRY_DELAY * (retry + 1))
             except Exception as e:
+                # Handle retries
+                retries += 1
                 logger.warning(
-                    f"Unexpected error calling API: {str(e)}, "
-                    f"retrying (attempt {retry+1}/{MAX_RETRIES})"
+                    f"API call failed (retry {retries}/{MAX_RETRIES}): {str(e)}"
                 )
-                await asyncio.sleep(RETRY_DELAY * (retry + 1))
 
-        # If we get here, all retries failed
-        logger.error(f"All API call attempts failed after {MAX_RETRIES} retries")
-        return []
+                if retries <= MAX_RETRIES:
+                    # Exponential backoff with jitter
+                    wait_time = (
+                        RETRY_DELAY * (2 ** (retries - 1)) * (0.5 + random.random())
+                    )
+                    logger.debug(f"Waiting {wait_time:.2f}s before retrying")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"All {MAX_RETRIES} API call retries failed: {str(e)}")
+                    raise Exception(
+                        f"Failed to fetch data from API after {MAX_RETRIES} retries"
+                    ) from e
+
+        # This should never be reached
+        raise Exception("API call retry loop exited unexpectedly")

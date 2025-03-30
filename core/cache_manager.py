@@ -17,22 +17,11 @@ from utils.validation_utils import (
     calculate_checksum,
     validate_file_with_checksum,
 )
-from utils.config import (
-    OUTPUT_DTYPES,
-    CANONICAL_INDEX_NAME,
-    DEFAULT_TIMEZONE,
-)
 from utils.time_utils import (
     enforce_utc_timezone,
     get_interval_floor,
 )
 from utils.market_constraints import Interval
-from core.vision_constraints import (
-    MIN_VALID_FILE_SIZE,
-    MAX_CACHE_AGE,
-    FileExtensions,
-    CACHE_SCHEMA,
-)
 
 logger = get_logger(__name__, "INFO", show_path=False)
 

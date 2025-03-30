@@ -5,9 +5,10 @@ from datetime import datetime, timedelta
 import pandas as pd
 from pathlib import Path
 from enum import Enum, auto
-import httpx
-import pyarrow as pa
 import logging
+
+import pyarrow as pa
+from curl_cffi.requests.errors import RequestsError
 
 # Import centralized validation utilities
 from utils.validation import DataValidation, DataFrameValidator
@@ -23,6 +24,7 @@ from utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_TIMEZONE,
     ERROR_TYPES,
+    CONSOLIDATION_DELAY,
 )  # Import ERROR_TYPES from central config
 
 # Type definitions for semantic clarity and safety
@@ -57,9 +59,9 @@ MILLISECOND_DIGITS: Final[int] = 13
 MICROSECOND_DIGITS: Final[int] = 16
 
 # Data availability constraints
-CONSOLIDATION_DELAY = timedelta(
-    hours=48
-)  # Time Binance needs to consolidate daily data - increased from 12h to 48h for safety margin
+# CONSOLIDATION_DELAY = timedelta(
+#     hours=48
+# )  # Time Binance needs to consolidate daily data - increased from 12h to 48h for safety margin
 
 # Type variable for DataFrame with enforced index
 T = TypeVar("T")
@@ -148,7 +150,7 @@ def classify_error(error: Exception) -> str:
     Returns:
         Standardized error type string
     """
-    if isinstance(error, (httpx.RequestError, httpx.HTTPStatusError)):
+    if isinstance(error, (RequestsError,)):
         return ERROR_TYPES["NETWORK"]
     elif isinstance(error, OSError):
         return ERROR_TYPES["FILE_SYSTEM"]

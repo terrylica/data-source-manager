@@ -1,5 +1,4 @@
 import logging
-import pytest
 from utils.logger_setup import get_logger
 
 

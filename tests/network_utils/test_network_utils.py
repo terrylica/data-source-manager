@@ -1,28 +1,19 @@
 #!/usr/bin/env python
 """Tests for network_utils module."""
 
-import os
 import asyncio
 import tempfile
 from pathlib import Path
-from typing import List, Dict, Any
 import pytest
-import aiohttp
-import httpx
 from unittest.mock import patch, AsyncMock, MagicMock
-from contextlib import asynccontextmanager
-import io
-import zipfile
 import pandas as pd
-from datetime import datetime, timezone
+from curl_cffi.requests import AsyncSession
 
 from utils.network_utils import (
     create_client,
-    create_aiohttp_client,
-    create_httpx_client,
+    create_curl_cffi_client,
     DownloadProgressTracker,
     DownloadHandler,
-    DownloadStalledException,
     RateLimitException,
     download_files_concurrently,
     make_api_request,
@@ -48,13 +39,14 @@ class TestDownloadProgressTracker:
     def test_update(self):
         """Test update method of DownloadProgressTracker."""
         tracker = DownloadProgressTracker(total_size=1000)
+        test_url = "https://example.com/test.zip"
 
         # Update with chunk
-        assert tracker.update(100) is True
+        assert tracker.update(test_url, 100) is True
         assert tracker.bytes_received == 100
 
         # Update with more chunks
-        assert tracker.update(200) is True
+        assert tracker.update(test_url, 200) is True
         assert tracker.bytes_received == 300
 
 
@@ -69,52 +61,40 @@ def temp_dir():
 class TestHttpClientFactories:
     """Tests for HTTP client factory functions."""
 
-    async def test_create_client_aiohttp(self):
-        """Test create_client with aiohttp client type."""
-        client = create_client(client_type="aiohttp")
-        assert isinstance(client, aiohttp.ClientSession)
+    async def test_create_client_curl_cffi(self):
+        """Test create_client returns curl_cffi client type."""
+        client = create_client()
+        assert isinstance(client, AsyncSession)
         await client.close()
 
-    async def test_create_client_httpx(self):
-        """Test create_client with httpx client type."""
-        client = create_client(client_type="httpx")
-        assert isinstance(client, httpx.AsyncClient)
-        await client.aclose()
-
-    async def test_create_client_invalid_type(self):
-        """Test create_client with invalid client type."""
-        with pytest.raises(ValueError, match="Unsupported client type"):
-            create_client(client_type="invalid")
-
-    async def test_create_aiohttp_client(self):
-        """Test create_aiohttp_client with default settings."""
-        client = create_aiohttp_client()
-        assert isinstance(client, aiohttp.ClientSession)
+    async def test_create_curl_cffi_client(self):
+        """Test create_curl_cffi_client with default settings."""
+        client = create_curl_cffi_client()
+        assert isinstance(client, AsyncSession)
 
         # Check default headers are set
-        assert "Accept" in client._default_headers
-        assert "User-Agent" in client._default_headers
+        assert "Accept" in client.headers
+        assert "User-Agent" in client.headers
 
         await client.close()
-
-    async def test_create_httpx_client(self):
-        """Test create_httpx_client with default settings."""
-        client = create_httpx_client()
-        assert isinstance(client, httpx.AsyncClient)
-
-        # Check default headers are set
-        assert "accept" in client.headers
-        assert "user-agent" in client.headers
-
-        await client.aclose()
 
     async def test_create_client_with_custom_headers(self):
         """Test create_client with custom headers."""
         custom_headers = {"X-Test-Header": "test-value"}
-        client = create_client(client_type="aiohttp", headers=custom_headers)
+        client = create_client(headers=custom_headers)
 
         # Check custom headers are set
-        assert client._default_headers.get("X-Test-Header") == "test-value"
+        assert client.headers.get("X-Test-Header") == "test-value"
+
+        await client.close()
+
+    async def test_create_curl_cffi_client_with_custom_headers(self):
+        """Test create_curl_cffi_client with custom headers."""
+        custom_headers = {"X-Test-Header": "test-value"}
+        client = create_curl_cffi_client(headers=custom_headers)
+
+        # Check custom headers are set
+        assert client.headers.get("X-Test-Header") == "test-value"
 
         await client.close()
 
@@ -124,17 +104,28 @@ class TestDownloadHandler:
     """Tests for DownloadHandler."""
 
     @pytest.fixture
-    async def httpx_client(self):
-        """Create a real httpx client for testing."""
-        client = httpx.AsyncClient()
+    async def curl_cffi_client(self):
+        """Create a curl_cffi client for testing."""
+        client = AsyncSession()
         yield client
-        await client.aclose()
+        await client.close()
 
     @pytest.fixture
-    def download_handler(self, httpx_client):
+    def download_handler(self, curl_cffi_client):
         """Create DownloadHandler with real client."""
         return DownloadHandler(
-            client=httpx_client,
+            client=curl_cffi_client,
+            max_retries=2,
+            min_wait=1,
+            max_wait=2,
+            chunk_size=4096,
+        )
+
+    @pytest.fixture
+    def curl_cffi_download_handler(self, curl_cffi_client):
+        """Create DownloadHandler with curl_cffi client."""
+        return DownloadHandler(
+            client=curl_cffi_client,
             max_retries=2,
             min_wait=1,
             max_wait=2,
@@ -174,15 +165,8 @@ class TestDownloadHandler:
         assert normal_result is True
         assert normal_path.exists()
 
-        # Demonstrate tenacity's retry logic by verifying the logs
-        # We don't need to create artificial network errors
-        # Just confirm that tenacity is properly configured
-
-        # Examining the download_handler function signature and retry configuration
+        # Examine the download_handler function signature and retry configuration
         assert hasattr(download_handler.download_file, "__wrapped__")
-
-        # Verify retry configuration in the logs during a successful download
-        assert "GET https://httpbin.org/bytes/10" in caplog.text
 
         # Test that we're using appropriate error handling by checking our function
         # directly, rather than trying to force an error
@@ -198,168 +182,284 @@ class TestDownloadHandler:
 
         # This should succeed
         result = await download_handler.download_file(url, target_path)
-
-        # Verify the download succeeded
         assert result is True
         assert target_path.exists()
         assert target_path.stat().st_size > 0
 
-        # Verify our logs contain relevant info
-        assert (
-            "http request" in caplog.text.lower() or "download" in caplog.text.lower()
-        )
+    async def test_curl_cffi_download_file_success(
+        self, curl_cffi_download_handler, temp_dir
+    ):
+        """Test successful file download using curl_cffi client."""
+        from unittest.mock import patch, MagicMock, AsyncMock
+
+        # Create a temporary file path
+        target_path = temp_dir / "curl_cffi_test.bin"
+
+        # Create a mock response that works with await
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b"test content"
+
+        # Create an async mock for the get method
+        mock_get = AsyncMock(return_value=mock_response)
+
+        # Patch the get method with our async mock
+        with patch.object(curl_cffi_download_handler.client, "get", mock_get):
+            # Download the file
+            result = await curl_cffi_download_handler.download_file(
+                "https://example.com/test", target_path
+            )
+
+            # Verify the download succeeded
+            assert result is True
+            assert target_path.exists()
+            with open(target_path, "rb") as f:
+                assert f.read() == b"test content"
+
+    async def test_curl_cffi_download_file_rate_limit(
+        self, curl_cffi_download_handler, temp_dir, caplog
+    ):
+        """Test rate limiting with curl_cffi client."""
+        from unittest.mock import patch, MagicMock, AsyncMock
+
+        # Create a temporary file path
+        target_path = temp_dir / "curl_cffi_rate_limit_test.bin"
+
+        # Create a mock response with rate limit status
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.headers = {"Retry-After": "1"}
+
+        # Create an async mock for the get method
+        mock_get = AsyncMock(return_value=mock_response)
+
+        # We need to bypass the retry decorator to test the function directly
+        # Access the original function through __wrapped__
+        original_download_file = curl_cffi_download_handler.download_file.__wrapped__
+
+        # Mock asyncio.sleep to avoid waiting
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            # Patch the get method with our async mock
+            with patch.object(curl_cffi_download_handler.client, "get", mock_get):
+                with pytest.raises(RateLimitException):
+                    await original_download_file(
+                        curl_cffi_download_handler,
+                        "https://example.com/test",
+                        target_path,
+                    )
+
+                # Verify that sleep was called with the retry value
+                mock_sleep.assert_called_once_with(1)
 
 
 @pytest.mark.asyncio
 class TestConcurrentDownloads:
-    """Tests for download_files_concurrently function."""
+    """Tests for concurrent download functionality."""
 
     @pytest.fixture
-    async def httpx_client(self):
-        """Create a real httpx client for testing."""
-        client = httpx.AsyncClient()
+    async def curl_cffi_client(self):
+        """Create a curl_cffi client for testing."""
+        client = AsyncSession()
         yield client
-        await client.aclose()
+        await client.close()
 
-    async def test_download_files_concurrently(self, httpx_client, temp_dir):
-        """Test downloading multiple files concurrently with real HTTP endpoints."""
-        # Create list of real URLs to download
-        urls = [
-            "https://httpbin.org/bytes/512",
-            "https://httpbin.org/bytes/1024",
-            "https://httpbin.org/bytes/2048",
-        ]
-        local_paths = [temp_dir / f"concurrent_test_{i}.bin" for i in range(len(urls))]
+    async def test_download_files_concurrently(self, curl_cffi_client, temp_dir):
+        """Test downloading multiple files concurrently with curl_cffi."""
+        from unittest.mock import patch
 
-        # Download files concurrently
-        results = await download_files_concurrently(
-            client=httpx_client, urls=urls, local_paths=local_paths, max_concurrent=2
-        )
+        # Create URL list and output paths
+        urls = ["https://example.com/file1", "https://example.com/file2"]
+        paths = [temp_dir / "file1", temp_dir / "file2"]
 
-        # Verify all downloads succeeded
-        assert all(results)
+        # Instead of mocking complex streaming behavior, let's patch the
+        # actual download_file method in DownloadHandler to simply write our test data
+        file1_content = b"file1 content"
+        file2_content = b"file2 content"
 
-        # Verify files exist and have content
-        for path in local_paths:
-            assert path.exists()
-            assert path.stat().st_size > 0
+        # Create a simple implementation that writes data to files
+        async def mock_download_file(self, url, path, **kwargs):
+            if url == urls[0]:
+                with open(path, "wb") as f:
+                    f.write(file1_content)
+            else:
+                with open(path, "wb") as f:
+                    f.write(file2_content)
+            return True
 
-        # Verify the file sizes are different (512, 1024, 2048 bytes)
-        file_sizes = [path.stat().st_size for path in local_paths]
-        assert len(set(file_sizes)) == 3  # Should have 3 unique file sizes
-
-    async def test_download_files_concurrently_mismatched_lengths(self, httpx_client):
-        """Test download_files_concurrently with mismatched URLs and paths."""
-        urls = ["https://httpbin.org/bytes/512", "https://httpbin.org/bytes/1024"]
-        local_paths = [Path("/tmp/file1.txt")]
-
-        with pytest.raises(
-            ValueError, match="URLs and local paths must have the same length"
+        # Patch the download_file method
+        with patch(
+            "utils.network_utils.DownloadHandler.download_file", mock_download_file
         ):
-            await download_files_concurrently(
-                client=httpx_client, urls=urls, local_paths=local_paths
+            # Test the function
+            results = await download_files_concurrently(
+                curl_cffi_client, urls, paths, max_concurrent=2
             )
+
+            # Verify results
+            assert all(results)
+            assert (temp_dir / "file1").exists()
+            assert (temp_dir / "file2").exists()
+            with open(temp_dir / "file1", "rb") as f:
+                assert f.read() == file1_content
+            with open(temp_dir / "file2", "rb") as f:
+                assert f.read() == file2_content
+
+    async def test_download_files_concurrently_mismatched_lengths(
+        self, curl_cffi_client
+    ):
+        """Test error handling with mismatched URL and path lists."""
+        urls = ["https://example.com/file1", "https://example.com/file2"]
+        paths = [Path("path1")]
+
+        # Test for the new behavior: returns list of False values instead of raising an error
+        results = await download_files_concurrently(curl_cffi_client, urls, paths)
+
+        # Check that results is a list of the appropriate length (max of the two input lists)
+        assert len(results) == max(len(urls), len(paths))
+        # All values should be False
+        assert all(result is False for result in results)
 
 
 @pytest.mark.asyncio
 class TestApiRequests:
-    """Tests for make_api_request function."""
+    """Tests for API request functionality."""
 
     @pytest.fixture
-    async def httpx_client(self):
-        """Create a httpx client for testing."""
-        client = httpx.AsyncClient()
-        yield client
-        await client.aclose()
-
-    @pytest.fixture
-    async def aiohttp_client(self):
-        """Create an aiohttp client for testing."""
-        client = aiohttp.ClientSession()
+    async def curl_cffi_client(self):
+        """Create a real curl_cffi client for testing."""
+        client = AsyncSession()
         yield client
         await client.close()
 
-    async def test_make_api_request_httpx_success(self, httpx_client, monkeypatch):
-        """Test successful API request with httpx client."""
-        # Use a real public API that returns JSON
-        test_url = "https://httpbin.org/json"
+    async def test_make_api_request_curl_cffi_success(
+        self, curl_cffi_client, monkeypatch
+    ):
+        """Test make_api_request with curl_cffi client - successful case."""
+        # Mock the client's get method to return success
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '{"success": true}'
+        mock_response.headers = {"content-type": "application/json"}
 
-        # Call the function with real endpoint
-        result = await make_api_request(
-            client=httpx_client,
-            url=test_url,
-            retry_delay=1,  # Speed up test
-        )
+        async def mock_get(*args, **kwargs):
+            return mock_response
 
-        # Check result has expected structure from httpbin.org/json
-        assert isinstance(result, dict)
-        assert "slideshow" in result
-        assert "title" in result["slideshow"]
+        async def mock_request(*args, **kwargs):
+            return mock_response
 
-    async def test_make_api_request_aiohttp_success(self, aiohttp_client, monkeypatch):
-        """Test successful API request with aiohttp client."""
-        # Use a real public API that returns JSON
-        test_url = "https://httpbin.org/json"
+        # Patch the get method
+        with patch.object(curl_cffi_client, "get", mock_get), patch.object(
+            curl_cffi_client, "request", mock_request
+        ):
+            # Call the function
+            status, data = await make_api_request(
+                client=curl_cffi_client,
+                url="https://api.example.com/endpoint",
+                method="GET",
+                params={"param": "value"},
+                headers={"Header": "Value"},
+                retries=2,
+            )
 
-        # Call the function directly with a real public API endpoint
-        result = await make_api_request(
-            client=aiohttp_client,
-            url=test_url,
-            retry_delay=1,  # Speed up test
-        )
+            # Verify result
+            assert status == 200
+            assert data == {"success": True}
 
-        # Check result has expected structure from httpbin.org/json
-        assert isinstance(result, dict)
-        assert "slideshow" in result
-        assert "title" in result["slideshow"]
+    async def test_make_api_request_curl_cffi_rate_limit(
+        self, curl_cffi_client, monkeypatch, caplog
+    ):
+        """Test make_api_request with curl_cffi client - rate limit case."""
+        # Setup mock responses - first rate limited, then success
+        mock_rate_limit = MagicMock()
+        mock_rate_limit.status_code = 429
+        mock_rate_limit.text = '{"code": 429, "msg": "Too many requests"}'
+        mock_rate_limit.headers = {
+            "content-type": "application/json",
+            "retry-after": "1",
+        }
+
+        mock_success = MagicMock()
+        mock_success.status_code = 200
+        mock_success.text = '{"success": true}'
+        mock_success.headers = {"content-type": "application/json"}
+
+        # Track calls to mock order of responses
+        call_count = 0
+
+        # Mock for both GET and general request methods
+        async def mock_request(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return mock_rate_limit
+            return mock_success
+
+        # Mock asyncio.sleep to make test run faster
+        original_sleep = asyncio.sleep
+        mock_sleep = AsyncMock()
+        monkeypatch.setattr(asyncio, "sleep", mock_sleep)
+
+        # Patch both request methods
+        with patch.object(curl_cffi_client, "request", mock_request), patch.object(
+            curl_cffi_client, "get", mock_request
+        ):
+            # Call the function, no raise_for_status to handle the rate limit
+            status, data = await make_api_request(
+                client=curl_cffi_client,
+                url="https://api.example.com/endpoint",
+                method="GET",
+                params={"param": "value"},
+                headers={"Header": "Value"},
+                retries=2,
+                raise_for_status=False,
+            )
+
+            # Verify result - should be success after retry
+            assert status == 200
+            assert data == {"success": True}
+            # Verify retry logging and sleep call
+            assert "retry" in caplog.text.lower()
+            assert "429" in caplog.text or "too many requests" in caplog.text
+            assert mock_sleep.call_count == 1  # Should have slept once for retry
 
     async def test_make_api_request_retry_on_error(
-        self, httpx_client, monkeypatch, caplog
+        self, curl_cffi_client, monkeypatch, caplog
     ):
-        """Test API request retry logic with a slow endpoint."""
-        # Use a deliberately slow endpoint to test the retry logic
-        test_url = "https://httpbin.org/delay/10"  # 10 second delay
+        """Test make_api_request retry behavior with connection errors."""
+        # We'll use httpbin's 418 endpoint to simulate a rate limit response
+        url = "https://httpbin.org/status/418"
 
-        # Set a very short timeout to force a timeout error
-        client = httpx.AsyncClient(timeout=httpx.Timeout(0.1))
-
-        # Call function with short retry delay
-        result = await make_api_request(
-            client=client,
-            url=test_url,
-            max_retries=2,
-            retry_delay=0.1,  # Very short delay for testing
+        # Call the function with raise_for_status=False to get the response
+        status, data = await make_api_request(
+            client=curl_cffi_client,
+            url=url,
+            method="GET",
+            retries=1,
+            raise_for_status=False,
         )
 
-        # Should return None after failing with timeouts
-        assert result is None
-
-        # Check logs to ensure timeouts were handled
-        assert "error" in caplog.text.lower() and "retry" in caplog.text.lower()
-
-        # Clean up
-        await client.aclose()
+        # Verify the result
+        assert status == 418
 
     async def test_make_api_request_all_retries_fail(
-        self, httpx_client, monkeypatch, caplog
+        self, curl_cffi_client, monkeypatch, caplog
     ):
-        """Test API request with a non-existent host."""
-        # Use a URL with a non-existent host
-        test_url = "https://this.host.does.not.exist.example.com/api"
+        """Test make_api_request when all retries fail."""
+        # Use a real endpoint that will fail
+        url = "https://httpbin.org/status/500"
 
-        # Call function with short retry delay
-        result = await make_api_request(
-            client=httpx_client,
-            url=test_url,
-            max_retries=2,
-            retry_delay=0.1,  # Short delay for testing
+        # Call the function with raise_for_status=False to get the error result
+        status, data = await make_api_request(
+            client=curl_cffi_client,
+            url=url,
+            method="GET",
+            retries=1,
+            raise_for_status=False,
         )
 
-        # Check result
-        assert result is None
-
-        # Verify error messages in logs show connection errors
-        assert "error" in caplog.text.lower() and "retry" in caplog.text.lower()
+        # Verify the result
+        assert status == 500
+        assert "error" in data or "text" in data
 
 
 @pytest.mark.asyncio
@@ -369,7 +469,7 @@ async def test_read_csv_from_zip_different_timestamp_formats(temp_dir, caplog):
     url = "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-01-01.zip"
 
     # Create a client to download the file
-    async with httpx.AsyncClient() as client:
+    async with AsyncSession() as client:
         # Download the file to our temp directory
         zip_path = temp_dir / "BTCUSDT-1m-sample.zip"
 

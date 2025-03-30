@@ -33,7 +33,11 @@ from utils.time_utils import (
     enforce_utc_timezone,
     filter_dataframe_by_time,
 )
-from utils.network_utils import create_client, VisionDownloadManager
+from utils.network_utils import (
+    create_client,
+    VisionDownloadManager,
+    safely_close_client,
+)
 from utils.config import create_empty_dataframe
 from core.vision_constraints import (
     TimestampedDataFrame,
@@ -109,8 +113,8 @@ class VisionDataClient(Generic[T]):
         self._max_concurrent_downloads = (
             max_concurrent_downloads or MAX_CONCURRENT_DOWNLOADS
         )
-        # Prepare HTTP client for API access
-        self._client = create_client(client_type="httpx", timeout=30)
+        # Prepare HTTP client for API access - use curl_cffi for better performance
+        self._client = create_client(timeout=30)  # Default is now curl_cffi
         # Initialize download manager
         self._download_manager = VisionDownloadManager(
             client=self._client, symbol=self.symbol, interval=self.interval
@@ -139,7 +143,7 @@ class VisionDataClient(Generic[T]):
 
         # Close HTTP client
         try:
-            await self._client.aclose()
+            await safely_close_client(self._client)
         except Exception as e:
             logger.warning(f"Error closing HTTP client: {e}")
 

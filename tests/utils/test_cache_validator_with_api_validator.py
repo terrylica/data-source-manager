@@ -10,8 +10,6 @@ import numpy as np
 from datetime import datetime, timezone, timedelta
 import tempfile
 from pathlib import Path
-import pyarrow as pa
-import pyarrow.ipc as ipc
 
 from utils.cache_validator import CacheValidator, ERROR_TYPES
 from utils.api_boundary_validator import ApiBoundaryValidator

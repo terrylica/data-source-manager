@@ -7,7 +7,7 @@ This module centralizes all time-related functionality, providing a single sourc
 3. Time boundary alignment for API requests
 4. Time window validation
 
-The module combines functionality previously scattered across time_alignment.py and 
+The module combines functionality previously scattered across time_alignment.py and
 api_boundary_validator.py to ensure consistent behavior throughout the application.
 """
 
@@ -350,6 +350,15 @@ def estimate_record_count(
     # Ensure timezone awareness
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
+
+    # Check if we're dealing with future dates (no data yet)
+    now = datetime.now(timezone.utc)
+    if start_time > now:
+        return 0  # No records for future dates
+
+    # Limit end_time to current time as future data isn't available
+    if end_time > now:
+        end_time = now
 
     # Get aligned boundaries
     aligned_start, aligned_end = align_time_boundaries(start_time, end_time, interval)

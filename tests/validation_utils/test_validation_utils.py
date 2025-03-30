@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Tests for validation_utils module."""
 
-import os
 import hashlib
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -23,7 +22,6 @@ from utils.validation_utils import (
     validate_cache_integrity,
     calculate_checksum,
     ValidationOptions,
-    CacheValidationError,
     ERROR_TYPES,
     ApiValidator,
     DataValidator,

@@ -3,17 +3,18 @@
 """Unified market data client with optimized 1-second data handling."""
 
 import asyncio
-import aiohttp
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
+
+# Import curl_cffi for better performance
+from curl_cffi.requests import AsyncSession
+
 from utils.logger_setup import get_logger
 from utils.market_constraints import (
     Interval,
     MarketType,
-    get_market_capabilities,
-    get_endpoint_url,
 )
 from utils.time_utils import (
     get_bar_close_time,
@@ -21,7 +22,7 @@ from utils.time_utils import (
     is_bar_complete,
 )
 from utils.hardware_monitor import HardwareMonitor
-from utils.network_utils import create_client
+from utils.network_utils import create_client, safely_close_client
 from utils.config import (
     KLINE_COLUMNS,
     standardize_column_names,
@@ -136,168 +137,266 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
 
 
 class EnhancedRetriever:
-    """Unified data retriever optimized for 1-second data."""
+    """Enhanced retriever for market data with chunking, retries, and rate limiting.
 
-    CHUNK_SIZE = 1000  # Maximum records per request allowed by Binance API
-    MAX_RETRIES = 3  # Maximum number of retries for failed requests
-    RETRY_DELAY = 1  # Delay in seconds between retries
+    This class handles fetching klines data with proper rate limit handling,
+    automatical chunking for large time ranges, and endpoint rotation for
+    better performance.
+    """
 
     def __init__(
         self,
         market_type: MarketType = MarketType.SPOT,
-        client: Optional[aiohttp.ClientSession] = None,
-        hw_monitor: Optional[HardwareMonitor] = None,
+        max_concurrent: int = 50,
+        retry_count: int = 5,
+        client: Optional[AsyncSession] = None,
     ):
-        """Initialize the retriever.
+        """Initialize the enhanced retriever.
 
         Args:
-            market_type: Type of market (SPOT only for 1-second data)
-            client: Optional pre-configured HTTP client
-            hw_monitor: Optional hardware monitor instance
+            market_type: Market type (spot, futures, etc.)
+            max_concurrent: Maximum concurrent API requests
+            retry_count: Number of retries for failed requests
+            client: Optional existing client session (curl_cffi AsyncSession)
         """
         self.market_type = market_type
-        self.endpoint_url = get_endpoint_url(market_type)
+        self.CHUNK_SIZE = 1000  # Maximum number of records per API request
+        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._retry_count = retry_count
+
+        # Get endpoints from market_constraints
+        from utils.market_constraints import get_endpoint_url
+
+        self._base_url = get_endpoint_url(market_type)
+        # Use multiple API endpoints for rotation
+        self._endpoints = [
+            self._base_url,
+            self._base_url.replace("api.", "api1."),
+            self._base_url.replace("api.", "api2."),
+            self._base_url.replace("api.", "api3."),
+        ]
+
+        # Initialize endpoint rotation attributes
+        self._endpoint_lock = asyncio.Lock()
+        self._endpoint_index = 0
+
+        # Initialize client
         self._client = client
         self._client_is_external = client is not None
-        self.CHUNK_SIZE_MS = self.CHUNK_SIZE * 1000  # Convert to milliseconds
-        self.hw_monitor = hw_monitor or HardwareMonitor()
-        self.stats = {"total_records": 0, "chunks_processed": 0, "chunks_failed": 0}
-        self._capabilities = get_market_capabilities(market_type)
 
-        # Validate market capabilities
-        if market_type != MarketType.SPOT:
-            raise ValueError("Only SPOT market type supports 1-second data")
-        if self._capabilities.max_limit != self.CHUNK_SIZE:
-            raise ValueError(
-                f"API limit {self._capabilities.max_limit} doesn't match CHUNK_SIZE {self.CHUNK_SIZE}"
-            )
+        # Initialize hardware monitor for resource optimization
+        self.hw_monitor = HardwareMonitor()
+
+        # Log initialization
+        logger.debug(
+            f"Initialized EnhancedRetriever with market_type={market_type}, "
+            f"max_concurrent={max_concurrent}, retry_count={retry_count}"
+        )
 
     async def __aenter__(self):
         """Async context manager entry."""
         if not self._client:
-            self._client = self._create_optimized_client()
-            self._client_is_external = False
+            # Create a client with default timeout
+            from utils.network_utils import create_client
+
+            self._client = create_client(timeout=30.0)
+            logger.debug("Created new HTTP client with default settings")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        if self._client:
-            await self._client.close()
+        """Context manager exit method."""
+        # Only close client if we created it internally
+        if self._client and not self._client_is_external:
+            try:
+                await safely_close_client(self._client)
+                logger.debug("Closed HTTP client")
+            except Exception as e:
+                logger.warning(f"Error closing HTTP client: {e}")
             self._client = None
 
-    async def _get_next_endpoint(self) -> str:
-        """Get next endpoint in round-robin fashion."""
-        async with self._endpoint_lock:
-            # Combine all available endpoints
-            all_endpoints = (
-                [self._capabilities.primary_endpoint]
-                + self._capabilities.backup_endpoints
-                + (
-                    [self._capabilities.data_only_endpoint]
-                    if self._capabilities.data_only_endpoint
-                    else []
-                )
+    async def _fetch_chunk_with_retry(
+        self, endpoint: str, params: Dict[str, Any], retry_count: int = 0
+    ) -> List[List[Any]]:
+        """Fetch a chunk of data with retry logic.
+
+        Args:
+            endpoint: API endpoint URL
+            params: API parameters
+            retry_count: Current retry count
+
+        Returns:
+            List of klines data
+
+        Raises:
+            Exception: If all retries fail
+        """
+        try:
+            logger.debug(
+                f"Fetching chunk from endpoint: {endpoint} with params: {params}"
             )
 
-            endpoint = all_endpoints[self._endpoint_index]
-            self._endpoint_index = (self._endpoint_index + 1) % len(all_endpoints)
+            # Make the API request using curl_cffi
+            response = await self._client.get(endpoint, params=params)
 
-            # Use the correct endpoint format
-            return f"{endpoint}/api/v3/klines"
+            # Check for errors
+            if response.status_code >= 400:
+                # Handle rate limiting specifically
+                if response.status_code in (418, 429):
+                    retry_after = int(response.headers.get("Retry-After", 1))
+                    logger.warning(f"Rate limited by API. Retry after {retry_after}s")
+                    await asyncio.sleep(retry_after)
+                    return await self._fetch_chunk_with_retry(
+                        endpoint, params, retry_count
+                    )
+
+                # Other error codes
+                logger.error(f"API error {response.status_code}: {response.text}")
+                raise Exception(f"API error {response.status_code}: {response.text}")
+
+            # Parse response
+            data = response.json()
+
+            # Validate response format
+            if not isinstance(data, list):
+                logger.error(f"Unexpected API response format: {type(data)}")
+                raise ValueError(f"Unexpected API response format: {type(data)}")
+
+            return data
+
+        except Exception as e:
+            if retry_count >= self._retry_count:
+                logger.error(f"All {self._retry_count} retries failed: {str(e)}")
+                raise
+
+            # Increment retry counter and wait with exponential backoff
+            retry_count += 1
+            wait_time = min(2**retry_count, 60)  # Cap at 60 seconds
+            logger.warning(
+                f"Error fetching chunk: {str(e)}. Retry {retry_count}/{self._retry_count} in {wait_time}s"
+            )
+            await asyncio.sleep(wait_time)
+
+            # Try with a different endpoint
+            async with self._endpoint_lock:
+                self._endpoint_index = (self._endpoint_index + 1) % len(self._endpoints)
+                new_endpoint = self._endpoints[self._endpoint_index]
+
+            # Log the endpoint rotation
+            logger.info(f"Rotating to endpoint: {new_endpoint}")
+
+            # Retry with new endpoint
+            return await self._fetch_chunk_with_retry(new_endpoint, params, retry_count)
 
     async def _fetch_chunk_with_retry(
         self,
         symbol: str,
         interval: Interval,
-        start_ms: int,
-        end_ms: int,
-        sem: asyncio.Semaphore,
+        chunk_start: int,
+        chunk_end: int,
+        semaphore: asyncio.Semaphore,
+        retry_count: int = 0,
     ) -> Tuple[List[List[Any]], str]:
-        """Fetch a single chunk with retries and endpoint failover.
+        """Fetch a chunk of klines data with retry logic and semaphore control.
 
         Args:
             symbol: Trading pair symbol
             interval: Time interval
-            start_ms: Start time in milliseconds
-            end_ms: End time in milliseconds
-            sem: Semaphore for concurrency control
+            chunk_start: Start time in milliseconds
+            chunk_end: End time in milliseconds
+            semaphore: Semaphore for concurrency control
+            retry_count: Current retry count
 
         Returns:
-            Tuple of (chunk data, endpoint used)
+            Tuple of (klines data, endpoint URL)
         """
-        retries = 0
-        last_error = None
+        # Get the current endpoint with rotation
+        async with self._endpoint_lock:
+            endpoint_index = self._endpoint_index
+            endpoint = self._endpoints[endpoint_index]
 
-        # Log chunk boundary details
-        start_time = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc)
-        end_time = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc)
-        logger.debug(  # Changed from info to debug
-            f"\n=== Chunk Details ===\n"
-            f"Symbol: {symbol}\n"
-            f"Interval: {interval.value}\n"
-            f"Start time: {start_time} ({start_ms})\n"
-            f"End time: {end_time} ({end_ms})\n"
-            f"Time window: {end_time - start_time}"
-        )
+        # Prepare request parameters
+        params = {
+            "symbol": symbol,
+            "interval": interval.value,
+            "startTime": chunk_start,
+            "endTime": chunk_end,
+            "limit": self.CHUNK_SIZE,
+        }
 
-        while retries < self.MAX_RETRIES:
+        # Use semaphore to limit concurrent requests
+        async with semaphore:
             try:
-                async with sem:
-                    endpoint_url = await self._get_next_endpoint()
-                    params = {
-                        "symbol": symbol,
-                        "interval": interval.value,
-                        "startTime": start_ms,
-                        "endTime": end_ms,
-                        "limit": self.CHUNK_SIZE,
-                    }
+                logger.debug(
+                    f"Fetching chunk from {endpoint}: {chunk_start} to {chunk_end}"
+                )
 
-                    logger.debug(
-                        f"Fetching chunk: {start_ms} -> {end_ms} from {endpoint_url}"
+                # Make API request using curl_cffi
+                response = await self._client.get(endpoint, params=params)
+
+                # Handle response
+                if response.status_code >= 400:
+                    # Handle rate limiting
+                    if response.status_code in (418, 429):
+                        retry_after = int(response.headers.get("Retry-After", 1))
+                        logger.warning(
+                            f"Rate limited by API. Retry after {retry_after}s"
+                        )
+                        await asyncio.sleep(retry_after)
+                        # Try with a different endpoint
+                        async with self._endpoint_lock:
+                            self._endpoint_index = (self._endpoint_index + 1) % len(
+                                self._endpoints
+                            )
+
+                        return await self._fetch_chunk_with_retry(
+                            symbol,
+                            interval,
+                            chunk_start,
+                            chunk_end,
+                            semaphore,
+                            retry_count,
+                        )
+
+                    # Handle other errors
+                    logger.error(f"API error {response.status_code}: {response.text}")
+                    raise Exception(
+                        f"API error {response.status_code}: {response.text}"
                     )
-                    async with self._client.get(
-                        endpoint_url, params=params
-                    ) as response:
-                        response.raise_for_status()
-                        data: List[List[Any]] = await response.json()
 
-                        # Validate and log response
-                        if not isinstance(data, list):
-                            logger.warning(
-                                f"Unexpected response format from {endpoint_url}: {data}"
-                            )
-                            raise ValueError(
-                                f"Expected list response, got {type(data)}"
-                            )
+                # Parse response
+                data = response.json()
 
-                        logger.debug(
-                            f"Received {len(data)} records"
-                        )  # Changed from info to debug
-                        if data:
-                            first_ts = datetime.fromtimestamp(
-                                int(data[0][0]) / 1000, tz=timezone.utc
-                            )
-                            last_ts = datetime.fromtimestamp(
-                                int(data[-1][0]) / 1000, tz=timezone.utc
-                            )
-                            logger.debug(
-                                f"First timestamp: {first_ts}\nLast timestamp: {last_ts}\nTime span: {last_ts - first_ts}"
-                            )
+                # Validate response format
+                if not isinstance(data, list):
+                    logger.error(f"Unexpected API response format: {type(data)}")
+                    raise ValueError(f"Unexpected API response format: {type(data)}")
 
-                        return data, endpoint_url
+                logger.debug(f"Retrieved {len(data)} records from chunk")
+                return data, endpoint
 
-            except (aiohttp.ClientError, ValueError) as e:
-                last_error = e
-                logger.warning(f"Failed to fetch chunk from {endpoint_url}: {str(e)}")
-                retries += 1
-                if retries < self.MAX_RETRIES:
-                    await asyncio.sleep(self.RETRY_DELAY)
-                continue
+            except Exception as e:
+                if retry_count >= self._retry_count:
+                    logger.error(f"All {self._retry_count} retries failed: {str(e)}")
+                    raise
 
-        logger.error(
-            f"Failed to fetch chunk after {self.MAX_RETRIES} retries: {str(last_error)}"
-        )
-        raise last_error or Exception("Failed to fetch chunk after all retries")
+                # Increment retry counter and wait with exponential backoff
+                retry_count += 1
+                wait_time = min(2**retry_count, 60)  # Cap at 60 seconds
+                logger.warning(
+                    f"Error fetching chunk: {str(e)}. Retry {retry_count}/{self._retry_count} in {wait_time}s"
+                )
+                await asyncio.sleep(wait_time)
+
+                # Try with a different endpoint
+                async with self._endpoint_lock:
+                    self._endpoint_index = (self._endpoint_index + 1) % len(
+                        self._endpoints
+                    )
+
+                # Retry
+                return await self._fetch_chunk_with_retry(
+                    symbol, interval, chunk_start, chunk_end, semaphore, retry_count
+                )
 
     def _validate_request_params(
         self, symbol: str, interval: Interval, start_time: datetime, end_time: datetime
@@ -328,11 +427,10 @@ class EnhancedRetriever:
         # Removed all alignment-specific validations
         # The Binance REST API will handle interval alignment according to its behavior
 
-    def _create_optimized_client(self) -> aiohttp.ClientSession:
+    def _create_optimized_client(self) -> AsyncSession:
         """Create an optimized client based on hardware capabilities."""
         concurrency_info = self.hw_monitor.calculate_optimal_concurrency()
         return create_client(
-            client_type="aiohttp",
             max_connections=concurrency_info["optimal_concurrency"],
             timeout=30,  # Increased for large datasets
         )
@@ -342,9 +440,7 @@ class EnhancedRetriever:
     ) -> List[Tuple[int, int]]:
         """Calculate chunk ranges based on start and end times.
 
-        This method creates chunks based solely on the CHUNK_SIZE parameter
-        without applying any manual time alignment. The REST API will handle
-        interval alignment.
+        This method divides the time range into chunks that respect the API limit.
 
         Args:
             start_ms: Start time in milliseconds
@@ -352,14 +448,32 @@ class EnhancedRetriever:
             interval: Time interval
 
         Returns:
-            List of (start_ms, end_ms) pairs for each chunk
+            List of (chunk_start, chunk_end) tuples for each chunk
         """
         chunks = []
         current_start = start_ms
 
+        # Determine the appropriate chunk size based on interval
+        # For 1s data, we need smaller chunks to avoid exceeding API limits
+        is_small_interval = interval in (Interval.SECOND_1, Interval.MINUTE_1)
+
+        # While there's still time range to process
         while current_start < end_ms:
-            chunk_end = min(current_start + self.CHUNK_SIZE - 1, end_ms)
+            # Calculate end of this chunk
+            # Use a smaller chunk size for small intervals to avoid hitting API limits
+            chunk_duration = min(
+                end_ms - current_start,  # Don't go beyond the requested end time
+                self.CHUNK_SIZE
+                * (60 * 1000 if is_small_interval else 60 * 60 * 1000),  # Convert to ms
+            )
+
+            chunk_end = current_start + chunk_duration
+            if chunk_end > end_ms:
+                chunk_end = end_ms
+
             chunks.append((current_start, chunk_end))
+
+            # Move to next chunk
             current_start = chunk_end + 1
 
         return chunks

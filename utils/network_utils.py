@@ -2,7 +2,7 @@
 """Network utilities for handling HTTP client creation and file downloads.
 
 This module centralizes network-related functionality, including:
-1. HTTP client creation with standardized configuration
+1. HTTP client creation with standardized configuration using curl_cffi
 2. Download handling with progress tracking and retry logic
 3. Rate limiting management and stall detection
 
@@ -14,19 +14,22 @@ import logging
 import time
 import tempfile
 import zipfile
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import (
     Dict,
     Any,
     Optional,
-    Union,
-    Literal,
     List,
+    Tuple,
 )
+import os
+import json
 
-import aiohttp
-import httpx
+# Import curl_cffi for HTTP client implementation
+from curl_cffi.requests import AsyncSession
+
 import pandas as pd
 from tenacity import (
     retry,
@@ -50,33 +53,28 @@ logger = get_logger(__name__, "INFO", show_path=False)
 
 
 def create_client(
-    client_type: Literal["aiohttp", "httpx"] = "aiohttp",
     timeout: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
     max_connections: Optional[int] = None,
     headers: Optional[Dict[str, str]] = None,
     **kwargs: Any,
-) -> Union[aiohttp.ClientSession, httpx.AsyncClient]:
-    """Create a standardized HTTP client of the specified type.
+) -> AsyncSession:
+    """Create a standardized curl_cffi HTTP client.
 
-    Provides a unified interface for creating both aiohttp and httpx clients
+    Provides a unified interface for creating HTTP clients
     with consistent configuration options.
 
     Args:
-        client_type: The type of client to create ("aiohttp" or "httpx")
         timeout: Request timeout in seconds
         max_connections: Maximum number of connections
         headers: Optional custom headers to include in all requests
         **kwargs: Additional client-specific configuration options
 
     Returns:
-        Configured HTTP client of the requested type with standard settings
-
-    Raises:
-        ValueError: If an unsupported client_type is specified
+        Configured curl_cffi AsyncSession with standard settings
     """
-    # Use default max connections based on client type if not specified
+    # Use default max connections if not specified
     if max_connections is None:
-        max_connections = 20 if client_type == "aiohttp" else 13
+        max_connections = 50
 
     # Merge default headers with custom headers
     default_headers = {
@@ -87,32 +85,21 @@ def create_client(
     if headers:
         default_headers.update(headers)
 
-    # Create the appropriate client type
-    if client_type == "aiohttp":
-        return create_aiohttp_client(
-            timeout=timeout,
-            max_connections=max_connections,
-            headers=default_headers,
-            **kwargs,
-        )
-    elif client_type == "httpx":
-        return create_httpx_client(
-            timeout=timeout,
-            max_connections=max_connections,
-            headers=default_headers,
-            **kwargs,
-        )
-    else:
-        raise ValueError(f"Unsupported client type: {client_type}")
+    return create_curl_cffi_client(
+        timeout=timeout,
+        max_connections=max_connections,
+        headers=default_headers,
+        **kwargs,
+    )
 
 
-def create_aiohttp_client(
+def create_curl_cffi_client(
     timeout: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
-    max_connections: int = 20,
+    max_connections: int = 50,
     headers: Optional[Dict[str, str]] = None,
     **kwargs: Any,
-) -> aiohttp.ClientSession:
-    """Factory function to create a pre-configured aiohttp ClientSession.
+) -> AsyncSession:
+    """Factory function to create a pre-configured curl_cffi AsyncSession.
 
     Args:
         timeout: Total timeout in seconds
@@ -121,7 +108,7 @@ def create_aiohttp_client(
         **kwargs: Additional client configuration options
 
     Returns:
-        Configured aiohttp ClientSession with standardized settings
+        Configured curl_cffi AsyncSession with standardized settings
     """
     client_headers = {
         "Accept": DEFAULT_ACCEPT_HEADER,
@@ -131,63 +118,16 @@ def create_aiohttp_client(
     if headers:
         client_headers.update(headers)
 
-    client_timeout = aiohttp.ClientTimeout(
-        total=timeout, connect=3, sock_connect=3, sock_read=5
-    )
-    connector = aiohttp.TCPConnector(limit=max_connections, force_close=False)
-
     client_kwargs = {
-        "timeout": client_timeout,
-        "connector": connector,
+        "timeout": timeout,
         "headers": client_headers,
+        "max_clients": max_connections,
     }
 
     # Add any additional kwargs
     client_kwargs.update(kwargs)
 
-    return aiohttp.ClientSession(**client_kwargs)
-
-
-def create_httpx_client(
-    timeout: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
-    max_connections: int = 13,
-    headers: Optional[Dict[str, str]] = None,
-    **kwargs: Any,
-) -> httpx.AsyncClient:
-    """Factory function to create a pre-configured httpx AsyncClient.
-
-    Args:
-        timeout: Total timeout in seconds
-        max_connections: Maximum number of connections
-        headers: Optional custom headers
-        **kwargs: Additional client configuration options
-
-    Returns:
-        Configured httpx AsyncClient with standardized settings
-    """
-    limits = httpx.Limits(
-        max_connections=max_connections, max_keepalive_connections=max_connections
-    )
-    timeout_config = httpx.Timeout(timeout)
-
-    client_headers = {
-        "Accept": DEFAULT_ACCEPT_HEADER,
-        "User-Agent": DEFAULT_USER_AGENT,
-    }
-
-    if headers:
-        client_headers.update(headers)
-
-    client_kwargs = {
-        "limits": limits,
-        "timeout": timeout_config,
-        "headers": client_headers,
-    }
-
-    # Add any additional kwargs
-    client_kwargs.update(kwargs)
-
-    return httpx.AsyncClient(**client_kwargs)
+    return AsyncSession(**client_kwargs)
 
 
 # ----- Download Handling -----
@@ -196,19 +136,16 @@ def create_httpx_client(
 class DownloadException(Exception):
     """Base class for download-related exceptions."""
 
-    pass
 
 
 class DownloadStalledException(DownloadException):
     """Raised when download progress stalls."""
 
-    pass
 
 
 class RateLimitException(DownloadException):
     """Raised when rate limited by the server."""
 
-    pass
 
 
 class DownloadProgressTracker:
@@ -233,10 +170,11 @@ class DownloadProgressTracker:
             f"Download progress tracker initialized. Total size: {total_size or 'unknown'} bytes"
         )
 
-    def update(self, bytes_chunk: int) -> bool:
+    def update(self, url: str, bytes_chunk: int) -> bool:
         """Update progress with newly received bytes.
 
         Args:
+            url: URL of the download
             bytes_chunk: Number of bytes received in this update
 
         Returns:
@@ -284,7 +222,7 @@ class DownloadHandler:
 
     def __init__(
         self,
-        client: httpx.AsyncClient,
+        client: AsyncSession,
         max_retries: int = 5,
         min_wait: int = 4,
         max_wait: int = 60,
@@ -293,7 +231,7 @@ class DownloadHandler:
         """Initialize download handler.
 
         Args:
-            client: Async HTTP client to use
+            client: Async HTTP client to use (curl_cffi AsyncSession recommended)
             max_retries: Maximum number of retry attempts
             min_wait: Minimum wait time between retries (seconds)
             max_wait: Maximum wait time between retries (seconds)
@@ -312,8 +250,8 @@ class DownloadHandler:
             (
                 DownloadStalledException,
                 RateLimitException,
-                httpx.TimeoutException,
-                httpx.NetworkError,
+                asyncio.TimeoutError,
+                ConnectionError,
             )
         ),
         before_sleep=before_sleep_log(logger, logging.WARNING),
@@ -325,63 +263,70 @@ class DownloadHandler:
         headers: Optional[Dict[str, Any]] = None,
         progress_tracker_kwargs: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Download file with progress monitoring and retries.
+        """Download a file with progress tracking and stall detection.
+
+        This method will automatically retry on failures with exponential backoff.
 
         Args:
-            url: URL to download from
-            local_path: Path to save the file to
-            headers: Optional HTTP headers
-            progress_tracker_kwargs: Optional kwargs for DownloadProgressTracker
+            url: URL of the file to download
+            local_path: Local path to save the file to
+            headers: Optional HTTP headers to include in the request
+            progress_tracker_kwargs: Optional arguments for DownloadProgressTracker
 
         Returns:
-            True if download successful, False otherwise
+            True if download succeeded, False otherwise
 
         Raises:
             DownloadStalledException: If download progress stalls
             RateLimitException: If rate limited by server
-            httpx.TimeoutException: If request times out
-            httpx.NetworkError: If network error occurs
+            asyncio.TimeoutError: If request times out
+            ConnectionError: If network error occurs
         """
         progress_tracker_kwargs = progress_tracker_kwargs or {}
 
         try:
-            async with self.client.stream("GET", url, headers=headers) as response:
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get("Retry-After", 60))
-                    logger.warning(f"Rate limit hit. Retry after {retry_after}s")
-                    await asyncio.sleep(retry_after)  # Honor the retry-after header
-                    raise RateLimitException()
+            response = await self.client.get(url, headers=headers)
 
-                if response.status_code != 200:
-                    logger.error(f"Download failed with status {response.status_code}")
-                    return False
+            # Check for rate limiting
+            if response.status_code in (418, 429):
+                retry_after = int(response.headers.get("Retry-After", 60))
+                logger.warning(f"Rate limit hit. Retry after {retry_after}s")
+                await asyncio.sleep(retry_after)
+                raise RateLimitException()
 
-                total_size = int(response.headers.get("content-length", 0))
-                progress = DownloadProgressTracker(
-                    total_size, **progress_tracker_kwargs
-                )
+            if response.status_code != 200:
+                logger.error(f"Download failed with status {response.status_code}")
+                return False
 
-                with open(local_path, "wb") as f:
-                    async for chunk in response.aiter_bytes(self.chunk_size):
-                        if not progress.update(len(chunk)):
-                            msg = f"Download stalled at {progress.bytes_received}/{total_size} bytes"
-                            logger.warning(msg)
-                            raise DownloadStalledException(msg)
-                        f.write(chunk)
+            # Create the directory if it doesn't exist
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Get content length from headers if available
+            total_size = int(response.headers.get("content-length", 0))
+
+            # Initialize progress tracker
+            progress = DownloadProgressTracker(total_size, **progress_tracker_kwargs)
+
+            # For direct download with curl_cffi, we get the content at once
+            content = response.content
+            progress.update(url, len(content))
+
+            with open(local_path, "wb") as f:
+                f.write(content)
 
             return True
 
         except (
             DownloadStalledException,
             RateLimitException,
-            httpx.TimeoutException,
-            httpx.NetworkError,
+            asyncio.TimeoutError,
+            ConnectionError,
         ) as e:
             # Let these exceptions propagate for retry
             raise
-
         except Exception as e:
-            logger.error(f"Unexpected error during download: {str(e)}")
+            logger.error(f"Download error: {str(e)}")
+            logger.debug(traceback.format_exc())
             return False
 
 
@@ -389,151 +334,170 @@ class DownloadHandler:
 
 
 async def download_files_concurrently(
-    client: httpx.AsyncClient,
+    client: AsyncSession,
     urls: List[str],
     local_paths: List[Path],
     max_concurrent: int = 5,
     **download_kwargs: Any,
 ) -> List[bool]:
-    """Download multiple files concurrently with throttling.
+    """Download multiple files concurrently with rate limiting.
 
     Args:
-        client: HTTP client to use for downloads
+        client: HTTP client (curl_cffi AsyncSession recommended)
         urls: List of URLs to download
-        local_paths: List of local paths to save files to (must match urls length)
+        local_paths: List of paths to save files to
         max_concurrent: Maximum number of concurrent downloads
-        **download_kwargs: Additional kwargs to pass to download_file
+        **download_kwargs: Additional arguments to pass to DownloadHandler.download_file
 
     Returns:
-        List of booleans indicating success/failure of each download (matches urls order)
+        List of download results (True for success, False for failure)
     """
     if len(urls) != len(local_paths):
-        raise ValueError("URLs and local paths must have the same length")
+        logger.error(
+            f"URL and path lists must have same length. "
+            f"Got {len(urls)} URLs and {len(local_paths)} paths."
+        )
+        return [False] * max(len(urls), len(local_paths))
 
     # Create download handler
-    download_handler = DownloadHandler(client)
+    handler = DownloadHandler(client=client)
 
-    # Use semaphore to limit concurrency
+    # Set up semaphore for concurrency control
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    async def _download_with_semaphore(url: str, path: Path) -> bool:
+    async def download_with_semaphore(url: str, path: Path) -> bool:
         async with semaphore:
-            return await download_handler.download_file(url, path, **download_kwargs)
+            try:
+                return await handler.download_file(url, path, **download_kwargs)
+            except Exception as e:
+                logger.error(f"Error downloading {url}: {str(e)}")
+                return False
 
-    # Create download tasks
-    download_tasks = [
-        _download_with_semaphore(url, path) for url, path in zip(urls, local_paths)
+    # Create tasks for all downloads
+    tasks = [
+        asyncio.create_task(download_with_semaphore(url, path))
+        for url, path in zip(urls, local_paths)
     ]
 
-    # Run downloads concurrently
-    results = await asyncio.gather(*download_tasks, return_exceptions=True)
+    # Wait for all tasks to complete
+    results = await asyncio.gather(*tasks)
 
-    # Process results, converting exceptions to False
-    return [result if isinstance(result, bool) else False for result in results]
+    return results
 
 
 # ----- API Request Handling -----
 
 
 async def make_api_request(
-    client: Union[httpx.AsyncClient, aiohttp.ClientSession],
+    client: AsyncSession,
     url: str,
-    params: Optional[Dict[str, Any]] = None,
     headers: Optional[Dict[str, str]] = None,
-    max_retries: int = 3,
-    retry_delay: int = 2,
-) -> Optional[Dict[str, Any]]:
-    """Make an API request with retry logic and error handling.
+    params: Optional[Dict[str, str]] = None,
+    method: str = "GET",
+    json_data: Optional[Dict] = None,
+    timeout: Optional[float] = None,
+    retries: int = 3,
+    retry_delay: float = 1.0,
+    raise_for_status: bool = True,
+) -> Tuple[int, Dict]:
+    """Make an API request with retry logic and timeout handling.
 
     Args:
-        client: HTTP client (either httpx.AsyncClient or aiohttp.ClientSession)
-        url: API URL to request
-        params: Query parameters
-        headers: Request headers
-        max_retries: Maximum number of retry attempts
-        retry_delay: Base delay between retries in seconds
+        client: HTTP client (curl_cffi AsyncSession recommended)
+        url: URL to request
+        headers: Optional request headers
+        params: Optional query parameters
+        method: HTTP method (GET, POST, etc.)
+        json_data: Optional JSON payload for POST requests
+        timeout: Request timeout in seconds
+        retries: Number of retry attempts
+        retry_delay: Base delay between retries
+        raise_for_status: Whether to raise an exception for error status codes
 
     Returns:
-        JSON response data or None if the request failed
+        Tuple of (status_code, response_data)
+
+    Raises:
+        Exception: For network errors or HTTP errors if raise_for_status is True
     """
-    params = params or {}
     headers = headers or {}
+    params = params or {}
+    timeout_value = timeout or DEFAULT_HTTP_TIMEOUT_SECONDS
 
-    for retry in range(max_retries):
+    attempt = 0
+    last_status = None
+    last_response_data = None
+
+    while attempt < retries:
         try:
-            if isinstance(client, httpx.AsyncClient):
-                response = await client.get(url, params=params, headers=headers)
-
-                # Check for rate limiting
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get("Retry-After", retry_delay))
-                    logger.warning(
-                        f"Rate limited by API, retrying after {retry_after}s (attempt {retry+1}/{max_retries})"
-                    )
-                    await asyncio.sleep(retry_after)
-                    continue
-
-                # Handle other HTTP errors
-                # Some clients (like aiohttp) have awaitable raise_for_status, while others (like httpx in tests) don't
-                # This conditional handling prevents "coroutine was never awaited" warnings while supporting both types
-                if hasattr(response.raise_for_status, "__await__"):
-                    await response.raise_for_status()
-                else:
-                    response.raise_for_status()
-
-                # Handle both AsyncMock and real response cases
-                if hasattr(response.json, "__await__"):
-                    return await response.json()
-                return response.json()
-
-            elif isinstance(client, aiohttp.ClientSession):
-                async with client.get(url, params=params, headers=headers) as response:
-                    # Check for rate limiting
-                    if response.status == 429:
-                        retry_after = int(
-                            response.headers.get("Retry-After", retry_delay)
-                        )
-                        logger.warning(
-                            f"Rate limited by API, retrying after {retry_after}s (attempt {retry+1}/{max_retries})"
-                        )
-                        await asyncio.sleep(retry_after)
-                        continue
-
-                    # Handle other HTTP errors
-                    # Some clients (like aiohttp) have awaitable raise_for_status, while others don't
-                    # This conditional handling prevents "coroutine was never awaited" warnings
-                    if hasattr(response.raise_for_status, "__await__"):
-                        await response.raise_for_status()
-                    else:
-                        response.raise_for_status()
-                    return await response.json()
+            # Use curl_cffi client
+            if method == "GET":
+                response = await client.get(
+                    url, headers=headers, params=params, timeout=timeout_value
+                )
+            elif method == "POST":
+                response = await client.post(
+                    url,
+                    headers=headers,
+                    params=params,
+                    json=json_data,
+                    timeout=timeout_value,
+                )
             else:
-                logger.error(f"Unsupported client type: {type(client)}")
-                return None
+                response = await client.request(
+                    method,
+                    url,
+                    headers=headers,
+                    params=params,
+                    json=json_data,
+                    timeout=timeout_value,
+                )
 
-        except (httpx.HTTPStatusError, aiohttp.ClientResponseError) as e:
-            logger.warning(
-                f"HTTP error during API request: {str(e)}, retrying ({retry+1}/{max_retries})"
-            )
-            await asyncio.sleep(retry_delay * (retry + 1))
-        except httpx.TimeoutException as e:
-            logger.warning(
-                f"Timeout during API request: {str(e)}, retrying ({retry+1}/{max_retries})"
-            )
-            await asyncio.sleep(retry_delay * (retry + 1))
-        except aiohttp.ClientConnectorError as e:
-            logger.warning(
-                f"Connection error during API request: {str(e)}, retrying ({retry+1}/{max_retries})"
-            )
-            await asyncio.sleep(retry_delay * (retry + 1))
-        except Exception as e:
-            logger.warning(
-                f"Unexpected error during API request: {str(e)}, retrying ({retry+1}/{max_retries})"
-            )
-            await asyncio.sleep(retry_delay * (retry + 1))
+            status_code = response.status_code
 
-    logger.error(f"Failed to complete API request after {max_retries} retries")
-    return None
+            # Check for rate limiting
+            if status_code in (418, 429):
+                retry_after = int(response.headers.get("retry-after", retry_delay))
+                logger.warning(
+                    f"Rate limited by API (HTTP {status_code}). Retry after {retry_after}s ({attempt+1}/{retries})"
+                )
+                await asyncio.sleep(retry_after)
+                attempt += 1
+                last_status = status_code
+                last_response_data = {"error": f"Rate limited (HTTP {status_code})"}
+                continue
+
+            if raise_for_status and status_code >= 400:
+                raise Exception(f"HTTP error: {status_code} - {response.text}")
+
+            try:
+                if response.headers.get("content-type", "").startswith(
+                    "application/json"
+                ):
+                    response_data = json.loads(response.text)
+                else:
+                    response_data = {"text": response.text}
+            except json.JSONDecodeError:
+                response_data = {"text": response.text}
+
+            # Successfully processed the response - return it
+            return status_code, response_data
+
+        except (json.JSONDecodeError, asyncio.TimeoutError) as e:
+            logger.warning(f"API request failed ({attempt+1}/{retries}): {str(e)}")
+            if attempt >= retries - 1:
+                # Last attempt failed, raise the exception
+                raise
+
+            # Exponential backoff
+            wait_time = retry_delay * (2**attempt)
+            logger.info(f"Retrying in {wait_time:.1f}s...")
+            await asyncio.sleep(wait_time)
+            attempt += 1
+
+    # If we got here, we exhausted our retries
+    logger.error(f"API request failed after {retries} attempts: {url}")
+    return last_status or 500, last_response_data or {"error": "Max retries exceeded"}
 
 
 class VisionDownloadManager:
@@ -541,7 +505,7 @@ class VisionDownloadManager:
 
     def __init__(
         self,
-        client: httpx.AsyncClient,
+        client: AsyncSession,
         symbol: str,
         interval: str,
         market_type: str = "spot",
@@ -549,7 +513,7 @@ class VisionDownloadManager:
         """Initialize the download manager.
 
         Args:
-            client: HTTP client for downloads
+            client: HTTP client for downloads (curl_cffi AsyncSession)
             symbol: Trading pair symbol
             interval: Time interval
             market_type: Market type (spot, futures_usdt, futures_coin)
@@ -624,7 +588,6 @@ class VisionDownloadManager:
                 logger.debug(f"Expected checksum: '{expected}'")
 
             from utils.validation_utils import (
-                validate_cache_integrity,
                 calculate_checksum,
             )
 
@@ -986,3 +949,113 @@ async def read_csv_from_zip(zip_file_path: str, log_prefix: str = "") -> pd.Data
     except Exception as e:
         logger.error(f"{log_prefix} Error reading zip file: {str(e)}")
         return pd.DataFrame()
+
+
+async def download_file(
+    client: AsyncSession,
+    url: str,
+    destination_path: Optional[str] = None,
+    headers: Optional[Dict[str, str]] = None,
+    timeout: Optional[float] = None,
+    retries: int = 3,
+    retry_delay: float = 1.0,
+    progress_tracker: Optional[DownloadProgressTracker] = None,
+) -> bool:
+    """Download a file to a local path with retries and error handling.
+
+    Args:
+        client: HTTP client (curl_cffi AsyncSession recommended)
+        url: URL to download
+        destination_path: Path to save the file to
+        headers: Additional HTTP headers
+        timeout: Request timeout in seconds
+        retries: Number of retries for transient errors
+        retry_delay: Delay between retries in seconds
+        progress_tracker: Optional progress tracker instance
+
+    Returns:
+        True if the download was successful, False otherwise
+
+    Raises:
+        Exception: For network or file errors
+    """
+    headers = headers or {}
+    timeout_value = timeout or 30.0
+    attempt = 0
+
+    # Create destination directory if it doesn't exist
+    if destination_path:
+        os.makedirs(os.path.dirname(os.path.abspath(destination_path)), exist_ok=True)
+
+    while attempt < retries:
+        try:
+            response = await client.get(url, headers=headers, timeout=timeout_value)
+            if response.status_code >= 400:
+                raise Exception(f"HTTP error: {response.status_code} - {response.text}")
+            content = response.content
+
+            # Update progress tracker if provided
+            if progress_tracker:
+                progress_tracker.update(url, len(content))
+
+            # Save to file if destination_path is provided
+            if destination_path:
+                with open(destination_path, "wb") as f:
+                    f.write(content)
+
+            return True
+
+        except Exception as e:
+            attempt += 1
+            # Check if this is a timeout, connection error, or rate limiting
+            error_str = str(e).lower()
+            is_timeout = "timeout" in error_str or isinstance(e, asyncio.TimeoutError)
+            is_connection_error = "connection" in error_str
+            is_rate_limited = (
+                "429" in error_str
+                or "too many requests" in error_str
+                or hasattr(e, "status")
+                and getattr(e, "status", 0) == 429
+                or hasattr(e, "status_code")
+                and getattr(e, "status_code", 0) == 429
+            )
+
+            # Determine retry behavior and delay
+            should_retry = attempt < retries and (
+                is_timeout or is_connection_error or is_rate_limited
+            )
+
+            if should_retry:
+                # Use longer delay for rate limiting
+                current_delay = retry_delay * (2 if is_rate_limited else 1)
+                logger.warning(
+                    f"Download failed for {url}: {str(e)}, retrying in {current_delay}s ({attempt}/{retries})"
+                )
+                await asyncio.sleep(current_delay)
+            else:
+                logger.error(
+                    f"Download failed for {url} after {retries} retries: {str(e)}"
+                )
+                return False
+
+    # If we've reached this point, all retries failed
+    return False
+
+
+async def safely_close_client(client: AsyncSession) -> None:
+    """Safely close curl_cffi AsyncSession with proper cleanup of background tasks.
+
+    The curl_cffi AsyncCurl implementation creates background tasks for timeout handling
+    that can cause "Task was destroyed but it is pending" warnings if not properly cleaned up.
+    This function ensures those tasks can complete before the client is fully closed.
+
+    Args:
+        client: curl_cffi AsyncSession to close
+    """
+    if client is not None:
+        try:
+            await client.close()
+            # Small delay to allow AsyncCurl._force_timeout tasks to complete
+            await asyncio.sleep(0.1)
+        except Exception as e:
+            logger.warning(f"Error closing AsyncSession: {e}")

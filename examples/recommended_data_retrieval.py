@@ -6,7 +6,6 @@ import signal
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import pandas as pd
 import traceback
 
 from utils.logger_setup import get_logger

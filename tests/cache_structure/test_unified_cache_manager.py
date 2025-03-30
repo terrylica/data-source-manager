@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 """Unit tests for UnifiedCacheManager with the updated cache path structure."""
 
-import os
 from datetime import datetime, timezone
 from pathlib import Path
-import pytest
 import tempfile
 import json
 import shutil

@@ -47,7 +47,6 @@ from utils.config import (
 class ValidationError(Exception):
     """Custom exception for validation errors."""
 
-    pass
 
 
 class DataValidation:
