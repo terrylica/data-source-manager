@@ -33,7 +33,7 @@ CACHE_UPDATE_INTERVAL: Final = timedelta(minutes=5)
 MIN_VALID_FILE_SIZE: Final = 1024  # 1KB minimum
 
 # API constraints
-API_TIMEOUT: Final = 30  # Seconds
+API_TIMEOUT: Final = 3.0  # Seconds - standardized based on benchmarks
 API_MAX_RETRIES: Final = 3
 API_RETRY_DELAY: Final = 1  # Seconds
 
@@ -108,7 +108,9 @@ CLOSE_TIME_ADJUSTMENT: Final[int] = 999  # Microseconds to add to close_time
 # HTTP Client configuration
 DEFAULT_USER_AGENT: Final[str] = "RestDataClient/2.0"
 DEFAULT_ACCEPT_HEADER: Final[str] = "application/json"
-DEFAULT_HTTP_TIMEOUT_SECONDS: Final[float] = 10.0
+DEFAULT_HTTP_TIMEOUT_SECONDS: Final[float] = (
+    3.0  # Standardized timeout for all HTTP requests
+)
 
 # Chunk size constraints
 REST_CHUNK_SIZE: Final = 1000

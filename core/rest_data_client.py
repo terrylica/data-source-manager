@@ -29,7 +29,9 @@ from utils.config import (
     TIMESTAMP_UNIT,
     CLOSE_TIME_ADJUSTMENT,
     CANONICAL_INDEX_NAME,
+    DEFAULT_COLUMN_ORDER,
     create_empty_dataframe,
+    DEFAULT_HTTP_TIMEOUT_SECONDS,
 )
 
 logger = get_logger(__name__, "INFO", show_path=False)
@@ -200,7 +202,7 @@ class RestDataClient:
             # Create a client with default timeout
             from utils.network_utils import create_client
 
-            self._client = create_client(timeout=30.0)
+            self._client = create_client(timeout=DEFAULT_HTTP_TIMEOUT_SECONDS)
             logger.debug("Created new HTTP client with default settings")
         return self
 
@@ -434,7 +436,7 @@ class RestDataClient:
         concurrency_info = self.hw_monitor.calculate_optimal_concurrency()
         return create_client(
             max_connections=concurrency_info["optimal_concurrency"],
-            timeout=30,  # Increased for large datasets
+            timeout=DEFAULT_HTTP_TIMEOUT_SECONDS,  # Using standard timeout
         )
 
     def _calculate_chunks(
@@ -579,7 +581,7 @@ class RestDataClient:
         api_status = await test_connectivity(
             self._client,
             url=self._base_url,  # Use our base API URL for the test
-            timeout=10.0,
+            timeout=DEFAULT_HTTP_TIMEOUT_SECONDS,
         )
 
         if not api_status:
