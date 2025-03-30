@@ -18,6 +18,9 @@ MARKET_TYPE="spot"
 # - For CM: typically like "BTCUSD_PERP", "ETHUSD_PERP" or "BCHUSD_PERP", etc.
 # For multiple symbols, use space-separated list: "BTCUSDT ETHUSDT XRPUSDT"
 SYMBOLS="BTCUSDT ETHUSDT BNBUSDT LTCUSDT ADAUSDT XRPUSDT EOSUSDT XLMUSDT TRXUSDT ETCUSDT ICXUSDT VETUSDT LINKUSDT ZILUSDT XMRUSDT THETAUSDT MATICUSDT ATOMUSDT FTMUSDT ALGOUSDT DOGEUSDT CHZUSDT XTZUSDT BCHUSDT KNCUSDT MANAUSDT SOLUSDT SANDUSDT CRVUSDT DOTUSDT LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
+# SYMBOLS="XMRUSDT THETAUSDT MATICUSDT ATOMUSDT FTMUSDT ALGOUSDT DOGEUSDT CHZUSDT XTZUSDT BCHUSDT KNCUSDT MANAUSDT SOLUSDT SANDUSDT CRVUSDT DOTUSDT LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
+# SYMBOLS="LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
+# SYMBOLS="LUNAUSDT"
 
 # Time intervals to process (space-separated list)
 # Available intervals:
@@ -26,6 +29,7 @@ SYMBOLS="BTCUSDT ETHUSDT BNBUSDT LTCUSDT ADAUSDT XRPUSDT EOSUSDT XLMUSDT TRXUSDT
 # - "1h", "2h", "4h", "6h", "8h", "12h"
 # - "1d"
 INTERVALS="1s 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d"
+INTERVALS="1s 1m"
 
 # Test mode - process a shorter date range for testing
 TEST_MODE=false
@@ -57,7 +61,7 @@ RETRY_FROM=""           # Path to CSV file to retry from (empty for fresh run)
 MAX_PARALLEL=50          # Number of parallel processes (lower for testing, increase for production)
 ARIA_CONNECTIONS=1       # Number of connections per download
 DOWNLOAD_TIMEOUT=30      # Download timeout in seconds
-MAX_RETRIES=3            # Maximum number of download retries
+MAX_RETRIES=10           # Maximum number of download retries (increased from 3 to 10)
 
 #--------------------------------------
 # OUTPUT CONFIGURATION
@@ -75,6 +79,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
 TEMP_DIR="${LOG_DIR}/temp_$(date +%Y%m%d_%H%M%S)"
 RESULTS_DIR="${TEMP_DIR}/results"
+TERMINATED_SYMBOLS_LOG="${LOG_DIR}/terminated_symbols.log"
 
 # Create log directory if it doesn't exist
 mkdir -p "${LOG_DIR}"
@@ -222,6 +227,8 @@ auto_detect_latest_date() {
         local url="${base_url}/${interval}/${filename}"
         local status=$(curl -s -o /dev/null -w "%{http_code}" -I "${url}")
         
+        echo -n "[$status] " >&2
+        
         if [ "${status}" = "200" ] || [ "${status}" = "302" ]; then
             echo "" >&2
             echo "✅ Found latest available date: ${check_date}" >&2
@@ -233,9 +240,11 @@ auto_detect_latest_date() {
     done
     
     echo "" >&2
-    echo "⚠️ Could not find recent data within last ${max_days_back} days. Using default START_DATE: ${default_date}" >&2
-    echo "${default_date}"
-    return 1
+    echo "❌ Could not find recent data within last ${max_days_back} days. Symbol appears to be TERMINATED." >&2
+    
+    # Return special code to indicate termination
+    echo "TERMINATED"
+    return 2
 }
 
 # Auto-detect the earliest date if END_DATE_AUTO is true
@@ -305,21 +314,79 @@ get_http_headers() {
     echo "$last_modified,$etag,$server,$content_type,$content_length,$x_cache,$x_amz_cf_id"
 }
 
-# Function to download file with aria2
+# Function to download file with aria2 and exponential backoff
 download_file() {
     local url=$1
     local output_file=$2
     local connections=$3
     local timeout=$4
-    local retries=$5
+    local max_retries=$5
     
-    aria2c --quiet --max-connection-per-server="${connections}" \
-           --connect-timeout="${timeout}" --timeout="${timeout}" --max-tries="${retries}" \
-           --allow-overwrite=true \
-           --auto-file-renaming=false \
-           --out="${output_file}" "${url}"
+    # First check if the file exists (using HTTP HEAD request)
+    local status_code=$(curl -s -o /dev/null -w "%{http_code}" -I "${url}")
     
-    return $?
+    # If file doesn't exist (404), don't attempt to download and return special code
+    if [ "${status_code}" = "404" ]; then
+        echo "DEBUG: File does not exist (404): ${url}" >&2
+        return 404
+    fi
+    
+    # If server error or other issue, we may want to retry
+    if [ "${status_code}" != "200" ] && [ "${status_code}" != "302" ]; then
+        echo "DEBUG: Unexpected status code ${status_code} for ${url}" >&2
+    fi
+    
+    local retry=0
+    local wait_time=1  # Initial wait time in seconds
+    
+    while [ $retry -lt $max_retries ]; do
+        # Attempt to download the file
+        aria2c --quiet --max-connection-per-server="${connections}" \
+               --connect-timeout="${timeout}" --timeout="${timeout}" \
+               --allow-overwrite=true \
+               --auto-file-renaming=false \
+               --out="${output_file}" "${url}"
+        
+        local result=$?
+        
+        # If download was successful, return success
+        if [ $result -eq 0 ]; then
+            return 0
+        fi
+        
+        # Increment retry counter
+        ((retry++))
+        
+        # If we've reached max retries, exit with failure
+        if [ $retry -ge $max_retries ]; then
+            return 1
+        fi
+        
+        # Calculate exponential backoff wait time (2^retry * base_wait_time)
+        # with a small random factor to avoid thundering herd problem
+        local jitter=$(( RANDOM % 1000 ))
+        local wait_ms=$(( (2**retry) * 1000 + jitter ))
+        local wait_sec=$(echo "scale=2; $wait_ms/1000" | bc)
+        
+        echo "Download failed for ${url}. Retry ${retry}/${max_retries} after ${wait_sec}s..." >&2
+        
+        # Sleep with millisecond precision if possible, otherwise round to seconds
+        if command -v sleep.exe >/dev/null 2>&1; then
+            # Windows Git Bash or similar
+            sleep.exe $wait_sec
+        elif command -v python3 >/dev/null 2>&1; then
+            # Use Python for precise sleep
+            python3 -c "import time; time.sleep($wait_sec)"
+        elif command -v python >/dev/null 2>&1; then
+            # Fallback to python if python3 is not available
+            python -c "import time; time.sleep($wait_sec)"
+        else
+            # Fallback to standard sleep with rounded seconds
+            sleep $(echo "$wait_sec" | awk '{printf "%d", $1+0.5}')
+        fi
+    done
+    
+    return 1  # Should not reach here, but return failure if it does
 }
 
 # Function to show progress indicator
@@ -396,6 +463,9 @@ analyze_file() {
     local work_dir="${TEMP_DIR}/work_${symbol}_${interval}_${date}"
     local expected_lines=$(get_expected_lines "${interval}")
     
+    # Update global stats - increment processed files counter
+    TOTAL_FILES_PROCESSED=$((TOTAL_FILES_PROCESSED+1))
+    
     # Create work directory
     fast_remove_dir "${work_dir}"  # Clean up any existing directory
     mkdir -p "${work_dir}"
@@ -404,6 +474,7 @@ analyze_file() {
     # Change to work directory
     pushd "${work_dir}" > /dev/null || {
         echo "0,${date},${interval},DIR_ERROR,DIR_ERROR,0,0,0,,,500,NA,NA,NA,NA,NA,NA,NA" > "${result_file}"
+        TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED+1))
         return 1
     }
     
@@ -413,6 +484,21 @@ analyze_file() {
     
     if ! curl -sI "${url}" > "${headers_file}"; then
         echo "0,${date},${interval},NOT_FOUND,NOT_FOUND,0,0,0,,,404,${header_values}" > "${result_file}"
+        TOTAL_FILES_NOTFOUND=$((TOTAL_FILES_NOTFOUND+1))
+        popd > /dev/null
+        fast_remove_dir "${work_dir}"
+        show_progress "failure"
+        return 0
+    fi
+    
+    # Extract HTTP status code from headers
+    local http_status=$(grep -i "^HTTP" "${headers_file}" | awk '{print $2}')
+    
+    # If file doesn't exist (404), record and exit early
+    if [ "${http_status}" = "404" ]; then
+        echo "DEBUG: File does not exist for ${symbol} ${interval} ${date} (HTTP 404)" >&2
+        echo "0,${date},${interval},FILE_NOT_FOUND,FILE_NOT_FOUND,0,0,0,,,404,${header_values}" > "${result_file}"
+        TOTAL_FILES_NOTFOUND=$((TOTAL_FILES_NOTFOUND+1))
         popd > /dev/null
         fast_remove_dir "${work_dir}"
         show_progress "failure"
@@ -422,19 +508,37 @@ analyze_file() {
     # Extract HTTP headers
     header_values=$(get_http_headers "${url}" "${headers_file}")
     
-    # Download files with aria2
-    if ! download_file "${url}" "${filename}" "${ARIA_CONNECTIONS}" "${DOWNLOAD_TIMEOUT}" "${MAX_RETRIES}" || \
-       ! download_file "${checksum_url}" "${checksum_file}" "${ARIA_CONNECTIONS}" "${DOWNLOAD_TIMEOUT}" "${MAX_RETRIES}"; then
-        echo "0,${date},${interval},DOWNLOAD_FAILED,DOWNLOAD_FAILED,0,0,0,,,500,${header_values}" > "${result_file}"
+    # Download files with aria2 - we already checked existence, so we can ignore 404 return code
+    local dl_result=0
+    download_file "${url}" "${filename}" "${ARIA_CONNECTIONS}" "${DOWNLOAD_TIMEOUT}" "${MAX_RETRIES}"
+    dl_result=$?
+    
+    # Check download_file result code
+    if [ $dl_result -eq 404 ]; then
+        echo "0,${date},${interval},FILE_NOT_FOUND,FILE_NOT_FOUND,0,0,0,,,404,${header_values}" > "${result_file}"
+        TOTAL_FILES_NOTFOUND=$((TOTAL_FILES_NOTFOUND+1))
+        popd > /dev/null
+        fast_remove_dir "${work_dir}"
+        show_progress "failure"
+        return 0
+    elif [ $dl_result -ne 0 ]; then
+        # Some other download error occurred
+        echo "0,${date},${interval},DOWNLOAD_FAILED,DOWNLOAD_FAILED,0,0,0,,,${http_status},${header_values}" > "${result_file}"
+        TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED+1))
         popd > /dev/null
         fast_remove_dir "${work_dir}"
         show_progress "failure"
         return 0
     fi
     
-    # Check if both files exist
-    if [ ! -f "${filename}" ] || [ ! -f "${checksum_file}" ]; then
+    # Download checksum file - no need for special handling as we can continue without it
+    download_file "${checksum_url}" "${checksum_file}" "${ARIA_CONNECTIONS}" "${DOWNLOAD_TIMEOUT}" "1"
+    local checksum_dl_result=$?
+    
+    # Check if main file exists
+    if [ ! -f "${filename}" ]; then
         echo "0,${date},${interval},FILE_MISSING,FILE_MISSING,0,0,0,,,404,${header_values}" > "${result_file}"
+        TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED+1))
         popd > /dev/null
         fast_remove_dir "${work_dir}"
         show_progress "failure"
@@ -454,6 +558,8 @@ analyze_file() {
     local checksum_match=0
     if [ -n "${expected_checksum}" ] && [ "${actual_checksum}" = "${expected_checksum}" ]; then
         checksum_match=1
+    else
+        TOTAL_FILES_CHECKSUMERROR=$((TOTAL_FILES_CHECKSUMERROR+1))
     fi
     
     # Get file size
@@ -466,6 +572,7 @@ analyze_file() {
     local temp_csv="${work_dir}/temp.csv"
     if ! unzip -p "${filename}" > "${temp_csv}" 2>/dev/null; then
         echo "0,${date},${interval},UNZIP_FAILED,${actual_checksum},${file_size},0,0,,,200,${header_values}" > "${result_file}"
+        TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED+1))
         popd > /dev/null
         fast_remove_dir "${work_dir}"
         show_progress "unzip_error"
@@ -486,7 +593,10 @@ analyze_file() {
     fi
     
     # Write results to result file
-    echo "${checksum_match},${date},${interval},${expected_checksum},${actual_checksum},${file_size},${line_count},${unique_timestamps},${first_timestamp},${last_timestamp},200,${header_values}" > "${result_file}"
+    echo "${checksum_match},${date},${interval},${expected_checksum},${actual_checksum},${file_size},${line_count},${unique_timestamps},${first_timestamp},${last_timestamp},${http_status},${header_values}" > "${result_file}"
+    
+    # Update successful download counter
+    TOTAL_FILES_DOWNLOADED=$((TOTAL_FILES_DOWNLOADED+1))
     
     # Clean up
     popd > /dev/null
@@ -526,6 +636,25 @@ get_failed_dates() {
     fi
 }
 
+# Function to log terminated symbols
+log_terminated_symbol() {
+    local market_type=$1
+    local symbol=$2
+    local interval=$3
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    
+    # Create log file if it doesn't exist
+    if [ ! -f "${TERMINATED_SYMBOLS_LOG}" ]; then
+        echo "TIMESTAMP,MARKET,SYMBOL,INTERVAL,STATUS" > "${TERMINATED_SYMBOLS_LOG}"
+        chmod 666 "${TERMINATED_SYMBOLS_LOG}"
+    fi
+    
+    # Log the terminated symbol
+    echo "${timestamp},${market_type},${symbol},${interval},TERMINATED" >> "${TERMINATED_SYMBOLS_LOG}"
+    
+    echo "⚠️ Symbol ${symbol}/${interval} appears to be TERMINATED by Binance. Logged to ${TERMINATED_SYMBOLS_LOG}" >&2
+}
+
 # Function to process dates for a specific interval
 process_interval() {
     local interval=$1
@@ -540,7 +669,17 @@ process_interval() {
     # If auto-detect is enabled for this interval, detect latest date
     if [ "${START_DATE_AUTO}" = true ]; then
         local auto_start=$(auto_detect_latest_date "${MARKET_TYPE}" "${symbol}" "${interval}" "${start_date}" | tail -n 1)
-        if [ -n "${auto_start}" ]; then
+        
+        # Check if symbol is terminated
+        if [ "${auto_start}" = "TERMINATED" ]; then
+            # Log the terminated symbol
+            log_terminated_symbol "${MARKET_TYPE}" "${symbol}" "${interval}"
+            
+            # Skip further processing for this symbol and interval
+            echo "Skipping further processing for ${symbol} - ${interval} (TERMINATED)"
+            echo "----------------------------------------"
+            return 0
+        elif [ -n "${auto_start}" ]; then
             start_date="${auto_start}"
         fi
     fi
@@ -632,6 +771,17 @@ process_interval() {
     if [ "${SAVE_FAILURES}" = true ]; then
         local failure_count=$(wc -l < "${failed_csv}")
         if [ "${failure_count}" -gt 1 ]; then  # More than just the header line
+            # Count specific error types
+            local not_found_count=$(grep -c "FILE_NOT_FOUND" "${failed_csv}" || echo 0)
+            local download_failed_count=$(grep -c "DOWNLOAD_FAILED" "${failed_csv}" || echo 0)
+            local unzip_failed_count=$(grep -c "UNZIP_FAILED" "${failed_csv}" || echo 0)
+            
+            # Display breakdown of failure types
+            echo "FAILURE SUMMARY:"
+            echo "- Files not found (404): ${not_found_count}"
+            echo "- Download failures: ${download_failed_count}"
+            echo "- Unzip failures: ${unzip_failed_count}"
+            
             # Rename failed file with the actual date range of the failed entries
             local failed_earliest=$(tail -n +2 "${failed_csv}" | sort -t',' -k2 | head -n1 | cut -d',' -f2)
             local failed_latest=$(tail -n +2 "${failed_csv}" | sort -t',' -k2 | tail -n1 | cut -d',' -f2)
@@ -656,6 +806,13 @@ process_interval() {
 # Create directories if they don't exist
 mkdir -p "${LOG_DIR}" "${RESULTS_DIR}"
 chmod 777 "${LOG_DIR}" "${RESULTS_DIR}"
+
+# Global counters for tracking success/failure
+TOTAL_FILES_PROCESSED=0
+TOTAL_FILES_DOWNLOADED=0
+TOTAL_FILES_NOTFOUND=0
+TOTAL_FILES_FAILED=0
+TOTAL_FILES_CHECKSUMERROR=0
 
 # Set retry mode flag
 RETRY_MODE=false
@@ -692,14 +849,40 @@ echo "==========================================
 
 "
 
+# Track which symbols/intervals we processed
+PROCESSED_SYMBOLS_INTERVALS=()
+
 # Process each symbol and interval
 for symbol in ${SYMBOLS}; do
     echo "Processing symbol: ${symbol}"
     echo "--------------------"
     
+    # Variables for tracking termination status
+    all_intervals_terminated=true
+    interval_processed=false
+    
     for interval in ${VALIDATED_INTERVALS}; do
+        # Process this interval for the symbol
         process_interval "${interval}" "${START_DATE}" "${END_DATE}" "${symbol}"
+        
+        # Add to our list of processed symbols/intervals
+        PROCESSED_SYMBOLS_INTERVALS+=("${symbol}/${interval}")
+        
+        # Check if the interval was terminated (by looking at the log file)
+        if grep -q "${symbol},${interval},TERMINATED" "${TERMINATED_SYMBOLS_LOG}" 2>/dev/null; then
+            # This interval was terminated
+            interval_processed=true
+        else
+            # At least one interval for this symbol is not terminated
+            all_intervals_terminated=false
+            interval_processed=true
+        fi
     done
+    
+    # If all intervals were terminated, log that entire symbol is terminated
+    if [ "${all_intervals_terminated}" = true ] && [ "${interval_processed}" = true ]; then
+        echo "⚠️ All intervals for symbol ${symbol} appear to be TERMINATED by Binance"
+    fi
     
     echo "Completed processing symbol: ${symbol}"
     echo ""
@@ -711,6 +894,45 @@ fast_remove_dir "${TEMP_DIR}"
 echo ""
 echo "All symbol and interval verification completed."
 echo ""
+
+# Show summary of terminated symbols if any were found
+if [ -f "${TERMINATED_SYMBOLS_LOG}" ] && [ $(wc -l < "${TERMINATED_SYMBOLS_LOG}") -gt 1 ]; then
+    echo "TERMINATED SYMBOLS SUMMARY:"
+    echo "--------------------"
+    echo "The following symbols or intervals appear to be TERMINATED by Binance Exchange:"
+    tail -n +2 "${TERMINATED_SYMBOLS_LOG}" | awk -F',' '{print "- " $3 " (" $2 ", " $4 ")"}'
+    echo ""
+fi
+
+# Generate and display final summary report
+echo "DOWNLOAD SUMMARY:"
+echo "--------------------"
+echo "Total files processed: ${TOTAL_FILES_PROCESSED}"
+echo "Files successfully downloaded: ${TOTAL_FILES_DOWNLOADED}"
+echo "Files not found (404): ${TOTAL_FILES_NOTFOUND}"
+echo "Download failures: ${TOTAL_FILES_FAILED}"
+echo "Checksum errors: ${TOTAL_FILES_CHECKSUMERROR}"
+echo ""
+
+if [ ${TOTAL_FILES_NOTFOUND} -gt 0 ]; then
+    echo "RECOMMENDATION:"
+    echo "--------------------"
+    echo "Some files were not found (404). This is expected for dates before the symbol"
+    echo "started trading or dates with no data. These are not errors in the script."
+    echo ""
+fi
+
+if [ ${TOTAL_FILES_FAILED} -gt 0 ]; then
+    echo "RECOMMENDATION:"
+    echo "--------------------"
+    echo "Some downloads failed due to network or server issues. Consider:"
+    echo "1. Check your network connection"
+    echo "2. Reduce MAX_PARALLEL (currently ${MAX_PARALLEL})"
+    echo "3. Increase DOWNLOAD_TIMEOUT (currently ${DOWNLOAD_TIMEOUT})"
+    echo "4. Run again with a more focused symbol/interval list"
+    echo ""
+fi
+
 echo "REFERENCE INFORMATION:"
 echo "--------------------"
 echo "Market Types and Data Availability:"
