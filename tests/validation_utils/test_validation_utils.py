@@ -151,6 +151,11 @@ class TestDataFrameValidation:
                 "low": np.random.random(len(index)) * 1000 + 29500,
                 "close": np.random.random(len(index)) * 1000 + 30000,
                 "volume": np.random.random(len(index)) * 100,
+                "close_time": [(x.timestamp() * 1000) + 999 for x in index],
+                "quote_asset_volume": np.random.random(len(index)) * 1000000,
+                "number_of_trades": np.random.randint(100, 1000, size=len(index)),
+                "taker_buy_base_asset_volume": np.random.random(len(index)) * 50,
+                "taker_buy_quote_asset_volume": np.random.random(len(index)) * 500000,
             },
             index=pd.DatetimeIndex(index, name="open_time"),
         )
@@ -325,10 +330,10 @@ async def sample_api_data(api_boundary_validator):
             "close",
             "volume",
             "close_time",
-            "quote_volume",
-            "trades",
-            "taker_buy_volume",
-            "taker_buy_quote_volume",
+            "quote_asset_volume",
+            "number_of_trades",
+            "taker_buy_base_asset_volume",
+            "taker_buy_quote_asset_volume",
             "ignored",
         ],
     )
@@ -454,6 +459,14 @@ class TestValidatorClasses:
                 "low": np.random.random(len(larger_index)) * 1000 + 29500,
                 "close": np.random.random(len(larger_index)) * 1000 + 30000,
                 "volume": np.random.random(len(larger_index)) * 100,
+                "close_time": [(x.timestamp() * 1000) + 999 for x in larger_index],
+                "quote_asset_volume": np.random.random(len(larger_index)) * 1000000,
+                "number_of_trades": np.random.randint(
+                    100, 1000, size=len(larger_index)
+                ),
+                "taker_buy_base_asset_volume": np.random.random(len(larger_index)) * 50,
+                "taker_buy_quote_asset_volume": np.random.random(len(larger_index))
+                * 500000,
             },
             index=larger_index,
         )

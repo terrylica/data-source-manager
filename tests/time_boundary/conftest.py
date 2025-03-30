@@ -213,10 +213,10 @@ async def sample_ohlcv_data():
             "low",
             "close",
             "volume",
-            "quote_volume",
-            "trades",
-            "taker_buy_volume",
-            "taker_buy_quote_volume",
+            "quote_asset_volume",
+            "number_of_trades",
+            "taker_buy_base_asset_volume",
+            "taker_buy_quote_asset_volume",
         ]
         for col in numeric_columns:
             df[col] = pd.to_numeric(df[col])
@@ -236,10 +236,10 @@ async def sample_ohlcv_data():
                 "close",
                 "volume",
                 "close_time",
-                "quote_volume",
-                "trades",
-                "taker_buy_volume",
-                "taker_buy_quote_volume",
+                "quote_asset_volume",
+                "number_of_trades",
+                "taker_buy_base_asset_volume",
+                "taker_buy_quote_asset_volume",
             ]
         )
         empty_df.index = pd.DatetimeIndex([], name="open_time")

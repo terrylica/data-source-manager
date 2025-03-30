@@ -36,10 +36,10 @@ ALL_COLUMNS = [
     "low",
     "close",
     "volume",
-    "quote_volume",
-    "trades",
-    "taker_buy_volume",
-    "taker_buy_quote_volume",
+    "quote_asset_volume",
+    "number_of_trades",
+    "taker_buy_base_asset_volume",
+    "taker_buy_quote_asset_volume",
 ]
 
 # Regex Patterns
@@ -486,7 +486,18 @@ def validate_dataframe(df: pd.DataFrame) -> None:
         raise ValueError("DataFrame index must be monotonically increasing")
 
     # Check for required columns
-    required_columns = ["open", "high", "low", "close", "volume"]
+    required_columns = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_asset_volume",
+        "number_of_trades",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
+    ]
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"DataFrame missing required columns: {missing_columns}")
@@ -506,7 +517,19 @@ def format_dataframe(
     """
     if df.empty:
         # Return an empty DataFrame with the correct structure and DatetimeIndex
-        empty_df = pd.DataFrame(columns=OHLCV_COLUMNS)
+        standard_columns = [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "close_time",
+            "quote_asset_volume",
+            "number_of_trades",
+            "taker_buy_base_asset_volume",
+            "taker_buy_quote_asset_volume",
+        ]
+        empty_df = pd.DataFrame(columns=standard_columns)
         empty_df.index = pd.DatetimeIndex(
             [], name=CANONICAL_INDEX_NAME, tz=timezone.utc
         )
@@ -533,7 +556,19 @@ def format_dataframe(
     formatted_df.index.name = CANONICAL_INDEX_NAME
 
     # Ensure all required columns exist
-    for column in OHLCV_COLUMNS:
+    standard_columns = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_asset_volume",
+        "number_of_trades",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
+    ]
+    for column in standard_columns:
         if column not in formatted_df.columns:
             formatted_df[column] = np.nan
 

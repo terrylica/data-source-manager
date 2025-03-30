@@ -467,15 +467,9 @@ async def test_year_boundary_data_consistency(manager: DataSourceManager) -> Non
         enforce_source=DataSource.AUTO,
     )
 
-    # Handle empty DataFrame possibility
+    # Basic structure checks for empty dataframe case
     if df.empty:
-        logger.warning(
-            "Empty DataFrame returned - this may be acceptable with time alignment changes"
-        )
-        # Verify basic structure even for empty DataFrame
-        assert isinstance(df, pd.DataFrame), "Result must be a DataFrame even if empty"
-
-        # Verify essential columns exist
+        logger.warning("Empty DataFrame returned - checking minimal structure")
         essential_columns = [
             "open",
             "high",
@@ -485,8 +479,8 @@ async def test_year_boundary_data_consistency(manager: DataSourceManager) -> Non
             "close_time",
             "quote_asset_volume",
             "number_of_trades",
-            "taker_buy_base_volume",
-            "taker_buy_quote_volume",
+            "taker_buy_base_asset_volume",
+            "taker_buy_quote_asset_volume",
         ]
         for col in essential_columns:
             assert col in df.columns, f"Column {col} missing in empty DataFrame"

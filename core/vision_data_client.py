@@ -131,21 +131,26 @@ class VisionDataClient(Generic[T]):
         exc_tb: Optional[object],
     ) -> None:
         """Async context manager exit."""
-        # Clean up memory map resources
+        # Clean up memory map resources if they exist
         if hasattr(self, "_current_mmap") and self._current_mmap is not None:
             try:
+                logger.debug("Closing memory map resources")
                 self._current_mmap.close()
             except Exception as e:
-                logger.warning(f"Error closing memory map: {e}")
+                logger.warning(f"Error closing memory map: {str(e)}")
             finally:
                 self._current_mmap = None
                 self._current_mmap_path = None
 
-        # Close HTTP client
-        try:
-            await safely_close_client(self._client)
-        except Exception as e:
-            logger.warning(f"Error closing HTTP client: {e}")
+        # Close HTTP client using the standardized safely_close_client function
+        if hasattr(self, "_client") and self._client is not None:
+            try:
+                logger.debug("Closing VisionDataClient HTTP client")
+                await safely_close_client(self._client)
+            except Exception as e:
+                logger.warning(f"Error closing VisionDataClient HTTP client: {str(e)}")
+            finally:
+                self._client = None
 
     def _create_empty_dataframe(self) -> pd.DataFrame:
         """Create an empty DataFrame with correct structure.

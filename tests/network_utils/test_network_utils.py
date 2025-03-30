@@ -118,7 +118,6 @@ class TestDownloadHandler:
             max_retries=2,
             min_wait=1,
             max_wait=2,
-            chunk_size=4096,
         )
 
     @pytest.fixture
@@ -129,7 +128,6 @@ class TestDownloadHandler:
             max_retries=2,
             min_wait=1,
             max_wait=2,
-            chunk_size=4096,
         )
 
     async def test_download_file_success(self, download_handler, temp_dir):
@@ -229,27 +227,24 @@ class TestDownloadHandler:
         mock_response = MagicMock()
         mock_response.status_code = 429
         mock_response.headers = {"Retry-After": "1"}
+        mock_response.text = "Rate limited"
 
         # Create an async mock for the get method
         mock_get = AsyncMock(return_value=mock_response)
 
-        # We need to bypass the retry decorator to test the function directly
-        # Access the original function through __wrapped__
-        original_download_file = curl_cffi_download_handler.download_file.__wrapped__
+        # Patch the get method with our async mock
+        with patch.object(curl_cffi_download_handler.client, "get", mock_get):
+            # Call the download_file method
+            result = await curl_cffi_download_handler.download_file(
+                "https://example.com/test", target_path
+            )
 
-        # Mock asyncio.sleep to avoid waiting
-        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            # Patch the get method with our async mock
-            with patch.object(curl_cffi_download_handler.client, "get", mock_get):
-                with pytest.raises(RateLimitException):
-                    await original_download_file(
-                        curl_cffi_download_handler,
-                        "https://example.com/test",
-                        target_path,
-                    )
-
-                # Verify that sleep was called with the retry value
-                mock_sleep.assert_called_once_with(1)
+            # Verify the download failed
+            assert result is False
+            # Verify the file does not exist
+            assert not target_path.exists()
+            # Verify the error was logged
+            assert "Download failed with status code 429" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -465,62 +460,167 @@ class TestApiRequests:
 @pytest.mark.asyncio
 async def test_read_csv_from_zip_different_timestamp_formats(temp_dir, caplog):
     """Test that read_csv_from_zip can handle real Binance kline data."""
+    import logging
+    import os
+    import time
+
+    # Set log level to DEBUG to capture more details
+    caplog.set_level(logging.DEBUG)
+
     # Use a public URL for a small Binance data archive
     url = "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-01-01.zip"
 
+    logger.info(f"Starting test with URL: {url}")
+    logger.info(f"Temporary directory: {temp_dir}")
+
     # Create a client to download the file
-    async with AsyncSession() as client:
-        # Download the file to our temp directory
-        zip_path = temp_dir / "BTCUSDT-1m-sample.zip"
+    client = None
+    zip_path = temp_dir / "BTCUSDT-1m-sample.zip"
 
+    try:
+        logger.info("Creating AsyncSession client")
+        client = AsyncSession(timeout=30.0)  # Set explicit timeout
+
+        # Test connectivity before attempting download
+        logger.info("Testing connectivity to data.binance.vision")
+        test_response = await client.get("https://data.binance.vision/", timeout=10.0)
+        logger.info(f"Connectivity test status: {test_response.status_code}")
+
+        # Check temporary directory access
+        logger.info(
+            f"Checking temporary directory permissions: {os.access(temp_dir, os.W_OK)}"
+        )
+
+        # Now attempt actual download
+        logger.info(f"Attempting to download from {url}")
+        download_start = time.time()
+        response = await client.get(url, timeout=30.0)  # Longer timeout for download
+        download_time = time.time() - download_start
+        logger.info(f"Download completed in {download_time:.2f} seconds")
+
+        # Log HTTP response details
+        logger.info(f"Response status code: {response.status_code}")
+        logger.info(f"Response headers: {dict(response.headers)}")
+
+        # Check response status
+        if response.status_code != 200:
+            raise Exception(f"HTTP error {response.status_code}: {response.text}")
+
+        # Check response size
+        content = response.content
+        content_size = len(content)
+        logger.info(f"Downloaded content size: {content_size} bytes")
+
+        if content_size == 0:
+            raise Exception("Downloaded file is empty")
+
+        # Write content to file
+        logger.info(f"Writing content to {zip_path}")
+        zip_path.write_bytes(content)
+
+        # Verify the file exists and has content
+        file_size = zip_path.stat().st_size
+        logger.info(f"File size on disk: {file_size} bytes")
+
+        if file_size == 0:
+            raise Exception("File written to disk is empty")
+
+        # Process the real data file
+        logger.info("Calling read_csv_from_zip function")
+        result = await read_csv_from_zip(str(zip_path), log_prefix="TEST")
+
+        # Check DataFrame properties
+        logger.info(f"DataFrame empty: {result.empty}")
+        logger.info(f"DataFrame shape: {result.shape if not result.empty else 'N/A'}")
+
+        if not result.empty:
+            logger.info(f"DataFrame columns: {result.columns.tolist()}")
+            logger.info(f"DataFrame index type: {type(result.index)}")
+            logger.info(f"DataFrame index timezone: {result.index.tz}")
+            logger.info(
+                f"First row: {result.iloc[0].to_dict() if len(result) > 0 else 'N/A'}"
+            )
+
+        # Validate the DataFrame
+        assert isinstance(result, pd.DataFrame), "Result is not a DataFrame"
+        assert not result.empty, "DataFrame is empty"
+        assert len(result) > 0, "DataFrame has no rows"
+
+        # Verify the DataFrame has the expected columns for Binance kline data
+        expected_columns = [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "close_time",
+            "quote_asset_volume",
+            "number_of_trades",
+            "taker_buy_base_asset_volume",
+            "taker_buy_quote_asset_volume",
+        ]
+
+        for column in expected_columns:
+            assert (
+                column in result.columns
+            ), f"Column {column} is missing from DataFrame"
+
+        # Verify timestamps are properly converted to datetime with UTC timezone
+        assert result.index.dtype.kind == "M", "Index is not datetime type"
+        assert result.index.tz is not None, "Index has no timezone information"
+        assert str(result.index.tz) == "UTC", "Index timezone is not UTC"
+
+        # Verify timestamp range makes sense for the file (should be data from Jan 1, 2023)
+        start_date = pd.Timestamp("2023-01-01", tz="UTC")
+        end_date = pd.Timestamp("2023-01-02", tz="UTC")
+        assert (
+            result.index.min() >= start_date
+        ), f"Min timestamp {result.index.min()} is before expected {start_date}"
+        assert (
+            result.index.max() < end_date
+        ), f"Max timestamp {result.index.max()} is after expected {end_date}"
+
+    except Exception as e:
+        import traceback
+
+        logger.error(f"Test failed with exception: {str(e)}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        # Test different aspects to diagnose the issue
         try:
-            # Download the file directly
-            response = await client.get(url)
-            response.raise_for_status()
-            zip_path.write_bytes(response.content)
+            # Test if we can create a file in temp_dir
+            test_file = temp_dir / "test_write.txt"
+            test_file.write_text("test")
+            logger.info(f"Successfully wrote test file: {test_file}")
+            test_file.unlink()
+        except Exception as write_err:
+            logger.error(f"Failed to write test file: {str(write_err)}")
 
-            # Verify the download succeeded
-            assert zip_path.exists()
-            assert zip_path.stat().st_size > 0
+        # Check if we can access Binance via curl directly
+        import subprocess
 
-            # Process the real data file
-            result = await read_csv_from_zip(zip_path, log_prefix="TEST")
+        logger.info("Testing Binance connectivity with curl")
+        try:
+            curl_result = subprocess.run(
+                ["curl", "-I", "https://data.binance.vision/", "--max-time", "5"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            logger.info(
+                f"Curl result: {curl_result.stdout}\nError: {curl_result.stderr}"
+            )
+        except Exception as curl_err:
+            logger.error(f"Curl test failed: {str(curl_err)}")
 
-            # Check that the result is a proper DataFrame with the expected structure
-            assert isinstance(result, pd.DataFrame)
-            assert not result.empty
-            assert len(result) > 0
+        pytest.skip(f"Skipping test due to failure: {str(e)}")
+    finally:
+        # Clean up
+        if client:
+            logger.info("Closing AsyncSession client")
+            await client.close()
 
-            # Verify the DataFrame has the expected columns for Binance kline data
-            expected_columns = [
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "close_time",
-                "quote_volume",
-                "trades",
-                "taker_buy_volume",
-                "taker_buy_quote_volume",
-            ]
-            for column in expected_columns:
-                assert column in result.columns
-
-            # Verify timestamps are properly converted to datetime with UTC timezone
-            assert result.index.dtype.kind == "M"  # datetime type
-            assert result.index.tz is not None
-            assert str(result.index.tz) == "UTC"
-
-            # Verify timestamp range makes sense for the file (should be data from Jan 1, 2023)
-            start_date = pd.Timestamp("2023-01-01", tz="UTC")
-            end_date = pd.Timestamp("2023-01-02", tz="UTC")
-            assert result.index.min() >= start_date
-            assert result.index.max() < end_date
-
-        except Exception as e:
-            pytest.skip(f"Skipping test due to download failure: {str(e)}")
-        finally:
-            # Clean up
-            if zip_path.exists():
-                zip_path.unlink()
+        if zip_path.exists():
+            logger.info(f"Removing temporary zip file: {zip_path}")
+            zip_path.unlink()

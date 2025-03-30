@@ -22,13 +22,14 @@ from utils.time_utils import (
     is_bar_complete,
 )
 from utils.hardware_monitor import HardwareMonitor
-from utils.network_utils import create_client, safely_close_client
+from utils.network_utils import create_client, safely_close_client, test_connectivity
 from utils.config import (
     KLINE_COLUMNS,
     standardize_column_names,
     TIMESTAMP_UNIT,
     CLOSE_TIME_ADJUSTMENT,
     CANONICAL_INDEX_NAME,
+    DEFAULT_COLUMN_ORDER,
 )
 
 logger = get_logger(__name__, "INFO", show_path=False)
@@ -76,12 +77,12 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
         "low",
         "close",
         "volume",
-        "quote_volume",
-        "taker_buy_volume",
-        "taker_buy_quote_volume",
+        "quote_asset_volume",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
     ]
     df[numeric_cols] = df[numeric_cols].astype(np.float64)
-    df["trades"] = df["trades"].astype(np.int32)
+    df["number_of_trades"] = df["number_of_trades"].astype(np.int32)
 
     # Standardize column names using centralized function
     df = standardize_column_names(df)
@@ -209,10 +210,11 @@ class RestDataClient:
         if self._client and not self._client_is_external:
             try:
                 await safely_close_client(self._client)
-                logger.debug("Closed HTTP client")
+                logger.debug("RestDataClient closed HTTP client")
             except Exception as e:
-                logger.warning(f"Error closing HTTP client: {e}")
-            self._client = None
+                logger.warning(f"Error closing RestDataClient HTTP client: {str(e)}")
+            finally:
+                self._client = None
 
     async def _fetch_chunk_with_retry(
         self, endpoint: str, params: Dict[str, Any], retry_count: int = 0
@@ -573,6 +575,17 @@ class RestDataClient:
             self._client = self._create_optimized_client()
             self._client_is_external = False
 
+        # Test connectivity to Binance API before proceeding
+        api_status = await test_connectivity(
+            self._client,
+            url=self._base_url,  # Use our base API URL for the test
+            timeout=10.0,
+        )
+
+        if not api_status:
+            logger.error(f"Cannot connect to Binance API at {self._base_url}")
+            return self.create_empty_dataframe(), {"error": "connectivity_failed"}
+
         # Convert datetime objects to milliseconds since epoch
         self._validate_request_params(symbol, interval, start_time, end_time)
         start_ms = int(start_time.timestamp() * 1000)
@@ -657,16 +670,4 @@ class RestDataClient:
         Returns:
             Empty DataFrame with proper column structure
         """
-        columns = [
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "close_time",
-            "quote_asset_volume",
-            "number_of_trades",
-            "taker_buy_base_volume",
-            "taker_buy_quote_volume",
-        ]
-        return pd.DataFrame(columns=columns)
+        return pd.DataFrame(columns=DEFAULT_COLUMN_ORDER)

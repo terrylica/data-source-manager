@@ -80,10 +80,10 @@ def validate_dataframe_structure(
         "close",
         "volume",
         "close_time",
-        "quote_volume",
-        "trades",
-        "taker_buy_volume",
-        "taker_buy_quote_volume",
+        "quote_asset_volume",
+        "number_of_trades",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
     }
     missing_columns = required_columns - set(df.columns)
     if missing_columns:
@@ -164,7 +164,7 @@ def log_dataframe_info(
         f"║   • 💰 Price Range: ${df['low'].min():,.2f} → ${df['high'].max():,.2f}"
     )
     logger.info(f"║   • 📈 Average Volume: {df['volume'].mean():,.2f}")
-    logger.info(f"║   • 🔄 Total Trades: {df['trades'].sum():,}")
+    logger.info(f"║   • 🔄 Total Trades: {df['number_of_trades'].sum():,}")
 
     # Data Types
     logger.info("║")

@@ -127,7 +127,7 @@ def validate_rest_data_structure(df: pd.DataFrame) -> None:
         )
         return
 
-    # Column presence and types - support both raw API and REST API data client formats
+    # Column presence and types - support different API response formats for backward compatibility
     required_columns_raw = [
         "open_time",
         "open",
@@ -136,12 +136,13 @@ def validate_rest_data_structure(df: pd.DataFrame) -> None:
         "close",
         "volume",
         "close_time",
-        "quote_volume",
-        "trades",
-        "taker_buy_base_volume",
-        "taker_buy_quote_volume",
+        "quote_asset_volume",
+        "number_of_trades",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
     ]
 
+    # Legacy column names for backward compatibility
     required_columns_client = [
         "open_time",
         "open",
@@ -156,7 +157,7 @@ def validate_rest_data_structure(df: pd.DataFrame) -> None:
         "taker_buy_quote",
     ]
 
-    # Add support for the actual format returned by RestDataClient
+    # Legacy format returned by older versions of RestDataClient
     required_columns_enhanced = [
         "open",
         "high",
@@ -170,7 +171,22 @@ def validate_rest_data_structure(df: pd.DataFrame) -> None:
         "taker_buy_quote_volume",
     ]
 
-    # Add support for the format returned by fetch_klines
+    # Legacy format with ignore column but no open_time
+    required_columns_enhanced_with_ignore = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_asset_volume",
+        "number_of_trades",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
+        "ignore",
+    ]
+
+    # Legacy format returned by older versions of fetch_klines
     required_columns_fetch = [
         "open",
         "high",
@@ -189,15 +205,23 @@ def validate_rest_data_structure(df: pd.DataFrame) -> None:
     has_client_format = all(col in df.columns for col in required_columns_client)
     has_enhanced_format = all(col in df.columns for col in required_columns_enhanced)
     has_fetch_format = all(col in df.columns for col in required_columns_fetch)
+    has_enhanced_with_ignore = all(
+        col in df.columns for col in required_columns_enhanced_with_ignore
+    )
 
     assert (
-        has_raw_format or has_client_format or has_enhanced_format or has_fetch_format
+        has_raw_format
+        or has_client_format
+        or has_enhanced_format
+        or has_fetch_format
+        or has_enhanced_with_ignore
     ), (
         f"DataFrame columns don't match any supported format.\n"
         f"Found: {df.columns.tolist()}\n"
         f"Expected raw API format: {required_columns_raw}\n"
         f"Expected client format: {required_columns_client}\n"
         f"Expected enhanced format: {required_columns_enhanced}\n"
+        f"Expected enhanced with ignore: {required_columns_enhanced_with_ignore}\n"
         f"Expected fetch format: {required_columns_fetch}"
     )
 
@@ -463,10 +487,10 @@ async def test_rest_data_integrity(api_session, reference_time: datetime, caplog
         "close",
         "volume",
         "close_time",
-        "quote_volume",
-        "trades",
-        "taker_buy_base_volume",
-        "taker_buy_quote_volume",
+        "quote_asset_volume",
+        "number_of_trades",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
         "ignore",
     ]
     df = pd.DataFrame(data, columns=columns)
@@ -476,10 +500,12 @@ async def test_rest_data_integrity(api_session, reference_time: datetime, caplog
     df["close_time"] = pd.to_datetime(df["close_time"], unit="ms", utc=True)
 
     # Convert numeric columns
-    for col in ["open", "high", "low", "close", "volume", "quote_volume"]:
+    for col in ["open", "high", "low", "close", "volume", "quote_asset_volume"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    df["trades"] = pd.to_numeric(df["trades"], errors="coerce").astype("int64")
+    df["number_of_trades"] = pd.to_numeric(
+        df["number_of_trades"], errors="coerce"
+    ).astype("int64")
 
     # Validate data
     validate_rest_data_structure(df)
@@ -521,10 +547,10 @@ async def test_rest_data_consistency(api_session, reference_time: datetime, capl
         "close",
         "volume",
         "close_time",
-        "quote_volume",
-        "trades",
-        "taker_buy_base_volume",
-        "taker_buy_quote_volume",
+        "quote_asset_volume",
+        "number_of_trades",
+        "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume",
         "ignore",
     ]
     df1 = pd.DataFrame(data1, columns=columns)
@@ -536,10 +562,12 @@ async def test_rest_data_consistency(api_session, reference_time: datetime, capl
         df["close_time"] = pd.to_datetime(df["close_time"], unit="ms", utc=True)
 
         # Convert numeric columns
-        for col in ["open", "high", "low", "close", "volume", "quote_volume"]:
+        for col in ["open", "high", "low", "close", "volume", "quote_asset_volume"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-        df["trades"] = pd.to_numeric(df["trades"], errors="coerce").astype("int64")
+        df["number_of_trades"] = pd.to_numeric(
+            df["number_of_trades"], errors="coerce"
+        ).astype("int64")
 
     # Verify consistency
     assert len(df1) == len(df2), "Data length should be consistent between fetches"

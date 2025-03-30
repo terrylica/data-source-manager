@@ -19,10 +19,10 @@ ALL_COLUMNS = [
     "low",
     "close",
     "volume",
-    "quote_volume",
-    "trades",
-    "taker_buy_volume",
-    "taker_buy_quote_volume",
+    "quote_asset_volume",
+    "number_of_trades",
+    "taker_buy_base_asset_volume",
+    "taker_buy_quote_asset_volume",
 ]
 
 # Regex Patterns
@@ -46,7 +46,6 @@ from utils.config import (
 
 class ValidationError(Exception):
     """Custom exception for validation errors."""
-
 
 
 class DataValidation:

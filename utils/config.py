@@ -41,19 +41,20 @@ API_RETRY_DELAY: Final = 1  # Seconds
 CANONICAL_CLOSE_TIME: Final[str] = "close_time"
 
 # Exhaustive list of all column names used in kline data
+# These follow the official Binance API documentation
 KLINE_COLUMNS: Final[List[str]] = [
-    "open_time",
-    "open",
-    "high",
-    "low",
-    "close",
-    "volume",
-    "close_time",
-    "quote_volume",
-    "trades",
-    "taker_buy_volume",  # Also called taker_buy_base in some sources
-    "taker_buy_quote_volume",  # Also called taker_buy_quote in some sources
-    "ignore",  # Present in raw API data but ignored in processing
+    "open_time",  # Kline open time
+    "open",  # Open price
+    "high",  # High price
+    "low",  # Low price
+    "close",  # Close price
+    "volume",  # Volume
+    "close_time",  # Kline Close time
+    "quote_asset_volume",  # Quote asset volume
+    "number_of_trades",  # Number of trades
+    "taker_buy_base_asset_volume",  # Taker buy base asset volume
+    "taker_buy_quote_asset_volume",  # Taker buy quote asset volume
+    "ignore",  # Unused field, ignore
 ]
 
 # Standard column dtypes for all market data DataFrames
@@ -64,18 +65,26 @@ OUTPUT_DTYPES: Final[Dict[str, str]] = {
     "close": "float64",
     "volume": "float64",
     "close_time": "int64",
-    "quote_volume": "float64",
-    "trades": "int64",
-    "taker_buy_volume": "float64",
-    "taker_buy_quote_volume": "float64",
+    "quote_asset_volume": "float64",
+    "number_of_trades": "int64",
+    "taker_buy_base_asset_volume": "float64",
+    "taker_buy_quote_asset_volume": "float64",
 }
 
 # Mapping between various column name variants used in different APIs
+# This comprehensive mapping ensures backward compatibility
 COLUMN_NAME_MAPPING: Final[Dict[str, str]] = {
-    "taker_buy_base": "taker_buy_volume",
-    "taker_buy_base_asset_volume": "taker_buy_volume",
-    "taker_buy_quote": "taker_buy_quote_volume",
-    "taker_buy_quote_asset_volume": "taker_buy_quote_volume",
+    # Quote volume variants
+    "quote_volume": "quote_asset_volume",
+    # Trade count variants
+    "trades": "number_of_trades",
+    # Taker buy base volume variants
+    "taker_buy_base": "taker_buy_base_asset_volume",
+    "taker_buy_volume": "taker_buy_base_asset_volume",
+    "taker_buy_base_volume": "taker_buy_base_asset_volume",
+    # Taker buy quote volume variants
+    "taker_buy_quote": "taker_buy_quote_asset_volume",
+    "taker_buy_quote_volume": "taker_buy_quote_asset_volume",
 }
 
 # Default column order for standardized output
@@ -86,10 +95,10 @@ DEFAULT_COLUMN_ORDER: Final[List[str]] = [
     "close",
     "volume",
     "close_time",
-    "quote_volume",
-    "trades",
-    "taker_buy_volume",
-    "taker_buy_quote_volume",
+    "quote_asset_volume",
+    "number_of_trades",
+    "taker_buy_base_asset_volume",
+    "taker_buy_quote_asset_volume",
 ]
 
 # Timestamp configuration

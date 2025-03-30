@@ -137,15 +137,12 @@ class DownloadException(Exception):
     """Base class for download-related exceptions."""
 
 
-
 class DownloadStalledException(DownloadException):
     """Raised when download progress stalls."""
 
 
-
 class RateLimitException(DownloadException):
     """Raised when rate limited by the server."""
-
 
 
 class DownloadProgressTracker:
@@ -218,30 +215,41 @@ class DownloadProgressTracker:
 
 
 class DownloadHandler:
-    """Handles file downloads with retry logic and progress monitoring."""
+    """Handles HTTP downloads with retry logic and progress tracking."""
 
     def __init__(
         self,
-        client: AsyncSession,
-        max_retries: int = 5,
-        min_wait: int = 4,
+        client: Optional[AsyncSession] = None,
+        max_retries: int = 3,
+        min_wait: int = 1,
         max_wait: int = 60,
-        chunk_size: int = 8192,
     ):
         """Initialize download handler.
 
         Args:
-            client: Async HTTP client to use (curl_cffi AsyncSession recommended)
+            client: HTTP client (curl_cffi AsyncSession recommended)
             max_retries: Maximum number of retry attempts
-            min_wait: Minimum wait time between retries (seconds)
-            max_wait: Maximum wait time between retries (seconds)
-            chunk_size: Size of download chunks in bytes
+            min_wait: Minimum wait time between retries in seconds
+            max_wait: Maximum wait time between retries in seconds
         """
         self.client = client
         self.max_retries = max_retries
         self.min_wait = min_wait
         self.max_wait = max_wait
-        self.chunk_size = chunk_size
+        self._client_is_external = client is not None
+
+    async def __aenter__(self):
+        """Enter async context manager."""
+        if not self.client:
+            self.client = create_client(timeout=30.0)
+            self._client_is_external = False
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit async context manager."""
+        if self.client and not self._client_is_external:
+            await safely_close_client(self.client)
+            self.client = None
 
     @retry(
         stop=stop_after_attempt(5),
@@ -260,74 +268,74 @@ class DownloadHandler:
         self,
         url: str,
         local_path: Path,
-        headers: Optional[Dict[str, Any]] = None,
-        progress_tracker_kwargs: Optional[Dict[str, Any]] = None,
+        timeout: float = 60.0,
+        verify_ssl: bool = True,
+        expected_size: Optional[int] = None,
+        stall_timeout: int = 30,
     ) -> bool:
-        """Download a file with progress tracking and stall detection.
-
-        This method will automatically retry on failures with exponential backoff.
+        """Download a file with retry logic, progress tracking and validation.
 
         Args:
-            url: URL of the file to download
-            local_path: Local path to save the file to
-            headers: Optional HTTP headers to include in the request
-            progress_tracker_kwargs: Optional arguments for DownloadProgressTracker
+            url: URL to download
+            local_path: Local path to save the file
+            timeout: Download timeout in seconds
+            verify_ssl: Whether to verify SSL certificates
+            expected_size: Expected file size for validation
+            stall_timeout: Time in seconds before considering download stalled
 
         Returns:
-            True if download succeeded, False otherwise
-
-        Raises:
-            DownloadStalledException: If download progress stalls
-            RateLimitException: If rate limited by server
-            asyncio.TimeoutError: If request times out
-            ConnectionError: If network error occurs
+            True on success, False on failure
         """
-        progress_tracker_kwargs = progress_tracker_kwargs or {}
+        # Ensure local directory exists
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create a temporary client if not provided
+        client_created = False
+        if not self.client:
+            self.client = create_client(timeout=timeout)
+            client_created = True
 
         try:
-            response = await self.client.get(url, headers=headers)
+            # Create progress tracker
+            tracker = DownloadProgressTracker(total_size=expected_size)
 
-            # Check for rate limiting
-            if response.status_code in (418, 429):
-                retry_after = int(response.headers.get("Retry-After", 60))
-                logger.warning(f"Rate limit hit. Retry after {retry_after}s")
-                await asyncio.sleep(retry_after)
-                raise RateLimitException()
+            logger.debug(f"Starting download from {url} to {local_path}")
 
+            # Perform download with the client
+            response = await self.client.get(url, timeout=timeout)
+
+            # Check status code
             if response.status_code != 200:
-                logger.error(f"Download failed with status {response.status_code}")
+                logger.error(
+                    f"Download failed with status code {response.status_code}: {response.text}"
+                )
                 return False
 
-            # Create the directory if it doesn't exist
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Get content length from headers if available
-            total_size = int(response.headers.get("content-length", 0))
-
-            # Initialize progress tracker
-            progress = DownloadProgressTracker(total_size, **progress_tracker_kwargs)
-
-            # For direct download with curl_cffi, we get the content at once
+            # Get content and write to file
             content = response.content
-            progress.update(url, len(content))
+            local_path.write_bytes(content)
 
-            with open(local_path, "wb") as f:
-                f.write(content)
+            # Verify file size if expected_size is provided
+            if expected_size is not None and local_path.stat().st_size != expected_size:
+                logger.error(
+                    f"File size mismatch: expected {expected_size}, got {local_path.stat().st_size}"
+                )
+                return False
 
+            logger.debug(
+                f"Download successful: {url} -> {local_path} ({len(content)} bytes)"
+            )
             return True
 
-        except (
-            DownloadStalledException,
-            RateLimitException,
-            asyncio.TimeoutError,
-            ConnectionError,
-        ) as e:
-            # Let these exceptions propagate for retry
-            raise
         except Exception as e:
-            logger.error(f"Download error: {str(e)}")
-            logger.debug(traceback.format_exc())
+            logger.error(f"Error downloading {url}: {str(e)}")
             return False
+
+        finally:
+            # Clean up client if we created it
+            if client_created and self.client:
+                await safely_close_client(self.client)
+                self.client = None
 
 
 # ----- Batch Download Handling -----
@@ -805,10 +813,10 @@ async def read_csv_from_zip(zip_file_path: str, log_prefix: str = "") -> pd.Data
                     "close",
                     "volume",
                     "close_time",
-                    "quote_volume",
-                    "trades",
-                    "taker_buy_volume",
-                    "taker_buy_quote_volume",
+                    "quote_asset_volume",
+                    "number_of_trades",
+                    "taker_buy_base_asset_volume",
+                    "taker_buy_quote_asset_volume",
                     "ignore",
                 ]
 
@@ -838,10 +846,10 @@ async def read_csv_from_zip(zip_file_path: str, log_prefix: str = "") -> pd.Data
                         "close",
                         "volume",
                         "close_time",
-                        "quote_volume",
-                        "trades",
-                        "taker_buy_volume",
-                        "taker_buy_quote_volume",
+                        "quote_asset_volume",
+                        "number_of_trades",
+                        "taker_buy_base_asset_volume",
+                        "taker_buy_quote_asset_volume",
                     ]
 
                     for col in numeric_columns:
@@ -1052,10 +1060,74 @@ async def safely_close_client(client: AsyncSession) -> None:
     Args:
         client: curl_cffi AsyncSession to close
     """
-    if client is not None:
+    if client is None:
+        return
+
+    try:
+        # First verify the client has a close method
+        if not hasattr(client, "close"):
+            logger.warning("Client doesn't have a close method, skipping cleanup")
+            return
+
+        # Close the client (this releases connection resources)
+        await client.close()
+
+        # Small delay to allow AsyncCurl._force_timeout tasks to complete
+        await asyncio.sleep(0.1)
+
+        logger.debug("Successfully closed AsyncSession client")
+    except asyncio.CancelledError:
+        # Handle explicit task cancellation
+        logger.warning("Client close operation was cancelled")
+    except Exception as e:
+        logger.warning(f"Error closing AsyncSession: {str(e)}")
+        logger.debug(f"Close error details: {traceback.format_exc()}")
+
+
+# ----- Network Validation Utilities -----
+
+
+async def test_connectivity(
+    client: AsyncSession,
+    url: str = "https://data.binance.vision/",
+    timeout: float = 10.0,
+    retry_count: int = 2,
+) -> bool:
+    """Test connectivity to a specific URL.
+
+    This function can be used to verify network connectivity before
+    making API requests, helping to diagnose network issues early.
+
+    Args:
+        client: HTTP client to use for the test
+        url: URL to test connectivity to
+        timeout: Request timeout in seconds
+        retry_count: Number of retry attempts
+
+    Returns:
+        True if connection succeeds, False otherwise
+    """
+    for attempt in range(retry_count + 1):
         try:
-            await client.close()
-            # Small delay to allow AsyncCurl._force_timeout tasks to complete
-            await asyncio.sleep(0.1)
+            logger.debug(
+                f"Testing connectivity to {url} (attempt {attempt+1}/{retry_count+1})"
+            )
+            response = await client.get(url, timeout=timeout)
+
+            if response.status_code < 400:
+                logger.debug(f"Connectivity test successful: {response.status_code}")
+                return True
+
+            logger.warning(
+                f"Connectivity test failed with status code: {response.status_code}"
+            )
+
+            if attempt < retry_count:
+                await asyncio.sleep(2**attempt)  # Exponential backoff
         except Exception as e:
-            logger.warning(f"Error closing AsyncSession: {e}")
+            logger.warning(f"Connectivity test failed with error: {str(e)}")
+
+            if attempt < retry_count:
+                await asyncio.sleep(2**attempt)  # Exponential backoff
+
+    return False

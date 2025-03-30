@@ -187,7 +187,7 @@ async def test_data_consistency():
         assert df["open"].dtype == float, "open column is not float"
         assert df["close"].dtype == float, "close column is not float"
         assert df["volume"].dtype == float, "volume column is not float"
-        assert df["trades"].dtype == int, "trades column is not int"
+        assert df["number_of_trades"].dtype == int, "number_of_trades column is not int"
 
         # Verify data completeness (exclusive end time)
         expected_rows = int((end_time - start_time).total_seconds())
@@ -303,7 +303,9 @@ async def test_timestamp_format_evolution():
             assert df["open"].dtype == float, f"{period} open column is not float"
             assert df["close"].dtype == float, f"{period} close column is not float"
             assert df["volume"].dtype == float, f"{period} volume column is not float"
-            assert df["trades"].dtype == int, f"{period} trades column is not int"
+            assert (
+                df["number_of_trades"].dtype == int
+            ), f"{period} number_of_trades column is not int"
 
         # --- Enhanced Banner Start ---
         logger.info(
@@ -361,4 +363,6 @@ async def test_timestamp_format_evolution():
             assert df["open"].dtype == float, f"{period} open column is not float"
             assert df["close"].dtype == float, f"{period} close column is not float"
             assert df["volume"].dtype == float, f"{period} volume column is not float"
-            assert df["trades"].dtype == int, f"{period} trades column is not int"
+            assert (
+                df["number_of_trades"].dtype == int
+            ), f"{period} number_of_trades column is not int"
