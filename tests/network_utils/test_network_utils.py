@@ -18,6 +18,7 @@ from utils.network_utils import (
     download_files_concurrently,
     make_api_request,
     read_csv_from_zip,
+    safely_close_client,
 )
 from utils.logger_setup import get_logger
 
@@ -108,7 +109,7 @@ class TestDownloadHandler:
         """Create a curl_cffi client for testing."""
         client = AsyncSession()
         yield client
-        await client.close()
+        await safely_close_client(client)
 
     @pytest.fixture
     def download_handler(self, curl_cffi_client):
@@ -256,7 +257,7 @@ class TestConcurrentDownloads:
         """Create a curl_cffi client for testing."""
         client = AsyncSession()
         yield client
-        await client.close()
+        await safely_close_client(client)
 
     async def test_download_files_concurrently(self, curl_cffi_client, temp_dir):
         """Test downloading multiple files concurrently with curl_cffi."""
@@ -324,7 +325,7 @@ class TestApiRequests:
         """Create a real curl_cffi client for testing."""
         client = AsyncSession()
         yield client
-        await client.close()
+        await safely_close_client(client)
 
     async def test_make_api_request_curl_cffi_success(
         self, curl_cffi_client, monkeypatch

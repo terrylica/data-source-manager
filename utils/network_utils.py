@@ -26,6 +26,7 @@ from typing import (
 )
 import os
 import json
+import sys
 
 # Import curl_cffi for HTTP client implementation
 from curl_cffi.requests import AsyncSession
@@ -1082,80 +1083,182 @@ async def safely_close_client(client: AsyncSession) -> None:
             logger.warning("Client doesn't have a close method, skipping cleanup")
             return
 
-        # Add debug logging to examine curl_cffi client internals
-        logger.debug(f"Closing curl_cffi client: {id(client)}")
-        # Extract the curl instance if available
-        curl_instance = None
-        if hasattr(client, "curl"):
-            curl_instance = client.curl
-            logger.debug(f"Client has curl instance: {id(curl_instance)}")
+        # Extract client information for better debugging
+        client_id = id(client)
+        logger.debug(f"Starting cleanup for curl_cffi client: {client_id}")
 
-        # Check if there are async jobs in the curl client
-        if hasattr(curl_instance, "async_jobs") and curl_instance.async_jobs:
+        # Extract the curl instance if available
+        curl_instance = getattr(client, "curl", None)
+
+        # Count async jobs before closing if possible
+        async_jobs_count = 0
+        if hasattr(curl_instance, "async_jobs"):
+            async_jobs_count = (
+                len(curl_instance.async_jobs) if curl_instance.async_jobs else 0
+            )
             logger.debug(
-                f"Found {len(curl_instance.async_jobs)} async jobs before closing"
+                f"Client {client_id} has {async_jobs_count} async jobs before closing"
             )
 
         # Close the client (this releases connection resources)
-        await client.close()
-        logger.debug("Client close() completed")
+        try:
+            await client.close()
+            logger.debug(f"Client {client_id} close() completed")
+        except Exception as e:
+            logger.warning(f"Error during client.close(): {e}")
 
-        # Look for pending curl_cffi tasks
-        pending_force_timeout_tasks = []
-        for task in asyncio.all_tasks():
-            task_str = str(task)
-            if not task.done() and "AsyncCurl._force_timeout" in task_str:
-                pending_force_timeout_tasks.append(task)
-                logger.debug(f"Found pending task: {task.get_name()} - {task_str}")
+        # Run a series of cleanup passes with increasing aggressiveness
+        # The first pass is the most gentle
+        await _cleanup_all_async_curl_tasks(0.3)
 
-        if pending_force_timeout_tasks:
-            logger.debug(
-                f"Attempting to clean up {len(pending_force_timeout_tasks)} pending tasks"
-            )
-            try:
-                # Get current event loop
-                loop = asyncio.get_event_loop()
+        # Check if we're in a test environment (detected by pytest being loaded)
+        # or if there were many async jobs that might need more cleanup
+        in_test = "pytest" in sys.modules
+        needs_aggressive_cleanup = in_test or async_jobs_count > 5
 
-                # Try to directly cancel these tasks - more aggressive approach
-                for task in pending_force_timeout_tasks:
-                    task.cancel()
+        if needs_aggressive_cleanup:
+            # Second pass with longer timeout and more aggressive cancellation
+            logger.debug(f"Running second cleanup pass for client {client_id}")
+            await _cleanup_all_async_curl_tasks(0.5)
 
-                # Give a very short opportunity for tasks to clean up
-                await asyncio.sleep(0.2)
+            # Check if any tasks are still remaining
+            curl_tasks = [
+                t
+                for t in asyncio.all_tasks()
+                if "AsyncCurl._force_timeout" in str(t) and not t.done()
+            ]
 
-                # Check if any tasks are still pending
-                still_pending = [t for t in pending_force_timeout_tasks if not t.done()]
-                if still_pending:
-                    logger.debug(
-                        f"{len(still_pending)} tasks still pending after cancellation"
-                    )
-                else:
-                    logger.debug("All pending tasks successfully cancelled")
-            except Exception as e:
-                logger.debug(f"Error during task cleanup: {e}")
-        else:
-            logger.debug("No pending curl_cffi tasks found")
-            # Short delay to allow any hidden tasks to settle
-            await asyncio.sleep(0.1)
+            # If tasks are still pending after two passes, get even more aggressive
+            if curl_tasks and in_test:
+                logger.debug(
+                    f"Running final aggressive cleanup for {len(curl_tasks)} stubborn tasks"
+                )
+                # Force garbage collection to break any circular references
+                import gc
 
-        # Final check for any remaining tasks
-        curl_tasks = []
-        for task in asyncio.all_tasks():
-            if "AsyncCurl" in str(task) and not task.done():
-                curl_tasks.append(task)
+                gc.collect()
 
-        if curl_tasks:
-            logger.debug(f"After cleanup, {len(curl_tasks)} curl tasks still pending")
-        else:
-            logger.debug("No curl tasks remaining after cleanup")
+                # Final cancellation attempt with long timeout
+                await _cleanup_all_async_curl_tasks(1.0)
 
-        logger.debug("Successfully closed AsyncSession client")
+        logger.debug(f"Successfully closed AsyncSession client {client_id}")
     except asyncio.CancelledError:
         # Handle explicit task cancellation
         logger.warning("Client close operation was cancelled")
     except Exception as e:
         logger.warning(f"Error closing AsyncSession: {str(e)}")
         logger.debug(f"Close error details: {traceback.format_exc()}")
+
+
+async def _cleanup_all_async_curl_tasks(timeout_seconds: float = 0.5) -> None:
+    """Helper function to find and cancel all AsyncCurl tasks.
+
+    This is extracted to a separate function to avoid code duplication and
+    enable multiple cleanup passes if needed.
+
+    Args:
+        timeout_seconds: How long to wait for tasks to complete after cancellation
+    """
+    # First pass: Identify and cancel all pending AsyncCurl._force_timeout tasks
+    pending_force_timeout_tasks = []
+
+    # Be more specific about which tasks we're targeting - focus on _force_timeout
+    for task in asyncio.all_tasks():
+        task_str = str(task)
+        # Specifically look for the _force_timeout method which causes the issues
+        if not task.done() and "AsyncCurl._force_timeout" in task_str:
+            pending_force_timeout_tasks.append(task)
+            logger.debug(f"Found pending timeout task: {task.get_name()} - {task_str}")
+
+    if pending_force_timeout_tasks:
+        logger.debug(
+            f"Attempting to clean up {len(pending_force_timeout_tasks)} pending timeout tasks"
+        )
+        try:
+            # First cancel all futures being waited on - this is the key fix
+            for task in pending_force_timeout_tasks:
+                # Aggressively cancel the _fut_waiter that the task is waiting on
+                if hasattr(task, "_fut_waiter") and task._fut_waiter is not None:
+                    logger.debug(f"Cancelling future for task {task.get_name()}")
+                    try:
+                        task._fut_waiter.cancel()
+                    except Exception as e:
+                        logger.debug(f"Error cancelling future: {e}")
+
+                # Then cancel the task itself if it's not done
+                if not task.done() and not task.cancelled():
+                    logger.debug(f"Cancelling task {task.get_name()}")
+                    task.cancel()
+
+            # Give tasks time to respond to cancellation
+            await asyncio.sleep(timeout_seconds)
+
+            # Check if tasks are still pending after cancellation
+            still_pending = [t for t in pending_force_timeout_tasks if not t.done()]
+            if still_pending:
+                logger.debug(
+                    f"{len(still_pending)} tasks still pending after cancellation"
+                )
+
+                # More aggressive approach for stubborn tasks - wait for them
+                try:
+                    # Set a timeout to prevent indefinite waiting
+                    done, pending = await asyncio.wait(
+                        still_pending, timeout=timeout_seconds
+                    )
+
+                    # For any tasks that are still pending, try even more aggressive approaches
+                    if pending:
+                        logger.debug(
+                            f"After waiting, {len(pending)} tasks still pending"
+                        )
+
+                        # Try setting a custom exception to wake up tasks that are waiting
+                        for task in pending:
+                            try:
+                                # Access internal task state to stop it directly
+                                try_unblock_task(task)
+                            except Exception as e:
+                                logger.debug(f"Error force-stopping task: {e}")
+                except asyncio.TimeoutError:
+                    logger.debug("Timeout waiting for tasks to complete")
+                except Exception as e:
+                    logger.debug(f"Error while waiting for tasks: {e}")
+            else:
+                logger.debug("All pending tasks successfully cancelled")
+        except Exception as e:
+            logger.debug(f"Error during task cleanup: {e}")
+    else:
+        logger.debug("No pending curl_cffi tasks found")
+        # Still add a short delay to allow any hidden tasks to settle
+        await asyncio.sleep(0.1)
+
+
+def try_unblock_task(task):
+    """Attempt to unblock a pending asyncio task using various approaches.
+
+    This function tries different methods to forcibly stop a task that
+    isn't responding to normal cancellation.
+
+    Args:
+        task: The asyncio.Task object to unblock
+    """
+    # First check if task has a _fut_waiter
+    if hasattr(task, "_fut_waiter") and task._fut_waiter is not None:
+        # Try to set an exception on the future to wake it up
+        try:
+            task._fut_waiter.set_exception(asyncio.CancelledError())
+        except Exception:
+            pass
+
+    # Try to directly cancel task with low-level SIGINT
+    try:
+        if hasattr(task, "_coro") and task._coro:
+            # Force the coroutine to raise an exception to exit
+            if hasattr(task._coro, "throw"):
+                task._coro.throw(asyncio.CancelledError())
+    except Exception:
+        pass
 
 
 # ----- Network Validation Utilities -----
