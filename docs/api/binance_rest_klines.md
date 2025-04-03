@@ -2,17 +2,219 @@
 
 This document provides detailed information about Binance's REST API endpoints for retrieving market data, based on extensive empirical testing and analysis of response structures.
 
-## 1. Available Endpoints Overview
+## 1. API Fundamentals
+
+### 1.1 Available Endpoints Overview
 
 Binance offers several REST API endpoints for different market types:
 
-| Market Type      | Base Endpoint                   | Description                                     |
+| Market Type      | Base URL                        | Description                                     |
 | ---------------- | ------------------------------- | ----------------------------------------------- |
 | Spot             | <https://api.binance.com>       | Primary endpoint for spot trading               |
 | Futures (USDT-M) | <https://fapi.binance.com>      | Perpetual futures contracts settled in USDT     |
 | Futures (COIN-M) | <https://dapi.binance.com>      | Perpetual futures contracts settled in the coin |
 | Options          | <https://eapi.binance.com>      | Options trading (limited functionality)         |
 | Margin           | <https://api.binance.com/sapi/> | Margin trading with different paths             |
+
+### 1.2 API URL Structure
+
+The Binance REST API uses different URL patterns for different market types. Following these patterns is critical for ensuring proper connectivity to the Binance API.
+
+#### 1.2.1 URL Patterns By Market Type
+
+| Market Type      | Base URL                   | Path Pattern    | Example                                                                         |
+| ---------------- | -------------------------- | --------------- | ------------------------------------------------------------------------------- |
+| Spot             | <https://api.binance.com>  | /api/v3/klines  | <https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m>              |
+| Futures (USDT-M) | <https://fapi.binance.com> | /fapi/v1/klines | <https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1m>            |
+| Futures (COIN-M) | <https://dapi.binance.com> | /dapi/v1/klines | <https://dapi.binance.com/dapi/v1/klines?symbol=BTCUSD_PERP&interval=1m>        |
+| Options          | <https://eapi.binance.com> | /eapi/v1/klines | <https://eapi.binance.com/eapi/v1/klines?symbol=BTC-230531-60000-C&interval=1h> |
+
+#### 1.2.2 Key Observations
+
+- **Spot Market**: Includes `/api/` in the path
+- **Futures (USDT-M)**: Uses `/fapi/` in the path (not `/api/`)
+- **Futures (COIN-M)**: Uses `/dapi/` in the path (not `/api/`)
+- **Options**: Uses `/eapi/` in the path (not `/api/`)
+
+#### 1.2.3 Common Pitfalls
+
+A common error is to assume all market types follow the same URL pattern as the Spot market (using `/api/` in the path). This can lead to connectivity failures when trying to access Futures or Options markets.
+
+### 1.3 Rate Limiting and Weight System
+
+Binance uses a weight-based rate limiting system. Each endpoint has an assigned weight, and users have a limit on the total weight they can use per minute.
+
+#### 1.3.1 Rate Limit Headers
+
+Headers returned in responses:
+
+- `x-mbx-used-weight`: Current used weight
+- `x-mbx-used-weight-1m`: Weight used in the last minute
+
+#### 1.3.2 Default Weight Limits
+
+Based on the exchange information response:
+
+```json
+[
+  {
+    "rateLimitType": "REQUEST_WEIGHT",
+    "interval": "MINUTE",
+    "intervalNum": 1,
+    "limit": 6000
+  }
+]
+```
+
+- IP addresses have a default limit of 6000 weight per minute
+- Weight costs vary by endpoint and parameters
+- When reaching the limit, a 429 error is returned with a Retry-After header
+
+#### 1.3.3 Empirical Weight Findings
+
+Based on our empirical testing, the weight costs of different endpoints are:
+
+| Endpoint                 | Weight (Single Symbol) | Weight (All Symbols) |
+| ------------------------ | ---------------------- | -------------------- |
+| /api/v3/klines           | 2                      | N/A                  |
+| /api/v3/ticker/price     | 2                      | 4                    |
+| /api/v3/trades           | 5                      | N/A                  |
+| /api/v3/depth            | 5 (small limit)        | N/A                  |
+| /api/v3/ticker/24hr      | 1                      | 40                   |
+| /api/v3/historicalTrades | 5                      | N/A                  |
+
+- Weight increments consistently with each request
+- Weight costs are cumulative across all endpoints
+- Weights are counted per minute, as shown in the headers
+- The weight cost for the same endpoint may vary based on the parameters
+
+#### 1.3.4 Weight Optimization Strategies
+
+1. **Batch Requests**: Get all price tickers with weight 2 instead of individual requests at weight 1 each
+2. **Use Lower Limit**: Request only the data you need to reduce weight
+3. **Distribute Across Endpoints**: Use backup endpoints for better distribution
+4. **Track Weights**: Monitor headers to avoid hitting limits
+5. **Use Appropriate Endpoints**: Use lower-weight endpoints when possible (e.g., price ticker instead of 24hr ticker)
+
+### 1.4 Response Limits
+
+- The default number of records returned is 500
+- The maximum number of records per request is 1000
+- When requesting more than 1000 records (e.g., limit=1500), the API still returns only 1000 records (server-enforced limit)
+- For historical data spanning more than 1000 candlesticks, multiple requests with different startTime/endTime parameters are required
+
+### 1.5 Historical Data Limits
+
+Empirical testing reveals important information about historical data limits:
+
+- Spot market data is available back to at least March 2020 (5 years back)
+- Some older data (early 2017/2018) may not be available for certain symbols
+- Attempts to request data from before a symbol was listed return empty arrays (not errors)
+- For very old data, Vision API is more reliable than REST API
+- No specific "earliest date" limit was identified - availability seems to depend on when the symbol started trading
+- Leveraged tokens like BTCUPUSDT have limited historical data compared to major pairs
+- The data is typically available from when the symbol began trading on Binance
+
+### 1.6 Error Responses
+
+Common error responses:
+
+#### Invalid Interval
+
+```json
+{
+  "code": -1120,
+  "msg": "Invalid interval."
+}
+```
+
+#### Invalid Symbol
+
+```json
+{
+  "code": -1121,
+  "msg": "Invalid symbol."
+}
+```
+
+#### Missing Required Parameter
+
+```json
+{
+  "code": -1102,
+  "msg": "Mandatory parameter 'symbol' was not sent, was empty/null, or malformed."
+}
+```
+
+#### Invalid Parameter
+
+```json
+{
+  "code": -1104,
+  "msg": "Not all sent parameters were read; read '3' parameter(s) but was sent '4'."
+}
+```
+
+#### Rate Limit Exceeded
+
+```json
+{
+  "code": -1429,
+  "msg": "Too many requests; current limit is 6000 request weight per 1 MINUTE. Please use the websocket for live updates to avoid polling the API."
+}
+```
+
+#### Future Date Error (403 Forbidden)
+
+When requesting data for timestamps in the future (even 1 millisecond ahead of the server's current time), the API returns a 403 Forbidden error. This is strictly enforced across all market types, but is especially critical for FUTURES_COIN markets.
+
+**Error Response:**
+
+```msg
+HTTP/2 403 Forbidden
+```
+
+**Common Scenarios:**
+
+- Current time is 2023-04-01 12:00:00.000 UTC
+- Request for endTime=2023-04-01 12:00:00.001 (1ms in future)
+- Result: 403 Forbidden
+
+**Best Practices:**
+
+1. Always validate timestamps against current UTC time before making API requests
+2. Consider adding a small buffer (1-5 seconds) to account for clock drift
+3. Use dynamic validation instead of hard-coded year checks
+4. Implement proper error handling for 403 responses
+
+**Example Implementation:**
+
+```python
+def validate_time_range(start_time, end_time):
+    now = datetime.now(timezone.utc)
+    if start_time > now or end_time > now:
+        raise ValueError(f"Cannot request future date data. Current time: {now.isoformat()}")
+    return start_time, end_time
+```
+
+**FUTURES_COIN Special Considerations:**
+The FUTURES_COIN market (e.g., BTCUSD_PERP) is especially sensitive to future date requests and will consistently return 403 errors for future timestamps.
+
+### 1.7 Response Time Analysis
+
+Based on empirical testing, response times vary significantly between endpoints:
+
+| Endpoint                  | Average Response Time |
+| ------------------------- | --------------------- |
+| Primary (api.binance.com) | ~0.14 seconds         |
+| Backup (api3.binance.com) | ~0.44 seconds         |
+| Data-only                 | ~0.53 seconds         |
+
+- Primary endpoint is consistently faster than backup endpoints
+- Data-only endpoint is typically the slowest
+- Response time can vary significantly based on network conditions
+- High-traffic periods may show increased response times
+- Using multiple endpoints can help distribute load for better overall performance
 
 ## 2. Market Data Endpoints
 
@@ -405,177 +607,7 @@ The options API returns a different response structure than other markets:
 - Getting ALL price tickers at once has a significantly lower weight cost (2) than individual requests
 - The 24hr ticker provides much more detailed information but has higher weight cost when requesting all symbols
 
-## 3. Rate Limiting and Weight System
-
-Binance uses a weight-based rate limiting system. Each endpoint has an assigned weight, and users have a limit on the total weight they can use per minute.
-
-### 3.1 Rate Limit Headers
-
-Headers returned in responses:
-
-- `x-mbx-used-weight`: Current used weight
-- `x-mbx-used-weight-1m`: Weight used in the last minute
-
-### 3.2 Default Weight Limits
-
-Based on the exchange information response:
-
-```json
-[
-  {
-    "rateLimitType": "REQUEST_WEIGHT",
-    "interval": "MINUTE",
-    "intervalNum": 1,
-    "limit": 6000
-  }
-]
-```
-
-- IP addresses have a default limit of 6000 weight per minute
-- Weight costs vary by endpoint and parameters
-- When reaching the limit, a 429 error is returned with a Retry-After header
-
-### 3.3 Empirical Weight Findings
-
-Based on our empirical testing, the weight costs of different endpoints are:
-
-| Endpoint                 | Weight (Single Symbol) | Weight (All Symbols) |
-| ------------------------ | ---------------------- | -------------------- |
-| /api/v3/klines           | 2                      | N/A                  |
-| /api/v3/ticker/price     | 2                      | 4                    |
-| /api/v3/trades           | 5                      | N/A                  |
-| /api/v3/depth            | 5 (small limit)        | N/A                  |
-| /api/v3/ticker/24hr      | 1                      | 40                   |
-| /api/v3/historicalTrades | 5                      | N/A                  |
-
-- Weight increments consistently with each request
-- Weight costs are cumulative across all endpoints
-- Weights are counted per minute, as shown in the headers
-- The weight cost for the same endpoint may vary based on the parameters
-
-### 3.4 Weight Optimization Strategies
-
-1. **Batch Requests**: Get all price tickers with weight 2 instead of individual requests at weight 1 each
-2. **Use Lower Limit**: Request only the data you need to reduce weight
-3. **Distribute Across Endpoints**: Use backup endpoints for better distribution
-4. **Track Weights**: Monitor headers to avoid hitting limits
-5. **Use Appropriate Endpoints**: Use lower-weight endpoints when possible (e.g., price ticker instead of 24hr ticker)
-
-## 4. Historical Data Limits
-
-Empirical testing reveals important information about historical data limits:
-
-- Spot market data is available back to at least March 2020 (5 years back)
-- Some older data (early 2017/2018) may not be available for certain symbols
-- Attempts to request data from before a symbol was listed return empty arrays (not errors)
-- For very old data, Vision API is more reliable than REST API
-- No specific "earliest date" limit was identified - availability seems to depend on when the symbol started trading
-- Leveraged tokens like BTCUPUSDT have limited historical data compared to major pairs
-- The data is typically available from when the symbol began trading on Binance
-
-## 5. Response Limits
-
-- The default number of records returned is 500
-- The maximum number of records per request is 1000
-- When requesting more than 1000 records (e.g., limit=1500), the API still returns only 1000 records (server-enforced limit)
-- For historical data spanning more than 1000 candlesticks, multiple requests with different startTime/endTime parameters are required
-
-## 6. Error Responses
-
-Common error responses:
-
-### Invalid Interval
-
-```json
-{
-  "code": -1120,
-  "msg": "Invalid interval."
-}
-```
-
-### Invalid Symbol
-
-```json
-{
-  "code": -1121,
-  "msg": "Invalid symbol."
-}
-```
-
-### Missing Required Parameter
-
-```json
-{
-  "code": -1102,
-  "msg": "Mandatory parameter 'symbol' was not sent, was empty/null, or malformed."
-}
-```
-
-### Invalid Parameter
-
-```json
-{
-  "code": -1104,
-  "msg": "Not all sent parameters were read; read '3' parameter(s) but was sent '4'."
-}
-```
-
-### Rate Limit Exceeded
-
-```json
-{
-  "code": -1429,
-  "msg": "Too many requests; current limit is 6000 request weight per 1 MINUTE. Please use the websocket for live updates to avoid polling the API."
-}
-```
-
-## 7. Response Time Analysis
-
-Based on empirical testing, response times vary significantly between endpoints:
-
-| Endpoint                  | Average Response Time |
-| ------------------------- | --------------------- |
-| Primary (api.binance.com) | ~0.14 seconds         |
-| Backup (api3.binance.com) | ~0.44 seconds         |
-| Data-only                 | ~0.53 seconds         |
-
-- Primary endpoint is consistently faster than backup endpoints
-- Data-only endpoint is typically the slowest
-- Response time can vary significantly based on network conditions
-- High-traffic periods may show increased response times
-- Using multiple endpoints can help distribute load for better overall performance
-
-## 8. Advanced Options
-
-### 8.1 WebSocket Alternatives
-
-For real-time data consumption, WebSocket endpoints are more efficient:
-
-- Lower latency
-- No rate limits for public market data streams
-- Continuous data feed without polling
-
-WebSocket URLs follow this format:
-
-```wss
-wss://stream.binance.com:9443/ws/<symbol>@<channel>
-```
-
-Example for BTCUSDT 1-minute candlesticks:
-
-```wss
-wss://stream.binance.com:9443/ws/btcusdt@kline_1m
-```
-
-### 8.2 Data-Only Endpoint
-
-The data-only endpoint provides the same response format but may have separate rate limiting:
-
-```url
-https://data-api.binance.vision/api/v3/klines
-```
-
-## 9. Market Differences
+## 3. Market Differences
 
 Based on empirical testing, different market types have different capabilities:
 
@@ -590,7 +622,7 @@ Based on empirical testing, different market types have different capabilities:
 | Price precision      | 8 decimals | 1-2 decimals   | 1 decimal      | Varies                |
 | Historical data      | Extensive  | More limited   | More limited   | Very limited          |
 
-### 9.1 Cross-Market Data Consistency
+### 3.1 Cross-Market Data Consistency
 
 Empirical testing of prices across markets shows:
 
@@ -602,7 +634,7 @@ Empirical testing of prices across markets shows:
   - USDT-M futures includes a timestamp
   - COIN-M futures returns an array with additional fields
 
-## 10. Key Differences Between REST API and Vision API
+## 4. Key Differences Between REST API and Vision API
 
 | Feature              | REST API                          | Vision API                          |
 | -------------------- | --------------------------------- | ----------------------------------- |
@@ -618,60 +650,60 @@ Empirical testing of prices across markets shows:
 | Price Accuracy       | Standard precision                | Same as REST API                    |
 | Bandwidth Usage      | Higher for multiple requests      | Lower (one-time download)           |
 
-## 11. Practical Examples
+## 5. Practical Examples
 
-### 11.1 Getting Historical Data Efficiently
+### 5.1 Getting Historical Data Efficiently
 
 ```bash
 # Start and end times in milliseconds (1 day apart)
 curl "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1641081600000&endTime=1641167999999&limit=1000"
 ```
 
-### 11.2 Getting Latest Data with Minimal Weight
+### 5.2 Getting Latest Data with Minimal Weight
 
 ```bash
 # Get just the last 5 candles
 curl "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=5"
 ```
 
-### 11.3 Monitoring Multiple Symbols Efficiently
+### 5.3 Monitoring Multiple Symbols Efficiently
 
 ```bash
 # Get all prices at once (weight: 2) instead of individually (weight: 1 each)
 curl "https://api.binance.com/api/v3/ticker/price"
 ```
 
-### 11.4 Basic Request (Spot Market)
+### 5.4 Basic Request (Spot Market)
 
 ```bash
 curl "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=5"
 ```
 
-### 11.5 Historical Data Request with Time Range
+### 5.5 Historical Data Request with Time Range
 
 ```bash
 curl "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=1640995200000&endTime=1641254400000"
 ```
 
-### 11.6 Futures Market Request
+### 5.6 Futures Market Request
 
 ```bash
 curl "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=1h&limit=10"
 ```
 
-### 11.7 COIN-M Futures Request
+### 5.7 COIN-M Futures Request
 
 ```bash
 curl "https://dapi.binance.com/dapi/v1/klines?symbol=BTCUSD_PERP&interval=1h&limit=10"
 ```
 
-### 11.8 Leveraged Token Data
+### 5.8 Leveraged Token Data
 
 ```bash
 curl "https://api.binance.com/api/v3/klines?symbol=BTCUPUSDT&interval=1d&limit=10"
 ```
 
-## 12. Optimization Strategies
+## 6. Optimization Strategies
 
 1. **Use Multiple Endpoints**: Distribute requests across available endpoints to avoid rate limiting.
 2. **Batch Efficiently**: Request the maximum 1000 records per call to minimize API calls.
@@ -683,3 +715,25 @@ curl "https://api.binance.com/api/v3/klines?symbol=BTCUPUSDT&interval=1d&limit=1
 8. **Cross-Market Data**: Be aware of format differences when using multiple market types.
 9. **WebSocket for Real-time**: Use WebSockets instead of polling for real-time data.
 10. **Batch Symbol Requests**: Request all ticker prices at once instead of individually.
+11. **Use Domain-Specific URL Patterns**: Different market types (Spot, USDT-M Futures, COIN-M Futures, Options) use different URL patterns. Always use the correct pattern:
+
+- Spot: `https://api.binance.com/api/v3/klines`
+- USDT-M Futures: `https://fapi.binance.com/fapi/v1/klines`
+- COIN-M Futures: `https://dapi.binance.com/dapi/v1/klines`
+- Options: `https://eapi.binance.com/eapi/v1/klines`
+
+### 6.1 Sample URL Construction Code
+
+When working with multiple Binance market types, use a helper function to construct the correct URL:
+
+```python
+def construct_binance_url(market_type, symbol, interval):
+    if market_type == "SPOT":
+        return f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}"
+    elif market_type == "FUTURES_USDT":
+        return f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}"
+    elif market_type == "FUTURES_COIN":
+        return f"https://dapi.binance.com/dapi/v1/klines?symbol={symbol}&interval={interval}"
+    elif market_type == "OPTIONS":
+        return f"https://eapi.binance.com/eapi/v1/klines?symbol={symbol}&interval={interval}"
+```

@@ -88,6 +88,71 @@ For queries spanning year changes (December 31 to January 1):
 
 3. **Boundary Edge Cases**: Our most extreme test cases (1ms after interval start to 1ms before next interval) confirmed that the API strictly enforces whole interval boundaries.
 
+## Future Date Handling
+
+Through extensive testing, we discovered that the Binance API strictly enforces a prohibition against requesting data for future dates.
+
+### 403 Forbidden Response
+
+The API will respond with a 403 Forbidden HTTP status code when:
+
+- Either the start time or end time parameter is in the future
+- The timestamp is even 1 millisecond ahead of the server's current time
+- The request is for any market type, but particularly strict for FUTURES_COIN markets
+
+### Testing Results
+
+Our tests using the debug_market_types.py script confirm:
+
+1. **Millisecond Precision**: Even timestamps just 1ms in the future trigger a 403 error
+
+   ```python
+   now = datetime.now(timezone.utc)
+   very_near_future = now + timedelta(milliseconds=1)  # This will cause 403
+   ```
+
+2. **Market Type Sensitivity**: The FUTURES_COIN market (e.g., BTCUSD_PERP) is especially sensitive to future date requests
+
+3. **UTC Time Alignment**: The server uses UTC time for this validation, and its clock may differ slightly from the client
+
+4. **Error Response**: The API returns a standard 403 Forbidden error without detailed information about the cause
+
+### Implementation Guidelines
+
+To prevent 403 errors related to future dates:
+
+1. **Strict Validation**: Always validate timestamps against current UTC time before making API requests:
+
+   ```python
+   now = datetime.now(timezone.utc)
+   if start_time > now or end_time > now:
+       # Handle error: future dates not allowed
+       return error_response
+   ```
+
+2. **Buffer Zone**: Consider implementing a small buffer (1-5 seconds) to account for potential clock drift:
+
+   ```python
+   buffer = timedelta(seconds=5)
+   safe_now = datetime.now(timezone.utc) - buffer
+   if start_time > safe_now or end_time > safe_now:
+       # Handle with caution: possibly in the future
+   ```
+
+3. **Dynamic Validation**: Avoid hard-coded year checks, as they become outdated. Instead, always compare against current time:
+
+   ```python
+   # Bad approach (will break eventually)
+   if start_time.year > 2025:  # Hard-coded year check
+       return error_response
+
+   # Good approach (always accurate)
+   if start_time > datetime.now(timezone.utc):
+       return error_response
+   ```
+
+4. **Error Handling**: Implement proper error handling for 403 responses and provide clear messages to users about future date restrictions
+
 ## Implications for Time-Series Data Retrieval
 
 ### Record Counting Logic

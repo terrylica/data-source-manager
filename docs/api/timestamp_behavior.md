@@ -24,7 +24,38 @@ This document details the timestamp behavior of the Binance API. Understanding t
   - Bar close: 999ms after the open time
   - Example: Open: `2024-01-01 00:00:00.000`, Close: `2024-01-01 00:00:00.999`
 
-### 2. Timestamp Inclusivity
+### 2. Future Date Rejection
+
+#### 403 Forbidden Response
+
+- The API strictly rejects any request for data from future timestamps
+- Even timestamps just 1 millisecond in the future will trigger a 403 Forbidden error
+- This behavior is consistent across all market types, but especially strict in FUTURES_COIN market
+- The server's current time (not the client's local time) is used for this validation
+- System clock synchronization issues can cause unexpected 403 errors
+
+#### Validation Requirements
+
+- Always validate date ranges before making API requests:
+
+  ```python
+  now = datetime.now(timezone.utc)
+  if start_time > now or end_time > now:
+      # Handle error: future dates not allowed
+  ```
+
+- For sensitive applications, add a small buffer (e.g., 1-5 seconds) to account for clock drift:
+
+  ```python
+  buffer = timedelta(seconds=5)
+  now_with_buffer = datetime.now(timezone.utc) - buffer
+  if start_time > now_with_buffer or end_time > now_with_buffer:
+      # Handle error: possible future date
+  ```
+
+- Do not use hard-coded years or dates for validation - always compare against current server time
+
+### 3. Timestamp Inclusivity
 
 #### Request Windows
 
@@ -40,14 +71,14 @@ This document details the timestamp behavior of the Binance API. Understanding t
 - A timestamp of `00:00:00.001` as endTime will be treated as the current second (`00:00:00`)
 - The API maintains perfect continuity across all time boundaries (second, minute, hour, day, month, year)
 
-### 3. Cross-Boundary Behavior
+### 4. Cross-Boundary Behavior
 
 - The API handles data queries that cross significant time boundaries (midnight, year) with complete continuity
 - No special handling or gaps occur at any boundary
 - Millisecond precision is handled consistently with the same rounding rules
 - The behavior is identical across day, month, and year boundaries
 
-### 4. Record Counting Logic
+### 5. Record Counting Logic
 
 For a given time range with start time `S` and end time `E` for interval `I`:
 
@@ -90,14 +121,26 @@ def calculate_chunks(start_ms: int, end_ms: int, interval: Interval) -> List[Tup
 
    - Use `ApiBoundaryValidator` to validate time boundaries and data ranges
    - Verify all alignment logic through integration tests against the REST API
+   - Always validate that requested dates are in the past before making API calls
+   - Implement the `validate_date_range_for_api()` function from utils/validation_utils.py to check for future dates
 
-3. **Data Processing**
+3. **Future Date Handling**
+
+   - Never request data for future timestamps (even 1ms in the future)
+   - For FUTURES_COIN market especially, implement strict validation against future dates
+   - When working with the current date, consider using a time slightly in the past to avoid 403 errors
+   - System clock synchronization issues can cause unexpected 403 errors, so implement validation that:
+     - Compares requested timestamps against current UTC time
+     - Does not rely on hard-coded year checks
+     - Provides meaningful error messages when future dates are detected
+
+4. **Data Processing**
 
    - Parse API responses with the understanding of the API's boundary behavior
    - First timestamp will be >= aligned start time (possibly rounded up by API)
    - Last timestamp will be <= aligned end time (rounded down by API)
 
-4. **API Limits**
+5. **API Limits**
    - Default limit: 500 candles per request
    - Maximum limit: 1000 candles (use `limit=1000` parameter)
    - Plan data retrieval with appropriate chunking for larger ranges
