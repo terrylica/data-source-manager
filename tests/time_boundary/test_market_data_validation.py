@@ -31,11 +31,9 @@ from utils.market_constraints import (
     Interval,
     MarketType,
 )
-from utils.logger_setup import get_logger
-from utils.network_utils import create_client
+from utils.logger_setup import logger
+from utils.network_utils import create_client, safely_close_client
 
-# Configure logging
-logger = get_logger(__name__, "INFO", show_path=False)
 
 # Test configuration
 TEST_SYMBOL = "BTCUSDT"
@@ -60,10 +58,7 @@ async def api_session():
     try:
         yield client
     finally:
-        if hasattr(client, "aclose"):
-            await client.aclose()
-        else:
-            await client.close()
+        await safely_close_client(client)
 
 
 @pytest_asyncio.fixture

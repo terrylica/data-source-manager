@@ -21,16 +21,14 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 
 from utils.api_boundary_validator import ApiBoundaryValidator
-from utils.market_constraints import Interval, MarketType
+from utils.market_constraints import Interval, MarketType, ChartType, get_endpoint_url
 from utils.time_utils import (
     align_time_boundaries,
     estimate_record_count,
 )
-from utils.logger_setup import get_logger
-from utils.network_utils import create_client
+from utils.logger_setup import logger
+from utils.network_utils import create_client, safely_close_client
 
-# Configure logger
-logger = get_logger(__name__)
 
 # Test symbol - using a common symbol with liquidity
 TEST_SYMBOL = "BTCUSDT"
@@ -54,10 +52,7 @@ async def direct_api_client():
     try:
         yield client
     finally:
-        if hasattr(client, "aclose"):
-            await client.aclose()
-        else:
-            await client.close()
+        await safely_close_client(client)
 
 
 @pytest.fixture
@@ -170,7 +165,7 @@ async def test_is_valid_time_range_valid_period(
     )
 
     # Direct API call to verify data existence
-    api_endpoint = f"https://api.binance.com/api/v3/klines"
+    api_endpoint = get_endpoint_url(MarketType.SPOT, ChartType.KLINES.endpoint)
     params = {
         "symbol": TEST_SYMBOL,
         "interval": interval.value,
@@ -178,7 +173,7 @@ async def test_is_valid_time_range_valid_period(
         "endTime": int(end_time.timestamp() * 1000),
         "limit": 1,
     }
-
+    logger.debug(f"Using API endpoint: {api_endpoint} with params: {params}")
     client = create_client(timeout=10.0)
     try:
         response = await client.get(api_endpoint, params=params)
@@ -200,10 +195,7 @@ async def test_is_valid_time_range_valid_period(
 
         api_data_exists = len(api_data) > 0
     finally:
-        if hasattr(client, "aclose"):
-            await client.aclose()
-        else:
-            await client.close()
+        await safely_close_client(client)
 
     # Test our validator
     result = await api_validator.is_valid_time_range(start_time, end_time, interval)
@@ -229,7 +221,7 @@ async def test_is_valid_time_range_future_period(api_validator, caplog):
     )
 
     # Direct API call to verify data absence
-    api_endpoint = f"https://api.binance.com/api/v3/klines"
+    api_endpoint = get_endpoint_url(MarketType.SPOT, ChartType.KLINES.endpoint)
     params = {
         "symbol": TEST_SYMBOL,
         "interval": interval.value,
@@ -259,10 +251,7 @@ async def test_is_valid_time_range_future_period(api_validator, caplog):
 
         api_data_exists = len(api_data) > 0
     finally:
-        if hasattr(client, "aclose"):
-            await client.aclose()
-        else:
-            await client.close()
+        await safely_close_client(client)
 
     # Test our validator
     result = await api_validator.is_valid_time_range(start_time, end_time, interval)
@@ -285,7 +274,7 @@ async def test_get_api_boundaries(api_validator, recent_time_range, caplog):
     )
 
     # Direct API call to get boundary data
-    api_endpoint = f"https://api.binance.com/api/v3/klines"
+    api_endpoint = get_endpoint_url(MarketType.SPOT, ChartType.KLINES.endpoint)
     params = {
         "symbol": TEST_SYMBOL,
         "interval": interval.value,
@@ -303,10 +292,7 @@ async def test_get_api_boundaries(api_validator, recent_time_range, caplog):
 
         api_data = response.json()
     finally:
-        if hasattr(client, "aclose"):
-            await client.aclose()
-        else:
-            await client.close()
+        await safely_close_client(client)
 
     if api_data:
         direct_first_timestamp = datetime.fromtimestamp(

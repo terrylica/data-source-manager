@@ -18,10 +18,8 @@ import pandas as pd
 # Import directly from core and utils
 from core.data_source_manager import DataSourceManager, DataSource
 from utils.market_constraints import Interval, MarketType
-from utils.logger_setup import get_logger
+from utils.logger_setup import logger
 
-# Configure logging using the proper utility
-logger = get_logger(__name__, "INFO")
 
 # Test configuration
 TEST_SYMBOL = "BTCUSDT"

@@ -10,10 +10,8 @@ import pytest
 from utils.api_boundary_validator import ApiBoundaryValidator
 from utils.market_constraints import Interval, MarketType
 from utils.validation import DataValidation
-from utils.logger_setup import get_logger
+from utils.logger_setup import logger
 
-# Configure logger
-logger = get_logger(__name__, "INFO")
 
 # Test constants
 TEST_SYMBOL = "BTCUSDT"

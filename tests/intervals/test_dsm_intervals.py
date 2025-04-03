@@ -18,16 +18,15 @@ Following the pytest-construction.mdc guidelines:
 """
 
 import pytest
-import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Tuple
 
-from utils.logger_setup import get_logger
+from utils.logger_setup import logger
 from core.data_source_manager import DataSourceManager, DataSource
-from utils.market_constraints import Interval, MarketType, get_market_capabilities
+from utils.market_constraints import Interval, MarketType
 from utils.network_utils import create_client
 
 from tests.intervals import (
@@ -39,8 +38,6 @@ from tests.intervals import (
     MARKET_TEST_PARAMS,
 )
 
-# Configure logging
-logger = get_logger(__name__, level="INFO")
 
 # Apply module-level fixture scope to avoid DeprecationWarning
 pytestmark = [
@@ -94,9 +91,13 @@ async def find_available_data(
     client_session = create_client(timeout=10.0)
 
     # For smaller intervals like 1s, use shorter windows
-    if interval == Interval.SECOND_1:
+    if interval.name == Interval.SECOND_1.name:
         fetch_window = timedelta(minutes=5)
-    elif interval in (Interval.MINUTE_1, Interval.MINUTE_3, Interval.MINUTE_5):
+    elif interval.name in (
+        Interval.MINUTE_1.name,
+        Interval.MINUTE_3.name,
+        Interval.MINUTE_5.name,
+    ):
         fetch_window = timedelta(hours=1)
     else:
         fetch_window = timedelta(hours=4)
@@ -171,7 +172,7 @@ async def test_dsm_spot_intervals(dsm: DataSourceManager, interval: Interval, ca
     2. The data has the correct format and structure
     3. Time boundaries are properly aligned
     """
-    caplog.set_level(logging.INFO)
+    caplog.set_level("INFO")
 
     # Find available data
     reference_time, found_data = await find_available_data(
@@ -179,16 +180,24 @@ async def test_dsm_spot_intervals(dsm: DataSourceManager, interval: Interval, ca
     )
 
     # Define a time window appropriate for this interval
-    if interval == Interval.SECOND_1:
+    if interval.name == Interval.SECOND_1.name:
         # For 1s data, use a 2-minute window
         time_window = timedelta(minutes=2)
-    elif interval in (Interval.MINUTE_1, Interval.MINUTE_3, Interval.MINUTE_5):
+    elif interval.name in (
+        Interval.MINUTE_1.name,
+        Interval.MINUTE_3.name,
+        Interval.MINUTE_5.name,
+    ):
         # For minute-level data, use a 1-hour window
         time_window = timedelta(hours=1)
-    elif interval in (Interval.MINUTE_15, Interval.MINUTE_30):
+    elif interval.name in (Interval.MINUTE_15.name, Interval.MINUTE_30.name):
         # For larger minute intervals, use a 4-hour window
         time_window = timedelta(hours=4)
-    elif interval in (Interval.HOUR_1, Interval.HOUR_2, Interval.HOUR_4):
+    elif interval.name in (
+        Interval.HOUR_1.name,
+        Interval.HOUR_2.name,
+        Interval.HOUR_4.name,
+    ):
         # For hour-level data, use a 24-hour window
         time_window = timedelta(days=1)
     else:
@@ -286,7 +295,7 @@ async def test_dsm_futures_intervals(
 
     This test covers both USDT-margined (UM) and Coin-margined (CM) futures.
     """
-    caplog.set_level(logging.INFO)
+    caplog.set_level("INFO")
 
     # Override the DSM market type to match the test case
     dsm._market_type = market_type
@@ -297,13 +306,21 @@ async def test_dsm_futures_intervals(
     )
 
     # Define a time window appropriate for this interval
-    if interval in (Interval.MINUTE_1, Interval.MINUTE_3, Interval.MINUTE_5):
+    if interval.name in (
+        Interval.MINUTE_1.name,
+        Interval.MINUTE_3.name,
+        Interval.MINUTE_5.name,
+    ):
         # For minute-level data, use a 1-hour window
         time_window = timedelta(hours=1)
-    elif interval in (Interval.MINUTE_15, Interval.MINUTE_30):
+    elif interval.name in (Interval.MINUTE_15.name, Interval.MINUTE_30.name):
         # For larger minute intervals, use a 4-hour window
         time_window = timedelta(hours=4)
-    elif interval in (Interval.HOUR_1, Interval.HOUR_2, Interval.HOUR_4):
+    elif interval.name in (
+        Interval.HOUR_1.name,
+        Interval.HOUR_2.name,
+        Interval.HOUR_4.name,
+    ):
         # For hour-level data, use a 24-hour window
         time_window = timedelta(days=1)
     else:
@@ -396,7 +413,7 @@ async def test_dsm_interval_data_consistency(
     2. The data structure is consistent across market types
     3. Metadata (e.g., column names, types) is consistent
     """
-    caplog.set_level(logging.INFO)
+    caplog.set_level("INFO")
 
     results = {}
 
@@ -411,9 +428,9 @@ async def test_dsm_interval_data_consistency(
         )
 
         # Define a time window appropriate for this interval
-        if interval == Interval.MINUTE_1:
+        if interval.name == Interval.MINUTE_1.name:
             time_window = timedelta(hours=1)
-        elif interval == Interval.HOUR_1:
+        elif interval.name == Interval.HOUR_1.name:
             time_window = timedelta(days=1)
         else:  # DAY_1
             time_window = timedelta(days=7)
@@ -530,7 +547,7 @@ async def test_dsm_metadata_consistency(
     2. The essential columns have consistent data types
     3. The interval-specific metadata is correctly handled
     """
-    caplog.set_level(logging.INFO)
+    caplog.set_level("INFO")
 
     # Use SPOT market for simplicity
     market_type = MarketType.SPOT
@@ -542,9 +559,9 @@ async def test_dsm_metadata_consistency(
     )
 
     # Define a time window appropriate for this interval
-    if interval == Interval.MINUTE_1:
+    if interval.name == Interval.MINUTE_1.name:
         time_window = timedelta(hours=1)
-    elif interval == Interval.HOUR_1:
+    elif interval.name == Interval.HOUR_1.name:
         time_window = timedelta(days=1)
     else:  # DAY_1
         time_window = timedelta(days=7)

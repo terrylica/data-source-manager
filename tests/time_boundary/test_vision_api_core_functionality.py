@@ -327,7 +327,6 @@ async def test_timestamp_format_evolution():
             "\033[33mValidates: Millisecond & Microsecond timestamp handling\033[0m"
         )  # Yellow color for validation description
         # --- Enhanced Banner End ---
-
         start_2024 = datetime(2024, 12, 1, tzinfo=timezone.utc)
         end_2024 = start_2024 + timedelta(hours=1)
 

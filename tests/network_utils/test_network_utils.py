@@ -19,10 +19,7 @@ from utils.network_utils import (
     read_csv_from_zip,
     safely_close_client,
 )
-from utils.logger_setup import get_logger
-
-# Configure logger for tests
-logger = get_logger(__name__, "INFO", show_path=False)
+from utils.logger_setup import logger
 
 
 # Create a TestDownloadProgressTracker class that isn't marked with asyncio
@@ -465,7 +462,7 @@ async def test_read_csv_from_zip_different_timestamp_formats(temp_dir, caplog):
     import time
 
     # Set log level to DEBUG to capture more details
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Use a public URL for a small Binance data archive
     url = "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-01-01.zip"

@@ -14,10 +14,8 @@ from pathlib import Path
 from utils.cache_validator import CacheValidator, ERROR_TYPES
 from utils.api_boundary_validator import ApiBoundaryValidator
 from utils.market_constraints import Interval, MarketType
-from utils.logger_setup import get_logger
+from utils.logger_setup import logger
 
-# Configure logger
-logger = get_logger(__name__, "INFO")
 
 # Test symbol - using a common symbol with liquidity
 TEST_SYMBOL = "BTCUSDT"

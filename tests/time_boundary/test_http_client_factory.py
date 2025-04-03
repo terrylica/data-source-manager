@@ -3,6 +3,7 @@ from curl_cffi.requests import AsyncSession
 from utils.network_utils import (
     create_client,
     create_curl_cffi_client,
+    safely_close_client,
     DEFAULT_USER_AGENT,
     DEFAULT_ACCEPT_HEADER,
     DEFAULT_HTTP_TIMEOUT_SECONDS,
@@ -41,10 +42,10 @@ async def test_create_curl_cffi_client():
         assert custom_client.timeout == custom_timeout
         assert custom_client.max_clients == custom_connections
 
-        await custom_client.close()
+        await safely_close_client(custom_client)
     finally:
         # Clean up
-        await client.close()
+        await safely_close_client(client)
 
 
 @pytest.mark.asyncio
@@ -79,9 +80,9 @@ async def test_create_client_curl_cffi_default():
         assert custom_client.headers["User-Agent"] == DEFAULT_USER_AGENT
         assert custom_client.headers["Accept"] == DEFAULT_ACCEPT_HEADER
 
-        await custom_client.close()
+        await safely_close_client(custom_client)
     finally:
-        await client.close()
+        await safely_close_client(client)
 
 
 @pytest.mark.asyncio
@@ -122,9 +123,9 @@ async def test_client_factory_dsm_integration():
         dsm = DataSourceManager(
             market_type=MarketType.SPOT,
             rest_client=market_client,
-            vision_client=data_client,
             cache_dir=cache_dir,
             use_cache=True,
+            # No vision_client - let DSM create its own as needed
         )
 
         try:
@@ -197,10 +198,20 @@ async def test_client_factory_dsm_integration():
             assert True, "Integration with DataSourceManager succeeded"
 
         finally:
-            # Ensure clients are closed
+            # Ensure clients are closed properly
             if hasattr(market_client, "__aexit__"):
                 await market_client.__aexit__(None, None, None)
             if hasattr(data_client, "__aexit__"):
                 await data_client.__aexit__(None, None, None)
+
+            # If we're not using __aexit__, make sure clients are properly closed
+            if not hasattr(market_client, "__aexit__") and market_client._client:
+                await safely_close_client(market_client._client)
+            if not hasattr(data_client, "__aexit__") and data_client._client:
+                await safely_close_client(data_client._client)
+
+            # Close DSM properly
             if hasattr(dsm, "close") and callable(dsm.close):
                 await dsm.close()
+            elif hasattr(dsm, "__aexit__"):
+                await dsm.__aexit__(None, None, None)

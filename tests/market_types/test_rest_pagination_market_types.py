@@ -62,7 +62,7 @@ def test_calculate_chunks_across_markets(market_type, symbol, api_limit, caplog)
     This tests that the _calculate_chunks method correctly handles the
     different API limits for each market type.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create RestDataClient with the specified market type
     client = RestDataClient(market_type=market_type)
@@ -136,7 +136,7 @@ async def test_fetch_across_markets(market_type, symbol, api_limit, caplog):
     This test verifies that the fetch method correctly handles different
     market types, their API limits, and supported intervals.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create client
     client_session = create_client(timeout=10.0)
@@ -234,7 +234,7 @@ async def test_large_fetch_with_chunking(market_type, symbol, _, caplog):
     This test verifies that the pagination strategy correctly handles
     large requests that require multiple API calls, across all market types.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create client
     client_session = create_client(timeout=10.0)
@@ -360,7 +360,7 @@ async def test_concurrent_fetches(market_type, symbol, _, caplog):
     fetch operations while respecting semaphore limits, even when API
     access might be restricted.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create client with a limited concurrency
     max_concurrent = 3

@@ -1,5 +1,5 @@
 import logging
-from utils.logger_setup import get_logger
+from utils.logger_setup import logger
 
 
 def test_logger_with_caplog(caplog):
@@ -7,14 +7,14 @@ def test_logger_with_caplog(caplog):
     # Set the capture level to DEBUG to see all logs
     caplog.set_level(logging.DEBUG)
 
-    # Create a logger
-    test_logger = get_logger("test_logger")
+    # Use the logger directly from logger_setup
+    # No need to create a new logger instance
 
     # Generate some log messages
-    test_logger.debug("This is a debug message")
-    test_logger.info("This is an info message")
-    test_logger.warning("This is a warning message")
-    test_logger.error("This is an error message")
+    logger.debug("This is a debug message")
+    logger.info("This is an info message")
+    logger.warning("This is a warning message")
+    logger.error("This is an error message")
 
     # Print out caplog records for debugging
     print("\nCAPLOG RECORDS:")
@@ -45,7 +45,7 @@ def test_multiple_log_levels_with_caplog(caplog):
     # Set level to WARNING
     caplog.set_level(logging.WARNING)
 
-    logger = get_logger("multiple_levels")
+    # Use the logger directly
     logger.info("Info should not be captured")
     logger.warning("Warning should be captured")
 

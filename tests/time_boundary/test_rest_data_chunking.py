@@ -33,31 +33,30 @@ API_LIMIT = 1000  # Maximum records per request
     "interval",
     [
         Interval.SECOND_1,
-        Interval.MINUTE_1,
-        Interval.MINUTE_3,
-        Interval.MINUTE_5,
-        Interval.MINUTE_15,
-        Interval.MINUTE_30,
-        Interval.HOUR_1,
-        Interval.HOUR_2,
-        Interval.HOUR_4,
-        Interval.HOUR_6,
-        Interval.HOUR_8,
-        Interval.HOUR_12,
-        Interval.DAY_1,
-        Interval.DAY_3,
-        Interval.WEEK_1,
-        Interval.MONTH_1,
+        pytest.param(Interval.MINUTE_1, marks=pytest.mark.interval("1m")),
+        pytest.param(Interval.MINUTE_3, marks=pytest.mark.interval("3m")),
+        pytest.param(Interval.MINUTE_5, marks=pytest.mark.interval("5m")),
+        pytest.param(Interval.MINUTE_15, marks=pytest.mark.interval("15m")),
+        pytest.param(Interval.MINUTE_30, marks=pytest.mark.interval("30m")),
+        pytest.param(Interval.HOUR_1, marks=pytest.mark.interval("1h")),
+        pytest.param(Interval.HOUR_2, marks=pytest.mark.interval("2h")),
+        pytest.param(Interval.HOUR_4, marks=pytest.mark.interval("4h")),
+        pytest.param(Interval.HOUR_6, marks=pytest.mark.interval("6h")),
+        pytest.param(Interval.HOUR_8, marks=pytest.mark.interval("8h")),
+        pytest.param(Interval.HOUR_12, marks=pytest.mark.interval("12h")),
+        pytest.param(Interval.DAY_1, marks=pytest.mark.interval("1d")),
+        pytest.param(Interval.DAY_3, marks=pytest.mark.interval("3d")),
+        pytest.param(Interval.WEEK_1, marks=pytest.mark.interval("1w")),
+        pytest.param(Interval.MONTH_1, marks=pytest.mark.interval("1M")),
     ],
 )
 def test_calculate_chunks_all_intervals(interval, caplog):
     """Test the _calculate_chunks method with all intervals.
 
     This validates that the chunking strategy is appropriate for each
-    interval type, respecting the 1000-record limit and optimizing
-    chunk size for efficient data retrieval.
+    interval type, respecting the 1000-record limit per API request.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create RestDataClient instance
     client = RestDataClient()
@@ -121,50 +120,13 @@ def test_calculate_chunks_all_intervals(interval, caplog):
         last_chunk_end == end_ms
     ), f"Last chunk should end at {end_ms}, got {last_chunk_end}"
 
-    # Check each interval follows the appropriate chunking strategy
-    if interval == Interval.SECOND_1:
-        # 1s interval should have small chunks to avoid too many records
-        max_chunk_duration = 1000 * 1000  # Max 1000 seconds (16.7 minutes)
-        chunk_sizes = [c[1] - c[0] for c in chunks]
-        assert (
-            max(chunk_sizes) <= max_chunk_duration
-        ), f"1s chunks should be at most {max_chunk_duration/1000} seconds, got {max(chunk_sizes)/1000}"
+    # For all intervals: verify chunks are sized according to the record limit (1000)
+    expected_max_chunk_duration = API_LIMIT * interval_ms
+    chunk_sizes = [c[1] - c[0] for c in chunks]
 
-    elif interval == Interval.MINUTE_1:
-        # 1m interval should have medium chunks
-        max_chunk_duration = 1000 * 60 * 1000  # Max 1000 minutes (16.7 hours)
-        chunk_sizes = [c[1] - c[0] for c in chunks]
-        assert (
-            max(chunk_sizes) <= max_chunk_duration
-        ), f"1m chunks should be at most {max_chunk_duration/(60*1000)} minutes, got {max(chunk_sizes)/(60*1000)}"
-
-    elif interval in (
-        Interval.MINUTE_3,
-        Interval.MINUTE_5,
-        Interval.MINUTE_15,
-        Interval.MINUTE_30,
-    ):
-        # Other minute intervals should cap at 7 days per chunk
-        max_chunk_duration = 7 * 24 * 60 * 60 * 1000  # Max 7 days
-        chunk_sizes = [c[1] - c[0] for c in chunks]
-        assert (
-            max(chunk_sizes) <= max_chunk_duration
-        ), f"Minute chunks should be at most {max_chunk_duration/(24*60*60*1000)} days, got {max(chunk_sizes)/(24*60*60*1000)}"
-
-    elif interval in (
-        Interval.HOUR_1,
-        Interval.HOUR_2,
-        Interval.HOUR_4,
-        Interval.HOUR_6,
-        Interval.HOUR_8,
-        Interval.HOUR_12,
-    ):
-        # Hour intervals should cap at 30 days per chunk
-        max_chunk_duration = 30 * 24 * 60 * 60 * 1000  # Max 30 days
-        chunk_sizes = [c[1] - c[0] for c in chunks]
-        assert (
-            max(chunk_sizes) <= max_chunk_duration
-        ), f"Hour chunks should be at most {max_chunk_duration/(24*60*60*1000)} days, got {max(chunk_sizes)/(24*60*60*1000)}"
+    assert (
+        max(chunk_sizes) <= expected_max_chunk_duration + interval_ms
+    ), f"Chunks for {interval.value} should be at most {expected_max_chunk_duration/1000}s, got {max(chunk_sizes)/1000}s"
 
     # Log the chunk statistics
     logger.info(
@@ -175,28 +137,20 @@ def test_calculate_chunks_all_intervals(interval, caplog):
 @pytest.mark.parametrize(
     "interval,duration_days,expected_chunks",
     [
-        (Interval.SECOND_1, 1, 86),  # 1s interval needs many chunks for just 1 day
-        (Interval.MINUTE_1, 1, 2),  # 1m interval needs fewer chunks
-        (
-            Interval.HOUR_1,
-            30,
-            1,
-        ),  # 1h interval can fit 30 days in 1 chunk (720 intervals)
-        (
-            Interval.DAY_1,
-            365,
-            1,
-        ),  # 1d interval can fit a full year in 1 chunk (365 intervals)
+        (Interval.SECOND_1, 1, 86),  # 1s: 86,400 seconds / 1000 ≈ 86 chunks
+        (Interval.MINUTE_1, 1, 2),  # 1m: 1440 minutes / 1000 ≈ 2 chunks
+        (Interval.HOUR_1, 30, 1),  # 1h: 720 hours < 1000, so 1 chunk
+        (Interval.DAY_1, 365, 1),  # 1d: 365 days < 1000, so 1 chunk
     ],
 )
 def test_chunk_count_optimization(interval, duration_days, expected_chunks, caplog):
     """Test that the chunking strategy creates an optimal number of chunks.
 
-    This test verifies that the algorithm intelligently creates more chunks
-    for smaller intervals and fewer chunks for larger intervals, for a
-    given time duration.
+    This test verifies that the algorithm creates the appropriate number of chunks
+    based on the interval size and time duration, ensuring each chunk contains
+    at most 1000 records.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create RestDataClient instance
     client = RestDataClient()
@@ -213,15 +167,48 @@ def test_chunk_count_optimization(interval, duration_days, expected_chunks, capl
     # Calculate chunks
     chunks = client._calculate_chunks(start_ms, end_ms, interval)
 
+    # Calculate expected chunks based on API limit
+    interval_ms = interval.to_seconds() * 1000
+    total_intervals = (end_ms - start_ms) / interval_ms
+    expected_chunks_calculated = max(
+        1,
+        int(total_intervals / API_LIMIT)
+        + (1 if total_intervals % API_LIMIT > 0 else 0),
+    )
+
+    # Log the calculation
+    logger.info(
+        f"Interval {interval.value}: Total intervals: {total_intervals}, "
+        f"Calculated expected chunks: {expected_chunks_calculated}"
+    )
+
     # For this test we allow a margin of error in the expected chunk count
     # because the exact count can vary slightly depending on time of day
     # when the test is run
     margin = max(1, expected_chunks // 5)  # Allow 20% margin or at least 1
 
+    # Check calculated chunks against parameterized expected chunks
     assert expected_chunks - margin <= len(chunks) <= expected_chunks + margin, (
         f"Expected roughly {expected_chunks} chunks for {interval.value} over {duration_days} days, "
         f"got {len(chunks)}"
     )
+
+    # Also check against our calculated expected chunks
+    assert (
+        expected_chunks_calculated - margin
+        <= len(chunks)
+        <= expected_chunks_calculated + margin
+    ), (
+        f"Calculated expectation: {expected_chunks_calculated} chunks for {interval.value} over {duration_days} days, "
+        f"got {len(chunks)}"
+    )
+
+    # Verify all chunks are within API limit
+    for chunk_start, chunk_end in chunks:
+        chunk_intervals = (chunk_end - chunk_start) / interval_ms
+        assert (
+            chunk_intervals <= API_LIMIT + 1
+        ), f"Chunk exceeds API limit: {chunk_intervals} intervals > {API_LIMIT}"
 
     # Log details for debugging
     logger.info(
@@ -239,7 +226,7 @@ async def test_time_boundary_alignment(api_session, caplog):
     - startTime is rounded up to the next interval boundary if not aligned
     - endTime is rounded down to the previous interval boundary if not aligned
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create client
     client = RestDataClient(client=api_session)
@@ -316,7 +303,7 @@ async def test_large_data_retrieval_with_chunking(api_session, caplog):
     fetches and combines data from multiple API calls into a single coherent
     dataset.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create client
     client = RestDataClient(client=api_session)
@@ -369,10 +356,10 @@ async def test_large_data_retrieval_with_chunking(api_session, caplog):
 
             # Check stats
             assert "chunks" in stats, "Stats should include chunk count"
-            assert "records" in stats, "Stats should include record count"
+            assert "total_records" in stats, "Stats should include record count"
 
             logger.info(
-                f"Successfully retrieved {stats.get('records', 0)} records using "
+                f"Successfully retrieved {stats.get('total_records', 0)} records using "
                 f"{stats.get('chunks', 0)} chunks"
             )
         else:
@@ -393,9 +380,9 @@ async def test_large_data_retrieval_with_chunking(api_session, caplog):
     "interval",
     [
         Interval.SECOND_1,
-        Interval.MINUTE_1,
-        Interval.HOUR_1,
-        Interval.DAY_1,
+        pytest.param(Interval.MINUTE_1, marks=pytest.mark.interval("1m")),
+        pytest.param(Interval.HOUR_1, marks=pytest.mark.interval("1h")),
+        pytest.param(Interval.DAY_1, marks=pytest.mark.interval("1d")),
     ],
 )
 async def test_multi_interval_data_consistency(interval, api_session, caplog):
@@ -410,7 +397,7 @@ async def test_multi_interval_data_consistency(interval, api_session, caplog):
     This validates that our chunking strategy works properly across
     all interval types.
     """
-    caplog.set_level(logging.DEBUG)
+    caplog.set_level("DEBUG")
 
     # Create client
     client = RestDataClient(client=api_session)
@@ -453,10 +440,10 @@ async def test_multi_interval_data_consistency(interval, api_session, caplog):
 
             # Check stats
             assert "chunks" in stats, "Stats should include chunk count"
-            assert "records" in stats, "Stats should include record count"
+            assert "total_records" in stats, "Stats should include record count"
 
             chunk_count = stats.get("chunks", 0)
-            record_count = stats.get("records", 0)
+            record_count = stats.get("total_records", 0)
 
             # Log details for debugging
             logger.info(

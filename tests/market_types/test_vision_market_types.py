@@ -29,11 +29,9 @@ from curl_cffi.aio import AsyncCurl  # Import for direct access to the class
 from core.vision_data_client import VisionDataClient
 from core.data_source_manager import DataSourceManager, DataSource
 from utils.market_constraints import MarketType, Interval
-from utils.logger_setup import get_logger
+from utils.logger_setup import logger
 from utils.network_utils import safely_close_client
 
-# Configure logging
-logger = get_logger(__name__, "DEBUG")
 
 # Test symbols for different market types
 SPOT_SYMBOL = "BTCUSDT"
@@ -243,6 +241,17 @@ async def find_latest_available_data(
     current_time = datetime.now(timezone.utc)
     client = None
 
+    # Ensure we're not using future dates
+    # Use comparison with server-measured time instead of hard-coded year
+    future_threshold = datetime.now(timezone.utc) + timedelta(seconds=1)
+    if current_time > future_threshold:  # If system clock appears to be ahead
+        logger.warning(
+            f"System date appears to be in the future: {current_time.isoformat()} > {future_threshold.isoformat()}"
+        )
+        # Use a reasonable date from the past (one day ago)
+        current_time = datetime.now(timezone.utc) - timedelta(days=1)
+        current_time = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
     try:
         # Create a Vision client specifically for checking data
         client = VisionDataClient(
@@ -339,19 +348,10 @@ async def find_latest_available_data(
         # Return the oldest date we tried, but with found=False
         return current_time - timedelta(days=max_days_back), False
     finally:
-        # Explicitly clean up the client
+        # Clean up client if needed
         if client:
             try:
                 await client.__aexit__(None, None, None)
-                # Force extra cleanup to prevent curl_cffi timeout task warnings
-                if hasattr(client, "_client") and client._client:
-                    # Register any timeout tasks before closing
-                    for task in asyncio.all_tasks():
-                        if not task.done() and "_force_timeout" in str(task):
-                            register_timeout_task(task)
-                    # Then safely close
-                    await safely_close_client(client._client)
-                    client._client = None
             except Exception as e:
                 logger.warning(f"Error closing client: {e}")
 

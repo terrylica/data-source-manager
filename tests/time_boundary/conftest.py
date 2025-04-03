@@ -10,10 +10,18 @@ from pathlib import Path
 import shutil
 import pandas as pd
 import logging
-from utils.network_utils import create_client
+from utils.network_utils import create_client, safely_close_client
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line(
+        "markers",
+        "interval(value): specify the interval to use for the test",
+    )
 
 
 @pytest.fixture
@@ -37,10 +45,7 @@ async def api_session() -> AsyncGenerator:
     try:
         yield client
     finally:
-        if hasattr(client, "aclose"):
-            await client.aclose()
-        else:
-            await client.close()
+        await safely_close_client(client)
 
 
 @pytest.fixture
@@ -50,8 +55,42 @@ def test_symbol() -> str:
 
 
 @pytest.fixture
-def test_interval() -> str:
-    """Fixture to provide a test time interval."""
+def test_interval(request) -> str:
+    """Fixture to provide a test time interval.
+
+    Returns "1s" for SPOT market type (default) and "1m" for FUTURES market types.
+    The appropriate interval is determined based on:
+    1. Explicit interval marker: @pytest.mark.interval("1m")
+    2. Market type: FUTURES market types use "1m" instead of "1s"
+    """
+    # Check for an explicit interval marker
+    marker = request.node.get_closest_marker("interval")
+    if marker and marker.args:
+        return marker.args[0]  # Use explicitly marked interval
+
+    # Get the test's market_type fixture value if available
+    try:
+        if hasattr(request, "getfixturevalue"):
+            market_type = request.getfixturevalue("market_type")
+            if market_type and "FUTURES" in str(market_type):
+                return "1m"  # Use 1m interval for FUTURES market types
+    except Exception:
+        # Fixture might not be available, continue checking other possibilities
+        pass
+
+    # Check for manager fixture, looking for its market_type
+    try:
+        if hasattr(request, "getfixturevalue"):
+            manager = request.getfixturevalue("manager")
+            if hasattr(manager, "market_type") and "FUTURES" in str(
+                manager.market_type
+            ):
+                return "1m"  # Use 1m interval for FUTURES market types
+    except Exception:
+        # Fixture might not be available, continue with default
+        pass
+
+    # Default to 1s (only valid for SPOT markets)
     return "1s"
 
 
@@ -179,7 +218,7 @@ async def sample_ohlcv_data():
                 api_data = response.json()
         finally:
             # Close the client
-            await client.aclose()
+            await safely_close_client(client)
 
         # Convert to DataFrame
         columns = [

@@ -10,9 +10,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from utils.logger_setup import get_logger
-
-logger = get_logger(__name__, "INFO", show_path=False)
+from utils.logger_setup import logger
 
 
 def validate_dataframe_structure(
