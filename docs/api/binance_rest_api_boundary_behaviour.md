@@ -260,9 +260,11 @@ This LSP adherence allows for simpler client implementations that don't need spe
 
 2. **Expected Record Count**:
    The formula for expected records is:
-   ```
+
+   ```python
    floor((aligned_end - aligned_start) / interval) + 1
    ```
+
    This accounts for the inclusive-inclusive behavior of the API.
 
 ## Understanding the API's Design
