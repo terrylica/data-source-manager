@@ -15,7 +15,6 @@ import pandas as pd
 import logging
 from datetime import datetime, timezone, timedelta
 import sys
-import asyncio
 
 from core.rest_data_client import RestDataClient
 from utils.market_constraints import (

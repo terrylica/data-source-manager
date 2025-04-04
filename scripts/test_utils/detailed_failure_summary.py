@@ -9,7 +9,6 @@ with full file paths and line numbers for better debugging.
 import sys
 import subprocess
 import re
-from collections import defaultdict
 
 
 def generate_detailed_failure_summary(test_path):

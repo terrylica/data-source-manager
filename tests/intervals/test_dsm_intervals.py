@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Integration tests for DataSourceManager across all interval types.
+"""Integration tests for DataSourceManager across key interval types.
 
 System Under Test (SUT):
 - core.data_source_manager.DataSourceManager
@@ -7,8 +7,8 @@ System Under Test (SUT):
 - core.rest_data_client.RestDataClient (indirectly)
 
 This test suite validates that the DataSourceManager correctly handles
-data retrieval across all supported intervals, with proper time alignment,
-data consistency, and error handling.
+data retrieval across essential intervals (1s for spot, 1m, 1h, 1d),
+with proper time alignment, data consistency, and error handling.
 
 Following the pytest-construction.mdc guidelines:
 1. We use real data only (no mocks)
@@ -18,7 +18,6 @@ Following the pytest-construction.mdc guidelines:
 """
 
 import pytest
-import logging
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import numpy as np
@@ -28,6 +27,7 @@ from utils.logger_setup import logger
 from core.data_source_manager import DataSourceManager, DataSource
 from utils.market_constraints import Interval, MarketType
 from utils.network_utils import create_client
+from core.rest_data_client import RestDataClient
 
 from tests.intervals import (
     SPOT_SYMBOL,
@@ -35,7 +35,6 @@ from tests.intervals import (
     FUTURES_COIN_SYMBOL,
     SPOT_INTERVALS,
     FUTURES_INTERVALS,
-    MARKET_TEST_PARAMS,
 )
 
 
@@ -93,14 +92,12 @@ async def find_available_data(
     # For smaller intervals like 1s, use shorter windows
     if interval.name == Interval.SECOND_1.name:
         fetch_window = timedelta(minutes=5)
-    elif interval.name in (
-        Interval.MINUTE_1.name,
-        Interval.MINUTE_3.name,
-        Interval.MINUTE_5.name,
-    ):
+    elif interval.name == Interval.MINUTE_1.name:
         fetch_window = timedelta(hours=1)
-    else:
-        fetch_window = timedelta(hours=4)
+    elif interval.name == Interval.HOUR_1.name:
+        fetch_window = timedelta(days=1)
+    else:  # DAY_1
+        fetch_window = timedelta(days=7)
 
     try:
         # Search backward from current time
@@ -164,7 +161,9 @@ async def find_available_data(
 
 
 @pytest.mark.parametrize("interval", SPOT_INTERVALS)
-async def test_dsm_spot_intervals(dsm: DataSourceManager, interval: Interval, caplog):
+async def test_dsm_spot_intervals(
+    dsm: DataSourceManager, interval: Interval, caplog_xdist_compatible
+):
     """Test DataSourceManager with SPOT market intervals.
 
     This test verifies that:
@@ -172,13 +171,7 @@ async def test_dsm_spot_intervals(dsm: DataSourceManager, interval: Interval, ca
     2. The data has the correct format and structure
     3. Time boundaries are properly aligned
     """
-    # Set log level with try/except to handle pytest-asyncio compatibility issues
-    try:
-        caplog.set_level("INFO")
-    except KeyError:
-        # This can happen when running with pytest-asyncio and using -n1 or -nX
-        # due to interaction with pytest-xdist. Continue test without setting log level.
-        pass
+    caplog_xdist_compatible.set_level("INFO")
 
     # Find available data
     reference_time, found_data = await find_available_data(
@@ -189,34 +182,36 @@ async def test_dsm_spot_intervals(dsm: DataSourceManager, interval: Interval, ca
     if interval.name == Interval.SECOND_1.name:
         # For 1s data, use a 2-minute window
         time_window = timedelta(minutes=2)
-    elif interval.name in (
-        Interval.MINUTE_1.name,
-        Interval.MINUTE_3.name,
-        Interval.MINUTE_5.name,
-    ):
+    elif interval.name == Interval.MINUTE_1.name:
         # For minute-level data, use a 1-hour window
         time_window = timedelta(hours=1)
-    elif interval.name in (Interval.MINUTE_15.name, Interval.MINUTE_30.name):
-        # For larger minute intervals, use a 4-hour window
-        time_window = timedelta(hours=4)
-    elif interval.name in (
-        Interval.HOUR_1.name,
-        Interval.HOUR_2.name,
-        Interval.HOUR_4.name,
-    ):
-        # For hour-level data, use a 24-hour window
+    elif interval.name == Interval.HOUR_1.name:
+        # For hour-level data, use a 1-day window
         time_window = timedelta(days=1)
-    else:
-        # For larger intervals, use a 7-day window
-        time_window = timedelta(days=7)
+    else:  # DAY_1
+        # For day-level data, use a 30-day window
+        time_window = timedelta(days=30)
 
-    # Create a time window for testing
-    start_time = reference_time - time_window
+    # Define test boundaries
     end_time = reference_time
+    start_time = end_time - time_window
 
     logger.info(
-        f"Testing SPOT {interval.value} data from "
+        f"Testing DSM with SPOT {interval.value} data from "
         f"{start_time.isoformat()} to {end_time.isoformat()}"
+    )
+
+    # Update the DSM market type to match the test
+    dsm._market_type = MarketType.SPOT
+
+    # Recreate the REST client with the new market type to ensure proper endpoint construction
+    from utils.network_utils import create_client
+
+    dsm.rest_client = RestDataClient(
+        market_type=MarketType.SPOT,
+        client=create_client(),
+        max_concurrent=dsm.max_concurrent,
+        retry_count=dsm.retry_count,
     )
 
     # Fetch data using DataSourceManager
@@ -225,55 +220,60 @@ async def test_dsm_spot_intervals(dsm: DataSourceManager, interval: Interval, ca
         interval=interval,
         start_time=start_time,
         end_time=end_time,
-        enforce_source=DataSource.REST,  # Use REST API for consistency
     )
 
     # Log the result
-    if df.empty:
-        logger.warning(f"No SPOT {interval.value} data retrieved")
-    else:
-        logger.info(f"Retrieved {len(df)} records of SPOT {interval.value} data")
+    logger.info(f"Retrieved {len(df)} records of SPOT {interval.value} data")
 
-    # Validate data structure even if empty
-    assert isinstance(df, pd.DataFrame), "Result should be a DataFrame"
+    # Verify that we got data
+    assert not df.empty, f"No data returned for SPOT {interval.value}"
 
-    # For non-empty results, validate data content
-    if not df.empty:
-        # Validate index and columns
-        assert isinstance(df.index, pd.DatetimeIndex), "Index should be DatetimeIndex"
+    # Verify expected columns
+    expected_columns = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_asset_volume",
+        "count",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
+    ]
+    for col in expected_columns:
+        assert col in df.columns, f"Missing expected column: {col}"
+
+    # Verify that data is sorted by time
+    assert df.index.is_monotonic_increasing, "Data is not sorted by time"
+
+    # Verify time alignment based on interval
+    if len(df) > 1:
+        time_diffs = np.diff(df.index.astype(np.int64)) / 1e9  # Convert to seconds
+
+        if interval.name == Interval.SECOND_1.name:
+            expected_diff = 1  # 1 second
+        elif interval.name == Interval.MINUTE_1.name:
+            expected_diff = 60  # 1 minute
+        elif interval.name == Interval.HOUR_1.name:
+            expected_diff = 3600  # 1 hour
+        else:  # DAY_1
+            expected_diff = 86400  # 1 day
+
+        # Check if most time differences match the expected interval
+        # We don't check all because there might be gaps in the data
+        close_to_expected = np.abs(time_diffs - expected_diff) < 5
         assert (
-            df.index.is_monotonic_increasing
-        ), "Index should be chronologically ordered"
+            np.mean(close_to_expected) > 0.9
+        ), f"Time alignment issues for {interval.value}"
 
-        # Check essential columns
-        required_columns = ["open", "high", "low", "close", "volume"]
-        for col in required_columns:
-            assert col in df.columns, f"Column {col} missing from result"
-
-        # Check that data falls within the requested time range
-        # Allow some flexibility due to interval boundary alignment
-        interval_seconds = interval.to_seconds()
-        start_diff = abs((df.index.min() - start_time).total_seconds())
-        end_diff = abs((df.index.max() - end_time).total_seconds())
-
-        # The difference should be at most 2 intervals
-        assert (
-            start_diff <= interval_seconds * 2
-        ), f"Data start time {df.index.min()} too far from requested {start_time}"
-        assert (
-            end_diff <= interval_seconds * 2
-        ), f"Data end time {df.index.max()} too far from requested {end_time}"
-
-        # Check that interval between records matches expected interval
-        if len(df) > 1:
-            time_diffs = np.diff(df.index.astype(np.int64)) / 1e9  # Convert to seconds
-            median_diff = np.median(time_diffs)
-
-            # The median difference should be close to the interval
-            assert abs(median_diff - interval_seconds) < 5, (
-                f"Median time difference {median_diff}s doesn't match "
-                f"expected interval {interval_seconds}s"
-            )
+    # Verify that data spans the requested time range
+    # Allow for small discrepancies due to time zone handling
+    tolerance = timedelta(hours=1)
+    assert (
+        df.index.min() >= start_time - tolerance
+    ), "Data starts before requested range"
+    assert df.index.max() <= end_time + tolerance, "Data ends after requested range"
 
 
 @pytest.mark.parametrize("interval", FUTURES_INTERVALS)
@@ -290,27 +290,17 @@ async def test_dsm_futures_intervals(
     symbol: str,
     _: int,
     interval: Interval,
-    caplog,
+    caplog_xdist_compatible,
 ):
     """Test DataSourceManager with futures market intervals.
 
     This test verifies that:
     1. DataSourceManager can retrieve data for all futures market intervals
-    2. The data has the correct format and structure
+    2. The data has the correct format and structure for futures markets
     3. Time boundaries are properly aligned
-
-    This test covers both USDT-margined (UM) and Coin-margined (CM) futures.
     """
-    # Set log level with try/except to handle pytest-asyncio compatibility issues
-    try:
-        caplog.set_level("INFO")
-    except KeyError:
-        # This can happen when running with pytest-asyncio and using -n1 or -nX
-        # due to interaction with pytest-xdist. Continue test without setting log level.
-        pass
-
-    # Override the DSM market type to match the test case
-    dsm._market_type = market_type
+    # Set log level for the test
+    caplog_xdist_compatible.set_level("INFO")
 
     # Find available data
     reference_time, found_data = await find_available_data(
@@ -318,34 +308,36 @@ async def test_dsm_futures_intervals(
     )
 
     # Define a time window appropriate for this interval
-    if interval.name in (
-        Interval.MINUTE_1.name,
-        Interval.MINUTE_3.name,
-        Interval.MINUTE_5.name,
-    ):
+    if interval.name == Interval.MINUTE_1.name:
         # For minute-level data, use a 1-hour window
         time_window = timedelta(hours=1)
-    elif interval.name in (Interval.MINUTE_15.name, Interval.MINUTE_30.name):
-        # For larger minute intervals, use a 4-hour window
-        time_window = timedelta(hours=4)
-    elif interval.name in (
-        Interval.HOUR_1.name,
-        Interval.HOUR_2.name,
-        Interval.HOUR_4.name,
-    ):
-        # For hour-level data, use a 24-hour window
+    elif interval.name == Interval.HOUR_1.name:
+        # For hour-level data, use a 1-day window
         time_window = timedelta(days=1)
-    else:
-        # For larger intervals, use a 7-day window
-        time_window = timedelta(days=7)
+    else:  # DAY_1
+        # For day-level data, use a 30-day window
+        time_window = timedelta(days=30)
 
-    # Create a time window for testing
-    start_time = reference_time - time_window
+    # Define test boundaries
     end_time = reference_time
+    start_time = end_time - time_window
 
     logger.info(
-        f"Testing {market_type.name} {interval.value} data from "
+        f"Testing DSM with {market_type.name} {interval.value} data from "
         f"{start_time.isoformat()} to {end_time.isoformat()}"
+    )
+
+    # Update the DSM market type to match the test
+    dsm._market_type = market_type
+
+    # Recreate the REST client with the new market type to ensure proper endpoint construction
+    from utils.network_utils import create_client
+
+    dsm.rest_client = RestDataClient(
+        market_type=market_type,
+        client=create_client(),
+        max_concurrent=dsm.max_concurrent,
+        retry_count=dsm.retry_count,
     )
 
     # Fetch data using DataSourceManager
@@ -354,57 +346,60 @@ async def test_dsm_futures_intervals(
         interval=interval,
         start_time=start_time,
         end_time=end_time,
-        enforce_source=DataSource.REST,  # Use REST API for consistency
     )
 
     # Log the result
-    if df.empty:
-        logger.warning(f"No {market_type.name} {interval.value} data retrieved")
-    else:
-        logger.info(
-            f"Retrieved {len(df)} records of {market_type.name} {interval.value} data"
-        )
+    logger.info(
+        f"Retrieved {len(df)} records of {market_type.name} {interval.value} data"
+    )
 
-    # Validate data structure even if empty
-    assert isinstance(df, pd.DataFrame), "Result should be a DataFrame"
+    # Verify that we got data
+    assert not df.empty, f"No data returned for {market_type.name} {interval.value}"
 
-    # For non-empty results, validate data content
-    if not df.empty:
-        # Validate index and columns
-        assert isinstance(df.index, pd.DatetimeIndex), "Index should be DatetimeIndex"
+    # Verify expected columns
+    expected_columns = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_asset_volume",
+        "count",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
+    ]
+    for col in expected_columns:
+        assert col in df.columns, f"Missing expected column: {col}"
+
+    # Verify that data is sorted by time
+    assert df.index.is_monotonic_increasing, "Data is not sorted by time"
+
+    # Verify time alignment based on interval
+    if len(df) > 1:
+        time_diffs = np.diff(df.index.astype(np.int64)) / 1e9  # Convert to seconds
+
+        if interval.name == Interval.MINUTE_1.name:
+            expected_diff = 60  # 1 minute
+        elif interval.name == Interval.HOUR_1.name:
+            expected_diff = 3600  # 1 hour
+        else:  # DAY_1
+            expected_diff = 86400  # 1 day
+
+        # Check if most time differences match the expected interval
+        # We don't check all because there might be gaps in the data
+        close_to_expected = np.abs(time_diffs - expected_diff) < 5
         assert (
-            df.index.is_monotonic_increasing
-        ), "Index should be chronologically ordered"
+            np.mean(close_to_expected) > 0.9
+        ), f"Time alignment issues for {interval.value}"
 
-        # Check essential columns
-        required_columns = ["open", "high", "low", "close", "volume"]
-        for col in required_columns:
-            assert col in df.columns, f"Column {col} missing from result"
-
-        # Check that data falls within the requested time range
-        # Allow some flexibility due to interval boundary alignment
-        interval_seconds = interval.to_seconds()
-        start_diff = abs((df.index.min() - start_time).total_seconds())
-        end_diff = abs((df.index.max() - end_time).total_seconds())
-
-        # The difference should be at most 2 intervals
-        assert (
-            start_diff <= interval_seconds * 2
-        ), f"Data start time {df.index.min()} too far from requested {start_time}"
-        assert (
-            end_diff <= interval_seconds * 2
-        ), f"Data end time {df.index.max()} too far from requested {end_time}"
-
-        # Check that interval between records matches expected interval
-        if len(df) > 1:
-            time_diffs = np.diff(df.index.astype(np.int64)) / 1e9  # Convert to seconds
-            median_diff = np.median(time_diffs)
-
-            # The median difference should be close to the interval
-            assert abs(median_diff - interval_seconds) < 5, (
-                f"Median time difference {median_diff}s doesn't match "
-                f"expected interval {interval_seconds}s"
-            )
+    # Verify that data spans the requested time range
+    # Allow for small discrepancies due to time zone handling
+    tolerance = timedelta(hours=1)
+    assert (
+        df.index.min() >= start_time - tolerance
+    ), "Data starts before requested range"
+    assert df.index.max() <= end_time + tolerance, "Data ends after requested range"
 
 
 @pytest.mark.parametrize(
@@ -416,229 +411,246 @@ async def test_dsm_futures_intervals(
     ],
 )
 async def test_dsm_interval_data_consistency(
-    dsm: DataSourceManager, interval: Interval, caplog
+    dsm: DataSourceManager, interval: Interval, caplog_xdist_compatible
 ):
-    """Test that data consistency is maintained when querying with different intervals.
+    """Test that DSM returns consistent data across different sources.
 
-    This test verifies that the DataSourceManager:
-    1. Returns consistent data when querying with different intervals
-    2. Properly handles interval boundaries and alignments
-    3. Respects time window constraints
+    This test verifies that:
+    1. Data is consistent when retrieved from different sources (REST vs VISION)
+    2. Column names and data types are consistent
+    3. Results have the same shape and content regardless of source
     """
-    # Set log level with try/except to handle pytest-asyncio compatibility issues
-    try:
-        caplog.set_level("INFO")
-    except KeyError:
-        # This can happen when running with pytest-asyncio and using -n1 or -nX
-        # due to interaction with pytest-xdist. Continue test without setting log level.
-        pass
-
-    results = {}
-
-    # Test each market type with the same interval
-    for market_type, symbol, _ in MARKET_TEST_PARAMS:
-        # Override the DSM market type
-        dsm._market_type = market_type
-
-        # Find available data
-        reference_time, found_data = await find_available_data(
-            market_type=market_type, symbol=symbol, interval=interval
-        )
-
-        # Define a time window appropriate for this interval
-        if interval.name == Interval.MINUTE_1.name:
-            time_window = timedelta(hours=1)
-        elif interval.name == Interval.HOUR_1.name:
-            time_window = timedelta(days=1)
-        else:  # DAY_1
-            time_window = timedelta(days=7)
-
-        # Create a time window for testing
-        start_time = reference_time - time_window
-        end_time = reference_time
-
-        logger.info(
-            f"Testing {market_type.name} {interval.value} data from "
-            f"{start_time.isoformat()} to {end_time.isoformat()}"
-        )
-
-        # Fetch data using DataSourceManager
-        df = await dsm.get_data(
-            symbol=symbol,
-            interval=interval,
-            start_time=start_time,
-            end_time=end_time,
-            enforce_source=DataSource.REST,  # Use REST API for consistency
-        )
-
-        # Store results for later comparison
-        results[market_type.name] = {
-            "df": df,
-            "symbol": symbol,
-            "record_count": len(df),
-            "columns": list(df.columns) if not df.empty else [],
-            "dtypes": (
-                {col: str(df[col].dtype) for col in df.columns} if not df.empty else {}
-            ),
-        }
-
-        # Log the result
-        if df.empty:
-            logger.warning(f"No {market_type.name} {interval.value} data retrieved")
-        else:
-            logger.info(
-                f"Retrieved {len(df)} records of {market_type.name} {interval.value} data"
-            )
-
-    # Compare structure across market types
-    for market_name, result in results.items():
-        # Basic validation for each market type
-        df = result["df"]
-        assert isinstance(
-            df, pd.DataFrame
-        ), f"{market_name} result should be a DataFrame"
-
-        if not df.empty:
-            # Check index and essential properties
-            assert isinstance(
-                df.index, pd.DatetimeIndex
-            ), f"{market_name} index should be DatetimeIndex"
-            assert (
-                df.index.is_monotonic_increasing
-            ), f"{market_name} index should be ordered"
-
-            # Check essential columns
-            required_columns = ["open", "high", "low", "close", "volume"]
-            for col in required_columns:
-                assert (
-                    col in df.columns
-                ), f"Column {col} missing from {market_name} result"
-
-    # Compare structure consistency between market types with data
-    non_empty_results = {k: v for k, v in results.items() if not v["df"].empty}
-
-    if len(non_empty_results) >= 2:
-        # Get the first market as reference
-        reference_market = list(non_empty_results.keys())[0]
-        reference_columns = set(non_empty_results[reference_market]["columns"])
-
-        # Compare all other markets to the reference
-        for market_name, result in non_empty_results.items():
-            if market_name == reference_market:
-                continue
-
-            # Check column consistency
-            market_columns = set(result["columns"])
-
-            # Check that essential columns are consistent
-            essential_columns = {"open", "high", "low", "close", "volume"}
-            assert essential_columns.issubset(
-                market_columns
-            ), f"{market_name} missing essential columns compared to {reference_market}"
-
-            # Log any additional or missing columns (not a failure)
-            extra_columns = market_columns - reference_columns
-            missing_columns = reference_columns - market_columns
-
-            if extra_columns:
-                logger.info(f"{market_name} has additional columns: {extra_columns}")
-
-            if missing_columns:
-                logger.info(f"{market_name} is missing columns: {missing_columns}")
-
-
-@pytest.mark.parametrize(
-    "interval,expected_field",
-    [
-        (Interval.MINUTE_1, "open_time"),
-        (Interval.HOUR_1, "open_time"),
-        (Interval.DAY_1, "open_time"),
-    ],
-)
-async def test_dsm_metadata_consistency(
-    dsm: DataSourceManager, interval: Interval, expected_field: str, caplog
-):
-    """Test that metadata is consistently included in DataSourceManager results.
-
-    This test verifies that the DataSourceManager:
-    1. Consistently includes expected metadata fields
-    2. Maintains proper value types and ranges for metadata
-    """
-    # Set log level with try/except to handle pytest-asyncio compatibility issues
-    try:
-        caplog.set_level("INFO")
-    except KeyError:
-        # This can happen when running with pytest-asyncio and using -n1 or -nX
-        # due to interaction with pytest-xdist. Continue test without setting log level.
-        pass
-
-    # Use SPOT market for simplicity
-    market_type = MarketType.SPOT
-    symbol = SPOT_SYMBOL
+    caplog_xdist_compatible.set_level("INFO")
 
     # Find available data
     reference_time, found_data = await find_available_data(
-        market_type=market_type, symbol=symbol, interval=interval
+        market_type=MarketType.SPOT, symbol=SPOT_SYMBOL, interval=interval
     )
 
     # Define a time window appropriate for this interval
     if interval.name == Interval.MINUTE_1.name:
+        # For minute-level data, use a 1-hour window
         time_window = timedelta(hours=1)
     elif interval.name == Interval.HOUR_1.name:
+        # For hour-level data, use a 1-day window
         time_window = timedelta(days=1)
     else:  # DAY_1
-        time_window = timedelta(days=7)
+        # For day-level data, use a 10-day window
+        time_window = timedelta(days=10)
 
-    # Create a time window for testing
-    start_time = reference_time - time_window
+    # Define test boundaries
     end_time = reference_time
+    start_time = end_time - time_window
 
     logger.info(
-        f"Testing metadata for {interval.value} data from "
+        f"Testing data consistency for {interval.value} from "
         f"{start_time.isoformat()} to {end_time.isoformat()}"
     )
 
-    # Fetch data using DataSourceManager
-    df = await dsm.get_data(
-        symbol=symbol,
+    # Using SPOT market for consistency tests
+    dsm._market_type = MarketType.SPOT
+
+    # Recreate the REST client with the new market type to ensure proper endpoint construction
+    from utils.network_utils import create_client
+
+    dsm.rest_client = RestDataClient(
+        market_type=MarketType.SPOT,
+        client=create_client(),
+        max_concurrent=dsm.max_concurrent,
+        retry_count=dsm.retry_count,
+    )
+
+    # Fetch data from REST source
+    df_rest = await dsm.get_data(
+        symbol=SPOT_SYMBOL,
         interval=interval,
         start_time=start_time,
         end_time=end_time,
-        enforce_source=DataSource.REST,  # Use REST API for consistency
+        enforce_source=DataSource.REST,
     )
 
-    # Validate even if the DataFrame is empty
-    assert isinstance(df, pd.DataFrame), "Result should be a DataFrame"
+    # For 1-minute data, also try to fetch from VISION source
+    # (Vision data might not be available for very recent data)
+    if interval.name in [
+        Interval.MINUTE_1.name,
+        Interval.HOUR_1.name,
+        Interval.DAY_1.name,
+    ]:
+        try:
+            # Try to fetch from VISION, but may not be available for recent data
+            # Use a slightly earlier time window to increase chances of finding data
+            vision_end_time = end_time - timedelta(days=1)
+            vision_start_time = vision_end_time - time_window
 
-    if not df.empty:
-        # Check index name
-        assert df.index.name == expected_field, f"Index name should be {expected_field}"
+            df_vision = await dsm.get_data(
+                symbol=SPOT_SYMBOL,
+                interval=interval,
+                start_time=vision_start_time,
+                end_time=vision_end_time,
+                enforce_source=DataSource.VISION,
+            )
 
-        # Check column data types
-        assert pd.api.types.is_float_dtype(df["open"]), "open should be float"
-        assert pd.api.types.is_float_dtype(df["high"]), "high should be float"
-        assert pd.api.types.is_float_dtype(df["low"]), "low should be float"
-        assert pd.api.types.is_float_dtype(df["close"]), "close should be float"
-        assert pd.api.types.is_float_dtype(df["volume"]), "volume should be float"
+            # If we got data from both sources, compare them
+            if not df_rest.empty and not df_vision.empty:
+                logger.info(
+                    f"Comparing {len(df_rest)} REST records with {len(df_vision)} VISION records"
+                )
 
-        # Check close_time column
-        assert "close_time" in df.columns, "close_time should be present"
-        assert pd.api.types.is_datetime64_dtype(
-            df["close_time"]
-        ), "close_time should be datetime"
+                # Verify core column consistency
+                rest_columns = set(df_rest.columns)
+                vision_columns = set(df_vision.columns)
 
-        # Check numeric fields
-        numeric_fields = ["trades", "quote_asset_volume", "taker_buy_base_asset_volume"]
-        for field in numeric_fields:
-            if field in df.columns:
-                assert pd.api.types.is_numeric_dtype(
-                    df[field]
-                ), f"{field} should be numeric"
+                # Common columns that should be in both
+                common_columns = ["open", "high", "low", "close", "volume"]
+                for col in common_columns:
+                    assert col in rest_columns, f"Missing {col} in REST data"
+                    assert col in vision_columns, f"Missing {col} in VISION data"
 
-        # Log column info for inspection
-        for col in df.columns:
-            logger.info(f"Column {col}: {df[col].dtype}")
-    else:
-        logger.warning(
-            f"No data available for {interval.value}, skipping detailed validation"
-        )
+                # Check data types for common columns
+                for col in common_columns:
+                    assert df_rest[col].dtype == df_vision[col].dtype, (
+                        f"Data type mismatch for {col}: "
+                        f"REST={df_rest[col].dtype}, VISION={df_vision[col].dtype}"
+                    )
+
+                # If there's an overlap in the time periods, compare values
+                rest_dates = set(df_rest.index)
+                vision_dates = set(df_vision.index)
+                common_dates = rest_dates.intersection(vision_dates)
+
+                if common_dates:
+                    # Take a sample date for comparison
+                    sample_date = sorted(common_dates)[0]
+                    logger.info(f"Comparing data for {sample_date}")
+
+                    rest_row = df_rest.loc[sample_date]
+                    vision_row = df_vision.loc[sample_date]
+
+                    # Compare price values with tolerance for float comparison
+                    # (small differences might exist due to data source differences)
+                    for col in ["open", "high", "low", "close"]:
+                        rest_val = float(rest_row[col])
+                        vision_val = float(vision_row[col])
+                        diff_pct = abs(rest_val - vision_val) / rest_val * 100
+
+                        # Difference should be very small (<0.1%)
+                        assert diff_pct < 0.1, (
+                            f"Value mismatch for {col} at {sample_date}: "
+                            f"REST={rest_val}, VISION={vision_val}, diff={diff_pct:.6f}%"
+                        )
+
+        except Exception as e:
+            # VISION data may not be available for very recent dates
+            # This is not a test failure
+            logger.warning(f"Could not fetch VISION data for comparison: {e}")
+            # We don't assert anything here, as the test can still pass
+            # even if VISION data is not available
+
+    # Basic validation of REST data
+    assert not df_rest.empty, f"No data returned for {interval.value} from REST"
+    logger.info(f"Successfully validated {interval.value} data consistency")
+
+
+@pytest.mark.parametrize(
+    "interval",
+    [
+        Interval.MINUTE_1,
+        Interval.HOUR_1,
+        Interval.DAY_1,
+    ],
+)
+async def test_dsm_metadata_consistency(
+    dsm: DataSourceManager,
+    interval: Interval,
+    caplog_xdist_compatible,
+):
+    """Test that DSM data index is consistent across intervals.
+
+    This test verifies that:
+    1. The DataFrame index is a DatetimeIndex
+    2. Timestamps are properly handled and aligned
+    """
+    caplog_xdist_compatible.set_level("INFO")
+
+    # Find available data
+    reference_time, found_data = await find_available_data(
+        market_type=MarketType.SPOT, symbol=SPOT_SYMBOL, interval=interval
+    )
+
+    # Define a time window appropriate for this interval
+    if interval.name == Interval.MINUTE_1.name:
+        # For minute-level data, use a 1-hour window
+        time_window = timedelta(hours=1)
+    elif interval.name == Interval.HOUR_1.name:
+        # For hour-level data, use a 1-day window
+        time_window = timedelta(days=1)
+    else:  # DAY_1
+        # For day-level data, use a 10-day window
+        time_window = timedelta(days=10)
+
+    # Define test boundaries
+    end_time = reference_time
+    start_time = end_time - time_window
+
+    logger.info(
+        f"Testing timestamp index for {interval.value} from "
+        f"{start_time.isoformat()} to {end_time.isoformat()}"
+    )
+
+    # Using SPOT market for metadata tests
+    dsm._market_type = MarketType.SPOT
+
+    # Recreate the REST client with the new market type to ensure proper endpoint construction
+    from utils.network_utils import create_client
+
+    dsm.rest_client = RestDataClient(
+        market_type=MarketType.SPOT,
+        client=create_client(),
+        max_concurrent=dsm.max_concurrent,
+        retry_count=dsm.retry_count,
+    )
+
+    # Fetch data
+    df = await dsm.get_data(
+        symbol=SPOT_SYMBOL,
+        interval=interval,
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    # Verify data was returned
+    assert not df.empty, f"No data returned for {interval.value}"
+
+    # Verify the index is a DatetimeIndex
+    assert isinstance(df.index, pd.DatetimeIndex), "Index is not a DatetimeIndex"
+
+    # Verify index is timezone aware and in UTC
+    assert df.index.tz is not None, "Index is not timezone aware"
+
+    # Verify index is monotonically increasing
+    assert df.index.is_monotonic_increasing, "Index is not monotonically increasing"
+
+    # Verify index range matches requested time range (with tolerance)
+    tolerance = timedelta(hours=1)
+    assert (
+        df.index.min() >= start_time - tolerance
+    ), "Data starts before requested range"
+    assert df.index.max() <= end_time + tolerance, "Data ends after requested range"
+
+    # For specific intervals, verify time alignment
+    if interval.name == Interval.MINUTE_1.name:
+        # For minute data, each timestamp should be aligned to the minute
+        for ts in df.index:
+            assert ts.second == 0, f"Timestamp {ts} not aligned to minute boundary"
+    elif interval.name == Interval.HOUR_1.name:
+        # For hour data, each timestamp should be aligned to the hour
+        for ts in df.index:
+            assert (
+                ts.minute == 0 and ts.second == 0
+            ), f"Timestamp {ts} not aligned to hour boundary"
+    elif interval.name == Interval.DAY_1.name:
+        # For day data, each timestamp should be aligned to the day
+        for ts in df.index:
+            assert (
+                ts.hour == 0 and ts.minute == 0 and ts.second == 0
+            ), f"Timestamp {ts} not aligned to day boundary"

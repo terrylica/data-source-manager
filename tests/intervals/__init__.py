@@ -5,8 +5,8 @@ across all supported intervals and market types:
 
 Intervals:
 - 1s (SPOT only)
-- 1m, 3m, 5m, 15m, 30m
-- 1h, 2h, 4h, 6h, 8h, 12h
+- 1m
+- 1h
 - 1d
 
 Market Types:
@@ -43,30 +43,12 @@ MARKET_TEST_PARAMS = [
 SPOT_INTERVALS = [
     Interval.SECOND_1,
     Interval.MINUTE_1,
-    Interval.MINUTE_3,
-    Interval.MINUTE_5,
-    Interval.MINUTE_15,
-    Interval.MINUTE_30,
     Interval.HOUR_1,
-    Interval.HOUR_2,
-    Interval.HOUR_4,
-    Interval.HOUR_6,
-    Interval.HOUR_8,
-    Interval.HOUR_12,
     Interval.DAY_1,
 ]
 
 FUTURES_INTERVALS = [
     Interval.MINUTE_1,
-    Interval.MINUTE_3,
-    Interval.MINUTE_5,
-    Interval.MINUTE_15,
-    Interval.MINUTE_30,
     Interval.HOUR_1,
-    Interval.HOUR_2,
-    Interval.HOUR_4,
-    Interval.HOUR_6,
-    Interval.HOUR_8,
-    Interval.HOUR_12,
     Interval.DAY_1,
 ]

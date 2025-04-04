@@ -21,7 +21,6 @@ import pytest
 import arrow
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-import asyncio
 from typing import (
     Dict,
     Any,

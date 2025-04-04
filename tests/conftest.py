@@ -58,26 +58,11 @@ def caplog_xdist_compatible():
     """
     A simplified caplog fixture compatible with pytest-xdist.
 
-    This fixture provides a testing-specific logging capture implementation
-    that works correctly with parallel test execution. Use this fixture instead
-    of the standard caplog fixture in tests run with pytest-xdist to avoid
-    KeyError issues.
+    Instead of trying to use the standard caplog fixture which has issues with
+    pytest-xdist, this provides a minimal implementation that collects logs
+    during test execution.
     """
 
-    # Handler class for collecting log records
-    class _CollectHandler(logging.Handler):
-        """Handler that collects log records in a list."""
-
-        def __init__(self, records_list):
-            """Initialize with a list to store records."""
-            super().__init__()
-            self.records_list = records_list
-
-        def emit(self, record):
-            """Add the record to our collection."""
-            self.records_list.append(record)
-
-    # The actual capture implementation
     class SimpleLogCapture:
         """A simple log capture implementation for pytest-xdist compatibility."""
 
@@ -109,6 +94,19 @@ def caplog_xdist_compatible():
             """Remove the handler when done."""
             if self.handler:
                 logging.getLogger().removeHandler(self.handler)
+
+    # Handler class for collecting log records
+    class _CollectHandler(logging.Handler):
+        """Handler that collects log records in a list."""
+
+        def __init__(self, records_list):
+            """Initialize with a list to store records."""
+            super().__init__()
+            self.records_list = records_list
+
+        def emit(self, record):
+            """Add the record to our collection."""
+            self.records_list.append(record)
 
     # Create and return the capture object
     capture = SimpleLogCapture()

@@ -2,7 +2,6 @@
 """Simplified test to reproduce endpoint URL issues."""
 
 import pytest
-import asyncio
 import inspect
 import sys
 import importlib

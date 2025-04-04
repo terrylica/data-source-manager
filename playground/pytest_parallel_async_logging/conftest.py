@@ -7,7 +7,6 @@ Enhanced conftest.py that incorporates best practices from:
 
 import logging
 import pytest
-from utils.logger_setup import logger
 
 
 # Set global asyncio configuration via pytest configuration

@@ -457,7 +457,6 @@ class TestApiRequests:
 @pytest.mark.asyncio
 async def test_read_csv_from_zip_different_timestamp_formats(temp_dir, caplog):
     """Test that read_csv_from_zip can handle real Binance kline data."""
-    import logging
     import os
     import time
 

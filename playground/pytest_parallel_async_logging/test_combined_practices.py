@@ -9,7 +9,6 @@ in a parallel execution environment.
 """
 
 import asyncio
-import logging
 import pytest
 from utils.logger_setup import logger
 

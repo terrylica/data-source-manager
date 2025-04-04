@@ -199,6 +199,14 @@ class RestDataClient:
             f"max_concurrent={max_concurrent}, retry_count={retry_count}"
         )
 
+    def _get_klines_endpoint(self) -> str:
+        """Get the klines endpoint URL for the current market type.
+
+        Returns:
+            The fully qualified klines endpoint URL
+        """
+        return get_endpoint_url(self.market_type, ChartType.KLINES)
+
     async def __aenter__(self):
         """Async context manager entry."""
         if not self._client:
@@ -793,7 +801,7 @@ class RestDataClient:
         # Test connectivity to Binance API with actual endpoint we'll use
         # Use the klines endpoint with actual parameters for a more accurate test
         # Get the properly constructed URL using get_endpoint_url with ChartType.KLINES
-        test_url = f"{get_endpoint_url(self.market_type, ChartType.KLINES)}?symbol={formatted_symbol}&interval={interval.value}&limit=1"
+        test_url = f"{self._get_klines_endpoint()}?symbol={formatted_symbol}&interval={interval.value}&limit=1"
 
         logger.debug(f"Testing connectivity to {test_url}")
 

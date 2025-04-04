@@ -29,7 +29,6 @@ Dependencies:
 """
 
 import pytest
-import pytest_asyncio
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import logging
@@ -82,7 +81,6 @@ def caplog_maybe(request):
 
         def set_level(self, level, logger=None):
             """Dummy implementation of set_level."""
-            pass
 
         def clear(self):
             """Clear logs."""

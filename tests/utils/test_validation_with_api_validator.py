@@ -10,7 +10,6 @@ import pytest
 from utils.api_boundary_validator import ApiBoundaryValidator
 from utils.market_constraints import Interval, MarketType
 from utils.validation import DataValidation
-from utils.logger_setup import logger
 
 
 # Test constants

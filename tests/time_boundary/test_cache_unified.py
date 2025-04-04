@@ -38,9 +38,6 @@ from core.vision_constraints import CONSOLIDATION_DELAY
 from utils.market_constraints import Interval, MarketType
 from utils.logger_setup import logger
 from utils.network_utils import safely_close_client
-from tests.utils.cache_test_utils import (
-    corrupt_cache_file,
-)
 
 
 # Configure test settings without global markers

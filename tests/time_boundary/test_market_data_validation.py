@@ -24,7 +24,7 @@ import pandas as pd
 
 import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any, List, Tuple, cast
+from typing import Optional, Dict, Any, List, Tuple
 
 from core.rest_data_client import RestDataClient
 from utils.market_constraints import (
@@ -66,7 +66,6 @@ def caplog_maybe(request):
 
         def set_level(self, level, logger=None):
             """Dummy implementation of set_level."""
-            pass
 
         def clear(self):
             """Clear logs."""

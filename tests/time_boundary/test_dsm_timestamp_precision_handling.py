@@ -190,7 +190,6 @@ def caplog_maybe(request):
 
         def set_level(self, level, logger=None):
             """Dummy implementation of set_level."""
-            pass
 
         def clear(self):
             """Clear logs."""
