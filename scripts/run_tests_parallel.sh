@@ -9,6 +9,9 @@
 #     significantly reducing test times, especially for extensive test suites. By
 #     default, it uses 8 worker processes, which can be adjusted via additional
 #     pytest arguments.
+#   - Smart Handling of Serial Tests: Automatically detects and runs tests marked
+#     with @pytest.mark.serial sequentially, ensuring tests that cannot run in 
+#     parallel are executed properly even in parallel mode.
 #   - Sequential Execution Option: Provides an option to run tests sequentially
 #     (without parallelism) for debugging complex test interactions or when
 #     troubleshooting race conditions.
@@ -21,9 +24,7 @@
 #   - Flexible Logging: Enables users to control the verbosity of test output
 #     using a log level argument, facilitating detailed debugging or minimizing
 #     output for cleaner test runs.
-#   - Custom Pytest Arguments: Supports the inclusion of extra pytest command-line
-#     arguments, allowing advanced users to further customize test execution behavior.
-#   - asyncio Configuration:  Configures asyncio loop scope to 'function'
+#   - asyncio Configuration: Configures asyncio loop scope to 'function'
 #     (`asyncio_default_fixture_loop_scope=function`) to prevent pytest-asyncio
 #     deprecation warnings and ensure consistent behavior for asynchronous tests.
 #   - Error Summary: Collects and displays a summary of all errors and warnings,
@@ -122,17 +123,21 @@
 #   ./scripts/run_tests_parallel.sh -s -e tests/time_boundary
 #
 # BEST PRACTICES and NOTES:
-#   - Interactive Test Selection:  The interactive mode smartly detects both
+#   - Interactive Test Selection: The interactive mode smartly detects both
 #     Git-tracked and untracked test files in the 'tests/' directory, ensuring
 #     comprehensive test discovery for selection.
 #   - Sequential vs Parallel: Use sequential mode (-s) when debugging test interactions
 #     or race conditions that might be masked by parallel execution. Use parallel mode
 #     (default) for faster execution in CI/CD pipelines and routine test runs.
+#   - Serial Test Marking: Use @pytest.mark.serial to mark tests that should not run
+#     in parallel with other tests. This script automatically detects and separates
+#     these tests to run sequentially even in parallel mode, ensuring test stability.
 #   - asyncio Configuration: The script automatically configures
 #     `asyncio_default_fixture_loop_scope=function` via pytest command-line option,
 #     preventing pytest-asyncio deprecation warnings and ensuring consistent
 #     async test behavior, independent of `pytest.ini` settings. This is critical
-#     for proper cleanup of asyncio resources between tests.
+#     for proper cleanup of asyncio resources between tests and avoids KeyError
+#     issues with pytest-xdist.
 #   - Log Level Flexibility: Leverage different log levels (DEBUG, INFO, WARNING, ERROR)
 #     to control output verbosity, aiding in detailed debugging or cleaner routine runs.
 #   - Parallel Execution Efficiency: Parallel testing with `-n8` significantly
@@ -213,6 +218,12 @@ show_help() {
     echo -e "  ${GREEN}-c, --clear${NC}      : Clear screen before test execution"
     echo -e "  ${GREEN}-h, --help${NC}        : Show this detailed help"
     echo -e ""
+    echo -e "${YELLOW}Test Markers:${NC}"
+    echo -e "  ${GREEN}@pytest.mark.serial${NC}    : Mark tests that should run serially (not in parallel)"
+    echo -e "  ${GREEN}@pytest.mark.asyncio${NC}   : Mark async tests (automatically uses function-scoped event loops)"
+    echo -e "  ${GREEN}@pytest.mark.real${NC}      : Mark tests that run against real data/resources"
+    echo -e "  ${GREEN}@pytest.mark.integration${NC}: Mark tests that integrate with external services"
+    echo -e ""
     echo -e "${YELLOW}Arguments:${NC}"
     echo -e "  ${GREEN}test_path${NC}            : Path to test file/directory (default: ${CYAN}tests/${NC})"
     echo -e "  ${GREEN}log_level${NC}            : Verbosity level (${CYAN}DEBUG${NC}|${CYAN}INFO${NC}|${CYAN}WARNING${NC}|${CYAN}ERROR${NC}) (default: ${CYAN}INFO${NC})"
@@ -225,12 +236,14 @@ show_help() {
     echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -e${NC}               : Show all errors"
     echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/cache${NC}      : Run specific tests"
     echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/ DEBUG${NC}     : With debug logging"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/ INFO -k test${NC}: Filter by test name"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -a test_output.log${NC} : Analyze existing log"
+    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/ INFO -m real${NC}: Only run real tests"
     echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -e -n4${NC}           : Error summary with 4 workers"
     echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -s -e${NC}            : Sequential with error summary"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -p tests/intervals${NC}: Profile tests in intervals directory"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -p -g${NC}            : Profile with SVG visualization"
+    echo -e ""
+    echo -e "${YELLOW}Async/Serial Test Handling:${NC}"
+    echo -e "  - Tests marked with ${CYAN}@pytest.mark.serial${NC} are automatically run sequentially"
+    echo -e "  - Async tests use function-scoped event loops for better isolation"
+    echo -e "  - Parallel tests use proper caplog fixtures to avoid KeyError issues"
   fi
   
   echo -e "${BOLD}${BLUE}======================================================${NC}"
@@ -790,11 +803,58 @@ PYTEST_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" \
   --asyncio-mode=auto \
   -o asyncio_default_fixture_loop_scope=function \
   --durations=10 \
-  -o 'markers=real: mark tests that run against real data/resources rather than mocks
+  -o 'markers=serial: mark tests to run serially (non-parallel)
+real: mark tests that run against real data/resources rather than mocks
 integration: mark tests that integrate with external services' \
   -o 'filterwarnings=ignore::ResourceWarning' \
   --showlocals \
   -rA${ADDITIONAL_ARGS_CMD}"
+
+# Add sequential execution support for serial tests when using parallel mode
+if ! $SEQUENTIAL && ! [[ "$ADDITIONAL_ARGS_STR" =~ "-k" ]]; then
+  # When in parallel mode, execute serial tests in a separate call
+  if [[ -d "$TEST_PATH" || "$TEST_PATH" == "tests/" ]]; then
+    echo "Pre-running any tests marked as 'serial' separately for better stability..."
+    
+    # First run the serial tests
+    SERIAL_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" \
+      -p no:timer \
+      -vv \
+      -o testpaths=tests \
+      -o python_files=test_*.py \
+      --asyncio-mode=auto \
+      -o asyncio_default_fixture_loop_scope=function \
+      -m serial \
+      -o 'filterwarnings=ignore::ResourceWarning' \
+      --showlocals \
+      -rA"
+      
+    echo "Running serial tests first: $SERIAL_CMD"
+    eval "$SERIAL_CMD"
+    
+    # Then exclude serial tests from the parallel run
+    ADDITIONAL_ARGS+=("-m" "not serial")
+    ADDITIONAL_ARGS_CMD=""
+    for arg in "${ADDITIONAL_ARGS[@]}"; do
+      ADDITIONAL_ARGS_CMD+=" $arg"
+    done
+    PYTEST_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" \
+      -p no:timer \
+      -vv \
+      -o testpaths=tests \
+      -o python_files=test_*.py \
+      --asyncio-mode=auto \
+      -o asyncio_default_fixture_loop_scope=function \
+      --durations=10 \
+      -o 'markers=serial: mark tests to run serially (non-parallel)
+real: mark tests that run against real data/resources rather than mocks
+integration: mark tests that integrate with external services' \
+      -o 'filterwarnings=ignore::ResourceWarning' \
+      --showlocals \
+      -rA${ADDITIONAL_ARGS_CMD}"
+  fi
+fi
+
 echo "Running: $PYTEST_CMD"
 echo "---------------------------------------------------"
 

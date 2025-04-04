@@ -1,78 +1,130 @@
-# Binance Data Services Test Suite
+# Testing Best Practices
 
-This directory contains tests for all components of the Binance Data Services library.
+This directory contains all the tests for the Binance Data Services project. This document outlines the best practices and patterns to follow when creating or modifying tests.
 
-## How to Run Tests
+## Running Tests
 
-All tests should be run using the `scripts/run_tests_parallel.sh` script, which configures pytest with the proper settings:
+Always use the `scripts/run_tests_parallel.sh` script to run tests. This script provides several features:
+
+- Parallel test execution (with `-n8` by default)
+- Smart handling of tests marked with `@pytest.mark.serial`
+- Proper event loop configuration for asyncio tests
+- Error summaries and diagnostic tools
 
 ```bash
 # Run all tests
-scripts/run_tests_parallel.sh tests/
+scripts/run_tests_parallel.sh
 
-# Run specific test directory
-scripts/run_tests_parallel.sh tests/time_boundary
+# Run a specific test file or directory
+scripts/run_tests_parallel.sh tests/utils/test_logging_parallel.py
 
-# Run with specific log level
-scripts/run_tests_parallel.sh tests/api_boundary DEBUG
+# Run tests sequentially (for debugging)
+scripts/run_tests_parallel.sh -s
 
-# Run with additional pytest parameters
-scripts/run_tests_parallel.sh tests/time_boundary INFO "-k 'test_cache' --tb=short"
+# Run with increased log verbosity
+scripts/run_tests_parallel.sh tests/ DEBUG
 ```
 
-## Test Organization
+## Test Markers
 
-The tests are organized by category:
+We use the following pytest markers:
 
-### Data Source Tests
+- `@pytest.mark.serial`: For tests that must run serially (not parallel with other tests)
+- `@pytest.mark.asyncio`: For asynchronous tests (always use this for async functions)
+- `@pytest.mark.real`: For tests that run against real data/resources
+- `@pytest.mark.integration`: For tests that integrate with external services
 
-`tests/data_sources/test_fallback.py` - Tests for data source selection and fallback:
+Example:
 
-- Automatic fallback from Vision API to REST API
-- Download-first approach efficiency
-- Caching integration with different data sources
-- Error handling for unavailable sources
+```python
+import pytest
 
-### API Boundary Tests
+# Regular synchronous test
+def test_some_function():
+    assert True
 
-`tests/api_boundary/test_api_boundary.py` - Tests for the ApiBoundaryValidator:
+# Asynchronous test
+@pytest.mark.asyncio
+async def test_async_function():
+    await some_async_function()
+    assert True
 
-- Core validation functionality
-- Boundary alignment
-- Edge cases (month/year boundaries)
-- Error handling
+# Test that should not run in parallel
+@pytest.mark.serial
+@pytest.mark.asyncio
+async def test_intensive_operation():
+    await resource_intensive_function()
+    assert True
+```
 
-### Market Data Tests
+## Logging in Tests
 
-`tests/time_boundary/test_rest_data_validation.py` - Market data validation:
+For capturing and testing logs, use the `caplog_xdist_compatible` fixture included in `tests/utils/test_logging_parallel.py`. This fixture is compatible with parallel test execution and prevents KeyError issues with pytest-xdist.
 
-- Data structure validation
-- Data integrity
-- API limits and chunking
-- Retriever integration
+```python
+def test_with_logging(caplog_xdist_compatible):
+    """Test with xdist-compatible logging capture."""
+    caplog_xdist_compatible.set_level(logging.INFO)
 
-### Cache Tests
+    logger.info("Some log message")
 
-`tests/time_boundary/test_cache_unified.py` - Cache testing:
+    messages = [r.message for r in caplog_xdist_compatible.records]
+    assert "Some log message" in messages
+```
 
-- Core cache operations
-- Directory structure
-- Cache lifecycle (validation, repair)
-- Concurrent access
-- Integration with DataSourceManager
+## Async Test Best Practices
 
-### Additional Test Directories
+1. **Always use function-scoped event loops**: Our configuration ensures each test gets a fresh event loop.
+2. **Mark async tests with `@pytest.mark.asyncio`**: This ensures proper async test handling.
 
-- `tests/interval_new/` - Tests for upcoming interval features
-- `tests/cache_structure/` - Tests specific to cache structure
-- `tests/utils/` - Utility functions for testing
+3. **Clean up resources**: Make sure to clean up any created resources in your tests, especially network connections.
 
-## Test Principles
+4. **Use `@pytest.mark.serial` for resource-intensive async tests**: If a test needs exclusive access to resources, mark it as serial.
 
-- All tests use real API data, never mocks
-- Tests properly initialize and clean up resources
-- Event loops are configured with `loop_scope="function"`
-- Tests handle errors appropriately without skipping
-- Detailed logging with `caplog` from pytest
+5. **Avoid creating global state**: Tests should be isolated and not depend on shared global state.
 
-For detailed testing guidelines, see the [internal testing guide](pytest-construction.mdc).
+Example:
+
+```python
+import pytest
+import asyncio
+from utils.logger_setup import logger
+
+@pytest.mark.asyncio
+async def test_async_concurrent_tasks(caplog_xdist_compatible):
+    """Test running concurrent async tasks."""
+    caplog_xdist_compatible.set_level(logging.INFO)
+
+    async def task(n):
+        logger.info(f"Task {n} started")
+        await asyncio.sleep(0.1)
+        logger.info(f"Task {n} completed")
+        return n
+
+    # Run tasks concurrently
+    results = await asyncio.gather(task(1), task(2), task(3))
+
+    assert results == [1, 2, 3]
+    assert len([msg for msg in caplog_xdist_compatible.records
+                if "started" in msg.message]) == 3
+```
+
+## Network Requests in Tests
+
+Use the `curl_cffi_client_with_cleanup` fixture for tests that make network requests:
+
+```python
+@pytest.mark.asyncio
+async def test_api_client(curl_cffi_client_with_cleanup):
+    client = curl_cffi_client_with_cleanup
+    # Use the client for HTTP requests
+    # The fixture will handle proper cleanup
+```
+
+## Additional Resources
+
+For more details on testing with asyncio and pytest-xdist, see:
+
+- Documentation in `docs/howto/pytest_asyncio_xdist_keyerror.md`
+- Documentation in `docs/howto/pytest_logging_parallel.md`
+- Example implementations in `playground/pytest_parallel_async_logging/`
