@@ -85,7 +85,9 @@ On API related issues, always use `CURL` from terminal to find the root causes f
 - No implicit state. No config sprawl. No surprises.
 - CLI arguments over config files. Script for execution control.
 
-### `scripts/run_tests_parallel.sh`
+### How to use `scripts/run_tests_parallel.sh`
+
+- DO NOT run entire `scripts/run_tests_parallel.sh -v` because the hundreds of cases output in the tests will overload the LLM context windows.
 
 ### Example Usage
 
