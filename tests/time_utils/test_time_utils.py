@@ -164,10 +164,10 @@ class TestTimeUtils:
         end = datetime(2023, 1, 7, tzinfo=timezone.utc)
         result = filter_dataframe_by_time(df, start, end)
 
-        # Expected: dates from Jan 3 to Jan 6 (end is exclusive)
-        assert len(result) == 4
+        # Expected: dates from Jan 3 to Jan 7 (end is inclusive)
+        assert len(result) == 5
         assert result.index[0].day == 3
-        assert result.index[-1].day == 6
+        assert result.index[-1].day == 7
 
     def test_align_time_boundaries(self):
         """Test align_time_boundaries function."""

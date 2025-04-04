@@ -557,7 +557,7 @@ class DataSourceManager:
 
                 if cached_data is not None:
                     # Filter DataFrame based on original requested time range
-                    # Use inclusive start, exclusive end consistent with API behavior
+                    # Use inclusive start, inclusive end consistent with API behavior
                     filtered_data = filter_dataframe_by_time(
                         cached_data, start_time, end_time
                     )

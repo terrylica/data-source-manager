@@ -239,7 +239,7 @@ def filter_dataframe_by_time(
     Args:
         df: Dataframe to filter
         start_time: Start time boundary (inclusive)
-        end_time: End time boundary (exclusive)
+        end_time: End time boundary (inclusive)
 
     Returns:
         Filtered dataframe
@@ -254,14 +254,14 @@ def filter_dataframe_by_time(
     # First check if 'timestamp' or 'open_time' is in columns
     if "timestamp" in df.columns:
         time_col = "timestamp"
-        filtered_df = df[(df[time_col] >= start_time) & (df[time_col] < end_time)]
+        filtered_df = df[(df[time_col] >= start_time) & (df[time_col] <= end_time)]
     elif "open_time" in df.columns:
         time_col = "open_time"
-        filtered_df = df[(df[time_col] >= start_time) & (df[time_col] < end_time)]
+        filtered_df = df[(df[time_col] >= start_time) & (df[time_col] <= end_time)]
     else:
         # If neither in columns, assume the index is the time
         # This handles cases where 'open_time' is already set as the index
-        filtered_df = df[(df.index >= start_time) & (df.index < end_time)]
+        filtered_df = df[(df.index >= start_time) & (df.index <= end_time)]
 
     return filtered_df
 
@@ -408,7 +408,7 @@ def vision_api_time_window_alignment(
     # For start time: ALWAYS use floor time (inclusive)
     adjusted_start = start_floor
 
-    # For end time: Use floor time (exclusive boundary)
+    # For end time: Use floor time (inclusive boundary)
     adjusted_end = end_floor
 
     return adjusted_start, adjusted_end

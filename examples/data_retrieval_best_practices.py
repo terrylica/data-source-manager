@@ -69,9 +69,17 @@ Best Practices Demonstrated:
 - Graceful degradation and fallback strategies
 """
 
+# IMPORTANT NOTE:
+# This example script includes intentional tests of the system's ability to properly
+# handle and validate date ranges, including requests for data from future dates.
+# In particular, the example_fetch_unavailable_data() function deliberately attempts
+# to fetch data for dates in the future to demonstrate that the system correctly
+# rejects such requests with appropriate error messages. These are not bugs or mistakes,
+# but intentional demonstrations of error handling capabilities.
+
 import asyncio
 import signal
-import sys, os
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import traceback
@@ -79,9 +87,126 @@ import pandas as pd
 
 from utils.logger_setup import logger
 
-logger.setLevel("ERROR")
+# Set to INFO instead of CRITICAL to see the colorized output
+logger.setLevel("INFO")
+# Enable rich logging for enhanced visual output
+logger.use_rich(True)
 from utils.market_constraints import Interval, MarketType, is_interval_supported
 from core.data_source_manager import DataSourceManager, DataSource
+
+
+def determine_data_source(manager, prev_stats, current_stats, enforce_source=None):
+    """Helper function to determine data source by analyzing cache statistics.
+
+    Args:
+        manager: DataSourceManager instance
+        prev_stats: Previous cache statistics before the operation
+        current_stats: Current cache statistics after the operation
+        enforce_source: If specified, the source that was enforced (DataSource.REST or DataSource.VISION)
+
+    Returns:
+        String indicating the data source (CACHE, VISION API, REST API)
+    """
+    # If a source was explicitly enforced, that's our answer
+    if enforce_source:
+        if enforce_source == DataSource.REST:
+            return "REST API (enforced)"
+        elif enforce_source == DataSource.VISION:
+            return "VISION API (enforced)"
+
+    # If cache hits increased, data came from cache
+    if current_stats.get("hits", 0) > prev_stats.get("hits", 0):
+        return "CACHE"
+
+    # If we got this far with misses increased, data came from an API
+    if current_stats.get("misses", 0) > prev_stats.get("misses", 0):
+        # We can't be 100% sure which API without additional tracking,
+        # but for most examples we can make an educated guess based on time range
+        now = datetime.now(timezone.utc)
+        threshold = now - timedelta(hours=DataSourceManager.VISION_DATA_DELAY_HOURS)
+
+        # This is a heuristic - not guaranteed to be accurate in all cases
+        # For production, you would want to add direct tracking in DataSourceManager
+        return "REST or VISION API (based on cache miss)"
+
+    # Default fallback
+    return "UNKNOWN SOURCE"
+
+
+def format_data_source(data_source):
+    """Format the data source string with distinctive visual styling using rich markup."""
+    source_styling = {
+        "CACHE": "[bold bright_green on black]CACHE[/bold bright_green on black]",
+        "REST API": "[bold bright_blue on black]REST API[/bold bright_blue on black]",
+        "VISION API": "[bold bright_magenta on black]VISION API[/bold bright_magenta on black]",
+        "REST API (enforced)": "[bold bright_blue on black]REST API[/bold bright_blue on black] [bright_yellow](enforced)[/bright_yellow]",
+        "VISION API (enforced)": "[bold bright_magenta on black]VISION API[/bold bright_magenta on black] [bright_yellow](enforced)[/bright_yellow]",
+        "REST or VISION API": "[bold bright_cyan on black]REST or VISION API[/bold bright_cyan on black]",
+        "UNKNOWN SOURCE": "[bold bright_red on black]UNKNOWN SOURCE[/bold bright_red on black]",
+    }
+
+    # Find the appropriate styling for this data source
+    for key, style in source_styling.items():
+        if key in data_source:
+            return style
+
+    # Default styling if no match
+    return f"[bold bright_cyan on black]{data_source}[/bold bright_cyan on black]"
+
+
+def format_header(title, time_range=None):
+    """Creates a formatted header with rich markup using distinctive colors and styling."""
+    # Create a colorful decorator line with alternating colors
+    decorator = (
+        "[bright_magenta]★[/bright_magenta][bright_cyan]★[/bright_cyan][bright_yellow]★[/bright_yellow]"
+        * 5
+    )
+
+    # Format the title with gradient-like effect
+    formatted_title = f"[bold bright_blue on black]{title}[/bold bright_blue on black]"
+
+    # Assemble the header with decorative elements
+    header = f"\n{decorator}\n[bold bright_green]┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓[/bold bright_green]\n"
+    header += f"[bold bright_green]┃[/bold bright_green] {formatted_title} [bold bright_green]┃[/bold bright_green]\n"
+    header += f"[bold bright_green]┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛[/bold bright_green]\n"
+    header += f"{decorator}"
+
+    # Add time range if provided
+    if time_range:
+        start, end = time_range
+        header += f"\n[bright_yellow]Time range: {start} to {end}[/bright_yellow]"
+
+    return header
+
+
+def format_dataframe_section(df, title, data_source, time_range=None):
+    """Creates a formatted section for dataframe display with distinctive rich markup."""
+    if df.empty:
+        return f"[bold bright_red]⚠️ {title}: No data available ⚠️[/bold bright_red]"
+
+    start_time, end_time = time_range if time_range else (None, None)
+
+    # Create multicolor separator
+    separator = "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+
+    # Build output with decorative elements
+    output = [
+        f"\n{separator}",
+        f"[bold bright_green on black]◉ {title} ◉[/bold bright_green on black]",
+        f"[bright_blue]⟫ Data source: {data_source} ⟪[/bright_blue]",
+    ]
+
+    if start_time and end_time:
+        output.append(
+            f"[bright_yellow]⏱ Time range: {start_time} to {end_time}[/bright_yellow]"
+        )
+
+    output.append(f"[bold bright_cyan]📊 Retrieved {len(df)} rows[/bold bright_cyan]")
+    output.append(f"{separator}")
+
+    # Convert DataFrame to string but don't add markup inside it
+    # as it would interfere with the tabular structure
+    return "\n".join(output)
 
 
 async def example_fetch_recent_data():
@@ -90,7 +215,7 @@ async def example_fetch_recent_data():
     now = datetime.now(timezone.utc)
     logger.debug("Starting example_fetch_recent_data function")
     logger.info(f"Current time: {now.isoformat()}")
-    logger.info("Fetching recent Bitcoin data using the recommended approach")
+    logger.info(format_header("Fetching Recent Bitcoin Data (Recommended Approach)"))
 
     # Create cache directory
     cache_dir = Path("./cache")
@@ -101,7 +226,9 @@ async def example_fetch_recent_data():
     end_time = now - timedelta(hours=48)
     start_time = end_time - timedelta(hours=1)
 
-    logger.info(f"Time range: {start_time} to {end_time}")
+    logger.info(
+        f"Time range: [yellow]{start_time}[/yellow] to [yellow]{end_time}[/yellow]"
+    )
 
     # Track cache statistics (single manager instance)
     cache_stats = {"hits": 0, "misses": 0, "errors": 0}
@@ -112,6 +239,9 @@ async def example_fetch_recent_data():
         cache_dir=cache_dir,
         use_cache=True,  # Enable caching through the unified cache manager
     ) as manager:
+        # Store initial stats
+        prev_stats = manager.get_cache_stats().copy()
+
         # The manager will automatically:
         # 1. Choose the appropriate data source (REST or Vision API)
         # 2. Handle caching through UnifiedCacheManager
@@ -128,19 +258,33 @@ async def example_fetch_recent_data():
         for key in current_stats:
             cache_stats[key] += current_stats[key]
 
-        # Display results
-        logger.info(f"Data retrieved: {len(df)} rows")
-        logger.info(f"Data shape: {df.shape}")
-        logger.info(f"Data columns: {df.columns.tolist()}")
+        # Determine data source
+        data_source = determine_data_source(manager, prev_stats, current_stats)
 
-        # Display a sample of the data
+        # Display results with rich formatting
+        logger.info(
+            format_dataframe_section(
+                df,
+                "BTCUSDT 1-second data",
+                format_data_source(data_source),
+                (start_time, end_time),
+            )
+        )
+
         if not df.empty:
-            logger.info("\nSample data:")
-            print(df.head().to_string())
+            # Rich logging will format the DataFrame output nicely
+            logger.info(df.head().to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
+
+        # Store stats before second operation
+        prev_stats = manager.get_cache_stats().copy()
 
         # Example of forcing a specific data source
         # You can force REST API for very recent data or testing
-        logger.info("\nFetching with forced REST API source:")
+        logger.info("\n[bold]Fetching with forced REST API source:[/bold]")
         df_rest = await manager.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
@@ -156,8 +300,32 @@ async def example_fetch_recent_data():
                 key
             ]  # Reset to latest since these are cumulative
 
-        logger.info(f"REST API data retrieved: {len(df_rest)} rows")
-        logger.info(f"\nFinal cache statistics: {cache_stats}")
+        # Determine data source with enforced source information
+        data_source = determine_data_source(
+            manager, prev_stats, current_stats, DataSource.REST
+        )
+
+        # Display REST API results with rich formatting
+        logger.info(
+            format_dataframe_section(
+                df_rest,
+                "BTCUSDT 1-second data (REST API)",
+                format_data_source(data_source),
+                (start_time, end_time),
+            )
+        )
+
+        if not df_rest.empty:
+            logger.info(df_rest.head().to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
+
+        # Display final cache statistics with enhanced formatting
+        logger.info(
+            f"\n[bold bright_green]🔍 Final Cache Statistics:[/bold bright_green] [bright_cyan]{cache_stats}[/bright_cyan]"
+        )
 
 
 async def example_fetch_historical_data():
@@ -165,7 +333,9 @@ async def example_fetch_historical_data():
     # Log current time for reference
     now = datetime.now(timezone.utc)
     logger.info(f"Current time: {now.isoformat()}")
-    logger.info("\nFetching historical Bitcoin data (recommended approach)")
+    logger.info(
+        format_header("Fetching Historical Bitcoin Data (Recommended Approach)")
+    )
 
     # Create cache directory
     cache_dir = Path("./cache")
@@ -176,7 +346,9 @@ async def example_fetch_historical_data():
     end_time = now - timedelta(days=90)
     start_time = end_time - timedelta(days=1)
 
-    logger.info(f"Historical time range: {start_time} to {end_time}")
+    logger.info(
+        f"Historical time range: [yellow]{start_time}[/yellow] to [yellow]{end_time}[/yellow]"
+    )
 
     # Track cache statistics (single manager instance)
     cache_stats = {"hits": 0, "misses": 0, "errors": 0}
@@ -187,6 +359,9 @@ async def example_fetch_historical_data():
         cache_dir=cache_dir,
         use_cache=True,
     ) as manager:
+        # Store initial stats
+        prev_stats = manager.get_cache_stats().copy()
+
         # For historical data, Vision API will automatically be selected
         # but we enforce it here to demonstrate the capability
         df = await manager.get_data(
@@ -202,18 +377,38 @@ async def example_fetch_historical_data():
         for key in current_stats:
             cache_stats[key] += current_stats[key]
 
-        # Display results
-        logger.info(f"Historical data retrieved: {len(df)} rows")
+        # Determine data source with enforced source information
+        data_source = determine_data_source(
+            manager, prev_stats, current_stats, DataSource.VISION
+        )
+
+        # Display results with rich formatting
+        logger.info(
+            format_dataframe_section(
+                df,
+                "BTCUSDT 1-second historical data",
+                format_data_source(data_source),
+                (start_time, end_time),
+            )
+        )
 
         # Display a sample of the data
         if not df.empty:
-            logger.info("\nSample historical data:")
-            print(df.head().to_string())
-
-            # No need to call get_cache_stats() again as we're tracking it
-            logger.info(f"\nCache statistics: {cache_stats}")
+            logger.info(df.head().to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
+            logger.info(
+                f"\n[bold bright_green]🔍 Cache Statistics:[/bold bright_green] [bright_cyan]{cache_stats}[/bright_cyan]"
+            )
         else:
-            logger.info("No data retrieved. Attempting with 1-minute data instead.")
+            logger.info(
+                "[yellow]No data retrieved. Attempting with 1-minute data instead.[/yellow]"
+            )
+
+            # Store stats before second operation
+            prev_stats = manager.get_cache_stats().copy()
 
             # Try with 1-minute data which might be more available
             df_minute = await manager.get_data(
@@ -230,11 +425,29 @@ async def example_fetch_historical_data():
                     key
                 ]  # Reset to latest since these are cumulative
 
-            logger.info(f"1-minute data retrieved: {len(df_minute)} rows")
+            # Determine data source for 1-minute data
+            data_source = determine_data_source(manager, prev_stats, current_stats)
+
+            # Display 1-minute results with rich formatting
+            logger.info(
+                format_dataframe_section(
+                    df_minute,
+                    "BTCUSDT 1-minute historical data (fallback)",
+                    format_data_source(data_source),
+                    (start_time, end_time),
+                )
+            )
+
             if not df_minute.empty:
-                logger.info("\nSample 1-minute data:")
-                print(df_minute.head().to_string())
-                logger.info(f"\nFinal cache statistics: {cache_stats}")
+                logger.info(df_minute.head().to_string())
+                # Use multicolor separator after dataframe display
+                logger.info(
+                    "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]"
+                    * 20
+                )
+                logger.info(
+                    f"\n[bold bright_green]🔍 Final Cache Statistics:[/bold bright_green] [bright_cyan]{cache_stats}[/bright_cyan]"
+                )
 
 
 async def example_fetch_same_day_minute_data():
@@ -242,7 +455,9 @@ async def example_fetch_same_day_minute_data():
     # Log current time for reference
     now = datetime.now(timezone.utc)
     logger.info(f"Current time: {now.isoformat()}")
-    logger.info("\nFetching 1-minute data for the current day (recommended approach)")
+    logger.info(
+        format_header("Fetching 1-minute Data for Current Day (Recommended Approach)")
+    )
 
     # Create cache directory
     cache_dir = Path("./cache")
@@ -256,7 +471,9 @@ async def example_fetch_same_day_minute_data():
         end_time.year, end_time.month, end_time.day, 0, 0, 0, tzinfo=timezone.utc
     )
 
-    logger.info(f"Same-day time range: {start_time} to {end_time}")
+    logger.info(
+        f"Same-day time range: [yellow]{start_time}[/yellow] to [yellow]{end_time}[/yellow]"
+    )
 
     # Using DataSourceManager with async context manager
     # Note: This example uses a single manager instance, so cache statistics
@@ -266,6 +483,9 @@ async def example_fetch_same_day_minute_data():
         cache_dir=cache_dir,
         use_cache=True,  # Enable caching
     ) as manager:
+        # Store initial stats
+        prev_stats = manager.get_cache_stats().copy()
+
         # Fetch 1-minute data
         df = await manager.get_data(
             symbol="BTCUSDT",
@@ -274,27 +494,48 @@ async def example_fetch_same_day_minute_data():
             interval=Interval.MINUTE_1,  # Using 1-minute interval
         )
 
-        # Display results
-        logger.info(f"1-minute data retrieved: {len(df)} rows")
-        logger.info(f"Data shape: {df.shape}")
-        logger.info(f"Data columns: {df.columns.tolist()}")
+        # Get current stats and determine source
+        current_stats = manager.get_cache_stats()
+        data_source = determine_data_source(manager, prev_stats, current_stats)
 
-        # Display a sample of the data
+        # Display results with rich formatting
+        logger.info(
+            format_dataframe_section(
+                df,
+                "BTCUSDT 1-minute same-day data",
+                format_data_source(data_source),
+                (start_time, end_time),
+            )
+        )
+
         if not df.empty:
-            logger.info("\nSample 1-minute data:")
-            print(df.head().to_string())
+            logger.info(df.head().to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
 
         # Get cache statistics - single instance so direct reporting is appropriate
         cache_stats = manager.get_cache_stats()
-        logger.info(f"\nCache statistics: {cache_stats}")
+        logger.info(
+            f"\n[bold bright_green]🔍 Cache Statistics:[/bold bright_green] [bright_cyan]{cache_stats}[/bright_cyan]"
+        )
 
 
 async def example_fetch_unavailable_data():
-    """Example function demonstrating robust handling of unavailable data."""
+    """Example function demonstrating robust handling of unavailable data.
+
+    This example INTENTIONALLY requests data for future dates to demonstrate the
+    robust error handling of the DataSourceManager. The example shows that the system
+    correctly prevents requesting data from the future, returning an empty DataFrame
+    with appropriate error messages.
+
+    It also demonstrates handling of non-existent symbols.
+    """
     # Log current time for reference
     now = datetime.now(timezone.utc)
     logger.info(f"Current time: {now.isoformat()}")
-    logger.info("\nDemonstrating robust handling of unavailable data")
+    logger.info(format_header("Demonstrating Robust Handling of Unavailable Data"))
 
     # Create cache directory
     cache_dir = Path("./cache")
@@ -303,12 +544,16 @@ async def example_fetch_unavailable_data():
     # Track cache statistics (single manager instance with multiple operations)
     cache_stats = {"hits": 0, "misses": 0, "errors": 0}
 
-    # A future date - this should be properly rejected by the DataSourceManager
+    # INTENTIONALLY create future dates (one day ahead and two days ahead) to test error handling
+    # These dates will be properly rejected by DataSourceManager with appropriate error messages
     future_start_time = now + timedelta(days=1)
     future_end_time = now + timedelta(days=2)
 
     logger.info(
-        f"Attempting to fetch future data: {future_start_time} to {future_end_time}"
+        f"Attempting to fetch future data: [yellow]{future_start_time}[/yellow] to [yellow]{future_end_time}[/yellow]"
+    )
+    logger.info(
+        "[bold red](This request is EXPECTED to fail with an appropriate error message)[/bold red]"
     )
 
     # Using DataSourceManager
@@ -317,7 +562,7 @@ async def example_fetch_unavailable_data():
         cache_dir=cache_dir,
         use_cache=True,
     ) as manager:
-        # Try to fetch future data (this should return an empty DataFrame)
+        # Try to fetch future data (this should return an empty DataFrame with error log)
         future_df = await manager.get_data(
             symbol="BTCUSDT",
             start_time=future_start_time,
@@ -331,13 +576,15 @@ async def example_fetch_unavailable_data():
             cache_stats[key] += current_stats[key]
 
         # Display results - should be an empty DataFrame with the correct structure
-        logger.info(f"Future data request result: {len(future_df)} rows")
+        logger.info(f"[bold]Future data request result:[/bold] {len(future_df)} rows")
         logger.info(
-            f"Is empty DataFrame properly structured: {future_df.empty and not future_df.columns.empty}"
+            f"[bold]Is empty DataFrame properly structured:[/bold] [{'green' if future_df.empty and not future_df.columns.empty else 'red'}]{future_df.empty and not future_df.columns.empty}[/{'green' if future_df.empty and not future_df.columns.empty else 'red'}]"
         )
 
         # Try with a non-existent symbol
-        logger.info("\nAttempting to fetch data for a non-existent symbol:")
+        logger.info(
+            "\n[bold yellow]Attempting to fetch data for a non-existent symbol:[/bold yellow]"
+        )
         invalid_df = await manager.get_data(
             symbol="INVALIDCOIN",
             start_time=now - timedelta(days=1),
@@ -352,8 +599,12 @@ async def example_fetch_unavailable_data():
                 key
             ]  # Reset to latest since these are cumulative
 
-        logger.info(f"Invalid symbol result: {len(invalid_df)} rows")
-        logger.info(f"\nFinal cache statistics: {cache_stats}")
+        logger.info(
+            f"[bold]Invalid symbol result:[/bold] [red]{len(invalid_df)} rows[/red]"
+        )
+        logger.info(
+            f"\n[bold bright_green]🔍 Final Cache Statistics:[/bold bright_green] [bright_cyan]{cache_stats}[/bright_cyan]"
+        )
 
 
 async def create_dsm_example(
@@ -366,7 +617,7 @@ async def create_dsm_example(
     description: str,
 ):
     """Utility function to create a DSM example with error handling."""
-    logger.info(f"\n=== {description} ===")
+    logger.info(f"\n[bold blue]{description}[/bold blue]")
     try:
         # Convert string interval to Interval enum if needed
         interval_enum = None
@@ -377,13 +628,13 @@ async def create_dsm_example(
                     break
 
         if interval_enum is None:
-            logger.error(f"Invalid interval string: {interval}")
+            logger.error(f"[bold red]Invalid interval string: {interval}[/bold red]")
             return pd.DataFrame()
 
         # Check if the interval is supported by this market type
         if not is_interval_supported(market_type, interval_enum):
             logger.error(
-                f"Interval {interval} is not supported for market type {market_type.name}"
+                f"[bold red]Interval {interval} is not supported for market type {market_type.name}[/bold red]"
             )
             return pd.DataFrame()
 
@@ -395,6 +646,9 @@ async def create_dsm_example(
             retry_count=3,
             max_concurrent_downloads=10,
         ) as manager:
+            # Store initial stats
+            prev_stats = manager.get_cache_stats().copy()
+
             df = await manager.get_data(
                 symbol=symbol,
                 start_time=start_time,
@@ -402,17 +656,32 @@ async def create_dsm_example(
                 interval=interval_enum,
             )
 
+            # Get current stats and determine source
+            current_stats = manager.get_cache_stats()
+            data_source = determine_data_source(manager, prev_stats, current_stats)
+
+            # Display results with rich formatting
             logger.info(
-                f"{market_type.name} {symbol} {interval} data retrieved: {len(df)} rows"
+                format_dataframe_section(
+                    df,
+                    f"{market_type.name} {symbol} {interval} data",
+                    format_data_source(data_source),
+                    (start_time, end_time),
+                )
             )
+
             if not df.empty:
-                logger.info(f"\nSample {market_type.name} {symbol} {interval} data:")
-                print(df.head(3).to_string())
+                logger.info(df.head(3).to_string())
+                # Use multicolor separator after dataframe display
+                logger.info(
+                    "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]"
+                    * 20
+                )
 
             return df
     except Exception as e:
         logger.error(
-            f"Error retrieving {market_type.name} {symbol} {interval} data: {e}"
+            f"[bold red]Error retrieving {market_type.name} {symbol} {interval} data: {e}[/bold red]"
         )
         return pd.DataFrame()
 
@@ -427,7 +696,7 @@ async def example_different_market_types():
     now = datetime.now(timezone.utc)
     logger.info(f"Current time: {now.isoformat()}")
     logger.info(
-        "\nDemonstrating data retrieval across different market types and intervals"
+        format_header("Data Retrieval Across Different Market Types and Intervals")
     )
 
     # Create cache directory
@@ -439,10 +708,12 @@ async def example_different_market_types():
     end_time = now - timedelta(days=5)
     start_time = end_time - timedelta(hours=4)  # 4-hour window
 
-    logger.info(f"Time range: {start_time} to {end_time}")
+    logger.info(
+        f"Time range: [yellow]{start_time}[/yellow] to [yellow]{end_time}[/yellow]"
+    )
 
     # Log which intervals are supported by each market type
-    logger.info("\nSupported intervals by market type:")
+    logger.info("\n[bold]Supported intervals by market type:[/bold]")
     for market_type in [
         MarketType.SPOT,
         MarketType.FUTURES_USDT,
@@ -453,7 +724,9 @@ async def example_different_market_types():
             for interval in Interval
             if is_interval_supported(market_type, interval)
         ]
-        logger.info(f"  {market_type.name}: {', '.join(supported)}")
+        logger.info(
+            f"  [cyan]{market_type.name}:[/cyan] [green]{', '.join(supported)}[/green]"
+        )
 
     # Create 1s window for high-frequency data (shorter time range)
     short_end_time = start_time + timedelta(minutes=10)
@@ -475,19 +748,39 @@ async def example_different_market_types():
         retry_count=3,
         max_concurrent_downloads=10,
     ) as manager:
-        logger.info("\n=== 1. SPOT market with 1-second BTCUSDT data ===")
+        # Store initial stats
+        prev_stats = manager.get_cache_stats().copy()
+
+        logger.info(
+            "\n[bold blue]1. SPOT market with 1-second BTCUSDT data[/bold blue]"
+        )
         df = await manager.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=short_end_time,
             interval=Interval.SECOND_1,
         )
+
+        # Get current stats and determine source
+        current_stats = manager.get_cache_stats()
+        data_source = determine_data_source(manager, prev_stats, current_stats)
+
+        # Display results with rich formatting
         logger.info(
-            f"SPOT BTCUSDT {Interval.SECOND_1.value} data retrieved: {len(df)} rows"
+            format_dataframe_section(
+                df,
+                f"SPOT BTCUSDT {Interval.SECOND_1.value} data",
+                format_data_source(data_source),
+                (start_time, short_end_time),
+            )
         )
+
         if not df.empty:
-            logger.info(f"\nSample SPOT BTCUSDT {Interval.SECOND_1.value} data:")
-            print(df.head(3).to_string())
+            logger.info(df.head(3).to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
 
         # Update market stats
         stats = manager.get_cache_stats()
@@ -504,19 +797,39 @@ async def example_different_market_types():
         retry_count=3,
         max_concurrent_downloads=10,
     ) as manager:
-        logger.info("\n=== 2. SPOT market with 15-minute ETHUSDT data ===")
+        # Store initial stats
+        prev_stats = manager.get_cache_stats().copy()
+
+        logger.info(
+            "\n[bold blue]2. SPOT market with 15-minute ETHUSDT data[/bold blue]"
+        )
         df = await manager.get_data(
             symbol="ETHUSDT",
             start_time=start_time,
             end_time=end_time,
             interval=Interval.MINUTE_15,
         )
+
+        # Get current stats and determine source
+        current_stats = manager.get_cache_stats()
+        data_source = determine_data_source(manager, prev_stats, current_stats)
+
+        # Display results with rich formatting
         logger.info(
-            f"SPOT ETHUSDT {Interval.MINUTE_15.value} data retrieved: {len(df)} rows"
+            format_dataframe_section(
+                df,
+                f"SPOT ETHUSDT {Interval.MINUTE_15.value} data",
+                format_data_source(data_source),
+                (start_time, end_time),
+            )
         )
+
         if not df.empty:
-            logger.info(f"\nSample SPOT ETHUSDT {Interval.MINUTE_15.value} data:")
-            print(df.head(3).to_string())
+            logger.info(df.head(3).to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
 
         # Update market stats
         stats = manager.get_cache_stats()
@@ -533,8 +846,11 @@ async def example_different_market_types():
         retry_count=3,
         max_concurrent_downloads=10,
     ) as manager:
+        # Store initial stats
+        prev_stats = manager.get_cache_stats().copy()
+
         logger.info(
-            "\n=== 3. USDT-margined futures (UM) with 1-minute BTCUSDT data ==="
+            "\n[bold blue]3. USDT-margined futures (UM) with 1-minute BTCUSDT data[/bold blue]"
         )
         df = await manager.get_data(
             symbol="BTCUSDT",
@@ -542,14 +858,27 @@ async def example_different_market_types():
             end_time=end_time,
             interval=Interval.MINUTE_1,
         )
+
+        # Get current stats and determine source
+        current_stats = manager.get_cache_stats()
+        data_source = determine_data_source(manager, prev_stats, current_stats)
+
+        # Display results with rich formatting
         logger.info(
-            f"FUTURES_USDT BTCUSDT {Interval.MINUTE_1.value} data retrieved: {len(df)} rows"
-        )
-        if not df.empty:
-            logger.info(
-                f"\nSample FUTURES_USDT BTCUSDT {Interval.MINUTE_1.value} data:"
+            format_dataframe_section(
+                df,
+                f"FUTURES_USDT BTCUSDT {Interval.MINUTE_1.value} data",
+                format_data_source(data_source),
+                (start_time, end_time),
             )
-            print(df.head(3).to_string())
+        )
+
+        if not df.empty:
+            logger.info(df.head(3).to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
 
         # Update market stats
         stats = manager.get_cache_stats()
@@ -566,40 +895,75 @@ async def example_different_market_types():
         retry_count=3,
         max_concurrent_downloads=10,
     ) as manager:
-        logger.info("\n=== 4. Coin-margined futures (CM) with 3-minute BTCUSD data ===")
+        # Store initial stats
+        prev_stats = manager.get_cache_stats().copy()
+
+        logger.info(
+            "\n[bold blue]4. Coin-margined futures (CM) with 3-minute BTCUSD data[/bold blue]"
+        )
         df = await manager.get_data(
             symbol="BTCUSD",  # _PERP suffix should be added automatically
             start_time=start_time,
             end_time=end_time,
             interval=Interval.MINUTE_3,
         )
+
+        # Get current stats and determine source
+        current_stats = manager.get_cache_stats()
+        data_source = determine_data_source(manager, prev_stats, current_stats)
+
+        # Display results with rich formatting
         logger.info(
-            f"FUTURES_COIN BTCUSD {Interval.MINUTE_3.value} data retrieved: {len(df)} rows"
+            format_dataframe_section(
+                df,
+                f"FUTURES_COIN BTCUSD {Interval.MINUTE_3.value} data",
+                format_data_source(data_source),
+                (start_time, end_time),
+            )
         )
+
         if not df.empty:
-            logger.info(f"\nSample FUTURES_COIN BTCUSD {Interval.MINUTE_3.value} data:")
-            print(df.head(3).to_string())
+            logger.info(df.head(3).to_string())
+            # Use multicolor separator after dataframe display
+            logger.info(
+                "[bright_magenta]━━[/bright_magenta][bright_cyan]━━[/bright_cyan]" * 20
+            )
 
         # Update market stats
         stats = manager.get_cache_stats()
         for key in stats:
             market_stats[MarketType.FUTURES_COIN][key] += stats[key]
 
-    # Display cache statistics for all markets
-    logger.info("\nCache statistics by market type:")
+    # Display cache statistics for all markets with enhanced formatting
+    logger.info(
+        "\n[bold bright_green]📊 Cache Statistics by Market Type:[/bold bright_green]"
+    )
     for market_type, market_name in [
         (MarketType.SPOT, "SPOT"),
         (MarketType.FUTURES_USDT, "FUTURES_USDT (UM)"),
         (MarketType.FUTURES_COIN, "FUTURES_COIN (CM)"),
     ]:
-        logger.info(f"  {market_name}: {market_stats[market_type]}")
+        logger.info(
+            f"  [bold bright_cyan]{market_name}:[/bold bright_cyan] [bright_yellow]{market_stats[market_type]}[/bright_yellow]"
+        )
 
 
 async def main():
     """Run the example functions."""
-    # Log the current time at the start of execution for reference
+    # Log the current time at the start of execution with enhanced formatting
     now = datetime.now(timezone.utc)
-    logger.info(f"Example script starting at: {now.isoformat()}")
+    # Create a colorful script title banner
+    title_banner = "\n".join(
+        [
+            "[bright_magenta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bright_magenta]",
+            "[bold bright_cyan on black]                 BINANCE DATA RETRIEVAL EXAMPLES                [/bold bright_cyan on black]",
+            "[bright_magenta]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bright_magenta]",
+        ]
+    )
+    logger.info(title_banner)
+    logger.info(
+        f"[bold bright_green]🚀 Script starting at:[/bold bright_green] [bright_yellow]{now.isoformat()}[/bright_yellow]"
+    )
 
     # Check if a specific example function was requested
     if len(sys.argv) > 1:
@@ -614,18 +978,26 @@ async def main():
 
         if example_name in example_map:
             try:
-                logger.info(f"Running example: {example_name}")
+                logger.info(
+                    f"[bold]Running example:[/bold] [cyan]{example_name}[/cyan]"
+                )
                 await example_map[example_name]()
                 return
             except KeyboardInterrupt:
-                logger.info("Received keyboard interrupt, shutting down gracefully...")
+                logger.info(
+                    "[yellow]Received keyboard interrupt, shutting down gracefully...[/yellow]"
+                )
             except Exception as e:
-                logger.error(f"Error in example {example_name}: {e}")
-                logger.debug(f"Error details: {traceback.format_exc()}")
+                logger.error(
+                    f"[bold red]Error in example {example_name}: {e}[/bold red]"
+                )
+                logger.debug(f"[red]Error details: {traceback.format_exc()}[/red]")
                 sys.exit(1)
         else:
-            logger.error(f"Unknown example: {example_name}")
-            logger.info(f"Available examples: {', '.join(example_map.keys())}")
+            logger.error(f"[bold red]Unknown example: {example_name}[/bold red]")
+            logger.info(
+                f"[green]Available examples:[/green] [cyan]{', '.join(example_map.keys())}[/cyan]"
+            )
             sys.exit(1)
 
     # If no specific example is requested, run all examples
@@ -637,10 +1009,12 @@ async def main():
         await example_fetch_unavailable_data()
         await example_different_market_types()
     except KeyboardInterrupt:
-        logger.info("Received keyboard interrupt, shutting down gracefully...")
+        logger.info(
+            "[yellow]Received keyboard interrupt, shutting down gracefully...[/yellow]"
+        )
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        logger.debug(f"Main function error: {traceback.format_exc()}")
+        logger.error(f"[bold red]Unexpected error: {e}[/bold red]")
+        logger.debug(f"[red]Main function error: {traceback.format_exc()}[/red]")
         sys.exit(1)
 
 
@@ -656,27 +1030,21 @@ def handle_signals():
 
 async def shutdown(sig, loop):
     """Cleanup tasks tied to the service's shutdown."""
-    logger.info(f"Received exit signal {sig.name}...")
+    logger.info(f"[yellow]Received exit signal {sig.name}...[/yellow]")
 
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     [task.cancel() for task in tasks]
 
-    logger.info(f"Cancelling {len(tasks)} outstanding tasks")
+    logger.info(f"[yellow]Cancelling {len(tasks)} outstanding tasks[/yellow]")
     await asyncio.gather(*tasks, return_exceptions=True)
 
     loop.stop()
 
 
 if __name__ == "__main__":
-    # clear screen
-    os.system("cls" if os.name == "nt" else "clear")
 
-    # precisly find out what this script path and how this script is executed
-    logger.debug(f"This script path: {os.path.abspath(__file__)}")
-    logger.debug(f"This script is executed with: {sys.argv}")
-
-    logger.info(
-        f"Current UTC date time precision up to milliseconds: {datetime.now(timezone.utc).isoformat(timespec='milliseconds')}"
+    logger.warning(
+        f"[bold yellow]Current UTC date time precision up to milliseconds:[/bold yellow] [cyan]{datetime.now(timezone.utc).isoformat(timespec='milliseconds')}[/cyan]"
     )
     # Set up signal handlers
     handle_signals()
