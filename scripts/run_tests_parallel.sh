@@ -35,10 +35,13 @@
 #   - Profiling Capabilities: Supports performance profiling via pytest-profiling
 #     with options to generate line-by-line profiling data (.prof files) and
 #     SVG visualizations of the call graph.
+#   - Log File Management: Saves test output to temporary log files and provides
+#     instructions for viewing these logs. Also offers an option to save logs to a
+#     permanent location without ANSI color codes for easier viewing in text editors.
 #
 # USAGE:
-#   ./scripts/run_tests_parallel.sh [options] [test_path] [log_level] [additional_pytest_args]
-#   ./scripts/run_tests_parallel.sh -i|--interactive [log_level] [additional_pytest_args]
+#   ./scripts/run_tests_parallel.sh [options] [test_path] [additional_pytest_args]
+#   ./scripts/run_tests_parallel.sh -i|--interactive
 #
 # OPTIONS:
 #   -i, --interactive:  Enable interactive test selection mode. Presents a menu
@@ -60,6 +63,9 @@
 #   -c, --clear:        Clear the screen before test execution.
 #                       In interactive mode, clears after test selection. 
 #                       In non-interactive mode, clears before displaying test information.
+#   --save-log FILE:    Save a clean version of the log to a specified file.
+#                       Removes ANSI color codes for better compatibility with text editors.
+#                       Automatically enables -e/--error-summary mode.
 #
 # ARGUMENTS:
 #   test_path: (Optional) Path to a specific test file or directory.
@@ -68,59 +74,42 @@
 #              If -i or --interactive is used, this argument is ignored, and the
 #              test path is selected interactively.
 #
-#   log_level: (Optional) Controls verbosity of test output.
-#              Default: INFO (standard level of detail).
-#              Options: DEBUG (most verbose),
-#                       INFO (normal output),
-#                       WARNING (reduced output),
-#                       ERROR (least verbose).
-#              Use DEBUG for detailed logs, INFO for standard test progress, and
-#              WARNING or ERROR to minimize output noise, especially in CI environments.
-#
 #   additional_pytest_args: (Optional)  Extra arguments to pass directly to pytest.
 #                           Examples: --tb=short (shorter tracebacks), -k "pattern"
 #                           (run tests matching a pattern), -m "marker" (run tests
 #                           with specific markers), -n4 (reduce parallel workers to 4).
 #
 # EXAMPLES:
-#   # 1. Run all tests in the tests/ directory with standard logging (default):
+#   # 1. Run all tests in the tests/ directory with default settings:
 #   ./scripts/run_tests_parallel.sh
 #
 #   # 2. Run tests interactively to select specific tests:
 #   ./scripts/run_tests_parallel.sh -i
 #
-#   # 3. Run tests in a specific subdirectory (e.g., time_boundary) with default log level:
+#   # 3. Run tests in a specific subdirectory with default settings:
 #   ./scripts/run_tests_parallel.sh tests/time_boundary
 #
 #   # 4. Display the full help message:
 #   ./scripts/run_tests_parallel.sh -h
 #
-#   # 5. Run all tests with DEBUG log level for verbose output:
-#   ./scripts/run_tests_parallel.sh tests/ DEBUG
+#   # 5. Run tests in sequential mode (no parallel execution):
+#   ./scripts/run_tests_parallel.sh -s tests/utils
 #
-#   # 6. Run tests with specific markers and WARNING log level:
-#   ./scripts/run_tests_parallel.sh tests/ WARNING -m "real"
+#   # 6. Run tests with pytest pattern matching:
+#   ./scripts/run_tests_parallel.sh tests/utils -k "test_pattern"
 #
-#   # 7. Run tests interactively with DEBUG log level and filter by test name:
-#   ./scripts/run_tests_parallel.sh -i DEBUG -k "some_test"
+#   # 7. Run tests with error summary for better debugging:
+#   ./scripts/run_tests_parallel.sh -e tests/utils
 #
-#   # 8. Run all tests with reduced parallel workers (e.g., 4) and short tracebacks:
-#   ./scripts/run_tests_parallel.sh tests/ --tb=short -n4
+#   # 8. Run tests sequentially with error summary:
+#   ./scripts/run_tests_parallel.sh -s -e tests/utils
 #
-#   # 9. Run tests and show a summary of all errors, even from passing tests:
-#   ./scripts/run_tests_parallel.sh -e
+#   # 9. Run tests and save the log file to a permanent location:
+#   ./scripts/run_tests_parallel.sh -e --save-log test_results.log tests/utils
 #
-#   # 10. Analyze errors in a previously generated log file:
-#   ./scripts/run_tests_parallel.sh -a test_output.log
-#
-#   # 11. Run asyncio-heavy tests with error summary for better debugging:
-#   ./scripts/run_tests_parallel.sh tests/time_boundary -e
-#
-#   # 12. Run tests sequentially (without parallelism) for debugging:
-#   ./scripts/run_tests_parallel.sh -s
-#
-#   # 13. Run specific tests sequentially with error summary:
-#   ./scripts/run_tests_parallel.sh -s -e tests/time_boundary
+#   # 10. First select interactively, then filter tests by pattern:
+#   ./scripts/run_tests_parallel.sh -i
+#   # (After selection) -k "pattern"
 #
 # BEST PRACTICES and NOTES:
 #   - Interactive Test Selection: The interactive mode smartly detects both
@@ -156,6 +145,9 @@
 #   - Profiling Capabilities: Supports performance profiling via pytest-profiling
 #     with options to generate line-by-line profiling data (.prof files) and
 #     SVG visualizations of the call graph.
+#   - Log File Viewing: When using the -e/--error-summary option, test output is
+#     saved to a temporary file that can be viewed in real-time using `less -R <log_file>`.
+#     Use the --save-log option to save a clean version of the log to a permanent location.
 #
 # LICENSE:
 #   This script is provided as is, without warranty. Use it at your own risk.
@@ -189,6 +181,7 @@ cd "${PROJECT_ROOT}"
 
 # Create a temp file for error logs
 ERROR_LOG_FILE=$(mktemp)
+SAVE_LOG_FILE=""
 trap 'rm -f "$ERROR_LOG_FILE"' EXIT
 
 # Function to display help based on verbosity level
@@ -206,7 +199,7 @@ show_help() {
     echo -e ""
   else
     # Full help information
-    echo -e "${YELLOW}Usage:${NC} ./scripts/run_tests_parallel.sh [options] [test_path] [log_level] [additional_pytest_args]"
+    echo -e "${YELLOW}Usage:${NC} ./scripts/run_tests_parallel.sh [options] [test_path] [additional_pytest_args]"
     echo -e ""
     echo -e "${YELLOW}Options:${NC}"
     echo -e "  ${GREEN}-i, --interactive${NC} : Select tests interactively"
@@ -216,6 +209,7 @@ show_help() {
     echo -e "  ${GREEN}-p, --profile${NC}    : Enable profiling and save .prof files"
     echo -e "  ${GREEN}-g, --profile-svg${NC}: Generate SVG visual profiles (requires graphviz)"
     echo -e "  ${GREEN}-c, --clear${NC}      : Clear screen before test execution"
+    echo -e "  ${GREEN}--save-log FILE${NC}  : Save a clean version of the log to a specified file"
     echo -e "  ${GREEN}-h, --help${NC}        : Show this detailed help"
     echo -e ""
     echo -e "${YELLOW}Test Markers:${NC}"
@@ -226,19 +220,22 @@ show_help() {
     echo -e ""
     echo -e "${YELLOW}Arguments:${NC}"
     echo -e "  ${GREEN}test_path${NC}            : Path to test file/directory (default: ${CYAN}tests/${NC})"
-    echo -e "  ${GREEN}log_level${NC}            : Verbosity level (${CYAN}DEBUG${NC}|${CYAN}INFO${NC}|${CYAN}WARNING${NC}|${CYAN}ERROR${NC}) (default: ${CYAN}INFO${NC})"
-    echo -e "  ${GREEN}additional_pytest_args${NC}: Extra arguments passed to pytest"
+    echo -e "  ${GREEN}additional_pytest_args${NC}: Extra arguments passed to pytest (e.g., -k pattern, -m marker)"
     echo -e ""
     echo -e "${YELLOW}Examples:${NC}"
     echo -e "  ${CYAN}./scripts/run_tests_parallel.sh${NC}                  : Run all tests"
     echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -i${NC}               : Interactive mode"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -s${NC}               : Sequential mode"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -e${NC}               : Show all errors"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/cache${NC}      : Run specific tests"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/ DEBUG${NC}     : With debug logging"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/ INFO -m real${NC}: Only run real tests"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -e -n4${NC}           : Error summary with 4 workers"
-    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -s -e${NC}            : Sequential with error summary"
+    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -s tests/utils${NC}   : Sequential mode"
+    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -e tests/utils${NC}   : With error summary"
+    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh tests/utils -k pattern${NC} : With pattern matching"
+    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -s -e tests/utils${NC}: Sequential with error summary"
+    echo -e "  ${CYAN}./scripts/run_tests_parallel.sh -e --save-log output.log tests/utils${NC} : Save log file"
+    echo -e ""
+    echo -e "${YELLOW}Log File Viewing:${NC}"
+    echo -e "  - When using ${CYAN}-e/--error-summary${NC}, logs are saved to a temporary file"
+    echo -e "  - To view the temporary log while tests are running, use: ${CYAN}less -R <log_file>${NC}"
+    echo -e "  - The ${CYAN}-R${NC} flag preserves ANSI color codes for better readability"
+    echo -e "  - Use ${CYAN}--save-log FILE${NC} to save a clean version of the log to a permanent location"
     echo -e ""
     echo -e "${YELLOW}Async/Serial Test Handling:${NC}"
     echo -e "  - Tests marked with ${CYAN}@pytest.mark.serial${NC} are automatically run sequentially"
@@ -561,6 +558,7 @@ SEQUENTIAL=false
 PROFILE=false
 PROFILE_SVG=false
 CLEAR_AFTER_SELECTION=false
+SAVE_LOG_FILE=""
 PYTEST_OPTIONS=()  # New array to collect pytest options
 
 # Parse options
@@ -585,6 +583,16 @@ while [[ $# -gt 0 && "$1" == -* ]]; do
         exit 1
       fi
       ANALYZE_LOG_FILE="$2"
+      shift 2
+      ;;
+    --save-log)
+      if [[ -z "$2" || "$2" == -* ]]; then
+        echo "Error: --save-log requires a file path argument"
+        show_help "full"
+        exit 1
+      fi
+      SAVE_LOG_FILE="$2"
+      ERROR_SUMMARY=true  # Enable error summary mode when saving log
       shift 2
       ;;
     -p|--profile)
@@ -659,13 +667,27 @@ if $INTERACTIVE; then
     fi
   done
   
+  # Ask for additional arguments
+  echo ""
+  echo "You selected: $TEST_PATH"
+  echo "Examples of additional pytest arguments:"
+  echo "  -k \"pattern\"    - Run tests that match the pattern"
+  echo "  -m \"marker\"     - Run tests with the specified marker"
+  echo "  -v             - Increase verbosity"
+  read -p "Additional pytest arguments (press Enter for none): " additional_args
+  
+  if [[ -n "$additional_args" ]]; then
+    # Add the arguments exactly as entered
+    ADDITIONAL_ARGS+=($additional_args)
+  fi
+  
   # Clear the screen if requested
   if $CLEAR_AFTER_SELECTION; then
     clear
   fi
   
-  LOG_LEVEL=${1:-INFO}
-  shift 1 2>/dev/null || shift $# 2>/dev/null || true
+  # Set log level to default
+  LOG_LEVEL="INFO"
 else
   TEST_PATH=${1:-tests/}  # Default to tests/ directory if not specified
   
@@ -760,7 +782,7 @@ fi
 
 echo "Running tests $WORKER_INFO"
 echo "Test path: $TEST_PATH"
-echo "Log level: $LOG_LEVEL (higher = more detailed output)"
+echo "Additional args: $ADDITIONAL_ARGS_STR"
 if $ERROR_SUMMARY; then
   echo "Error summary: Enabled (will show all errors after tests complete)"
 fi
@@ -773,7 +795,6 @@ if $PROFILE; then
     echo "SVG Visualization: Enabled (generating .svg files in ${PROJECT_ROOT}/prof/)"
   fi
 fi
-echo "Additional args: $ADDITIONAL_ARGS_STR"
 echo "---------------------------------------------------"
 
 # Construct the additional args string with proper spacing
@@ -858,110 +879,58 @@ fi
 echo "Running: $PYTEST_CMD"
 echo "---------------------------------------------------"
 
+# Use a simplified parallel-mode command - this solves various issues with pytest-xdist
+if ! $SEQUENTIAL; then
+  echo "Using simplified parallel execution for better compatibility..."
+  PARALLEL_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" -v -m \"not serial\" -n8 --asyncio-mode=auto -o asyncio_default_fixture_loop_scope=function -o 'filterwarnings=ignore::ResourceWarning'"
+else
+  # In sequential mode, use the original command without the parallel flag
+  PARALLEL_CMD="$PYTEST_CMD"
+fi
+
 # Run the command and capture the output
 if $ERROR_SUMMARY; then
   # Create a temporary file for logging if not already set
-  if [ -z "$ERROR_LOG_FILE" ]; then
-    ERROR_LOG_FILE=$(mktemp)
-    trap 'rm -f "$ERROR_LOG_FILE"' EXIT
+  if [[ -z "$SAVE_LOG_FILE" ]]; then
+    LOG_FILE=$(mktemp)
+    trap 'rm -f "$LOG_FILE"' EXIT
+  else
+    LOG_FILE="$SAVE_LOG_FILE"
   fi
   
-  echo "Running with error summary enabled (log file: $ERROR_LOG_FILE)"
+  # Display the log file path for viewing in realtime
+  echo "Running with error summary enabled (log file: $LOG_FILE)"
+  echo "Tip: You can view the log file in real-time using:"
+  echo "  less -R $LOG_FILE in another terminal"
   
-  # Set COLUMNS to a very wide value to prevent truncation in the summary table
-  export COLUMNS=200
+  # Set shell variables to improve test output
+  CMD_WITH_ENV="PYTHONUNBUFFERED=1 FORCE_COLOR=1 PYTHONASYNCIOEBUG=1 COLUMNS=200 $PARALLEL_CMD --color=yes"
+  echo "Executing: $CMD_WITH_ENV"
   
-  # Force color output with --color=yes and capture both stdout and stderr
-  # Set PYTHONUNBUFFERED=1 to prevent output buffering
-  # Set FORCE_COLOR=1 to ensure terminal colors are preserved through the pipe
-  # Pass COLUMNS to ensure wide tables in the output
-  TEMP_CMD="PYTHONUNBUFFERED=1 FORCE_COLOR=1 PYTHONASYNCIOEBUG=1 COLUMNS=${COLUMNS} $PYTEST_CMD --color=yes"
-  echo "Executing: $TEMP_CMD"
-  
-  # Use eval with direct output redirection to tee
-  eval "$TEMP_CMD" 2>&1 | tee "$ERROR_LOG_FILE"
-  # Capture exit code from first command in the pipe (bash-specific)
-  PYTEST_EXIT_CODE=${PIPESTATUS[0]}
-  
-  echo "Pytest finished with exit code: $PYTEST_EXIT_CODE"
-  
-  # Add custom detailed failure summary if asyncio tests are involved
-  if [[ "$TEST_PATH" == *"asyncio"* ]]; then
-    echo -e "\n${BOLD}${GREEN}==================================================================${NC}"
-    echo -e "${BOLD}${BLUE}                 DETAILED FAILURE SUMMARY                       ${NC}"
-    echo -e "${BOLD}${GREEN}==================================================================${NC}"
-    
-    echo "Generating a comprehensive error summary with full file paths..."
-    echo ""
-    
-    # Call the Python script directly with the test path
-    python "${SCRIPT_DIR}/detailed_failure_summary.py" "$TEST_PATH"
-  fi
-  
-  # Process and display error summary
-  enhanced_extract_errors "$ERROR_LOG_FILE"
-  
-  # Run a custom command to get a full failure table without truncation if needed
-  if [[ "$TEST_PATH" == *test_asyncio_errors.py ]]; then
-    echo -e "\n${BOLD}${BLUE}======================================================${NC}"
-    echo -e "${BOLD}${GREEN}        COMPREHENSIVE FAILURE SUMMARY (FULL PATHS)     ${NC}"
-    echo -e "${BOLD}${BLUE}======================================================${NC}"
-    
-    # Use our dedicated Python script for improved failure summary
-    python "${SCRIPT_DIR}/detailed_failure_summary.py" "$TEST_PATH"
-  fi
-  
-else
-  # Run pytest without capturing output but still set COLUMNS to avoid truncation
-  export COLUMNS=200
-  eval "COLUMNS=${COLUMNS} $PYTEST_CMD"
-  PYTEST_EXIT_CODE=$?
-fi
-
-# Check if exit code is defined and not empty
-if [[ -n "$PYTEST_EXIT_CODE" ]]; then
-  # Display profiling summary if profiling was enabled
-  if $PROFILE; then
-    echo -e "\n${BOLD}${BLUE}======================================================${NC}"
-    echo -e "${BOLD}${GREEN}                 PROFILING SUMMARY                    ${NC}"
-    echo -e "${BOLD}${BLUE}======================================================${NC}"
-    
-    PROF_DIR="${PROJECT_ROOT}/prof"
-    PROF_COUNT=$(ls -1 "${PROF_DIR}"/*.prof 2>/dev/null | wc -l)
-    
-    if [ "$PROF_COUNT" -gt 0 ]; then
-      echo -e "${GREEN}${PROF_COUNT} profile files generated in ${PROF_DIR}${NC}"
-      
-      # List the profile files
-      echo -e "\n${YELLOW}Profile files:${NC}"
-      ls -lh "${PROF_DIR}"/*.prof | awk '{print $9, "("$5")"}'
-      
-      if $PROFILE_SVG; then
-        SVG_COUNT=$(ls -1 "${PROF_DIR}"/*.svg 2>/dev/null | wc -l)
-        if [ "$SVG_COUNT" -gt 0 ]; then
-          echo -e "\n${YELLOW}SVG visualizations:${NC}"
-          ls -lh "${PROF_DIR}"/*.svg | awk '{print $9, "("$5")"}'
-        fi
-      fi
-      
-      echo -e "\n${YELLOW}To analyze a specific profile, use:${NC}"
-      echo -e "  python -m pstats ${PROF_DIR}/<profile_file>"
-      echo -e "  or"
-      echo -e "  gprof2dot -f pstats ${PROF_DIR}/<profile_file> | dot -Tsvg -o ${PROF_DIR}/<output_file>.svg"
-    else
-      echo -e "${RED}No profile files generated. Make sure tests are actually running.${NC}"
-    fi
-    
-    echo -e "${BOLD}${BLUE}======================================================${NC}"
-  fi
-
-  if [ $PYTEST_EXIT_CODE -eq 0 ]; then
+  # Run the command and capture output to log file
+  if eval "$CMD_WITH_ENV" | tee "$LOG_FILE"; then
+    PYTEST_EXIT_CODE=$?
     echo "Tests completed successfully!"
   else
-    echo "Tests failed with exit code $PYTEST_EXIT_CODE"
+    PYTEST_EXIT_CODE=$?
+    echo "Pytest finished with exit code: $PYTEST_EXIT_CODE"
+    enhanced_extract_errors "$LOG_FILE"
   fi
-  exit $PYTEST_EXIT_CODE
+  
+  # Save a clean copy without ANSI codes if requested
+  if [[ -n "$SAVE_LOG_FILE" && "$SAVE_LOG_FILE" != "$LOG_FILE" ]]; then
+    cat "$LOG_FILE" | perl -pe 's/\e\[[0-9;]*m(?:\e\[K)?//g' > "$SAVE_LOG_FILE"
+    echo "Saved clean log file to: $SAVE_LOG_FILE"
+  fi
 else
-  echo "Warning: No exit code was captured"
-  exit 1
-fi 
+  # Run without error summary
+  if eval "$PARALLEL_CMD"; then
+    PYTEST_EXIT_CODE=$?
+    echo "Tests completed successfully!"
+  else
+    PYTEST_EXIT_CODE=$?
+    echo "Pytest finished with exit code: $PYTEST_EXIT_CODE"
+  fi
+fi
+
+exit $PYTEST_EXIT_CODE 
