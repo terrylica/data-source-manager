@@ -11,6 +11,7 @@ The implementation leverages the following design principles:
 3. **Proxy Pattern Interface**: Implements lazy module detection via runtime introspection
 4. **Method Chaining API**: Supports fluent interface pattern for sequential operations
 5. **Singleton Pattern**: Maintains logger instance cache to prevent duplicate configurations
+6. **Source File Identification**: Optional filename display to quickly identify log sources
 
 ## Usage Patterns
 
@@ -35,6 +36,9 @@ from utils.logger_setup import logger
 
 # Configure logging hierarchy in application entrypoint
 logger.setLevel("INFO")  # Sets root logger level
+
+# Optionally enable filename display for better debugging
+logger.show_filename(True)  # Shows source filename in log entries
 
 def main():
     logger.info("Application initialization complete")
@@ -67,8 +71,12 @@ The logger implements a hierarchical configuration model where:
 # Programmatic configuration
 logger.setLevel("DEBUG")
 
+# Enable filename display for easier debugging
+logger.show_filename(True)
+
 # Environment variable configuration (higher precedence)
 # LOG_LEVEL=WARNING python your_application.py
+# SHOW_LOG_FILENAME=true python your_application.py
 ```
 
 ### Method Chaining Implementation
@@ -77,16 +85,61 @@ The implementation supports the fluent interface pattern via method chaining:
 
 ```python
 # Configuration chaining
-logger.setLevel("INFO").info("Configuration complete")
+logger.setLevel("INFO").show_filename(True).info("Configuration complete")
 
 # Sequential logging operations
 logger.info("Operation started").warning("Anomalies detected").error("Operation failed")
 ```
 
+### Filename Display Feature
+
+The logger can optionally display source filenames in log messages to help identify where each log is coming from:
+
+```python
+# Enable filename display
+logger.show_filename(True)
+logger.info("This log will show filename and line number")  # Log message with filename at end main.py:10
+
+# Combine with rich logging
+logger.use_rich(True).show_filename(True)
+logger.info("Rich logging with filename")  # Rich log with filename at end
+
+# Disable filename display
+logger.show_filename(False)
+logger.info("Back to normal logging without filename")
+```
+
+The filename and line number are right-aligned at the end of each log message, creating a clean and consistent layout. This display format aligns filenames in a column at the end of each line, making it easy to scan logs and identify their source without disrupting the main content.
+
+This feature is particularly valuable in larger codebases where understanding the origin of log messages is important for debugging. The implementation uses a custom logger class that properly identifies the actual source file of log messages, rather than displaying the logging infrastructure files.
+
+For example, in a multi-module application:
+
+```python
+# main.py
+from utils.logger_setup import logger
+from user_module import create_user
+
+logger.show_filename(True)
+logger.info("Application starting")  # Application starting              main.py:5
+create_user("example")  # This will log from user_module.py with correct filename
+```
+
+```python
+# user_module.py
+from utils.logger_setup import logger
+
+def create_user(username):
+    logger.info(f"Creating user: {username}")  # Creating user: example      user_module.py:4
+```
+
+The logger properly tracks the actual source file and line number regardless of how the logger is accessed through the application, and maintains consistent visual alignment of the log messages.
+
 ## Example Implementations
 
 - `test_modules.py`: Demonstrates module-level logger usage without explicit configuration
 - `main_example.py`: Illustrates application entrypoint configuration and hierarchical propagation
+- `main_example_filename.py`: Shows how to use the filename display feature
 
 ## Technical Benefits
 
@@ -95,3 +148,4 @@ logger.info("Operation started").warning("Anomalies detected").error("Operation 
 - **Minimal Configuration Overhead**: Eliminates boilerplate through proxy pattern implementation
 - **Thread Safety**: Maintains proper logger isolation across module boundaries
 - **Colorized Output**: Leverages ANSI color codes for console output categorization
+- **Source Identification**: Optional filename display helps pinpoint log origins

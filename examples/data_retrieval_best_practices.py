@@ -30,8 +30,9 @@ Examples included:
 
 4. `example_fetch_unavailable_data()`:
    - Demonstrates robust error handling for unavailable data cases
-   - Shows proper handling of future dates (which should be rejected)
-   - Tests the behavior with non-existent symbols
+   - Shows proper exception handling for future dates (catching ValueError exceptions)
+   - Creates properly structured empty DataFrames to maintain consistent return interfaces
+   - Tests error handling with non-existent symbols
 
 5. `create_dsm_example()`:
    - Utility function with comprehensive error handling
@@ -74,8 +75,9 @@ Best Practices Demonstrated:
 # handle and validate date ranges, including requests for data from future dates.
 # In particular, the example_fetch_unavailable_data() function deliberately attempts
 # to fetch data for dates in the future to demonstrate that the system correctly
-# rejects such requests with appropriate error messages. These are not bugs or mistakes,
-# but intentional demonstrations of error handling capabilities.
+# raises ValueError exceptions for such requests, which are then properly caught and
+# handled with appropriate error messages. These are not bugs or mistakes, but
+# intentional demonstrations of proper error handling practices in client applications.
 
 import asyncio
 import signal
@@ -91,6 +93,8 @@ from utils.logger_setup import logger
 logger.setLevel("INFO")
 # Enable rich logging for enhanced visual output
 logger.use_rich(True)
+# Enable filename display to see which file generates log messages
+logger.show_filename(True)
 from utils.market_constraints import Interval, MarketType, is_interval_supported
 from core.data_source_manager import DataSourceManager, DataSource
 
@@ -527,10 +531,12 @@ async def example_fetch_unavailable_data():
 
     This example INTENTIONALLY requests data for future dates to demonstrate the
     robust error handling of the DataSourceManager. The example shows that the system
-    correctly prevents requesting data from the future, returning an empty DataFrame
-    with appropriate error messages.
+    correctly rejects future date requests by raising a ValueError exception, which
+    is then properly caught and handled. This demonstrates proper error handling practices
+    for client applications that might accidentally request future dates.
 
-    It also demonstrates handling of non-existent symbols.
+    It also demonstrates handling of non-existent symbols, returning empty DataFrames
+    with the correct structure in both error cases to maintain consistent interfaces.
     """
     # Log current time for reference
     now = datetime.now(timezone.utc)
@@ -562,18 +568,29 @@ async def example_fetch_unavailable_data():
         cache_dir=cache_dir,
         use_cache=True,
     ) as manager:
-        # Try to fetch future data (this should return an empty DataFrame with error log)
-        future_df = await manager.get_data(
-            symbol="BTCUSDT",
-            start_time=future_start_time,
-            end_time=future_end_time,
-            interval=Interval.MINUTE_1,
-        )
+        try:
+            # Try to fetch future data (this should fail with a ValueError)
+            future_df = await manager.get_data(
+                symbol="BTCUSDT",
+                start_time=future_start_time,
+                end_time=future_end_time,
+                interval=Interval.MINUTE_1,
+            )
 
-        # Update stats after first operation
-        current_stats = manager.get_cache_stats()
-        for key in current_stats:
-            cache_stats[key] += current_stats[key]
+            # If we get here, the request didn't fail as expected
+            logger.warning(
+                "[bold yellow]Future data request did not fail as expected![/bold yellow]"
+            )
+
+        except ValueError as e:
+            # This is the expected path - validation should raise ValueError for future dates
+            logger.info(
+                f"[bold green]✓ Correctly rejected future dates:[/bold green] {e}"
+            )
+            # Create empty DataFrame with proper structure for demonstrating the result
+            future_df = manager.rest_client.create_empty_dataframe()
+            # Update stats to record the error
+            cache_stats["errors"] += 1
 
         # Display results - should be an empty DataFrame with the correct structure
         logger.info(f"[bold]Future data request result:[/bold] {len(future_df)} rows")
@@ -585,23 +602,31 @@ async def example_fetch_unavailable_data():
         logger.info(
             "\n[bold yellow]Attempting to fetch data for a non-existent symbol:[/bold yellow]"
         )
-        invalid_df = await manager.get_data(
-            symbol="INVALIDCOIN",
-            start_time=now - timedelta(days=1),
-            end_time=now - timedelta(hours=1),
-            interval=Interval.MINUTE_1,
-        )
+        try:
+            invalid_df = await manager.get_data(
+                symbol="INVALIDCOIN",
+                start_time=now - timedelta(days=1),
+                end_time=now - timedelta(hours=1),
+                interval=Interval.MINUTE_1,
+            )
 
-        # Update stats after second operation
-        current_stats = manager.get_cache_stats()
-        for key in current_stats:
-            cache_stats[key] = current_stats[
-                key
-            ]  # Reset to latest since these are cumulative
+            # Update stats after second operation
+            current_stats = manager.get_cache_stats()
+            for key in current_stats:
+                cache_stats[key] = current_stats[
+                    key
+                ]  # Reset to latest since these are cumulative
 
-        logger.info(
-            f"[bold]Invalid symbol result:[/bold] [red]{len(invalid_df)} rows[/red]"
-        )
+            logger.info(
+                f"[bold]Invalid symbol result:[/bold] [red]{len(invalid_df)} rows[/red]"
+            )
+        except Exception as e:
+            logger.info(
+                f"[bold]Invalid symbol resulted in error:[/bold] [red]{e}[/red]"
+            )
+            invalid_df = manager.rest_client.create_empty_dataframe()
+            cache_stats["errors"] += 1
+
         logger.info(
             f"\n[bold bright_green]🔍 Final Cache Statistics:[/bold bright_green] [bright_cyan]{cache_stats}[/bright_cyan]"
         )
