@@ -128,30 +128,35 @@ class CustomLogger(logging.Logger):
 logging.setLoggerClass(CustomLogger)
 
 
-def get_logger(name=None, level=None, setup_root=False, use_rich=None):
+# DEPRECATED: This function is intentionally disabled to enforce the use of 'logger' instead
+def get_logger(*args, **kwargs):
     """
-    Retrieve or create a logger instance with appropriate configuration.
+    DEPRECATED: Do not use this function. Import and use 'logger' directly.
 
-    Implements module-specific logger acquisition with optional root logger configuration.
-    Maintains singleton logger instances via caching mechanism to prevent duplicate
-    handler configuration and ensure consistent behavior across modules.
+    Example:
+        from utils.logger_setup import logger
 
-    Parameters:
-        name (str, optional): Logger name, typically __name__. If None, automatically
-                              derived from calling module via stack introspection.
-        level (str, optional): Logging level threshold for message filtering.
-                               One of: DEBUG, INFO, WARNING, ERROR, CRITICAL.
-        setup_root (bool): When True, configures the root logger with specified level,
-                           affecting all loggers in the hierarchy.
-        use_rich (bool, optional): When True, uses rich for logging formatting.
-                                   If None, uses the value from USE_RICH_LOGGING env var.
+        # Then use directly:
+        logger.info("Your message")
+    """
+    raise DeprecationWarning(
+        "get_logger() is deprecated and has been disabled. "
+        "Please use 'from utils.logger_setup import logger' instead and access logging methods directly."
+    )
 
-    Returns:
-        logging.Logger: Configured logger instance with appropriate level and handlers.
+
+def _get_module_logger(name=None, level=None, setup_root=False, use_rich=None):
+    """
+    INTERNAL USE ONLY: Retrieve or create a logger instance with appropriate configuration.
+
+    This function is for internal use by the LoggerProxy only.
+    External code should use the 'logger' directly.
     """
     # Auto-detect caller's module name if not provided
     if name is None:
-        frame = inspect.currentframe().f_back
+        frame = (
+            inspect.currentframe().f_back.f_back
+        )  # Extra level for _get_module_logger caller
         module = inspect.getmodule(frame)
         name = module.__name__ if module else "__main__"
 
@@ -165,21 +170,21 @@ def get_logger(name=None, level=None, setup_root=False, use_rich=None):
     if name in _module_loggers:
         return _module_loggers[name]
 
-    logger = logging.getLogger(name)
+    logger_instance = logging.getLogger(name)
 
     # If not using as a module within a configured app,
     # set up minimal logging for this module
-    if not _root_configured and not logger.handlers:
+    if not _root_configured and not logger_instance.handlers:
         log_level = (level or DEFAULT_LEVEL).upper()
-        logger.setLevel(log_level)
+        logger_instance.setLevel(log_level)
     elif level:
         # Allow level override when explicitly requested
-        logger.setLevel(level.upper())
+        logger_instance.setLevel(level.upper())
 
     # Cache the logger
-    _module_loggers[name] = logger
+    _module_loggers[name] = logger_instance
 
-    return logger
+    return logger_instance
 
 
 def _setup_root_logger(level=None, use_rich=None, show_filename=None):
@@ -275,8 +280,10 @@ def use_rich_logging(enable=True, level=None):
     global _use_rich
 
     if enable and not RICH_AVAILABLE:
-        logger = get_logger()
-        logger.warning("Rich library not available. Install with 'pip install rich'")
+        tmp_logger = _get_module_logger()
+        tmp_logger.warning(
+            "Rich library not available. Install with 'pip install rich'"
+        )
         return False
 
     _use_rich = enable
@@ -318,6 +325,12 @@ class LoggerProxy:
     allowing sequential logging operations and configuration with a concise syntax.
     """
 
+    def __init__(self):
+        """Initialize the LoggerProxy with root logger configuration"""
+        # Configure root logger with default settings if not already configured
+        if not _root_configured:
+            _setup_root_logger(level=DEFAULT_LEVEL, use_rich=_use_rich)
+
     def __getattr__(self, name):
         """
         Dynamic attribute resolution with runtime module detection.
@@ -342,22 +355,42 @@ class LoggerProxy:
             "critical",
             "exception",
         ):
+            # Get caller's module (skip this frame)
             frame = inspect.currentframe().f_back
             module = inspect.getmodule(frame)
             module_name = module.__name__ if module else "__main__"
-            logger = get_logger(module_name)
+
+            # Get the appropriate logger for the module
+            logger_instance = _get_module_logger(module_name)
 
             # Create a wrapper that calls the log method and returns self for chaining
             def log_wrapper(*args, **kwargs):
-                log_method = getattr(logger, name)
+                log_method = getattr(logger_instance, name)
                 log_method(*args, **kwargs)
                 return self
 
             return log_wrapper
 
         # For any other attributes, use this module's logger
-        logger = get_logger()
-        return getattr(logger, name)
+        tmp_logger = _get_module_logger()
+        return getattr(tmp_logger, name)
+
+    def setup_root(self, level=None, use_rich=None, show_filename=None):
+        """
+        Configure the root logger with specified options.
+
+        Provides a cleaner interface for setting up the root logger with various options.
+
+        Parameters:
+            level (str, optional): Logging level to set
+            use_rich (bool, optional): Whether to use Rich logging
+            show_filename (bool, optional): Whether to show filenames in log output
+
+        Returns:
+            LoggerProxy: Self reference for method chaining
+        """
+        _setup_root_logger(level=level, use_rich=use_rich, show_filename=show_filename)
+        return self
 
     def setLevel(self, level, configure_root=True):
         """
@@ -385,7 +418,7 @@ class LoggerProxy:
         # Set up root logger if requested (usually first setup)
         if configure_root:
             _setup_root_logger(level=level_str, use_rich=_use_rich)
-            # Use logging.getLogger directly to avoid circular reference with the global 'logger'
+            # Use logging.getLogger directly to avoid circular reference
             root_logger = logging.getLogger("root")
             root_logger.debug(f"Logger root configured with level {level_str}")
 
@@ -394,9 +427,8 @@ class LoggerProxy:
         module = inspect.getmodule(frame.f_back) if frame else None
         module_name = module.__name__ if module else "__main__"
 
-        # Set level for the specific module logger (already done for all if root configured)
-        # but ensure the specific module has the level set
-        module_logger = get_logger(module_name)
+        # Set level for the specific module logger
+        module_logger = _get_module_logger(module_name)
         module_logger.setLevel(level_str)
 
         # Return self for chaining
@@ -434,9 +466,8 @@ class LoggerProxy:
 # Create the auto-detecting logger proxy for conventional syntax
 logger = LoggerProxy()
 
-# Configure root logger with simple format by default
-if not _root_configured:
-    _setup_root_logger(level=DEFAULT_LEVEL, use_rich=_use_rich)
+# Hide the get_logger function from imports
+__all__ = ["logger", "show_filename", "use_rich_logging"]
 
 # Test logger if run directly
 if __name__ == "__main__":
@@ -504,3 +535,9 @@ if __name__ == "__main__":
     # Test method chaining with show_filename
     print("\nTesting method chaining with show_filename:")
     logger.show_filename(True).info("This message should show filename (chained)")
+
+    # Try to use the deprecated get_logger function - should raise an error
+    try:
+        get_logger()
+    except Exception as e:
+        print(f"\nSuccessfully disabled get_logger(): {e}")
