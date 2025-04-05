@@ -53,7 +53,7 @@ python automate_funding_rate_download.py --symbols BTCUSDT ETHUSDT --interval 30
 
 The CSV files will have the following structure:
 
-```
+```csv
 Symbol,Funding Time,Funding Rate,Mark Price
 BTCUSDT,2025-04-04 08:00:00,0.00001659,88106.70000000
 BTCUSDT,2025-04-04 16:00:00,-0.00003082,86704.27858519
