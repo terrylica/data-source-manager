@@ -32,6 +32,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import logging
+import numpy as np
 
 from core.vision_data_client import VisionDataClient
 from core.vision_constraints import CONSOLIDATION_DELAY
@@ -61,34 +62,39 @@ def get_test_time_range(
 
     # Round to nearest second to avoid sub-second precision issues
     start_time = (now - timedelta(days=days_ago)).replace(microsecond=0)
+
+    # Ensure we're not using dates in the future year
+    # This is critical as we're in 2025 and need to avoid future date validation errors
+    current_year = now.year
+    if start_time.year > current_year or (start_time + duration).year > current_year:
+        # Use a safe historical date from the previous year
+        safe_year = current_year - 1
+        start_time = datetime(safe_year, 4, 1, tzinfo=timezone.utc)
+
+    # Ensure end_time is after start_time
     end_time = (start_time + duration).replace(microsecond=0)
+
+    # Double-check time window is valid
+    if end_time <= start_time:
+        logger.critical(
+            f"Invalid time window: start_time ({start_time}) must be before end_time ({end_time})"
+        )
+        # Use a safe 1-hour window as fallback
+        start_time = datetime(current_year - 1, 4, 1, tzinfo=timezone.utc)
+        end_time = start_time + timedelta(hours=1)
+
     logger.info(f"Generated test time range: {start_time} to {end_time}")
     return start_time, end_time
 
 
 @pytest.fixture
 def caplog_maybe(request):
-    """Fixture to provide a safe caplog alternative that works with pytest-xdist."""
+    """Fixture to provide a safe caplog alternative that works with pytest-xdist.
 
-    # Create a dummy caplog object if the real one is not available
-    class DummyCaplog:
-        """A dummy caplog implementation that doesn't raise KeyError."""
-
-        def __init__(self):
-            """Initialize with empty records."""
-            self.records = []
-            self.text = ""
-
-        def set_level(self, level, logger=None):
-            """Dummy implementation of set_level."""
-
-        def clear(self):
-            """Clear logs."""
-            self.records = []
-            self.text = ""
-
-    # Always return the dummy implementation to avoid issues with pytest-xdist
-    return DummyCaplog()
+    This uses our unified logging approach for compatibility with parallel execution.
+    """
+    # Get caplog_unified fixture which is our standardized approach
+    return request.getfixturevalue("caplog_unified")
 
 
 @pytest.mark.real
@@ -216,7 +222,9 @@ async def test_data_consistency(caplog_maybe):
         assert df["open"].dtype == float, "open column is not float"
         assert df["close"].dtype == float, "close column is not float"
         assert df["volume"].dtype == float, "volume column is not float"
-        assert df["count"].dtype == int, "count column is not int"
+        assert np.issubdtype(
+            df["count"].dtype, np.integer
+        ), "count column is not an integer type"
 
         # Verify data completeness (inclusive end time)
         expected_rows = int((end_time - start_time).total_seconds()) + 1
@@ -358,4 +366,6 @@ async def test_timestamp_format_evolution(caplog_maybe):
             assert df["open"].dtype == float, f"{period} open column is not float"
             assert df["close"].dtype == float, f"{period} close column is not float"
             assert df["volume"].dtype == float, f"{period} volume column is not float"
-            assert df["count"].dtype == int, f"{period} count column is not int"
+            assert np.issubdtype(
+                df["count"].dtype, np.integer
+            ), f"{period} count column is not an integer type"

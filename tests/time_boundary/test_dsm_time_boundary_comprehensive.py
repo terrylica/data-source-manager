@@ -34,16 +34,10 @@ from utils.logger_setup import logger
 from core.data_source_manager import DataSourceManager, DataSource
 from utils.market_constraints import Interval, MarketType
 from utils.time_utils import (
-    align_vision_api_to_rest,
+    align_time_boundaries,
     get_interval_timedelta,
+    get_interval_micros,
 )
-
-# Import functions directly from time_utils
-from utils.time_utils import (
-    align_vision_api_to_rest,
-    get_interval_timedelta,
-)
-
 
 # Test configuration
 TEST_SYMBOL = "BTCUSDT"
@@ -201,11 +195,22 @@ async def test_time_boundary_comprehensive(manager: DataSourceManager) -> None:
             )
 
             # Get time boundaries using the consolidated utility function directly
-            time_boundaries = align_vision_api_to_rest(
+            adjusted_start, adjusted_end = align_time_boundaries(
                 start_time, end_time, TEST_INTERVAL
             )
-            adjusted_start = time_boundaries["adjusted_start"]
-            adjusted_end = time_boundaries["adjusted_end"]
+
+            # Get interval in microseconds for metadata
+            interval_micros = get_interval_micros(TEST_INTERVAL)
+
+            # Create metadata structure similar to the previous implementation
+            time_boundaries = {
+                "original_start": start_time,
+                "original_end": end_time,
+                "adjusted_start": adjusted_start,
+                "adjusted_end": adjusted_end,
+                "interval": TEST_INTERVAL,
+                "interval_micros": interval_micros,
+            }
 
             # Calculate expected records based on adjusted times and interval
             interval_seconds = get_interval_timedelta(TEST_INTERVAL).total_seconds()

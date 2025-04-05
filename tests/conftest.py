@@ -5,16 +5,28 @@ This file contains:
 1. Fixtures for handling network clients with proper cleanup
 2. Enhanced caplog fixture for pytest-xdist compatibility
 3. Asyncio configuration for proper event loop management
+4. Unified logging abstractions for parallel testing
 """
 
 # Left empty for backwards compatibility
 # The fixtures were previously imported here but are no longer used
 
 import pytest
-import logging
 from curl_cffi.requests import AsyncSession
 from utils.network_utils import safely_close_client
-from utils.logger_setup import logger
+
+# Import our unified logging abstractions
+from tests.utils.unified_logging import (
+    UnifiedLogCapture,
+    configure_root_logger_for_testing,
+    caplog_unified,
+    caplog_xdist_compatible,
+    assert_log_contains,
+)
+
+# Import fixtures to make them available to all tests
+# These imports are needed for pytest to discover the fixtures
+# Note: The imports must be explicit to ensure the fixtures are registered
 
 
 # Set global asyncio configuration via pytest configuration
@@ -39,6 +51,9 @@ def pytest_configure(config):
     # This is critical for avoiding KeyError issues with pytest-xdist
     config.option.asyncio_default_fixture_loop_scope = "function"
 
+    # Configure root logger to ensure all log levels pass through
+    configure_root_logger_for_testing()
+
 
 @pytest.fixture
 async def curl_cffi_client_with_cleanup():
@@ -54,166 +69,28 @@ async def curl_cffi_client_with_cleanup():
 
 
 @pytest.fixture
-def caplog_xdist_compatible():
+def caplog():
+    """Enhanced caplog fixture compatible with pytest-xdist.
+
+    This fixture provides a drop-in replacement for pytest's standard caplog fixture
+    that works reliably with pytest-xdist parallel testing.
+
+    This implementation uses our unified log capture class which is designed to work
+    in all testing environments, including pytest-xdist parallel execution.
+
+    Yields:
+        UnifiedLogCapture: A caplog-compatible object for capturing and inspecting logs
     """
-    A simplified caplog fixture compatible with pytest-xdist.
+    # Configure the root logger to ensure DEBUG logs are captured
+    configure_root_logger_for_testing()
 
-    Instead of trying to use the standard caplog fixture which has issues with
-    pytest-xdist, this provides a minimal implementation that collects logs
-    during test execution.
-    """
-
-    class SimpleLogCapture:
-        """A simple log capture implementation for pytest-xdist compatibility."""
-
-        def __init__(self):
-            """Initialize with empty records list."""
-            self.records = []
-            self.handler = None
-
-            # Create and attach a handler that will collect logs
-            self.handler = _CollectHandler(self.records)
-            self.handler.setLevel(logging.DEBUG)
-            logging.getLogger().addHandler(self.handler)
-
-        def set_level(self, level):
-            """Set logging level."""
-            if isinstance(level, str):
-                level = getattr(logging, level.upper(), logging.INFO)
-            self.handler.setLevel(level)
-
-        def clear(self):
-            """Clear captured records."""
-            self.records.clear()
-
-        def __enter__(self):
-            """Context manager entry."""
-            return self
-
-        def __exit__(self, *args):
-            """Remove the handler when done."""
-            if self.handler:
-                logging.getLogger().removeHandler(self.handler)
-
-    # Handler class for collecting log records
-    class _CollectHandler(logging.Handler):
-        """Handler that collects log records in a list."""
-
-        def __init__(self, records_list):
-            """Initialize with a list to store records."""
-            super().__init__()
-            self.records_list = records_list
-
-        def emit(self, record):
-            """Add the record to our collection."""
-            self.records_list.append(record)
-
-    # Create and return the capture object
-    capture = SimpleLogCapture()
+    # Create and yield our unified log capture implementation
+    capture = UnifiedLogCapture()
     try:
         yield capture
     finally:
-        # Clean up the handler
-        if capture.handler:
-            logging.getLogger().removeHandler(capture.handler)
+        capture.cleanup()
 
 
-@pytest.fixture
-def caplog(request):
-    """Enhanced caplog fixture compatible with pytest-xdist.
-
-    This fixture addresses KeyError issues when running tests in parallel with pytest-xdist
-    while providing full logging capture capability. It handles both sequential
-    and parallel execution environments gracefully.
-    """
-
-    # Handler class for collecting log records
-    class _CollectHandler(logging.Handler):
-        """Handler that collects log records in a list."""
-
-        def __init__(self, records_list):
-            """Initialize with a list to store records."""
-            super().__init__()
-            self.records_list = records_list
-
-        def emit(self, record):
-            """Add the record to our collection."""
-            self.records_list.append(record)
-
-    # Create a xdist-compatible caplog implementation
-    class XdistCompatibleCaplog:
-        """A caplog implementation that works with pytest-xdist."""
-
-        def __init__(self):
-            """Initialize with storage for records and handlers."""
-            self.records = []
-            self.text = ""
-            self._handler = logging.NullHandler()
-            self._level = logging.INFO
-            self._handler.setLevel(self._level)
-
-            # Create a real handler to show logs in the console
-            self._real_handler = logging.StreamHandler()
-            self._real_handler.setFormatter(
-                logging.Formatter("%(levelname)s %(name)s: %(message)s")
-            )
-            self._real_handler.setLevel(self._level)
-
-            # Add a special handler to collect logs for inspection in tests
-            self._collect_handler = _CollectHandler(self.records)
-            self._collect_handler.setLevel(logging.DEBUG)  # Collect all levels
-
-            # Add handlers to root logger
-            root_logger = logging.getLogger()
-            root_logger.addHandler(self._real_handler)
-            root_logger.addHandler(self._collect_handler)
-
-        @property
-        def handler(self):
-            """Get the handler property that pytest expects."""
-            return self._handler
-
-        def set_level(self, level, logger=None):
-            """Set the capture level - works with strings or log level constants."""
-            if isinstance(level, str):
-                level = getattr(logging, level.upper(), logging.INFO)
-
-            # Set level on our handlers
-            self._level = level
-            self._handler.setLevel(level)
-            self._real_handler.setLevel(level)
-            self._collect_handler.setLevel(level)
-
-            # If a specific logger is provided, set its level
-            if logger is not None:
-                logging.getLogger(logger).setLevel(level)
-
-        def clear(self):
-            """Clear logs."""
-            self.records.clear()
-            self.text = ""
-
-        def __enter__(self):
-            """Context manager entry."""
-            return self
-
-        def __exit__(self, *args, **kwargs):
-            """Context manager exit."""
-            # Clean up by removing our handlers from the root logger
-            root_logger = logging.getLogger()
-            if self._real_handler in root_logger.handlers:
-                root_logger.removeHandler(self._real_handler)
-            if self._collect_handler in root_logger.handlers:
-                root_logger.removeHandler(self._collect_handler)
-
-    try:
-        # Try to get the real caplog fixture from pytest
-        # This will work when running sequentially, but fail with pytest-xdist
-        real_caplog = request.getfixturevalue("caplog")
-        return real_caplog
-    except Exception:
-        # If caplog fixture isn't available or raises KeyError (with pytest-xdist)
-        logger.debug(
-            "Using xdist-compatible caplog implementation for compatibility with pytest-xdist"
-        )
-        return XdistCompatibleCaplog()
+# Re-export the unified fixtures from unified_logging.py to make them globally available
+# This ensures backward compatibility while encouraging the use of the new unified approach

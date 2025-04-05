@@ -833,8 +833,9 @@ async def test_date_validation(manager: DataSourceManager, now: arrow.Arrow) -> 
     except ValueError as e:
         # Original behavior - raising ValueError is also acceptable
         logger.info(f"Got expected ValueError: {e}")
+        error_message = str(e).lower()
         assert (
-            "start_time" in str(e).lower() and "end_time" in str(e).lower()
+            "start time" in error_message and "end time" in error_message
         ), "Error should mention start/end time"
 
     # Test 2: Excessive time range
@@ -847,8 +848,8 @@ async def test_date_validation(manager: DataSourceManager, now: arrow.Arrow) -> 
         df = await manager.get_data(
             symbol=TEST_SYMBOL,
             interval=TEST_INTERVAL,
-            start_time=start_time.datetime,
-            end_time=end_time.datetime,
+            start_time=start_time,
+            end_time=end_time,
         )
 
         # If we get here, either the validation was removed or it's now more permissive
@@ -868,4 +869,5 @@ async def test_date_validation(manager: DataSourceManager, now: arrow.Arrow) -> 
     except ValueError as e:
         # Original behavior - raising ValueError is acceptable
         logger.info(f"Got expected ValueError: {e}")
-        assert "time range" in str(e).lower(), "Error should mention time range"
+        error_message = str(e).lower()
+        assert "time range" in error_message, "Error should mention time range"

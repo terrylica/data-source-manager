@@ -37,6 +37,7 @@ import pytest_asyncio
 from utils.logger_setup import logger
 from core.data_source_manager import DataSourceManager
 from utils.market_constraints import Interval, MarketType
+from tests.time_boundary.test_cache_unified import get_safe_test_time_range
 
 
 # Test configuration
@@ -177,27 +178,12 @@ def log_dataframe_info(df: pd.DataFrame, source: str) -> None:
 
 @pytest.fixture
 def caplog_maybe(request):
-    """Fixture to provide a safe caplog alternative that works with pytest-xdist."""
+    """Fixture to provide a safe caplog alternative that works with pytest-xdist.
 
-    # Create a dummy caplog object if the real one is not available
-    class DummyCaplog:
-        """A dummy caplog implementation that doesn't raise KeyError."""
-
-        def __init__(self):
-            """Initialize with empty records."""
-            self.records = []
-            self.text = ""
-
-        def set_level(self, level, logger=None):
-            """Dummy implementation of set_level."""
-
-        def clear(self):
-            """Clear logs."""
-            self.records = []
-            self.text = ""
-
-    # Always return the dummy implementation to avoid issues with pytest-xdist
-    return DummyCaplog()
+    This uses our unified logging approach for compatibility with parallel execution.
+    """
+    # Get caplog_unified fixture which is our standardized approach
+    return request.getfixturevalue("caplog_unified")
 
 
 @pytest_asyncio.fixture
@@ -304,18 +290,21 @@ async def test_input_format_handling(
         ],
     )
 
+    # Use safe test time range function to avoid 2025 future dates
+    safe_start_time, safe_end_time = get_safe_test_time_range(timedelta(minutes=5))
+
     # Test cases with different input formats
     test_cases = [
-        # Case 1: Naive datetime
+        # Case 1: Naive datetime - converted from safe time range
         (
-            datetime.now() - timedelta(days=2),
-            datetime.now() - timedelta(days=2) + timedelta(minutes=5),
+            safe_start_time.replace(tzinfo=None),
+            safe_end_time.replace(tzinfo=None),
             "Naive datetime",
         ),
-        # Case 2: Aware datetime (UTC)
+        # Case 2: Aware datetime (UTC) - using safe time range directly
         (
-            datetime.now(timezone.utc) - timedelta(days=2),
-            datetime.now(timezone.utc) - timedelta(days=2) + timedelta(minutes=5),
+            safe_start_time,
+            safe_end_time,
             "Aware datetime (UTC)",
         ),
     ]
@@ -353,11 +342,11 @@ async def test_input_format_handling(
             "datetime64"
         ), "close_time must be datetime64 type (with or without timezone)"
 
-        # Verify trades column
-        assert "trades" in df.columns, "DataFrame should have 'trades' column"
+        # Verify count column exists (not trades column as per Vision API standards)
+        assert "count" in df.columns, "DataFrame should have 'count' column"
         # Convert to int64 if not already (handles both int32 and int64 cases)
-        df["trades"] = df["trades"].astype(np.int64)
-        assert df["trades"].dtype == np.int64, "trades should be int64"
+        df["count"] = df["count"].astype(np.int64)
+        assert df["count"].dtype == np.int64, "count should be int64"
 
         # Check if we have a reasonable number of records
         expected_minutes = 5  # Time range is 5 minutes

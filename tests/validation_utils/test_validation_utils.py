@@ -11,8 +11,6 @@ import numpy as np
 
 from utils.validation_utils import (
     validate_dates,
-    validate_time_window,
-    validate_time_range,
     validate_interval,
     validate_symbol_format,
     validate_data_availability,
@@ -31,20 +29,21 @@ from utils.api_boundary_validator import ApiBoundaryValidator
 
 
 class TestValidationFunctions:
-    """Tests for basic validation functions."""
+    """Tests for validation utility functions."""
 
     def test_validate_dates_valid(self):
-        """Test validate_dates with valid dates."""
+        """Test validate_dates with valid inputs."""
         start_time = datetime(2023, 1, 1, tzinfo=timezone.utc)
         end_time = datetime(2023, 1, 2, tzinfo=timezone.utc)
-        # Should not raise
-        validate_dates(start_time, end_time)
+        result_start, result_end = validate_dates(start_time, end_time)
+        assert result_start == start_time
+        assert result_end == end_time
 
     def test_validate_dates_invalid_order(self):
-        """Test validate_dates with invalid date order."""
+        """Test validate_dates with start after end."""
         start_time = datetime(2023, 1, 2, tzinfo=timezone.utc)
         end_time = datetime(2023, 1, 1, tzinfo=timezone.utc)
-        with pytest.raises(ValueError, match="Start time must be before end time"):
+        with pytest.raises(ValueError, match="must be before"):
             validate_dates(start_time, end_time)
 
     def test_validate_dates_timezone_awareness(self):
@@ -53,31 +52,6 @@ class TestValidationFunctions:
         end_time = datetime(2023, 1, 2, tzinfo=timezone.utc)
         with pytest.raises(ValueError, match="must be timezone-aware"):
             validate_dates(start_time, end_time)
-
-    def test_validate_time_window_valid(self):
-        """Test validate_time_window with valid time window."""
-        start_time = datetime(2023, 1, 1, tzinfo=timezone.utc)
-        end_time = datetime(2023, 1, 2, tzinfo=timezone.utc)
-        # Should not raise
-        validate_time_window(start_time, end_time)
-
-    def test_validate_time_window_too_large(self):
-        """Test validate_time_window with too large window."""
-        from utils.config import MAX_TIME_RANGE
-
-        start_time = datetime(2023, 1, 1, tzinfo=timezone.utc)
-        end_time = start_time + MAX_TIME_RANGE + timedelta(seconds=1)
-        with pytest.raises(ValueError, match="Time range exceeds maximum allowed"):
-            validate_time_window(start_time, end_time)
-
-    def test_validate_time_range(self):
-        """Test validate_time_range normalization."""
-        # Test with timezone-naive datetimes
-        start_time = datetime(2023, 1, 1)
-        end_time = datetime(2023, 1, 2)
-        normalized_start, normalized_end = validate_time_range(start_time, end_time)
-        assert normalized_start.tzinfo is not None
-        assert normalized_end.tzinfo is not None
 
     def test_validate_interval_valid(self):
         """Test validate_interval with valid intervals."""

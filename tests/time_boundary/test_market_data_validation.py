@@ -53,33 +53,12 @@ ONE_DAY = timedelta(days=1)
 
 @pytest.fixture
 def caplog_maybe(request):
-    """Fixture to provide a safe caplog alternative that works with pytest-xdist."""
+    """Fixture to provide a safe caplog alternative that works with pytest-xdist.
 
-    # Create a dummy caplog object if the real one is not available
-    class DummyCaplog:
-        """A dummy caplog implementation that doesn't raise KeyError."""
-
-        def __init__(self):
-            """Initialize with empty records."""
-            self.records = []
-            self.text = ""
-
-        def set_level(self, level, logger=None):
-            """Dummy implementation of set_level."""
-
-        def clear(self):
-            """Clear logs."""
-            self.records = []
-            self.text = ""
-
-    try:
-        # Try to get the real caplog fixture
-        real_caplog = request.getfixturevalue("caplog")
-        return real_caplog
-    except:
-        # If caplog fixture isn't available, return our dummy implementation
-        logger.debug("Using dummy caplog implementation")
-        return DummyCaplog()
+    This uses our unified logging approach for compatibility with parallel execution.
+    """
+    # Get caplog_unified fixture which is our standardized approach
+    return request.getfixturevalue("caplog_unified")
 
 
 # Fixtures

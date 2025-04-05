@@ -2,6 +2,29 @@
 
 This directory contains all the tests for the Binance Data Services project. This document outlines the best practices and patterns to follow when creating or modifying tests.
 
+## Test Directory Structure
+
+The test directory is organized by module/component:
+
+```tree
+tests/
+├── api_boundary/       # Tests for API boundary validation
+├── cache_structure/    # Tests for cache system
+├── data_sources/       # Tests for data source modules
+├── intervals/          # Tests for time interval handling
+├── market_constraints/ # Tests for market constraints
+├── market_types/       # Tests for market types
+├── network_utils/      # Tests for network utilities
+├── time_boundary/      # Tests for time boundary logic
+├── time_utils/         # Tests for time utilities
+├── utils/              # Testing utilities and helpers
+├── validation/         # Tests for validation modules
+├── validation_utils/   # Legacy tests for validation_utils (being migrated)
+└── vision_data_client/ # Tests for VisionDataClient
+```
+
+Each test directory should contain an `__init__.py` file with a docstring describing the tests in that directory.
+
 ## Running Tests
 
 Always use the `scripts/run_tests_parallel.sh` script to run tests. This script provides several features:

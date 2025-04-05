@@ -7,7 +7,6 @@ from datetime import datetime, timezone, timedelta
 
 from utils.time_utils import (
     enforce_utc_timezone,
-    validate_time_window,
     get_interval_micros,
     get_interval_seconds,
     get_interval_timedelta,
@@ -18,25 +17,29 @@ from utils.time_utils import (
     filter_dataframe_by_time,
     align_time_boundaries,
     estimate_record_count,
-    vision_api_time_window_alignment,
-    align_vision_api_to_rest,
 )
+from utils.validation import DataValidation
 from utils.market_constraints import Interval
 
 
 class TestTimeUtils:
     """Test cases for time_utils module."""
 
-    def test_enforce_utc_timezone(self):
-        """Test enforce_utc_timezone function."""
-        # Test with naive datetime
+    def test_enforce_utc_timezone_naive(self):
+        """Test enforce_utc_timezone with naive datetime."""
         naive_dt = datetime(2023, 1, 1, 12, 0, 0)
         result = enforce_utc_timezone(naive_dt)
-        assert result.tzinfo is not None
         assert result.tzinfo == timezone.utc
+        assert result != naive_dt  # Should be a new object
+        assert result.year == 2023
+        assert result.month == 1
+        assert result.day == 1
+        assert result.hour == 12
 
-        # Test with non-UTC timezone
-        est = timezone(timedelta(hours=-5))
+    def test_enforce_utc_timezone_non_utc(self):
+        """Test enforce_utc_timezone with non-UTC timezone."""
+        # Create a datetime with EST timezone (UTC-5)
+        est = timezone(timedelta(hours=-5), name="EST")
         est_dt = datetime(2023, 1, 1, 12, 0, 0, tzinfo=est)
         result = enforce_utc_timezone(est_dt)
         assert result.tzinfo == timezone.utc
@@ -54,21 +57,21 @@ class TestTimeUtils:
         start = datetime(2023, 1, 1, tzinfo=timezone.utc)
         end = datetime(2023, 1, 2, tzinfo=timezone.utc)
         # Should not raise exception
-        validate_time_window(start, end)
+        DataValidation.validate_time_window(start, end)
 
     def test_validate_time_window_invalid_order(self):
         """Test validate_time_window with start after end."""
         start = datetime(2023, 1, 2, tzinfo=timezone.utc)
         end = datetime(2023, 1, 1, tzinfo=timezone.utc)
         with pytest.raises(ValueError, match="Start time .* must be before end time"):
-            validate_time_window(start, end)
+            DataValidation.validate_time_window(start, end)
 
     def test_validate_time_window_too_large(self):
         """Test validate_time_window with range too large."""
         start = datetime(2023, 1, 1, tzinfo=timezone.utc)
         end = datetime(2024, 2, 1, tzinfo=timezone.utc)  # More than 1 year
         with pytest.raises(ValueError, match="Time range too large"):
-            validate_time_window(start, end)
+            DataValidation.validate_time_window(start, end)
 
     def test_get_interval_micros(self):
         """Test get_interval_micros function."""
@@ -210,37 +213,3 @@ class TestTimeUtils:
         end = datetime(2023, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
         count = estimate_record_count(start, end, Interval.HOUR_1)
         assert count == 25  # 24 hours plus the 00:00 of day 2
-
-    def test_vision_api_time_window_alignment(self):
-        """Test vision_api_time_window_alignment function."""
-        # Test with 1-minute interval
-        start = datetime(2023, 1, 1, 12, 0, 30, tzinfo=timezone.utc)
-        end = datetime(2023, 1, 1, 12, 5, 30, tzinfo=timezone.utc)
-        aligned_start, aligned_end = vision_api_time_window_alignment(
-            start, end, Interval.MINUTE_1
-        )
-        assert aligned_start == datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-        assert aligned_end == datetime(2023, 1, 1, 12, 5, 0, tzinfo=timezone.utc)
-
-    def test_align_vision_api_to_rest(self):
-        """Test align_vision_api_to_rest function."""
-        # Test with 1-minute interval
-        start = datetime(2023, 1, 1, 12, 0, 30, tzinfo=timezone.utc)
-        end = datetime(2023, 1, 1, 12, 5, 30, tzinfo=timezone.utc)
-        result = align_vision_api_to_rest(start, end, Interval.MINUTE_1)
-
-        # Check result structure and values
-        assert isinstance(result, dict)
-        assert "original_start" in result
-        assert "original_end" in result
-        assert "adjusted_start" in result
-        assert "adjusted_end" in result
-        assert "interval" in result
-        assert "interval_micros" in result
-
-        assert result["adjusted_start"] == datetime(
-            2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc
-        )
-        assert result["adjusted_end"] == datetime(
-            2023, 1, 1, 12, 6, 0, tzinfo=timezone.utc
-        )

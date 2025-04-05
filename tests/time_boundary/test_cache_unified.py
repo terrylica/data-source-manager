@@ -147,11 +147,6 @@ def get_safe_test_time_range(
     # This avoids issues with future dates in 2025 which may be invalid
     target_date = now - timedelta(days=safe_days)
 
-    # Ensure we're not using a date in 2025
-    if target_date.year == 2025:
-        # Use a previous known date from 2024 that should have data
-        target_date = datetime(2024, 1, 15, tzinfo=timezone.utc)
-
     # Round to nearest second to avoid sub-second precision issues
     start_time = target_date.replace(microsecond=0)
     end_time = (start_time + duration).replace(microsecond=0)
