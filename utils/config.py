@@ -57,6 +57,14 @@ KLINE_COLUMNS: Final[List[str]] = [
     "ignore",  # Unused field, ignore
 ]
 
+# Funding rate column names
+FUNDING_RATE_COLUMNS: Final[List[str]] = [
+    "time",  # Time of funding rate
+    "contracts",  # Contract symbol
+    "funding_interval",  # Funding interval
+    "funding_rate",  # Funding rate value
+]
+
 # Standard column dtypes for all market data DataFrames
 OUTPUT_DTYPES: Final[Dict[str, str]] = {
     "open": "float64",
@@ -69,6 +77,13 @@ OUTPUT_DTYPES: Final[Dict[str, str]] = {
     "count": "int64",
     "taker_buy_volume": "float64",
     "taker_buy_quote_volume": "float64",
+}
+
+# Standard column dtypes for funding rate DataFrames
+FUNDING_RATE_DTYPES: Final[Dict[str, str]] = {
+    "contracts": "string",
+    "funding_interval": "string",
+    "funding_rate": "float64",
 }
 
 # Mapping between various column name variants used in different APIs
@@ -85,6 +100,9 @@ COLUMN_NAME_MAPPING: Final[Dict[str, str]] = {
     # Taker buy quote volume variants
     "taker_buy_quote": "taker_buy_quote_volume",
     "taker_buy_quote_volume": "taker_buy_quote_volume",
+    # Funding rate mapping
+    "time": "open_time",
+    "funding_rate_pct": "funding_rate",
 }
 
 # Default column order for standardized output
@@ -99,6 +117,13 @@ DEFAULT_COLUMN_ORDER: Final[List[str]] = [
     "count",
     "taker_buy_volume",
     "taker_buy_quote_volume",
+]
+
+# Default column order for funding rate output
+FUNDING_RATE_COLUMN_ORDER: Final[List[str]] = [
+    "contracts",
+    "funding_interval",
+    "funding_rate",
 ]
 
 # Timestamp configuration
@@ -179,6 +204,26 @@ def create_empty_dataframe() -> pd.DataFrame:
 
     # Set correct data types
     for col, dtype in OUTPUT_DTYPES.items():
+        df[col] = df[col].astype(dtype)
+
+    # Set index
+    df.index = pd.DatetimeIndex([], name=CANONICAL_INDEX_NAME)
+    df.index = df.index.tz_localize(DEFAULT_TIMEZONE)
+
+    return df
+
+
+# Create a standard empty funding rate DataFrame with proper structure
+def create_empty_funding_rate_dataframe() -> pd.DataFrame:
+    """Create an empty DataFrame with the standard funding rate data structure.
+
+    Returns:
+        An empty DataFrame with correct column types and index
+    """
+    df = pd.DataFrame([], columns=FUNDING_RATE_COLUMN_ORDER)
+
+    # Set correct data types
+    for col, dtype in FUNDING_RATE_DTYPES.items():
         df[col] = df[col].astype(dtype)
 
     # Set index

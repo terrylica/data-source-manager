@@ -52,10 +52,7 @@ Examples included:
 Chart Types:
 The system supports various chart data types defined in the `ChartType` enum:
 - `KLINES`: Standard candlestick data (default, supported by all markets)
-- `UI_KLINES`: Optimized klines for UI applications (spot market only)
-- `MARK_PRICE_KLINES`: Mark price klines (futures markets only)
-- `PREMIUM_INDEX_KLINES`: Premium index klines (futures markets only)
-- `CONTINUOUS_KLINES`: Continuous contract klines (futures markets only)
+- `FUNDING_RATE`: Funding rate data (futures markets only)
 
 Each chart type is mapped to the corresponding API endpoint, and compatibility with
 different market types is handled automatically. The DataSourceManager and underlying

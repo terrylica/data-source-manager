@@ -1,95 +1,135 @@
-# Market Data Retrieval Workflow
+# Core Workflow in Mermaid
+
+## Data Retrieval Flow
 
 ```mermaid
-graph TB
-    %% Define four columns to maximize horizontal space
-    subgraph "Initial Request"
-        A["Start: Data Request<br/>symbol, time range, interval"] --> B["**Check Cache (Daily)?**<br/>use_cache=True<br/><br/><sup>User preference & config</sup>"]
-    end
+graph TD
+    A[Application] --> B[DataSourceManager]
+    B --> C{DataSourceManager._should_use_vision_api?}
+    C -->|Yes| D[Create client via DataClientFactory]
+    C -->|No| E[Create client via DataClientFactory]
 
-    subgraph "Cache Check"
-        B -- Yes --> C["**Cache Hit (Daily)?**<br/>Valid & Recent Data for Day?<br/><br/><sup>Metadata & checksum validation</sup><br/><sup>Data freshness threshold</sup>"]
-        C -- Yes --> E["**Load Data from Cache**<br/>UnifiedCacheManager.load_from_cache<br/><br/><sup>Fast daily retrieval</sup><br/><sup>REST API boundary aligned</sup>"]
-        E --> F["Return Data<br/>DataFrame from Cache"]
-    end
+    D -->|VisionClient| F[Vision API Client]
+    E -->|RestClient| G[REST API Client]
+    E -->|FundingRateClient| H[Funding Rate Client]
+    E -->|CustomClientType| I[Other Specialized Clients]
 
-    subgraph "API Strategy"
-        B -- No --> D["**Data Source Selection**<br/>_should_use_vision_api<br/><br/><sup>Estimate data points</sup><br/><sup>Vision API for large requests</sup>"]
-        C -- No --> D
-        D --> G1["**Vision API (Primary)**<br/>VisionDataClient.fetch<br/><br/><sup>Download-First Approach</sup><br/><sup>No pre-checking - faster retrieval</sup>"]
-        G1 --> G{"**Vision API Fetch**<br/>VisionDataClient._download_data<br/><br/><sup>Direct download with dynamic concurrency</sup><br/><sup>Aligned boundaries via ApiBoundaryValidator</sup>"}
-    end
+    F --> J[Check Cache]
+    G --> K[Check Cache]
+    H --> L[Check Cache]
+    I --> M[Check Cache]
 
-    subgraph "Results & Caching"
-        G -- Success --> I{"**Save to Cache (Daily)?**<br/>UnifiedCacheManager.save_to_cache<br/><br/><sup>Saves with REST API-aligned boundaries</sup><br/><sup>using TimeRangeManager.align_vision_api_to_rest</sup>"}
-        G -- Fail --> H["**Automatic Fallback**<br/>RestDataClient.fetch<br/><br/><sup>Transparent fallback for the user</sup><br/><sup>Same consistent interface</sup>"]
+    J -->|Cache Hit| N[Return Cached Data]
+    J -->|Cache Miss| O[Download from Vision API]
+    K -->|Cache Hit| P[Return Cached Data]
+    K -->|Cache Miss| Q[Fetch from REST API]
+    L -->|Cache Hit| R[Return Cached Data]
+    L -->|Cache Miss| S[Fetch from Provider-Specific API]
+    M -->|Cache Hit| T[Return Cached Data]
+    M -->|Cache Miss| U[Fetch from Custom API]
 
-        H -- Success --> K{"**Save to Cache (Daily)?**<br/>UnifiedCacheManager.save_to_cache<br/><br/><sup>Caches successful REST API data</sup><br/><sup>Same format as Vision API data</sup>"}
-        H -- Fail --> M["**Error Handling**<br/>raise Exception<br/><br/><sup>Retrieval failure</sup><br/><sup>Logged error details</sup>"]
+    O --> V[Format and Validate Data]
+    Q --> V
+    S --> V
+    U --> V
 
-        I --> J["Return Data<br/>DataFrame from Vision API<br/><br/><sup>Aligned with REST API boundaries</sup>"]
-        K --> L["Return Data<br/>DataFrame from REST API"]
-    end
-
-    %% Connect across subgraphs
-    F --> N["End: Data Retrieval<br/>Returns DataFrame"]
-    J --> N
-    L --> N
-    M --> N
-
-    %% Styling
-    style I fill:#f9f,stroke:#333,stroke-width:2px,color:#000
-    style K fill:#f9f,stroke:#333,stroke-width:2px,color:#000
-    style B fill:#ccf,stroke:#333,stroke-width:2px,color:#000,shape:rect
-    style C fill:#ccf,stroke:#333,stroke-width:2px,color:#000,shape:rect
-    style D fill:#ccf,stroke:#333,stroke-width:2px,color:#000,shape:rect
-    style G1 fill:#cfc,stroke:#333,stroke-width:2px,color:#000
-    style H fill:#cfc,stroke:#333,stroke-width:2px,color:#000,stroke-dasharray: 5, 5
-    style E fill:#cfc,stroke:#333,stroke-width:2px,color:#000
-    style G fill:#eee,stroke:#333,stroke-width:2px,color:#000
-    style M fill:#fee,stroke:#333,stroke-width:2px,color:#000
-
-    %% Define larger font class
-    classDef largeText fontSize:18px;
-
-    %% Apply large text to all nodes
-    class A,B,C,D,E,F,G,G1,H,I,J,K,L,M,N largeText;
+    V --> W[Cache Results]
+    W --> X[Return Data to Application]
+    N --> X
+    P --> X
+    R --> X
+    T --> X
 ```
 
-## Updated Workflow Overview
+## Factory and Client Flow
 
-This diagram illustrates the improved market data retrieval workflow with two key optimizations:
+```mermaid
+graph TD
+    A[DataSourceManager.get_data] --> B{Override provider/chart_type?}
+    B -->|Yes| C[Use Overridden Values]
+    B -->|No| D[Use Manager Defaults]
 
-1. **Download-First Approach**: The Vision API client now uses a direct download-first approach without pre-checking file existence, significantly improving performance.
+    C --> E[DataClientFactory.create_data_client]
+    D --> E
 
-2. **Automatic Fallback**: If Vision API fails to retrieve data, the system automatically and transparently falls back to REST API.
+    E --> F{Provider + Market Type + Chart Type}
 
-The workflow retains the existing advantages while adding these performance and reliability improvements.
+    F -->|Binance + Spot + KLines| G[Binance Spot KLines Client]
+    F -->|Binance + Futures + KLines| H[Binance Futures KLines Client]
+    F -->|Binance + Futures + FundingRate| I[Binance Funding Rate Client]
+    F -->|TradeStation + Spot + KLines| J[TradeStation KLines Client]
+    F -->|Other Combination| K[Other Specialized Client]
 
-## Process Description
+    G --> L[Client.fetch]
+    H --> L
+    I --> L
+    J --> L
+    K --> L
 
-The data retrieval process begins with a user request for market data. The system first checks for valid REST API-aligned cached data. If found, it's immediately returned.
+    L --> M[Return Standardized DataFrame]
+```
 
-Otherwise, the data source selection process is triggered:
+## Cache Structure
 
-- **Primary Path (Vision API with Download-First)**:
+```mermaid
+graph TD
+    A[Cache Root Directory] --> B{Provider}
+    B --> C[BINANCE]
+    B --> D[TRADESTATION]
 
-  - The system tries Vision API first for most requests, especially larger historical ones
-  - Uses download-first approach (no pre-checking) for optimal performance
-  - Applies dynamic concurrency optimization based on batch size
-  - Downloads data by day, combines results, and caches with REST API-aligned boundaries
+    C --> E{Chart Type}
+    D --> F{Chart Type}
 
-- **Automatic Fallback Path (REST API)**:
-  - If Vision API fails or returns no data, the system automatically falls back to REST API
-  - This fallback is transparent to the user - same interface and data format
-  - REST API data is also cached for future retrieval
+    E --> G[KLINES]
+    E --> H[FUNDING_RATE]
+    F --> I[KLINES]
 
-All data sources (Vision API, REST API, and cache) deliver consistent results with identical time boundaries, ensuring a seamless experience regardless of which source ultimately provides the data.
+    G --> J{Symbol}
+    H --> K{Symbol}
+    I --> L{Symbol}
 
-## Key Benefits
+    J --> M[BTCUSDT]
+    K --> N[BTCUSDT]
+    L --> O[BTCUSD]
 
-1. **Improved Performance**: The download-first approach eliminates unnecessary HEAD requests
-2. **Higher Reliability**: Automatic fallback ensures data retrieval even when Vision API is unavailable
-3. **Optimized Resource Usage**: Dynamic concurrency adjustment based on batch size
-4. **Consistent Data Format**: All sources return identical data structure
-5. **Transparent Experience**: Users don't need to worry about which source provides the data
+    M --> P{Interval}
+    N --> Q{Interval}
+    O --> R{Interval}
+
+    P --> S[1h]
+    Q --> T[8h]
+    R --> U[1m]
+
+    S --> V[YYYY-MM-DD.arrow]
+    T --> W[YYYY-MM-DD.arrow]
+    U --> X[YYYY-MM-DD.arrow]
+```
+
+## Error Handling Flow
+
+```mermaid
+graph TD
+    A[DataSourceManager.get_data] --> B{Try Source}
+    B -->|Success| C[Return Data]
+    B -->|Failure| D{Error Type}
+
+    D -->|Network Error| E[Apply Retry with Backoff]
+    D -->|Validation Error| F[Try Alternative Source]
+    D -->|Data Missing| G[Try Alternative Source]
+    D -->|Other Error| H[Propagate Error]
+
+    E --> I{Max Retries Reached?}
+    I -->|No| B
+    I -->|Yes| J[Try Alternative Source]
+
+    F --> K{Alternative Available?}
+    G --> K
+    J --> K
+
+    K -->|Yes| L[Try Alternative Source]
+    K -->|No| M[Propagate Error]
+
+    L --> N{Try Source}
+    N -->|Success| O[Return Data]
+    N -->|Failure| M
+```

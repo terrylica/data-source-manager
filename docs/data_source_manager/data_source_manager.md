@@ -2,11 +2,11 @@
 
 ## Overview
 
-The `DataSourceManager` serves as a mediator between different Binance data sources, primarily the REST API (`RestDataClient`) and Vision API (`VisionDataClient`). It provides intelligent source selection, caching, and fallback mechanisms to optimize data retrieval.
+The `DataSourceManager` serves as a mediator between different data sources across multiple providers. It provides intelligent source selection, caching, and fallback mechanisms to optimize data retrieval for various chart types.
 
 ### Core Responsibilities
 
-1. Data source selection between REST and Vision APIs
+1. Data source selection across multiple providers and chart types
 2. Unified caching strategy across all data sources
 3. Cache integrity validation and management
 4. Data format standardization
@@ -14,8 +14,8 @@ The `DataSourceManager` serves as a mediator between different Binance data sour
 ### Module Location
 
 ```python
-from core.data_source_manager import DataSourceManager
-from utils.market_constraints import Interval, MarketType
+from core.data_source_manager import DataSourceManager, DataSource
+from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
 ```
 
 ## System Architecture
@@ -30,25 +30,39 @@ from utils.market_constraints import Interval, MarketType
   - `REST`: Force REST API usage
   - `VISION`: Force Vision API usage
 
+- `DataProvider` Enum:
+
+  - `BINANCE`: Binance data provider
+  - `TRADESTATION`: TradeStation data provider
+
+- `ChartType` Enum:
+
+  - `KLINES`: Standard candlestick data
+  - `FUNDING_RATE`: Funding rate data (futures)
+
 - Dependencies:
+  - `DataClientInterface` (Abstract base class for all data clients)
+  - `DataClientFactory` (Factory for creating data clients based on provider, market type, and chart type)
   - `RestDataClient` from `rest_data_client.py`
   - `VisionDataClient` from `vision_data_client.py`
+  - `BinanceFundingRateClient` from `binance_funding_rate_client.py`
   - `UnifiedCacheManager` from `cache_manager.py`
   - `Interval`, `MarketType` from `market_constraints.py`
-  - `adjust_time_window` from `time_alignment.py`
 
 #### Configuration Constants
 
 ```python
 class DataSourceManager:
-    VISION_DATA_DELAY_HOURS = 36  # Data newer than this isn't available in Vision API
+    VISION_DATA_DELAY_HOURS = 48  # Data newer than this isn't available in Vision API
     REST_CHUNK_SIZE = 1000        # Maximum records per REST API request
-    REST_MAX_CHUNKS = 10          # Maximum number of chunks to request via REST
+    REST_MAX_CHUNKS = 5           # Maximum number of chunks to request via REST
 ```
 
 ### 2. Data Layer
 
 #### Output Format Specification
+
+For KLines data:
 
 ```python
 OUTPUT_DTYPES = {
@@ -57,11 +71,21 @@ OUTPUT_DTYPES = {
     "low": "float64",
     "close": "float64",
     "volume": "float64",
-    "close_time": "int64",
-    "quote_volume": "float64",
-    "trades": "int64",
+    "close_time": "datetime64[ns]",
+    "quote_asset_volume": "float64",
+    "count": "int64",
     "taker_buy_volume": "float64",
     "taker_buy_quote_volume": "float64",
+}
+```
+
+For Funding Rate data:
+
+```python
+FUNDING_RATE_DTYPES = {
+    "contracts": "string",
+    "funding_interval": "string",
+    "funding_rate": "float64",
 }
 ```
 
@@ -75,135 +99,92 @@ OUTPUT_DTYPES = {
    - Aligned to interval boundaries
 
 2. Column Requirements:
-   - All OUTPUT_DTYPES columns present
+   - All required columns present based on chart type
    - Exact dtype matching
    - Consistent ordering
    - Normalized naming
 
-### 3. Cache Layer
+### 3. Client Factory Layer
 
-#### Storage Implementation
+The `DataClientFactory` serves as a factory for creating appropriate data clients based on provider, market type, and chart type.
 
-The cache uses a structured directory layout:
+```python
+# Example client registration
+DataClientFactory.register_client(
+    provider=DataProvider.BINANCE,
+    market_type=MarketType.FUTURES_USDT,
+    chart_type=ChartType.FUNDING_RATE,
+    client_class=BinanceFundingRateClient
+)
+
+# Example client creation
+client = DataClientFactory.create_data_client(
+    provider=DataProvider.BINANCE,
+    market_type=MarketType.FUTURES_USDT,
+    chart_type=ChartType.FUNDING_RATE,
+    symbol="BTCUSDT",
+    interval=Interval.HOUR_8
+)
+```
+
+### 4. Abstract Client Interface
+
+All data clients implement the `DataClientInterface` abstract base class:
+
+```python
+class DataClientInterface(ABC):
+    @property
+    @abstractmethod
+    def provider(self) -> DataProvider:
+        """Get the data provider for this client."""
+        pass
+
+    @property
+    @abstractmethod
+    def market_type(self) -> MarketType:
+        """Get the market type for this client."""
+        pass
+
+    @property
+    @abstractmethod
+    def chart_type(self) -> ChartType:
+        """Get the chart type for this client."""
+        pass
+
+    @abstractmethod
+    async def fetch(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """Fetch data for the configured parameters."""
+        pass
+
+    # Additional abstract methods...
+```
+
+### 5. Cache Layer
+
+The cache has been updated to support multiple providers and chart types:
 
 ```tree
 /cache_dir
-    /data
-        /SYMBOL
-            /INTERVAL
-                /YYYYMM.arrow
-    /metadata
-        cache_index.json
+    /PROVIDER
+        /CHART_TYPE
+            /SYMBOL
+                /INTERVAL
+                    /YYYY-MM-DD.arrow
+    cache_metadata.json
 ```
 
 Features:
 
-- Apache Arrow MMAP for zero-copy reads
-- Monthly file partitioning by symbol and interval
+- Apache Arrow for efficient storage
+- Provider and chart type support in cache keys
+- Hierarchical directory structure
 - JSON-based metadata tracking
-- Checksum validation for data integrity
-- Memory-mapped file access for efficiency
-- Selective column loading capability
-
-#### Cache Management
-
-```python
-# Cache Statistics
-async def get_cache_stats() -> Dict[str, int]:
-    """Get cache performance metrics.
-
-    Returns:
-        {
-            "hits": int,    # Successful cache retrievals
-            "misses": int,  # Cache misses requiring source fetch
-            "errors": int   # Cache validation or loading errors
-        }
-    """
-
-# Cache Validation
-async def validate_cache_integrity(
-    symbol: str,
-    interval: str,
-    date: datetime
-) -> Tuple[bool, Optional[str]]:
-    """Validate cache integrity for specific data.
-
-    Validates:
-    1. Cache existence
-    2. Data format and structure
-    3. Column presence and types
-    4. Index properties and timezone
-    """
-
-# Cache Repair
-async def repair_cache(
-    symbol: str,
-    interval: str,
-    date: datetime
-) -> bool:
-    """Attempt to repair corrupted cache entry.
-
-    Process:
-    1. Invalidate corrupted entry
-    2. Refetch from source
-    3. Save to cache
-    4. Verify repair success
-    """
-```
-
-### 4. Time Handling Layer
-
-#### Core Principle
-
-The system employs strict **inclusive start** and **inclusive end** timing for 1-second intervals:
-
-- Mathematical notation: [start, end]
-- Precise alignment with exchange data bars
-- No overlapping or missing intervals
-
-#### Time Window Adjustments
-
-```python
-def _validate_dates(self, start_time: datetime, end_time: datetime) -> None:
-    """Validate date ranges for data retrieval.
-
-    Validations:
-    1. End time must not be in the future
-    2. Start time must be before end time
-    """
-    now = datetime.now(timezone.utc)
-    if end_time > now:
-        raise ValueError(f"End time {end_time} is in the future")
-    if start_time > end_time:
-        raise ValueError(f"Start time {start_time} is after end time {end_time}")
-
-def _estimate_data_points(self, start_time: datetime, end_time: datetime, interval: Interval) -> int:
-    """Estimate number of data points for a time range.
-
-    Rules:
-    - SECOND_1: total_seconds
-    - MINUTE_1: total_seconds // 60
-    """
-    time_diff = end_time - start_time
-    if interval == Interval.SECOND_1:
-        return int(time_diff.total_seconds())
-    elif interval == Interval.MINUTE_1:
-        return int(time_diff.total_seconds()) // 60
-    else:
-        raise ValueError(f"Unsupported interval: {interval}")
-```
-
-#### Example Adjustments
-
-```python
-# Input with microsecond precision
-start = datetime(2024, 3, 15, 12, 34, 56, 500_000, tzinfo=timezone.utc)  # 12:34:56.500
-end = datetime(2024, 3, 15, 12, 35, 2, 123_456, tzinfo=timezone.utc)     # 12:35:02.123
-
-# Adjusted to aligned [start, end] interval:
-start_adjusted = datetime(2024, 3, 15, 12, 34, 57, tzinfo=timezone.utc)  # Round up to next second
-end_adjusted = datetime(2024, 3, 15, 12, 35, 2, tzinfo=timezone.utc)     # Round down to second
-```
+- Cache validation for all data types
 
 ## Usage Guide
 
@@ -213,11 +194,15 @@ end_adjusted = datetime(2024, 3, 15, 12, 35, 2, tzinfo=timezone.utc)     # Round
 
 ```python
 def __init__(
-    market_type: MarketType = MarketType.SPOT,  # Type of market (SPOT, FUTURES, etc.)
-    rest_client: Optional[RestDataClient] = None,  # Optional pre-configured REST client
-    vision_client: Optional[VisionDataClient] = None,  # Optional pre-configured Vision client
-    cache_dir: Optional[Path] = None,  # Directory for caching data
-    use_cache: bool = True,  # Whether to use caching
+    market_type: MarketType = MarketType.SPOT,
+    provider: DataProvider = DataProvider.BINANCE,
+    chart_type: ChartType = ChartType.KLINES,
+    rest_client: Optional[RestDataClient] = None,
+    cache_dir: Optional[Path] = None,
+    use_cache: bool = True,
+    max_concurrent: int = 50,
+    retry_count: int = 5,
+    max_concurrent_downloads: Optional[int] = None,
 )
 ```
 
@@ -225,202 +210,140 @@ def __init__(
 
 ```python
 async def get_data(
-    symbol: str,                                # Trading pair (e.g., "BTCUSDT")
-    interval: Interval = Interval.SECOND_1,     # Time interval
-    start_time: datetime,                       # Start time in UTC
-    end_time: datetime,                         # End time in UTC
-    use_cache: bool = True,                     # Whether to use caching
-    enforce_source: DataSource = DataSource.AUTO # Force specific data source
+    symbol: str,                                 # Trading pair (e.g., "BTCUSDT")
+    start_time: datetime,                        # Start time in UTC
+    end_time: datetime,                          # End time in UTC
+    interval: Interval = Interval.SECOND_1,      # Time interval
+    use_cache: bool = True,                      # Whether to use caching
+    enforce_source: DataSource = DataSource.AUTO, # Force specific data source
+    provider: Optional[DataProvider] = None,      # Optional override for data provider
+    chart_type: Optional[ChartType] = None,       # Optional override for chart type
 ) -> pd.DataFrame:
-    """Get market data from the most appropriate source."""
+    """Get data for symbol within time range with smart source selection."""
 ```
 
-### 2. Data Source Selection
+### 2. Examples
 
-#### Selection Logic
+#### Getting Funding Rate Data
 
 ```python
-def _should_use_vision_api(self, start_time: datetime, end_time: datetime, interval: Interval) -> bool:
-    """Determine if Vision API should be used based on request parameters.
-
-    Decision Factors:
-    1. Data size: Use Vision for requests > REST_CHUNK_SIZE * REST_MAX_CHUNKS
-    2. Default: Try Vision first with REST fallback
-    """
-    estimated_points = self._estimate_data_points(start_time, end_time, interval)
-
-    # Rule 1: Always use Vision API for large requests
-    if estimated_points > self.REST_CHUNK_SIZE * self.REST_MAX_CHUNKS:
-        return True
-
-    # Rule 2: Try Vision API first for all other cases
-    return True
+# Create a DataSourceManager for funding rate data
+async with DataSourceManager(
+    market_type=MarketType.FUTURES_USDT,
+    provider=DataProvider.BINANCE,
+    chart_type=ChartType.FUNDING_RATE,
+    cache_dir=Path("./cache"),
+    use_cache=True,
+) as dsm:
+    # Fetch funding rate data
+    funding_df = await dsm.get_data(
+        symbol="BTCUSDT",
+        start_time=start_time,
+        end_time=end_time,
+        interval=Interval.HOUR_8,  # Funding rates typically use 8h interval
+    )
 ```
 
-#### Vision API Characteristics
-
-- Advantages:
-  - Best for bulk historical data (>10,000 points)
-  - No rate limits
-  - More stable for large requests
-- Limitations:
-  - 36-hour data delay (VISION_DATA_DELAY_HOURS)
-  - Potential gaps in data
-  - Different column naming (handled by \_format_dataframe)
-
-#### REST API Characteristics
-
-- Advantages:
-  - Real-time data access
-  - Immediate availability
-  - Direct from source
-- Limitations:
-  - Rate limits apply
-  - Max 10,000 points per request (REST_CHUNK_SIZE \* REST_MAX_CHUNKS)
-  - Higher failure rate for large requests
-
-#### Fallback Mechanism
+#### Getting Multiple Data Types from a Single Manager
 
 ```python
-async def _fetch_from_source(
-    self,
-    symbol: str,
-    start_time: datetime,
-    end_time: datetime,
-    interval: Interval,
-    use_vision: bool = True
-) -> pd.DataFrame:
-    """Fetch data with automatic fallback.
-
-    Process:
-    1. Try Vision API if use_vision=True
-    2. Fall back to REST API if:
-       - Vision API returns no data
-       - Vision API fails
-       - use_vision=False
-    3. Format and validate results
-    """
-```
-
-### 3. Best Practices
-
-1. Source Selection:
-
-   - Use AUTO for optimal selection
-   - Force REST for real-time needs
-   - Force Vision for large historical
-
-2. Performance:
-
-   - Enable caching for repeats
-   - Use appropriate time windows
-   - Mind chunk size limits
-
-3. Error Handling:
-   - Validate date ranges
-   - Check empty results
-   - Handle rate limits
-
-### 4. Example Usage
-
-```python
-# Recent Data
-data = await manager.get_data(
-    symbol="BTCUSDT",
-    start_time=datetime.now(timezone.utc) - timedelta(hours=1),
-    end_time=datetime.now(timezone.utc)
-)
-
-# Historical Data with Vision
-data = await manager.get_data(
-    symbol="BTCUSDT",
-    start_time=start_time,
-    end_time=end_time,
-    enforce_source=DataSource.VISION
-)
-```
-
-## Testing & Quality Assurance
-
-### Test Configuration
-
-```python
-# Test Setup
-@pytest.fixture
-def data_source_manager():
-    return DataSourceManager(
-        market_type=MarketType.SPOT,
-        cache_dir=Path("./test_cache"),
-        use_cache=True
+# Create a DataSourceManager that can handle all data types
+async with DataSourceManager(
+    market_type=MarketType.FUTURES_USDT,
+    provider=DataProvider.BINANCE,
+    cache_dir=Path("./cache"),
+    use_cache=True,
+) as dsm:
+    # Fetch price data
+    klines_df = await dsm.get_data(
+        symbol="BTCUSDT",
+        start_time=start_time,
+        end_time=end_time,
+        interval=Interval.HOUR_1,
+        chart_type=ChartType.KLINES,  # Explicitly specify chart type
     )
 
-# Test Parameters
-SYMBOL = "BTCUSDT"
-INTERVAL = Interval.SECOND_1
-TEST_WINDOWS = [
-    timedelta(minutes=5),
-    timedelta(hours=1),
-    timedelta(hours=24)
-]
+    # Fetch funding rate data from the same manager
+    funding_df = await dsm.get_data(
+        symbol="BTCUSDT",
+        start_time=start_time,
+        end_time=end_time,
+        interval=Interval.HOUR_8,
+        chart_type=ChartType.FUNDING_RATE,  # Explicitly specify chart type
+    )
 ```
 
-### Coverage Areas
+## Extending the Framework
 
-#### 1. Source Selection Tests
+### 1. Adding a New Data Provider
 
-- Auto selection logic
-- Vision API enforcement
-- REST API enforcement
-- Fallback mechanisms
-- Data size thresholds
+To add support for a new data provider:
 
-#### 2. Data Validation Tests
+1. Add the provider to the `DataProvider` enum in `market_constraints.py`
+2. Create a new client implementation that implements `DataClientInterface`
+3. Register the client with the `DataClientFactory`
 
-- DataFrame structure
-- Column presence and types
-- Index properties
-- Timezone handling
-- Empty result handling
+```python
+# Add provider to enum
+class DataProvider(Enum):
+    BINANCE = auto()
+    TRADESTATION = auto()
+    NEW_PROVIDER = auto()  # Add new provider
 
-#### 3. Cache Management Tests
+# Create client implementation
+class NewProviderClient(DataClientInterface):
+    # Implement abstract methods
 
-- Cache hit/miss tracking
-- Integrity validation
-- Auto-repair functionality
-- Concurrent access
-- Error recovery
+# Register client with factory
+DataClientFactory.register_client(
+    provider=DataProvider.NEW_PROVIDER,
+    market_type=MarketType.SPOT,
+    chart_type=ChartType.KLINES,
+    client_class=NewProviderClient
+)
+```
 
-#### 4. Time Handling Tests
+### 2. Adding a New Chart Type
 
-- Window adjustments
-- Boundary conditions
-- Invalid ranges
-- Future dates
-- Zero-duration requests
+To add support for a new chart type:
 
-#### 5. Integration Tests
+1. Add the chart type to the `ChartType` enum in `market_constraints.py`
+2. Add appropriate column definitions and DTYPEs in `config.py`
+3. Create a client implementation for the new chart type
+4. Register the client with the `DataClientFactory`
 
-- End-to-end workflows
-- Error propagation
-- Resource cleanup
-- Memory management
-- Performance metrics
+```python
+# Add chart type to enum
+class ChartType(Enum):
+    KLINES = "klines"
+    NEW_CHART_TYPE = "newChartType"  # Add new chart type
 
-## Future Improvements
+# Add column definitions
+NEW_CHART_TYPE_COLUMNS = [
+    "time",
+    "value1",
+    "value2",
+]
 
-1. Caching Enhancements:
+# Add DTYPEs
+NEW_CHART_TYPE_DTYPES = {
+    "value1": "float64",
+    "value2": "string",
+}
 
-   - Implement expiration
-   - Add LRU implementation
-   - Optimize disk caching
+# Create client implementation
+class NewChartTypeClient(DataClientInterface):
+    # Implement abstract methods
 
-2. Performance Optimization:
+# Register client with factory
+DataClientFactory.register_client(
+    provider=DataProvider.BINANCE,
+    market_type=MarketType.SPOT,
+    chart_type=ChartType.NEW_CHART_TYPE,
+    client_class=NewChartTypeClient
+)
+```
 
-   - Dynamic chunk sizing
-   - Parallel fetching
-   - Progress tracking
+## Conclusion
 
-3. Monitoring:
-   - Performance metrics
-   - API usage tracking
-   - Cache hit rates
+The `DataSourceManager` has been redesigned to be a flexible, extensible framework that can handle multiple data providers and chart types. The factory pattern and abstract interface allow for easy addition of new data sources and chart types without modifying existing code, adhering to the Liskov Substitution Principle and Occam's Razor philosophy.

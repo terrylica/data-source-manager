@@ -1,342 +1,194 @@
 # Binance Data Service
 
-## Overview
+A high-performance, robust package for efficient market data retrieval from multiple data providers, including Binance Vision, using Apache Arrow MMAP for optimal performance.
 
-This package provides efficient market data retrieval from Binance Vision using Apache Arrow MMAP for optimal performance.
+## Features
 
-## Key Features
+- **Multi-Provider Support**: Supports multiple data providers (currently Binance with TradeStation coming soon)
+- **Multiple Chart Types**: Supports various chart types including KLines and Funding Rates
+- **Zero-copy Reads**: Uses Apache Arrow memory-mapped files for efficient data access
+- **Automatic Caching**: Intelligent caching system with provider and chart type awareness
+- **Timezone-aware Timestamps**: All timestamps are UTC with proper timezone handling
+- **Connection Limit Enforcement**: Built-in rate limiting to prevent API throttling
+- **Data Validation**: Comprehensive validation of all data sources
+- **Exponential Backoff**: Retry mechanism for transient failures
+- **Factory Pattern**: Extensible architecture for adding new data providers and chart types
 
-- Zero-copy reads with Apache Arrow MMAP
-- Automatic caching with efficient partial data loading
-- Column-based data access
-- Timezone-aware timestamp handling
-- Connection limit enforcement (13 concurrent)
-- Built-in data validation and integrity checks
-- Exponential backoff retry mechanism
-- Prefetch capability for data caching
-- Cache validation and metadata tracking
+## Installation
 
-## Usage
-
-### Basic Usage
-
-```python
-from binance_data_services import DataSourceManager
-from datetime import datetime, timezone
-from pathlib import Path
-
-# Initialize manager with caching
-manager = DataSourceManager(
-    cache_dir=Path("/path/to/cache"),
-    use_cache=True
-)
-
-# Fetch data with automatic source selection
-df = await manager.get_data(
-    symbol="BTCUSDT",
-    start_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
-    end_time=datetime(2024, 1, 2, tzinfo=timezone.utc),
-    columns=["open", "close", "volume"]  # Optional column selection
-)
-
-# DataFrame is indexed by 'open_time' in UTC
-print(df.head())
+```bash
+pip install binance-data-service
 ```
 
-### Advanced Usage
+## Basic Usage
 
 ```python
-from binance_data_services import DataSourceManager, DataSource
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
+from core.data_source_manager import DataSourceManager
 
-manager = DataSourceManager(cache_dir=Path("/path/to/cache"))
+# Set time range for data retrieval
+end_time = datetime.now(timezone.utc)
+start_time = end_time - timedelta(days=5)
 
-try:
-    # Force Vision API for historical data
-    df_historical = await manager.get_data(
-        symbol="BTCUSDT",
-        start_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        end_time=datetime(2024, 1, 6, tzinfo=timezone.utc),
-        enforce_source=DataSource.VISION
-    )
+async def basic_example():
+    # Initialize DataSourceManager
+    async with DataSourceManager(
+        market_type=MarketType.SPOT,
+        provider=DataProvider.BINANCE,
+        chart_type=ChartType.KLINES,
+        cache_dir=Path("./cache"),
+    ) as dsm:
+        # Fetch data
+        df = await dsm.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+        )
 
-    # Force REST API for recent data
-    df_recent = await manager.get_data(
-        symbol="BTCUSDT",
-        start_time=datetime(2024, 3, 14, tzinfo=timezone.utc),
-        end_time=datetime(2024, 3, 15, tzinfo=timezone.utc),
-        enforce_source=DataSource.REST
-    )
-except Exception as e:
-    print(f"Error: {e}")
+        print(f"Retrieved {len(df)} records")
+        print(df.head())
 ```
 
-### Efficient Data Loading
+## Advanced Usage
+
+### Fetching Funding Rate Data
 
 ```python
-from binance_data_services import DataSourceManager
-from datetime import datetime, timezone
-from pathlib import Path
+async def funding_rate_example():
+    # Initialize DataSourceManager for funding rate data
+    async with DataSourceManager(
+        market_type=MarketType.FUTURES_USDT,
+        provider=DataProvider.BINANCE,
+        chart_type=ChartType.FUNDING_RATE,
+        cache_dir=Path("./cache"),
+    ) as dsm:
+        # Fetch funding rate data
+        df = await dsm.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_8,  # Funding rates typically use 8h interval
+        )
 
-manager = DataSourceManager(cache_dir=Path("/path/to/cache"))
-
-# Client automatically optimizes based on hardware:
-# - Concurrent downloads
-# - Memory usage
-# - Network bandwidth
-# - I/O operations
-
-# Load specific columns for better performance
-df = await manager.get_data(
-    symbol="BTCUSDT",
-    start_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
-    end_time=datetime(2024, 1, 2, tzinfo=timezone.utc),
-    columns=["open", "high", "low", "close"]  # Only load needed columns
-)
+        print(f"Retrieved {len(df)} funding rate records")
+        print(df.head())
 ```
 
-## Time Boundary Handling
+### Working with Multiple Data Types
 
-The system implements precise time boundary handling:
+```python
+async def multi_data_example():
+    # Create a DataSourceManager that can handle all data types
+    async with DataSourceManager(
+        market_type=MarketType.FUTURES_USDT,
+        provider=DataProvider.BINANCE,
+        cache_dir=Path("./cache"),
+    ) as dsm:
+        # Fetch price data
+        klines_df = await dsm.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+            chart_type=ChartType.KLINES,  # Explicitly specify chart type
+        )
 
-- All timestamps are aligned to second boundaries
-- Start times with microseconds are rounded UP to the next interval
-- End times with microseconds are rounded DOWN to the current interval
-- Both start and end boundaries are INCLUSIVE after alignment
-- Automatic handling of market open/close times
-- Timezone conversion to UTC if needed
-- Microsecond precision support in internal calculations
-- Consistent handling across data sources
+        # Fetch funding rate data from the same manager
+        funding_df = await dsm.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_8,
+            chart_type=ChartType.FUNDING_RATE,  # Explicitly specify chart type
+        )
 
-### Example Time Window Behavior
-
-For a time window from `2025-03-17 08:37:25.528448` to `2025-03-17 08:37:30.056345` with 1-second intervals:
-
-- Adjusted start: `2025-03-17 08:37:26.000000` (rounded UP from 25.528448)
-- Adjusted end: `2025-03-17 08:37:30.000000` (rounded DOWN from 30.056345)
-- Expected records: 5 (seconds 26, 27, 28, 29, 30 inclusive)
+        print(f"Retrieved {len(klines_df)} kline records and {len(funding_df)} funding rate records")
+```
 
 ## Performance Characteristics
 
-The client automatically optimizes for your hardware:
-
-- CPU: Utilizes available cores for parallel processing
-- Memory: Adjusts concurrent operations based on available RAM
-- Network: Measures bandwidth and adapts request concurrency
-- I/O: Monitors system load and adjusts operations accordingly
-- Endpoints: Load balances across multiple Binance endpoints
-
-Typical performance metrics:
-
-- Single-day data retrieval: ~1-2 seconds with cache
-- Multi-day cached reads: ~0.2-0.3 seconds per day
-- Vision API preferred for data older than 36 hours
-- REST API used for recent data with automatic chunking
-- Memory usage: ~100MB per day of data
+- **Memory Efficiency**: Zero-copy reads minimize memory usage
+- **High Throughput**: Arrow-based columnar storage optimizes data access patterns
+- **Optimal Caching**: Hierarchical cache structure optimizes storage and retrieval
 
 ## API Reference
 
-### VisionDataClient
+### DataSourceManager
 
-#### Constructor Parameters
+```python
+class DataSourceManager:
+    def __init__(
+        market_type: MarketType = MarketType.SPOT,
+        provider: DataProvider = DataProvider.BINANCE,
+        chart_type: ChartType = ChartType.KLINES,
+        rest_client: Optional[RestDataClient] = None,
+        cache_dir: Optional[Path] = None,
+        use_cache: bool = True,
+        max_concurrent: int = 50,
+        retry_count: int = 5,
+        max_concurrent_downloads: Optional[int] = None,
+    )
 
-- `symbol: str` - Trading pair symbol (e.g., "BTCUSDT")
-- `interval: str = "1s"` - Time interval (only "1s" is supported)
-- `cache_dir: Optional[Path] = None` - Directory for caching data
-- `max_concurrent_downloads: int = 13` - Maximum concurrent downloads (None for auto-detect)
-- `use_cache: bool = False` - Whether to enable caching mechanisms (disabled by default)
-
-#### Methods
-
-- `fetch(start_time: datetime, end_time: datetime, columns: Optional[List[str]] = None) -> TimestampedDataFrame`
-
-  - Retrieves market data for the specified time range
-  - Supports column selection for efficient data loading
-  - Returns timezone-aware DataFrame indexed by open_time
-  - Validates time boundaries and data integrity
-  - Handles cache hits/misses automatically
-  - Automatically retries on network errors
-  - Supports partial data loading from cache
-
-- `prefetch(start_time: datetime, end_time: datetime, max_days: int = 5) -> None`
-  - Prefetches data in background for future use
-  - Improves performance for subsequent fetch calls
-  - Limited to max_days to prevent excessive downloads
-  - Handles failures gracefully without blocking
-  - Supports concurrent prefetch operations
-
-#### Available Intervals
-
-Only 1-second interval ("1s") is supported by this client.
+    async def get_data(
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        interval: Interval = Interval.SECOND_1,
+        use_cache: bool = True,
+        enforce_source: DataSource = DataSource.AUTO,
+        provider: Optional[DataProvider] = None,
+        chart_type: Optional[ChartType] = None,
+    ) -> pd.DataFrame
+```
 
 ## Architecture
 
-The system implements a layered architecture with a mediator pattern at its core:
+The system is built with a layered architecture:
 
-1. Mediator Layer (`DataSourceManager`):
-
-   - Smart source selection between REST and Vision APIs
-   - 36-hour threshold for Vision API preference
-   - Unified data format standardization
-   - Centralized caching coordination
-   - Automatic time window adjustment
-   - Output dtype enforcement
-   - Market type handling (SPOT, FUTURES)
-
-2. Data Source Layer:
-
-   - REST API Client (`RestDataClient`):
-
-     - Optimized for recent data (< 36 hours)
-     - Chunk-based retrieval (1000 records/chunk)
-     - Hardware-aware connection pooling
-     - Microsecond-precision timestamps
-     - Real-time data validation
-     - Automatic retry with backoff
-
-   - Vision API Client:
-     - Bulk historical data retrieval
-     - Zero-copy Arrow MMAP reads
-     - Concurrent download management (13 max)
-     - Progress monitoring and recovery
-     - Atomic file operations
-     - Comprehensive error classification
-
-3. Cache Layer (`UnifiedCacheManager`):
-
-   - Arrow-based columnar storage
-   - Monthly file organization
-   - JSON metadata tracking
-   - SHA-256 integrity checks
-   - Partial data loading
-   - Cache invalidation logic
-   - Memory map lifecycle management
-
-4. Validation Layer:
-   - Multi-stage validation pipeline:
-     - Symbol format validation
-     - Time range boundaries
-     - DataFrame structure
-     - Cache integrity
-     - Data completeness
-   - Timezone enforcement (UTC)
-   - Index consistency ('open_time')
-   - Column type verification
-   - Hardware resource monitoring
-
-Each layer maintains clear responsibilities and communicates through well-defined interfaces. The `DataSourceManager` acts as the facade, providing a simplified interface while coordinating complex interactions between layers.
+1. **Mediator Layer**: `DataSourceManager` orchestrates data access across providers and chart types
+2. **Client Factory Layer**: `DataClientFactory` creates appropriate clients for each provider/chart type combination
+3. **Data Client Layer**: Implements provider-specific API access logic
+4. **Cache Layer**: Efficiently stores retrieved data with provider and chart type awareness
+5. **Time Handling Layer**: Manages timezone-aware timestamps
 
 ## Error Handling
 
-The client implements comprehensive error handling:
+The system provides comprehensive error handling:
 
-- Network errors: Exponential backoff retry
-- Rate limiting: Honors Retry-After headers
-- Stalled downloads: Progress monitoring and recovery
-- Cache corruption: Automatic invalidation and redownload
-- Data integrity: Multi-stage validation
-- Memory management: Proper resource cleanup
-- Timezone mismatches: Automatic conversion to UTC
+- **ApiError**: Represents errors from data provider APIs
+- **CacheError**: Represents errors in cache operations
+- **ValidationError**: Represents data validation failures
+- **RequestError**: Represents errors in HTTP requests
+
+All errors are properly propagated and logged with detailed context.
 
 ## Data Integrity
 
-The client enforces strict data integrity rules:
+Data integrity is maintained through:
 
-- SHA-256 checksum verification for downloads
-- UTC timezone enforcement throughout
-- Strict index name and type validation
-- Cache metadata tracking and validation
-- Time boundary completeness checks
-- Column name and type validation
-- Symbol format validation
+1. **Boundary Validation**: Validates time boundaries for data consistency
+2. **Schema Validation**: Ensures data structure matches expected schema
+3. **Type Validation**: Validates data types for all columns
+4. **Missing Data Detection**: Identifies and reports missing data points
 
-## Caching and Performance
+## Extending the Framework
 
-The library includes a sophisticated caching system that dramatically improves performance for repeated queries.
+### Adding a New Data Provider
 
-### Caching Configuration
+1. Add the provider to the `DataProvider` enum in `market_constraints.py`
+2. Create a new client implementation that implements `DataClientInterface`
+3. Register the client with the `DataClientFactory`
 
-Caching is enabled by default when using `DataSourceManager`.
+### Adding a New Chart Type
 
-```python
-# Create a DataSourceManager with caching enabled (default)
-manager = DataSourceManager(market_type=MarketType.SPOT)
+1. Add the chart type to the `ChartType` enum in `market_constraints.py`
+2. Add appropriate column definitions and DTYPEs in `config.py`
+3. Create a client implementation for the new chart type
+4. Register the client with the `DataClientFactory`
 
-# Or explicitly configure the cache
-from core.cache_manager import UnifiedCacheManager
+## License
 
-manager = DataSourceManager(
-    cache_manager=UnifiedCacheManager(
-        use_cache=True,
-        cache_dir=Path("./custom_cache_directory")
-    ),
-    market_type=MarketType.SPOT
-)
-```
-
-The caching system automatically:
-
-- Stores data to disk in an efficient format
-- Validates data integrity on retrieval
-- Handles cache invalidation for stale data
-- Optimizes memory usage with memory-mapped files
-
-For more details on caching, see the [Caching Documentation](docs/caching/).
-
-## Dependencies
-
-- Python 3.8+
-- pandas
-- pyarrow
-- httpx
-- aiohttp
-- psutil (for hardware monitoring)
-- tenacity (for retry logic)
-- colorlog (for colored console logging)
-- typing_extensions
-
-## Cache Directory Structure
-
-```tree
-cache_dir/
-├── BTCUSDT/
-│   ├── 1s/
-│   │   ├── 202403.arrow
-│   │   └── 202404.arrow
-│   └── metadata.json
-└── ETHUSDT/
-    ├── 1s/
-    │   └── 202403.arrow
-    └── metadata.json
-```
-
-## Recent Improvements
-
-### Download-First Approach for Vision API
-
-We've implemented the download-first approach for Vision API based on benchmark testing. This approach:
-
-- Directly attempts to download files without pre-checking file existence
-- Significantly reduces latency by eliminating unnecessary HEAD requests
-- Improves performance by dynamically adjusting concurrency based on batch size
-
-### Automatic Fallback from Vision to REST API
-
-The system now automatically falls back to REST API when Vision API fails or returns no data:
-
-1. First attempts to retrieve data from Vision API (for historical data)
-2. If Vision API fails or returns empty data, automatically tries REST API
-3. Caches data from whichever source successfully returns it
-4. Returns data to the client from the successful source
-
-## Architecture Update
-
-The Binance Data Services library provides a unified interface for retrieving market data from both REST and Vision APIs, with intelligent source selection and automatic caching.
-
-Main components:
-
-- DataSourceManager: Central coordinator for data source selection and caching
-- VisionDataClient: Client for historical data from Binance Vision API
-- RestDataClient: Client for real-time and recent data from Binance REST API
-- UnifiedCacheManager: Manages caching of data from all sources
+MIT

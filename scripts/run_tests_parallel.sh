@@ -21,9 +21,9 @@
 #   - Comprehensive Test Path Discovery: Automatically identifies test files and
 #     directories, including both Git-tracked and newly added, untracked files,
 #     ensuring all relevant tests are available for selection in interactive mode.
-#   - Flexible Logging: Enables users to control the verbosity of test output
-#     using a log level argument, facilitating detailed debugging or minimizing
-#     output for cleaner test runs.
+#   - Flexible Parameter Handling: Properly processes command-line arguments like
+#     the pytest pattern filter (-k) and other flags, passing them directly to
+#     pytest in both interactive and non-interactive modes.
 #   - asyncio Configuration: Configures asyncio loop scope to 'function'
 #     (`asyncio_default_fixture_loop_scope=function`) to prevent pytest-asyncio
 #     deprecation warnings and ensure consistent behavior for asynchronous tests.
@@ -41,12 +41,13 @@
 #
 # USAGE:
 #   ./scripts/run_tests_parallel.sh [options] [test_path] [additional_pytest_args]
-#   ./scripts/run_tests_parallel.sh -i|--interactive
+#   ./scripts/run_tests_parallel.sh -i|--interactive [additional_pytest_args]
 #
 # OPTIONS:
 #   -i, --interactive:  Enable interactive test selection mode. Presents a menu
 #                       of test directories and files for selection, useful for
-#                       focused testing.
+#                       focused testing. All pytest options provided alongside
+#                       the -i option will be passed directly to pytest.
 #   -s, --sequential:   Run tests sequentially (without parallelism). Useful for
 #                       debugging race conditions or complex test interactions.
 #   -h, --help:         Show detailed help message and exit. Displays comprehensive
@@ -66,6 +67,9 @@
 #   --save-log FILE:    Save a clean version of the log to a specified file.
 #                       Removes ANSI color codes for better compatibility with text editors.
 #                       Automatically enables -e/--error-summary mode.
+#   -k PATTERN:         Run tests that match the given substring pattern. The pattern
+#                       is matched against the test names. This option requires a
+#                       pattern argument and will be passed directly to pytest.
 #
 # ARGUMENTS:
 #   test_path: (Optional) Path to a specific test file or directory.
@@ -74,10 +78,12 @@
 #              If -i or --interactive is used, this argument is ignored, and the
 #              test path is selected interactively.
 #
-#   additional_pytest_args: (Optional)  Extra arguments to pass directly to pytest.
+#   additional_pytest_args: (Optional) Extra arguments to pass directly to pytest.
 #                           Examples: --tb=short (shorter tracebacks), -k "pattern"
 #                           (run tests matching a pattern), -m "marker" (run tests
 #                           with specific markers), -n4 (reduce parallel workers to 4).
+#                           These arguments will be properly handled in both interactive
+#                           and non-interactive modes.
 #
 # EXAMPLES:
 #   # 1. Run all tests in the tests/ directory with default settings:
@@ -85,6 +91,9 @@
 #
 #   # 2. Run tests interactively to select specific tests:
 #   ./scripts/run_tests_parallel.sh -i
+#
+#   # 2a. Run tests interactively with verbosity flag and error summary:
+#   ./scripts/run_tests_parallel.sh -i -v -e
 #
 #   # 3. Run tests in a specific subdirectory with default settings:
 #   ./scripts/run_tests_parallel.sh tests/time_boundary
@@ -108,13 +117,16 @@
 #   ./scripts/run_tests_parallel.sh -e --save-log test_results.log tests/utils
 #
 #   # 10. First select interactively, then filter tests by pattern:
-#   ./scripts/run_tests_parallel.sh -i
-#   # (After selection) -k "pattern"
+#   ./scripts/run_tests_parallel.sh -i -k "pattern"
 #
 # BEST PRACTICES and NOTES:
 #   - Interactive Test Selection: The interactive mode smartly detects both
 #     Git-tracked and untracked test files in the 'tests/' directory, ensuring
-#     comprehensive test discovery for selection.
+#     comprehensive test discovery for selection. All pytest options provided
+#     alongside the -i option will be passed directly to pytest after test selection.
+#   - Pytest Option Handling: Options like -k (pattern matching), -v (verbosity),
+#     and other pytest flags are correctly processed and passed to pytest in both
+#     interactive and non-interactive modes.
 #   - Sequential vs Parallel: Use sequential mode (-s) when debugging test interactions
 #     or race conditions that might be masked by parallel execution. Use parallel mode
 #     (default) for faster execution in CI/CD pipelines and routine test runs.
@@ -127,8 +139,6 @@
 #     async test behavior, independent of `pytest.ini` settings. This is critical
 #     for proper cleanup of asyncio resources between tests and avoids KeyError
 #     issues with pytest-xdist.
-#   - Log Level Flexibility: Leverage different log levels (DEBUG, INFO, WARNING, ERROR)
-#     to control output verbosity, aiding in detailed debugging or cleaner routine runs.
 #   - Parallel Execution Efficiency: Parallel testing with `-n8` significantly
 #     reduces test execution time. Adjust the worker count (`-n`) based on your
 #     system's CPU cores and resources for optimal performance.
@@ -611,6 +621,17 @@ while [[ $# -gt 0 && "$1" == -* ]]; do
       show_help "full"
       exit 0
       ;;
+    -k)
+      # Special handling for -k filter which needs a value
+      if [[ $# -gt 1 && "${2:0:1}" != "-" ]]; then
+        PYTEST_OPTIONS+=("$1" "$2")
+        shift 2
+      else
+        echo "Error: -k requires a pattern argument"
+        show_help "full"
+        exit 1
+      fi
+      ;;
     *)
       # Instead of erroring, collect this as a pytest option
       PYTEST_OPTIONS+=("$1")
@@ -667,19 +688,10 @@ if $INTERACTIVE; then
     fi
   done
   
-  # Ask for additional arguments
+  # Just display the selected path without asking for additional arguments
   echo ""
   echo "You selected: $TEST_PATH"
-  echo "Examples of additional pytest arguments:"
-  echo "  -k \"pattern\"    - Run tests that match the pattern"
-  echo "  -m \"marker\"     - Run tests with the specified marker"
-  echo "  -v             - Increase verbosity"
-  read -p "Additional pytest arguments (press Enter for none): " additional_args
-  
-  if [[ -n "$additional_args" ]]; then
-    # Add the arguments exactly as entered
-    ADDITIONAL_ARGS+=($additional_args)
-  fi
+  echo "Using pre-configured options from command line"
   
   # Clear the screen if requested
   if $CLEAR_AFTER_SELECTION; then
@@ -688,6 +700,29 @@ if $INTERACTIVE; then
   
   # Set log level to default
   LOG_LEVEL="INFO"
+  
+  # Custom handling for interactive mode: Run tests directly
+  if $INTERACTIVE; then
+    echo "Running tests directly for path: $TEST_PATH"
+    # Build a simple direct command
+    DIRECT_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\""
+    
+    # Simply add all pytest options directly - they're already processed correctly during option parsing
+    for opt in "${PYTEST_OPTIONS[@]}"; do
+      # Handle special characters in parameters
+      if [[ "$opt" == *" "* || "$opt" == *"*"* || "$opt" == *"?"* || "$opt" == *"["* ]]; then
+        DIRECT_CMD+=" \"$opt\""
+      else
+        DIRECT_CMD+=" $opt"
+      fi
+    done
+    
+    # Execute the command directly in interactive mode
+    echo "Executing: $DIRECT_CMD"
+    echo "---------------------------------------------------"
+    eval "$DIRECT_CMD"
+    exit $?
+  fi
 else
   TEST_PATH=${1:-tests/}  # Default to tests/ directory if not specified
   
@@ -710,14 +745,33 @@ fi
 # Configure worker count or sequential mode
 ADDITIONAL_ARGS=()
 
+# Process any stored positional arguments
+if [[ -n "${POSITIONAL_ARGS[*]}" ]]; then
+  for posarg in "${POSITIONAL_ARGS[@]}"; do
+    # If it's a single letter, add a dash prefix
+    if [[ "$posarg" =~ ^[a-zA-Z]$ ]]; then
+      ADDITIONAL_ARGS+=("-$posarg")
+    else
+      ADDITIONAL_ARGS+=("$posarg")
+    fi
+  done
+fi
+
+# If we have log level arguments from positional parameters, process them first
+if [[ -n "$TEST_PATH" && $# -gt 0 ]]; then
+  for posarg in "$@"; do
+    # If it's a single letter, add a dash prefix
+    if [[ "$posarg" =~ ^[a-zA-Z]$ ]]; then
+      ADDITIONAL_ARGS+=("-$posarg")
+    else
+      ADDITIONAL_ARGS+=("$posarg")
+    fi
+  done
+fi
+
 # Add any collected pytest options
 for opt in "${PYTEST_OPTIONS[@]}"; do
   ADDITIONAL_ARGS+=("$opt")
-done
-
-# Add remaining arguments
-for arg in "$@"; do
-  ADDITIONAL_ARGS+=("$arg")
 done
 
 # Format the arguments for display and command usage
@@ -797,40 +851,6 @@ if $PROFILE; then
 fi
 echo "---------------------------------------------------"
 
-# Construct the additional args string with proper spacing
-ADDITIONAL_ARGS_CMD=""
-for arg in "${ADDITIONAL_ARGS[@]}"; do
-  ADDITIONAL_ARGS_CMD+=" $arg"
-done
-
-# Construct and run the pytest command
-# Move all pytest.ini settings to command line flags:
-# -vv: Increases verbosity
-# -p no:timer: Disable the pytest-timer plugin since we use --durations
-# -o testpaths=tests: Define test paths
-# -o python_files=test_*.py: Define pattern for test files 
-# --asyncio-mode=auto: Manages asyncio behavior
-# -o asyncio_default_fixture_loop_scope=function: Sets fixture loop scope
-# -n8: Runs tests in 8 parallel processes
-# --durations=10: Show execution time for top 10 slowest tests
-# -o markers: Define markers (we register but don't apply them)
-# -o filterwarnings: Configure warning filters
-# --showlocals and -rA flags for better error context
-PYTEST_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" \
-  -p no:timer \
-  -vv \
-  -o testpaths=tests \
-  -o python_files=test_*.py \
-  --asyncio-mode=auto \
-  -o asyncio_default_fixture_loop_scope=function \
-  --durations=10 \
-  -o 'markers=serial: mark tests to run serially (non-parallel)
-real: mark tests that run against real data/resources rather than mocks
-integration: mark tests that integrate with external services' \
-  -o 'filterwarnings=ignore::ResourceWarning' \
-  --showlocals \
-  -rA${ADDITIONAL_ARGS_CMD}"
-
 # Add sequential execution support for serial tests when using parallel mode
 if ! $SEQUENTIAL && ! [[ "$ADDITIONAL_ARGS_STR" =~ "-k" ]]; then
   # When in parallel mode, execute serial tests in a separate call
@@ -854,39 +874,46 @@ if ! $SEQUENTIAL && ! [[ "$ADDITIONAL_ARGS_STR" =~ "-k" ]]; then
     eval "$SERIAL_CMD"
     
     # Then exclude serial tests from the parallel run
-    ADDITIONAL_ARGS+=("-m" "not serial")
-    ADDITIONAL_ARGS_CMD=""
-    for arg in "${ADDITIONAL_ARGS[@]}"; do
-      ADDITIONAL_ARGS_CMD+=" $arg"
+    # Save the original arguments before adding the 'not serial' marker
+    ORIGINAL_ARGS=("${ADDITIONAL_ARGS[@]}")
+    
+    # Reset and add the not serial marker
+    ADDITIONAL_ARGS=("-m" "not serial")
+    
+    # Re-add the original arguments (except any existing -m flags)
+    for arg in "${ORIGINAL_ARGS[@]}"; do
+      if [[ "$arg" != "-m" && "$arg" != "-n8" ]]; then
+        ADDITIONAL_ARGS+=("$arg")
+      fi
     done
-    PYTEST_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" \
-      -p no:timer \
-      -vv \
-      -o testpaths=tests \
-      -o python_files=test_*.py \
-      --asyncio-mode=auto \
-      -o asyncio_default_fixture_loop_scope=function \
-      --durations=10 \
-      -o 'markers=serial: mark tests to run serially (non-parallel)
-real: mark tests that run against real data/resources rather than mocks
-integration: mark tests that integrate with external services' \
-      -o 'filterwarnings=ignore::ResourceWarning' \
-      --showlocals \
-      -rA${ADDITIONAL_ARGS_CMD}"
+    
+    # Always ensure -n8 is present for parallel execution
+    if [[ ! "${ADDITIONAL_ARGS[@]}" =~ "-n8" ]]; then
+      ADDITIONAL_ARGS+=("-n8")
+    fi
   fi
 fi
 
-echo "Running: $PYTEST_CMD"
-echo "---------------------------------------------------"
+# Build the main command for running tests
+echo "Running main tests for path: ${TEST_PATH}"
+PARALLEL_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" \
+  -p no:timer \
+  -vv \
+  -o testpaths=tests \
+  -o python_files=test_*.py \
+  --asyncio-mode=auto \
+  -o asyncio_default_fixture_loop_scope=function \
+  -o 'filterwarnings=ignore::ResourceWarning' \
+  --showlocals \
+  -rA"
 
-# Use a simplified parallel-mode command - this solves various issues with pytest-xdist
-if ! $SEQUENTIAL; then
-  echo "Using simplified parallel execution for better compatibility..."
-  PARALLEL_CMD="PYTHONPATH=${PROJECT_ROOT} pytest \"${TEST_PATH}\" -v -m \"not serial\" -n8 --asyncio-mode=auto -o asyncio_default_fixture_loop_scope=function -o 'filterwarnings=ignore::ResourceWarning'"
-else
-  # In sequential mode, use the original command without the parallel flag
-  PARALLEL_CMD="$PYTEST_CMD"
-fi
+# Add all arguments to the command
+for arg in "${ADDITIONAL_ARGS[@]}"; do
+  PARALLEL_CMD+=" $arg"
+done
+
+echo "Executing: $PARALLEL_CMD"
+echo "---------------------------------------------------"
 
 # Run the command and capture the output
 if $ERROR_SUMMARY; then
@@ -904,7 +931,7 @@ if $ERROR_SUMMARY; then
   echo "  less -R $LOG_FILE in another terminal"
   
   # Set shell variables to improve test output
-  CMD_WITH_ENV="PYTHONUNBUFFERED=1 FORCE_COLOR=1 PYTHONASYNCIOEBUG=1 COLUMNS=200 $PARALLEL_CMD --color=yes"
+  CMD_WITH_ENV="PYTHONUNBUFFERED=1 FORCE_COLOR=1 PYTHONASYNCIOEBUG=1 COLUMNS=80 $PARALLEL_CMD --color=yes"
   echo "Executing: $CMD_WITH_ENV"
   
   # Run the command and capture output to log file
@@ -924,7 +951,8 @@ if $ERROR_SUMMARY; then
   fi
 else
   # Run without error summary
-  if eval "$PARALLEL_CMD"; then
+  echo "Executing: $PARALLEL_CMD"
+  if eval "COLUMNS=80 $PARALLEL_CMD"; then
     PYTEST_EXIT_CODE=$?
     echo "Tests completed successfully!"
   else

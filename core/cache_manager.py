@@ -7,6 +7,9 @@ from typing import Dict, Optional, Tuple, Any, Sequence
 import pandas as pd
 import pyarrow as pa
 import filelock
+import os
+import asyncio
+import re
 
 from utils.logger_setup import logger
 from utils.cache_validator import (
@@ -19,391 +22,381 @@ from utils.time_utils import (
     get_interval_floor,
     align_time_boundaries,
 )
-from utils.market_constraints import Interval
+from utils.market_constraints import Interval, MarketType
 
 
 class UnifiedCacheManager:
-    """Centralized cache management with hierarchical directory structure.
+    """Unified cache manager for all data sources.
 
-    Directory Structure:
-    /cache_dir
-        /data
-            /{exchange}            # Default: binance
-                /{market_type}     # Default: spot
-                    /{data_nature} # Default: klines
-                        /{packaging_frequency} # Default: daily
-                            /{SYMBOL}
-                                /{INTERVAL}
-                                    /YYYYMMDD.arrow
-        /metadata
-            cache_index.json
+    This class provides a single interface for caching data from multiple sources,
+    with standardized cache keys, path generation, and metadata handling.
 
-    This structure is implemented through CacheKeyManager.get_cache_path().
+    Features:
+    - Consistent cache key generation
+    - Concurrent access support
+    - Metadata storage
+    - Integrity validation
+    - Cache invalidation
     """
 
-    def __init__(self, cache_dir: Path):
-        """Initialize cache manager.
+    def __init__(self, cache_dir: Path, create_dirs: bool = True):
+        """Initialize the cache manager.
 
         Args:
-            cache_dir: Base cache directory
+            cache_dir: Base directory for cache storage
+            create_dirs: Whether to create cache directory structure
         """
-        self.cache_dir = cache_dir
-        self.data_dir = cache_dir / "data"
-        self.metadata_dir = cache_dir / "metadata"
+        self.cache_dir = Path(cache_dir)
+        self.metadata: Dict[str, Dict[str, Any]] = {}
+        self._cache_lock = asyncio.Lock()
 
-        # Create directory structure
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.metadata_dir.mkdir(parents=True, exist_ok=True)
-
-        # Load metadata
-        self.metadata = self._load_metadata()
-
-    def _load_metadata(self) -> Dict[str, Any]:
-        """Load cache metadata from disk."""
-        metadata_file = self.metadata_dir / "cache_index.json"
-        if metadata_file.exists():
+        # Create directories if needed
+        if create_dirs:
             try:
-                with open(metadata_file, "r") as f:
-                    return json.load(f)
-            except json.JSONDecodeError:
-                logger.warning("Corrupted metadata file, creating new")
-                return {}
-        return {}
+                os.makedirs(self.cache_dir, exist_ok=True)
+                logger.debug(f"Cache directory created: {self.cache_dir}")
+            except OSError as e:
+                logger.error(f"Failed to create cache directory: {e}")
 
-    def _save_metadata(self) -> None:
-        """Save cache metadata to disk."""
-        metadata_file = self.metadata_dir / "cache_index.json"
-        logger.debug(f"Saving metadata to {metadata_file}")
+        # Load existing metadata
         try:
-            with open(metadata_file, "w") as f:
-                json.dump(self.metadata, f, indent=2)
-            logger.debug(f"Metadata saved successfully to {metadata_file}")
+            self._load_metadata()
         except Exception as e:
-            logger.error(f"Error writing metadata to {metadata_file}: {e}")
-            # Check if directory exists
-            if not self.metadata_dir.exists():
-                logger.error(f"Metadata directory does not exist: {self.metadata_dir}")
-            # Check permissions
-            try:
-                if self.metadata_dir.exists():
-                    logger.debug(
-                        f"Metadata directory permissions: {self.metadata_dir.stat().st_mode & 0o777:o}"
-                    )
-            except Exception as perm_err:
-                logger.error(
-                    f"Error checking metadata directory permissions: {perm_err}"
-                )
-            raise
+            logger.warning(f"Failed to load cache metadata, starting fresh: {e}")
 
-    def get_cache_path(self, symbol: str, interval: str, date: datetime) -> Path:
-        """Get cache file path following the simplified structure.
-
-        Args:
-            symbol: Trading pair symbol
-            interval: Time interval
-            date: Target date (should be aligned to REST API boundaries)
+    def _get_metadata_path(self) -> Path:
+        """Get path to metadata file.
 
         Returns:
-            Path to cache file
+            Path to metadata file
         """
-        # Ensure date is aligned to interval boundaries to match REST API behavior
-        try:
-            # Try to convert interval string to Interval enum
-            interval_enum = next(
-                (i for i in Interval if i.value == interval), Interval.SECOND_1
-            )
+        return self.cache_dir / "cache_metadata.json"
 
-            # Use time_utils to align date to match REST API behavior
-            aligned_date = get_interval_floor(enforce_utc_timezone(date), interval_enum)
+    def _load_metadata(self) -> None:
+        """Load metadata from file."""
+        metadata_path = self._get_metadata_path()
+        if metadata_path.exists():
+            try:
+                with open(metadata_path, "r") as f:
+                    self.metadata = json.load(f)
+                logger.debug(f"Loaded cache metadata: {len(self.metadata)} entries")
+            except Exception as e:
+                logger.error(f"Failed to load metadata: {e}")
+                self.metadata = {}
+        else:
+            logger.debug("No metadata file found, starting fresh")
+            self.metadata = {}
 
-            # Use the aligned date for cache path generation
-            return CacheKeyManager.get_cache_path(
-                self.data_dir, symbol, interval, aligned_date
-            )
-        except Exception as e:
-            logger.warning(f"Error aligning date for cache path: {e}")
-            # Fall back to original behavior if alignment fails
-            return CacheKeyManager.get_cache_path(self.data_dir, symbol, interval, date)
+    async def _save_metadata(self) -> None:
+        """Save metadata to file."""
+        async with self._cache_lock:
+            try:
+                metadata_path = self._get_metadata_path()
+                with open(metadata_path, "w") as f:
+                    json.dump(self.metadata, f, indent=2)
+                logger.debug(f"Saved cache metadata: {len(self.metadata)} entries")
+            except Exception as e:
+                logger.error(f"Failed to save metadata: {e}")
 
-    def get_cache_key(self, symbol: str, interval: str, date: datetime) -> str:
-        """Generate cache key.
+    def get_cache_key(
+        self,
+        symbol: str,
+        interval: str,
+        date: datetime,
+        provider: str = "BINANCE",
+        chart_type: str = "KLINES",
+    ) -> str:
+        """Generate a standardized cache key.
 
         Args:
             symbol: Trading pair symbol
             interval: Time interval
-            date: Target date (should be aligned to REST API boundaries)
+            date: Reference date
+            provider: Data provider
+            chart_type: Chart type
 
         Returns:
             Cache key string
         """
-        # Ensure date is aligned to interval boundaries to match REST API behavior
-        try:
-            # Try to convert interval string to Interval enum
-            interval_enum = next(
-                (i for i in Interval if i.value == interval), Interval.SECOND_1
-            )
+        # Standardize inputs
+        symbol = symbol.upper()
+        interval = interval.lower()
+        date_str = date.strftime("%Y-%m-%d")
+        provider = provider.upper()
+        chart_type = chart_type.upper()
 
-            # Use time_utils to align date to match REST API behavior
-            aligned_date = get_interval_floor(enforce_utc_timezone(date), interval_enum)
+        # Create a key that incorporates all components
+        return f"{provider}_{chart_type}_{symbol}_{interval}_{date_str}"
 
-            # Use the aligned date for cache key generation
-            return CacheKeyManager.get_cache_key(symbol, interval, aligned_date)
-        except Exception as e:
-            logger.warning(f"Error aligning date for cache key: {e}")
-            # Fall back to original behavior if alignment fails
-            return CacheKeyManager.get_cache_key(symbol, interval, date)
-
-    def _align_date_for_caching(self, date: datetime, interval: str) -> datetime:
-        """Align date to interval boundaries for consistent cache handling.
+    def _get_cache_path(self, cache_key: str) -> Path:
+        """Get filesystem path for a cache key.
 
         Args:
-            date: Original date to align
-            interval: Interval string
+            cache_key: Cache key string
 
         Returns:
-            Aligned date following REST API boundary rules
+            Path to cache file
         """
-        try:
-            # Ensure date has proper timezone
-            date = enforce_utc_timezone(date)
+        # Use cache key components to create a directory structure
+        components = cache_key.split("_")
 
-            # Try to convert interval string to Interval enum
-            interval_enum = next(
-                (i for i in Interval if i.value == interval), Interval.SECOND_1
+        if len(components) >= 5:
+            provider, chart_type, symbol, interval, date_str = components[:5]
+
+            # Create path with hierarchical structure
+            return (
+                self.cache_dir
+                / provider
+                / chart_type
+                / symbol
+                / interval
+                / f"{date_str}.arrow"
             )
-
-            # Use unified time_utils to align date to match REST API behavior
-            date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            aligned_date, _ = align_time_boundaries(date, date_end, interval_enum)
-
-            logger.debug(
-                f"Aligned date for caching: {date.isoformat()} -> {aligned_date.isoformat()}"
-            )
-            return aligned_date
-
-        except Exception as e:
-            logger.warning(f"Error aligning date for cache operation: {e}")
-            # Return original date if alignment fails
-            return date
-
-    async def save_to_cache(
-        self, df: pd.DataFrame, symbol: str, interval: str, date: datetime
-    ) -> Tuple[str, int]:
-        """Save DataFrame to cache.
-
-        Args:
-            df: DataFrame to cache
-            symbol: Trading pair symbol
-            interval: Time interval
-            date: Target date (will be aligned to REST API boundaries)
-
-        Returns:
-            Tuple of (checksum, record_count)
-        """
-        # Align date to interval boundaries
-        date = self._align_date_for_caching(date, interval)
-
-        # Log input data for debugging
-        logger.debug(
-            f"Attempting to cache data for {symbol} {interval} {date.strftime('%Y-%m-%d')}"
-        )
-        logger.debug(f"DataFrame shape before caching: {df.shape}")
-        logger.debug(f"DataFrame index name: {df.index.name}")
-        logger.debug(f"DataFrame has duplicates: {df.index.has_duplicates}")
-        logger.debug(f"DataFrame is monotonic: {df.index.is_monotonic_increasing}")
-
-        # Handle duplicate timestamps by keeping the first occurrence
-        if not df.empty and df.index.has_duplicates:
-            logger.debug(
-                f"Removing {df.index.duplicated().sum()} duplicate timestamps before caching"
-            )
-            df = df[~df.index.duplicated(keep="first")]
-
-        # Sort the DataFrame by index if it's not monotonically increasing
-        if not df.empty and not df.index.is_monotonic_increasing:
-            logger.debug("Sorting DataFrame by index before caching")
-            df = df.sort_index()
-
-        # Validate DataFrame before caching
-        try:
-            DataFrameValidator.validate_dataframe(df)
-        except ValueError as e:
-            logger.warning(f"Invalid DataFrame, not caching: {e}")
-            # Log more details about the DataFrame for debugging
-            if not df.empty:
-                logger.debug(f"DataFrame dtypes: {df.dtypes}")
-                logger.debug(f"DataFrame columns: {df.columns.tolist()}")
-                logger.debug(
-                    f"DataFrame index range: {df.index.min()} to {df.index.max()}"
-                )
-            raise
-
-        cache_path = self.get_cache_path(symbol, interval, date)
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        logger.debug(f"Cache path: {cache_path}")
-
-        # Create a lock file path for file locking
-        lock_file = str(cache_path) + ".lock"
-        checksum = ""
-        record_count = 0
-
-        # Use file lock to prevent race conditions during parallel access
-        with filelock.FileLock(lock_file, timeout=10):
-            # Convert to Arrow table - Handling reset_index carefully
-            try:
-                logger.debug("Converting DataFrame to Arrow table")
-
-                # Check if the index name conflicts with a column name
-                if df.index.name is not None and df.index.name in df.columns:
-                    logger.debug(
-                        f"Index name '{df.index.name}' conflicts with column, renaming index before reset"
-                    )
-                    df.index.name = f"{df.index.name}_idx"
-
-                # Reset index with a temporary name if it has no name
-                if df.index.name is None:
-                    logger.debug("Index has no name, using temporary name for reset")
-                    df.index.name = "temp_index"
-
-                # Reset index and check for column conflicts
-                reset_df = df.reset_index()
-                logger.debug(
-                    f"After reset_index, columns are: {reset_df.columns.tolist()}"
-                )
-
-                table = pa.Table.from_pandas(reset_df)
-
-                # Save to Arrow file
-                with pa.OSFile(str(cache_path), "wb") as sink:
-                    with pa.ipc.new_file(sink, table.schema) as writer:
-                        writer.write_table(table)
-
-                logger.debug(f"Successfully wrote data to {cache_path}")
-            except Exception as e:
-                logger.error(f"Error saving cache file: {e}")
-                raise
-
-            # Calculate checksum and record count
-            checksum = DataValidation.calculate_checksum(cache_path)
-            record_count = len(df)
-
-            # Update metadata
-            cache_key = self.get_cache_key(symbol, interval, date)
-            self.metadata[cache_key] = {
-                "symbol": symbol,
-                "interval": interval,
-                "year_month_day": date.strftime("%Y%m%d"),
-                "date": date.strftime("%Y-%m-%d"),
-                "checksum": checksum,
-                "record_count": record_count,
-                "path": str(cache_path),
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
-
-        # Log metadata before saving
-        logger.debug(f"Updating metadata for key: {cache_key}")
-        logger.debug(f"Metadata content: {self.metadata[cache_key]}")
-
-        # Use file lock for the metadata file too
-        metadata_lock_file = str(self.metadata_dir / "cache_index.json") + ".lock"
-        with filelock.FileLock(metadata_lock_file, timeout=10):
-            try:
-                self._save_metadata()
-                logger.debug("Successfully saved metadata")
-            except Exception as e:
-                logger.error(f"Error saving metadata: {e}")
-                raise
-
-        logger.info(f"Cached {record_count} records to {cache_path}")
-        return checksum, record_count
+        else:
+            # Fallback for legacy cache keys
+            return self.cache_dir / f"{cache_key}.arrow"
 
     async def load_from_cache(
         self,
         symbol: str,
         interval: str,
         date: datetime,
-        columns: Optional[Sequence[str]] = None,
+        provider: str = "BINANCE",
+        chart_type: str = "KLINES",
     ) -> Optional[pd.DataFrame]:
-        """Load data from cache if available.
+        """Load data from cache.
 
         Args:
             symbol: Trading pair symbol
             interval: Time interval
-            date: Target date (will be aligned to REST API boundaries)
-            columns: Optional list of columns to load
+            date: Reference date
+            provider: Data provider
+            chart_type: Chart type
 
         Returns:
-            DataFrame if cache exists and is valid, None otherwise
+            DataFrame with cached data or None if not found
         """
-        # Align date to interval boundaries
-        date = self._align_date_for_caching(date, interval)
-
-        # Get cache path
-        cache_path = self.get_cache_path(symbol, interval, date)
-        logger.debug(f"Looking for cache at: {cache_path}")
-
-        cache_key = self.get_cache_key(symbol, interval, date)
-
-        # Use filelock for metadata access
-        metadata_lock_file = str(self.metadata_dir / "cache_index.json") + ".lock"
-        with filelock.FileLock(metadata_lock_file, timeout=5):
-            cache_info = self.metadata.get(cache_key)
-
-        if not cache_info:
-            return None
+        cache_key = self.get_cache_key(symbol, interval, date, provider, chart_type)
+        cache_path = self._get_cache_path(cache_key)
 
         if not cache_path.exists():
-            logger.warning(f"Cache file missing: {cache_path}")
+            logger.debug(f"Cache miss - file not found: {cache_path}")
             return None
 
-        if not DataValidation.validate_file_with_checksum(
-            cache_path, cache_info["checksum"]
-        ):
-            logger.warning(f"Cache checksum verification failed for {cache_path}")
-            return None
-
-        # Create a lock file path for file locking
-        lock_file = str(cache_path) + ".lock"
-
-        # Use a shorter timeout for reading to avoid test hangs
-        with filelock.FileLock(lock_file, timeout=5):
-            # Use the async version of the safe reader for Arrow files for better performance
-            df = await safely_read_arrow_file_async(cache_path, columns)
-
-        if df is None:
-            return None
-
-        # Ensure index has correct timezone using time_utils
-        if isinstance(df.index, pd.DatetimeIndex):
-            new_index = pd.DatetimeIndex(
-                [enforce_utc_timezone(dt) for dt in df.index.to_pydatetime()],
-                name=df.index.name,
-            )
-            df.index = new_index
-
-        # Perform validation on loaded data
         try:
-            DataFrameValidator.validate_dataframe(df)
-        except ValueError as e:
-            logger.error(f"DataFrame validation failed: {e}")
+            # Check metadata for validation info
+            if cache_key in self.metadata:
+                if not self.metadata[cache_key].get("is_valid", True):
+                    logger.warning(f"Skipping invalid cache: {cache_key}")
+                    return None
+
+            # Load from Arrow format
+            df = pd.read_feather(cache_path)
+
+            # Ensure index is a DatetimeIndex for time-series data
+            if "open_time" in df.columns:
+                df = df.set_index("open_time")
+                # Ensure timezone info
+                if df.index.tzinfo is None:
+                    df.index = df.index.tz_localize(timezone.utc)
+
+            logger.debug(f"Cache hit: {cache_key}, shape: {df.shape}")
+            return df
+
+        except Exception as e:
+            logger.error(f"Failed to load cache: {cache_key}, error: {e}")
+            # Mark as invalid in metadata
+            await self._mark_cache_invalid(cache_key, str(e))
             return None
 
-        logger.info(f"Loaded {len(df)} records from cache: {cache_path}")
-        return df
+    async def save_to_cache(
+        self,
+        df: pd.DataFrame,
+        symbol: str,
+        interval: str,
+        date: datetime,
+        provider: str = "BINANCE",
+        chart_type: str = "KLINES",
+    ) -> bool:
+        """Save data to cache.
 
-    def invalidate_cache(self, symbol: str, interval: str, date: datetime) -> None:
-        """Invalidate cache entry.
+        Args:
+            df: DataFrame to cache
+            symbol: Trading pair symbol
+            interval: Time interval
+            date: Reference date
+            provider: Data provider
+            chart_type: Chart type
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if df.empty:
+            logger.debug("Not caching empty DataFrame")
+            return False
+
+        cache_key = self.get_cache_key(symbol, interval, date, provider, chart_type)
+        cache_path = self._get_cache_path(cache_key)
+
+        # Create parent directories if they don't exist
+        try:
+            os.makedirs(cache_path.parent, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create cache directory: {e}")
+            return False
+
+        try:
+            # Reset index to include open_time as a column
+            df_reset = df.reset_index()
+
+            # Save to Arrow format
+            df_reset.to_feather(cache_path)
+
+            # Update metadata
+            metadata_entry = {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "symbol": symbol,
+                "interval": interval,
+                "provider": provider,
+                "chart_type": chart_type,
+                "date": date.isoformat(),
+                "rows": len(df),
+                "is_valid": True,
+            }
+
+            async with self._cache_lock:
+                self.metadata[cache_key] = metadata_entry
+                await self._save_metadata()
+
+            logger.debug(f"Cached {len(df)} rows to {cache_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to save cache: {cache_key}, error: {e}")
+            return False
+
+    async def _mark_cache_invalid(self, cache_key: str, reason: str) -> None:
+        """Mark a cache entry as invalid.
+
+        Args:
+            cache_key: Cache key to invalidate
+            reason: Reason for invalidation
+        """
+        async with self._cache_lock:
+            if cache_key in self.metadata:
+                self.metadata[cache_key]["is_valid"] = False
+                self.metadata[cache_key]["invalidation_reason"] = reason
+                self.metadata[cache_key]["invalidated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+                await self._save_metadata()
+                logger.debug(f"Marked cache as invalid: {cache_key}, reason: {reason}")
+
+    def invalidate_cache(
+        self,
+        symbol: str,
+        interval: str,
+        date: datetime,
+        provider: str = "BINANCE",
+        chart_type: str = "KLINES",
+    ) -> None:
+        """Invalidate a cache entry.
 
         Args:
             symbol: Trading pair symbol
             interval: Time interval
-            date: Target date
+            date: Reference date
+            provider: Data provider
+            chart_type: Chart type
         """
-        cache_key = self.get_cache_key(symbol, interval, date)
-        if cache_key in self.metadata:
-            cache_path = self.cache_dir / self.metadata[cache_key]["path"]
-            if cache_path.exists():
-                cache_path.unlink()
-            del self.metadata[cache_key]
-            self._save_metadata()
-            logger.info(f"Invalidated cache: {cache_key}")
+        cache_key = self.get_cache_key(symbol, interval, date, provider, chart_type)
+        cache_path = self._get_cache_path(cache_key)
+
+        if cache_path.exists():
+            try:
+                # Try to delete the file
+                os.remove(cache_path)
+                logger.debug(f"Deleted invalidated cache: {cache_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete cache file: {e}")
+
+        # Also mark as invalid in metadata
+        asyncio.create_task(self._mark_cache_invalid(cache_key, "Manual invalidation"))
+
+    async def purge_expired_cache(self, max_age_days: int = 30) -> int:
+        """Purge expired cache entries.
+
+        Args:
+            max_age_days: Maximum age of cache entries in days
+
+        Returns:
+            Number of entries purged
+        """
+        purged_count = 0
+        now = datetime.now(timezone.utc)
+        keys_to_purge = []
+
+        async with self._cache_lock:
+            # Identify keys to purge
+            for key, metadata in self.metadata.items():
+                try:
+                    created_at = datetime.fromisoformat(metadata.get("created_at", ""))
+                    age_days = (now - created_at).days
+                    if age_days > max_age_days or not metadata.get("is_valid", True):
+                        keys_to_purge.append(key)
+                except Exception:
+                    # If we can't parse the date, consider it expired
+                    keys_to_purge.append(key)
+
+            # Delete files and update metadata
+            for key in keys_to_purge:
+                try:
+                    cache_path = self._get_cache_path(key)
+                    if cache_path.exists():
+                        os.remove(cache_path)
+                    del self.metadata[key]
+                    purged_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to purge cache: {key}, error: {e}")
+
+            # Save updated metadata
+            if purged_count > 0:
+                await self._save_metadata()
+                logger.info(f"Purged {purged_count} expired cache entries")
+
+        return purged_count
+
+    async def get_cache_statistics(self) -> Dict[str, Any]:
+        """Get statistics about the cache.
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        stats = {
+            "total_entries": len(self.metadata),
+            "valid_entries": 0,
+            "invalid_entries": 0,
+            "total_rows": 0,
+            "providers": set(),
+            "chart_types": set(),
+            "symbols": set(),
+            "intervals": set(),
+        }
+
+        for key, metadata in self.metadata.items():
+            if metadata.get("is_valid", True):
+                stats["valid_entries"] += 1
+                stats["total_rows"] += metadata.get("rows", 0)
+            else:
+                stats["invalid_entries"] += 1
+
+            stats["providers"].add(metadata.get("provider", "UNKNOWN"))
+            stats["chart_types"].add(metadata.get("chart_type", "UNKNOWN"))
+            stats["symbols"].add(metadata.get("symbol", "UNKNOWN"))
+            stats["intervals"].add(metadata.get("interval", "UNKNOWN"))
+
+        # Convert sets to lists for JSON serialization
+        for key in ["providers", "chart_types", "symbols", "intervals"]:
+            stats[key] = list(stats[key])
+
+        return stats

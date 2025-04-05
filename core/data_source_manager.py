@@ -1,15 +1,15 @@
 #!/usr/bin/env python
-"""Data source manager that mediates between REST and Vision API data sources."""
+"""Data source manager that mediates between different data sources."""
 
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any, Union
 from enum import Enum, auto
 import pandas as pd
 from pathlib import Path
 import asyncio
 
 from utils.logger_setup import logger
-from utils.market_constraints import Interval, MarketType
+from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
 from utils.time_utils import (
     filter_dataframe_by_time,
     enforce_utc_timezone,
@@ -18,14 +18,20 @@ from utils.time_utils import (
 from utils.validation import DataFrameValidator, DataValidation
 from utils.config import (
     OUTPUT_DTYPES,
+    FUNDING_RATE_DTYPES,
     VISION_DATA_DELAY_HOURS,
     REST_CHUNK_SIZE,
     REST_MAX_CHUNKS,
     standardize_column_names,
+    create_empty_dataframe,
+    create_empty_funding_rate_dataframe,
 )
 from core.rest_data_client import RestDataClient
 from core.vision_data_client import VisionDataClient
+from core.binance_funding_rate_client import BinanceFundingRateClient
 from core.cache_manager import UnifiedCacheManager
+from core.data_client_factory import DataClientFactory
+from core.data_client_interface import DataClientInterface
 from utils.network_utils import safely_close_client
 
 
@@ -38,10 +44,10 @@ class DataSource(Enum):
 
 
 class DataSourceManager:
-    """Mediator between REST and Vision API data sources with smart selection and caching.
+    """Mediator between data sources with smart selection and caching.
 
     This class serves as the central point for:
-    1. Data source selection between REST and Vision APIs
+    1. Data source selection between different providers and APIs
     2. Unified caching strategy across all data sources
     3. Cache integrity validation and management
     4. Data format standardization
@@ -56,10 +62,16 @@ class DataSourceManager:
 
     # Output format specification from centralized config
     OUTPUT_DTYPES = OUTPUT_DTYPES.copy()
+    FUNDING_RATE_DTYPES = FUNDING_RATE_DTYPES.copy()
 
     @classmethod
-    def get_output_format(cls) -> Dict[str, str]:
+    def get_output_format(
+        cls, chart_type: ChartType = ChartType.KLINES
+    ) -> Dict[str, str]:
         """Get the standardized output format specification.
+
+        Args:
+            chart_type: Type of chart data
 
         Returns:
             Dictionary mapping column names to their dtypes
@@ -68,13 +80,16 @@ class DataSourceManager:
             - Index is always pd.DatetimeIndex in UTC timezone
             - All timestamps are aligned to interval boundaries
             - Empty DataFrames maintain this structure
-            - Both REST and Vision API data are normalized to this format
         """
+        if chart_type == ChartType.FUNDING_RATE:
+            return cls.FUNDING_RATE_DTYPES.copy()
         return cls.OUTPUT_DTYPES.copy()
 
     def __init__(
         self,
         market_type: MarketType = MarketType.SPOT,
+        provider: DataProvider = DataProvider.BINANCE,
+        chart_type: ChartType = ChartType.KLINES,
         rest_client: Optional[RestDataClient] = None,
         cache_dir: Optional[Path] = None,
         use_cache: bool = True,
@@ -86,7 +101,9 @@ class DataSourceManager:
 
         Args:
             market_type: Type of market (SPOT, FUTURES_USDT, FUTURES_COIN, etc.)
-            rest_client: Optional pre-configured REST client
+            provider: Data provider (BINANCE, TRADESTATION, etc.)
+            chart_type: Type of chart data (KLINES, FUNDING_RATE, etc.)
+            rest_client: Optional pre-configured REST client (for backward compatibility)
             cache_dir: Directory for caching data
             use_cache: Whether to use caching
             max_concurrent: Maximum concurrent API requests for REST client (default: 50)
@@ -98,19 +115,22 @@ class DataSourceManager:
         self.retry_count = retry_count
         self.max_concurrent_downloads = max_concurrent_downloads
 
+        # Store market configuration
         self.market_type = market_type
-        self.rest_client = rest_client or RestDataClient(
-            market_type=market_type,
-            max_concurrent=max_concurrent,
-            retry_count=retry_count,
-        )
+        self.provider = provider
+        self.chart_type = chart_type
+
+        # Legacy clients (to be phased out)
+        self.rest_client = rest_client
+        self.vision_client = None
+        self._vision_client_initialized = False
+
+        # Data client from factory (new architecture)
+        self._data_client = None
+        self._data_client_initialized = False
 
         # Convert market_type to string for Vision API if needed
         self.market_type_str = self._get_market_type_str(market_type)
-
-        # Vision client will be created when needed
-        self.vision_client = None
-        self._vision_client_initialized = False
 
         # Initialize cache manager if caching is enabled
         self.use_cache = use_cache and cache_dir is not None
@@ -120,6 +140,9 @@ class DataSourceManager:
             else None
         )
         self._cache_stats = {"hits": 0, "misses": 0, "errors": 0}
+
+        # Register client implementations with factory
+        self._register_client_implementations()
 
     def _get_market_type_str(self, market_type: MarketType) -> str:
         """Convert MarketType enum to string representation for Vision API.
@@ -349,80 +372,107 @@ class DataSourceManager:
             DataFrame with market data
         """
         # Initialize with empty DataFrame in case of errors
-        result_df = pd.DataFrame()
+        result_df = self.create_empty_dataframe()
 
-        # If Vision API is requested, try it first
-        if use_vision:
-            try:
-                # Get aligned boundaries once and reuse them
-                vision_start, vision_end = align_time_boundaries(
-                    start_time, end_time, interval
-                )
+        try:
+            # For non-klines chart types, use the appropriate data client
+            if self.chart_type != ChartType.KLINES:
+                client = await self._get_data_client(symbol, interval)
 
-                logger.info(
-                    f"Using Vision API with aligned boundaries: {vision_start} -> {vision_end}"
-                )
+                # Fetch data using the client
+                result_df = await client.fetch(start_time, end_time)
 
-                # Create Vision client if not exists
-                self._ensure_vision_client(symbol, interval.value)
+                # Validate the data
+                if not result_df.empty:
+                    try:
+                        if self.chart_type == ChartType.FUNDING_RATE:
+                            is_valid, error = await client.validate_data(result_df)
+                            if not is_valid:
+                                logger.error(f"Invalid funding rate data: {error}")
+                                return self.create_empty_dataframe()
+                        else:
+                            DataFrameValidator.validate_dataframe(result_df)
+                    except ValueError as e:
+                        logger.error(f"Data validation error: {e}")
+                        return self.create_empty_dataframe()
 
-                # Fetch from Vision API with aligned boundaries
-                vision_df = await self.vision_client.fetch(vision_start, vision_end)
+                return result_df
 
-                # Check if we got valid data
-                if not vision_df.empty:
-                    # Filter result to exact requested time range if needed
-                    result_df = filter_dataframe_by_time(
-                        vision_df, start_time, end_time
+            # For KLINES, we still use the legacy code path with REST/Vision
+            if use_vision:
+                try:
+                    # Get aligned boundaries once and reuse them
+                    vision_start, vision_end = align_time_boundaries(
+                        start_time, end_time, interval
                     )
 
-                    # If we have data, return it
-                    if not result_df.empty:
-                        logger.info(
-                            f"Successfully retrieved {len(result_df)} records from Vision API"
-                        )
-                        return result_df
+                    logger.info(
+                        f"Using Vision API with aligned boundaries: {vision_start} -> {vision_end}"
+                    )
 
-                # If we get here, Vision API failed or returned empty results
-                logger.info("Vision API returned no data, falling back to REST API")
+                    # Create Vision client if not exists
+                    self._ensure_vision_client(symbol, interval.value)
+
+                    # Fetch from Vision API with aligned boundaries
+                    vision_df = await self.vision_client.fetch(vision_start, vision_end)
+
+                    # Check if we got valid data
+                    if not vision_df.empty:
+                        # Filter result to exact requested time range if needed
+                        result_df = filter_dataframe_by_time(
+                            vision_df, start_time, end_time
+                        )
+
+                        # If we have data, return it
+                        if not result_df.empty:
+                            logger.info(
+                                f"Successfully retrieved {len(result_df)} records from Vision API"
+                            )
+                            return result_df
+
+                    # If we get here, Vision API failed or returned empty results
+                    logger.info("Vision API returned no data, falling back to REST API")
+
+                except Exception as e:
+                    logger.warning(f"Vision API error, falling back to REST API: {e}")
+
+            # Fall back to REST API (or use it directly if use_vision=False)
+            try:
+                logger.info(
+                    f"Using REST API with original boundaries: {start_time} -> {end_time}"
+                )
+
+                # Fetch from REST API - returns tuple of (DataFrame, stats)
+                rest_result = await self.rest_client.fetch(
+                    symbol, interval, start_time, end_time
+                )
+
+                # Unpack the tuple - RestDataClient.fetch returns (df, stats)
+                rest_df, stats = rest_result
+
+                if not rest_df.empty:
+                    logger.info(
+                        f"Successfully retrieved {len(rest_df)} records from REST API"
+                    )
+                    # Validate the DataFrame
+                    DataFrameValidator.validate_dataframe(rest_df)
+                    return rest_df
+
+                logger.warning(
+                    f"REST API returned no data for {symbol} from {start_time} to {end_time}"
+                )
 
             except Exception as e:
-                logger.warning(f"Vision API error, falling back to REST API: {e}")
-
-        # Fall back to REST API (or use it directly if use_vision=False)
-        try:
-            logger.info(
-                f"Using REST API with original boundaries: {start_time} -> {end_time}"
-            )
-
-            # Fetch from REST API - returns tuple of (DataFrame, stats)
-            rest_result = await self.rest_client.fetch(
-                symbol, interval, start_time, end_time
-            )
-
-            # Unpack the tuple - RestDataClient.fetch returns (df, stats)
-            rest_df, stats = rest_result
-
-            if not rest_df.empty:
-                logger.info(
-                    f"Successfully retrieved {len(rest_df)} records from REST API"
-                )
-                # Validate the DataFrame
-                DataFrameValidator.validate_dataframe(rest_df)
-                return rest_df
-
-            logger.warning(
-                f"REST API returned no data for {symbol} from {start_time} to {end_time}"
-            )
+                logger.error(f"REST API fetch error: {e}")
 
         except Exception as e:
-            logger.error(f"REST API fetch error: {e}")
+            logger.error(f"Error fetching data: {e}")
 
-        # If we reach here, both APIs failed or returned empty results
+        # If we reach here, all sources failed or returned empty results
         logger.warning(
             f"No data returned for {symbol} from {start_time} to {end_time} from any source"
         )
-        return self.rest_client.create_empty_dataframe()
+        return self.create_empty_dataframe()
 
     def _get_aligned_cache_date(
         self,
@@ -458,6 +508,8 @@ class DataSourceManager:
         interval: Interval = Interval.SECOND_1,
         use_cache: bool = True,
         enforce_source: DataSource = DataSource.AUTO,
+        provider: Optional[DataProvider] = None,
+        chart_type: Optional[ChartType] = None,
     ) -> pd.DataFrame:
         """Get data for symbol within time range, with smart source selection.
 
@@ -468,95 +520,129 @@ class DataSourceManager:
             interval: Time interval
             use_cache: Whether to use cache
             enforce_source: Force specific data source
+            provider: Optional override for data provider
+            chart_type: Optional override for chart type
 
         Returns:
             DataFrame with market data
         """
-        # Standardize input parameters
-        symbol = symbol.upper()
+        # Override provider and chart_type if specified
+        original_provider = self.provider
+        original_chart_type = self.chart_type
 
-        # Apply comprehensive time boundary validation
-        start_time, end_time, metadata = DataValidation.validate_query_time_boundaries(
-            start_time, end_time, handle_future_dates="error"
-        )
+        if provider is not None:
+            self.provider = provider
 
-        # Log any warnings from validation
-        for warning in metadata.get("warnings", []):
-            logger.warning(warning)
-
-        # Log input parameters
-        logger.info(
-            f"Getting data for {symbol} from {start_time} to {end_time} "
-            f"with interval {interval.value}"
-        )
-
-        # Determine data source to use
-        use_vision = self._determine_data_source(
-            start_time, end_time, interval, enforce_source
-        )
-
-        # Check if we can use cache
-        is_valid = use_cache and self.cache_manager
-        is_cache_hit = False
+        if chart_type is not None:
+            self.chart_type = chart_type
 
         try:
-            # Attempt to load from cache if enabled
-            if is_valid:
-                # Get the aligned cache date
-                cache_date = self._get_aligned_cache_date(
-                    start_time, end_time, interval, use_vision
+            # Standardize input parameters
+            symbol = symbol.upper()
+
+            # Apply comprehensive time boundary validation
+            start_time, end_time, metadata = (
+                DataValidation.validate_query_time_boundaries(
+                    start_time, end_time, handle_future_dates="error"
                 )
+            )
 
-                cached_data = await self.cache_manager.load_from_cache(
-                    symbol=symbol, interval=interval.value, date=cache_date
-                )
+            # Log any warnings from validation
+            for warning in metadata.get("warnings", []):
+                logger.warning(warning)
 
-                if cached_data is not None:
-                    # Filter DataFrame based on original requested time range
-                    # Use inclusive start, inclusive end consistent with API behavior
-                    filtered_data = filter_dataframe_by_time(
-                        cached_data, start_time, end_time
-                    )
+            # Log input parameters
+            logger.info(
+                f"Getting {self.chart_type.value} data for {symbol} from {start_time} to {end_time} "
+                f"with interval {interval.value}, provider={self.provider.name}"
+            )
 
-                    if not filtered_data.empty:
-                        self._cache_stats["hits"] += 1
-                        logger.info(f"Cache hit for {symbol} from {start_time}")
-                        return filtered_data
+            # Determine data source to use (only applies to KLINES)
+            use_vision = self._determine_data_source(
+                start_time, end_time, interval, enforce_source
+            )
 
-                    logger.info(
-                        "Cache hit, but filtered data is empty. Fetching from source."
-                    )
-                else:
-                    logger.info(f"Cache miss for {symbol} from {start_time}")
+            # Check if we can use cache
+            is_valid = use_cache and self.cache_manager
+            is_cache_hit = False
 
-                self._cache_stats["misses"] += 1
+            # Cache key components
+            cache_components = {
+                "symbol": symbol,
+                "interval": interval.value,
+                "provider": self.provider.name,
+                "chart_type": self.chart_type.name,
+            }
 
-        except Exception as e:
-            logger.error(f"Cache error: {e}")
-            self._cache_stats["errors"] += 1
-            # Continue with fetching from source
-
-        # Fetch data from appropriate source
-        df = await self._fetch_from_source(
-            symbol, start_time, end_time, interval, use_vision
-        )
-
-        # Cache if enabled and data is not empty
-        if is_valid and not df.empty and self.cache_manager:
             try:
-                # Get the aligned cache date
-                cache_date = self._get_aligned_cache_date(
-                    start_time, end_time, interval, use_vision
-                )
+                # Attempt to load from cache if enabled
+                if is_valid:
+                    # Get the aligned cache date
+                    cache_date = self._get_aligned_cache_date(
+                        start_time, end_time, interval, use_vision
+                    )
 
-                await self.cache_manager.save_to_cache(
-                    df, symbol, interval.value, cache_date
-                )
-                logger.info(f"Cached {len(df)} records for {symbol}")
+                    cached_data = await self.cache_manager.load_from_cache(
+                        date=cache_date, **cache_components
+                    )
+
+                    if cached_data is not None:
+                        # Filter DataFrame based on original requested time range
+                        # Use inclusive start, inclusive end consistent with API behavior
+                        filtered_data = filter_dataframe_by_time(
+                            cached_data, start_time, end_time
+                        )
+
+                        if not filtered_data.empty:
+                            self._cache_stats["hits"] += 1
+                            logger.info(
+                                f"Cache hit for {symbol} {self.chart_type.name} from {start_time}"
+                            )
+                            return filtered_data
+
+                        logger.info(
+                            "Cache hit, but filtered data is empty. Fetching from source."
+                        )
+                    else:
+                        logger.info(
+                            f"Cache miss for {symbol} {self.chart_type.name} from {start_time}"
+                        )
+
+                    self._cache_stats["misses"] += 1
+
             except Exception as e:
-                logger.error(f"Error caching data: {e}")
+                logger.error(f"Cache error: {e}")
+                self._cache_stats["errors"] += 1
+                # Continue with fetching from source
 
-        return df
+            # Fetch data from appropriate source
+            df = await self._fetch_from_source(
+                symbol, start_time, end_time, interval, use_vision
+            )
+
+            # Cache if enabled and data is not empty
+            if is_valid and not df.empty and self.cache_manager:
+                try:
+                    # Get the aligned cache date
+                    cache_date = self._get_aligned_cache_date(
+                        start_time, end_time, interval, use_vision
+                    )
+
+                    await self.cache_manager.save_to_cache(
+                        df=df, date=cache_date, **cache_components
+                    )
+                    logger.info(
+                        f"Cached {len(df)} records for {symbol} {self.chart_type.name}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error caching data: {e}")
+
+            return df
+
+        finally:
+            # Restore original values
+            self.provider = original_provider
+            self.chart_type = original_chart_type
 
     def _determine_data_source(
         self,
@@ -598,6 +684,16 @@ class DataSourceManager:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Cleanup resources and restore original cache settings."""
         try:
+            # Clean up data client if initialized
+            if self._data_client and self._data_client_initialized:
+                try:
+                    await self._data_client.__aexit__(exc_type, exc_val, exc_tb)
+                    self._data_client = None
+                    self._data_client_initialized = False
+                except Exception as e:
+                    logger.warning(f"Failed to clean up data client: {e}")
+
+            # Clean up vision client (legacy)
             if self.vision_client and self._vision_client_initialized:
                 # Properly cleanup vision client
                 await self.vision_client.__aexit__(exc_type, exc_val, exc_tb)
@@ -617,6 +713,7 @@ class DataSourceManager:
                 await safely_close_client(self.vision_client._client)
                 self.vision_client._client = None
 
+        # Clean up rest client (legacy)
         if self.rest_client:
             # Close the REST client
             await self.rest_client.__aexit__(exc_type, exc_val, exc_tb)
@@ -685,3 +782,95 @@ class DataSourceManager:
                 )
 
             self._vision_client_initialized = True
+
+    def _register_client_implementations(self):
+        """Register all client implementations with the factory."""
+        try:
+            # Register BinanceFundingRateClient for funding rate data
+            DataClientFactory.register_client(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.FUTURES_USDT,
+                chart_type=ChartType.FUNDING_RATE,
+                client_class=BinanceFundingRateClient,
+            )
+
+            DataClientFactory.register_client(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.FUTURES_COIN,
+                chart_type=ChartType.FUNDING_RATE,
+                client_class=BinanceFundingRateClient,
+            )
+
+            logger.debug("Registered client implementations with factory")
+        except Exception as e:
+            logger.error(f"Failed to register client implementations: {e}")
+
+    async def _get_data_client(
+        self, symbol: str, interval: Interval
+    ) -> DataClientInterface:
+        """Get the appropriate data client for the configured parameters.
+
+        This method is part of the transition to the new architecture. It will create
+        a client from the factory if the chart type is supported, or fall back to the
+        legacy clients for backward compatibility.
+
+        Args:
+            symbol: Trading pair symbol
+            interval: Time interval
+
+        Returns:
+            DataClientInterface implementation
+        """
+        # Try to get a client from the factory for non-klines data
+        if self.chart_type != ChartType.KLINES:
+            try:
+                if (
+                    not self._data_client_initialized
+                    or (
+                        hasattr(self._data_client, "symbol")
+                        and self._data_client.symbol != symbol
+                    )
+                    or (
+                        hasattr(self._data_client, "interval")
+                        and self._data_client.interval != interval
+                    )
+                ):
+                    # Create a new client
+                    self._data_client = DataClientFactory.create_data_client(
+                        provider=self.provider,
+                        market_type=self.market_type,
+                        chart_type=self.chart_type,
+                        symbol=symbol,
+                        interval=interval,
+                        max_concurrent=self.max_concurrent,
+                        retry_count=self.retry_count,
+                        max_concurrent_downloads=self.max_concurrent_downloads,
+                        use_cache=False,  # We use our own caching
+                    )
+                    self._data_client_initialized = True
+
+                return self._data_client
+            except Exception as e:
+                logger.error(f"Failed to create data client from factory: {e}")
+                # Fall back to legacy clients
+
+        # For KLINES, we still use the legacy clients
+        # Initialize REST client if needed
+        if not self.rest_client:
+            self.rest_client = RestDataClient(
+                market_type=self.market_type,
+                max_concurrent=self.max_concurrent,
+                retry_count=self.retry_count,
+            )
+
+        return self.rest_client
+
+    def create_empty_dataframe(self) -> pd.DataFrame:
+        """Create an empty DataFrame with the correct structure for the configured chart type.
+
+        Returns:
+            Empty DataFrame with correct columns and types
+        """
+        if self.chart_type == ChartType.FUNDING_RATE:
+            return create_empty_funding_rate_dataframe()
+        return create_empty_dataframe()

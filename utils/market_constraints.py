@@ -8,6 +8,37 @@ import re
 from utils.logger_setup import logger
 
 
+class DataProvider(Enum):
+    """Enum for data provider types."""
+
+    BINANCE = auto()  # Binance data provider
+    TRADESTATION = auto()  # TradeStation data provider
+
+    @classmethod
+    def from_string(cls, provider_str: str) -> "DataProvider":
+        """Convert string representation to DataProvider enum.
+
+        Args:
+            provider_str: String representation of data provider
+
+        Returns:
+            DataProvider enum value
+
+        Raises:
+            ValueError: If the string doesn't match any known data provider
+        """
+        mapping = {
+            "binance": cls.BINANCE,
+            "tradestation": cls.TRADESTATION,
+        }
+
+        provider_str = provider_str.lower()
+        if provider_str in mapping:
+            return mapping[provider_str]
+
+        raise ValueError(f"Unknown data provider string: {provider_str}")
+
+
 class MarketType(Enum):
     SPOT = auto()
     FUTURES_USDT = auto()  # USDT-margined futures (UM)
@@ -69,13 +100,10 @@ class MarketType(Enum):
 
 
 class ChartType(Enum):
-    """Types of chart data available from Binance API."""
+    """Types of chart data available from providers."""
 
     KLINES = "klines"  # Standard candlestick data
-    UI_KLINES = "uiKlines"  # Optimized klines for UI applications
-    MARK_PRICE_KLINES = "markPriceKlines"  # Mark price klines (futures)
-    PREMIUM_INDEX_KLINES = "premiumIndexKlines"  # Premium index klines (futures)
-    CONTINUOUS_KLINES = "continuousKlines"  # Continuous contract klines (futures)
+    FUNDING_RATE = "fundingRate"  # Funding rate data (futures)
 
     @property
     def endpoint(self) -> str:
@@ -88,14 +116,8 @@ class ChartType(Enum):
         # Use name comparison instead of direct comparison to avoid module reloading issues
         if self.name == "KLINES":
             return "klines"
-        elif self.name == "UI_KLINES":
-            return "ui-klines"
-        elif self.name == "MARK_PRICE_KLINES":
-            return "markPriceKlines"
-        elif self.name == "PREMIUM_INDEX_KLINES":
-            return "premiumIndexKlines"
-        elif self.name == "CONTINUOUS_KLINES":
-            return "continuousKlines"
+        elif self.name == "FUNDING_RATE":
+            return "fundingRate"
         else:
             raise ValueError(f"Unknown chart type: {self}")
 
@@ -111,18 +133,21 @@ class ChartType(Enum):
                 MarketType.FUTURES,
                 MarketType.OPTIONS,
             ]
-        elif self.name == "UI_KLINES":
-            return [MarketType.SPOT]
-        elif self.name in (
-            "MARK_PRICE_KLINES",
-            "PREMIUM_INDEX_KLINES",
-            "CONTINUOUS_KLINES",
-        ):
+        elif self.name == "FUNDING_RATE":
             return [
                 MarketType.FUTURES_USDT,
                 MarketType.FUTURES_COIN,
                 MarketType.FUTURES,
             ]
+        else:
+            return []
+
+    @property
+    def supported_providers(self) -> List["DataProvider"]:
+        """Get list of data providers that support this chart type."""
+        # Use name comparison instead of direct comparison to avoid module reloading issues
+        if self.name in ("KLINES", "FUNDING_RATE"):
+            return [DataProvider.BINANCE]
         else:
             return []
 
@@ -141,10 +166,7 @@ class ChartType(Enum):
         """
         mapping = {
             "klines": cls.KLINES,
-            "uiklines": cls.UI_KLINES,
-            "markpriceklines": cls.MARK_PRICE_KLINES,
-            "premiumindexklines": cls.PREMIUM_INDEX_KLINES,
-            "continuousklines": cls.CONTINUOUS_KLINES,
+            "fundingrate": cls.FUNDING_RATE,
         }
 
         chart_type_str = chart_type_str.lower()
@@ -165,6 +187,21 @@ class ChartType(Enum):
         # Use name-based comparison for compatibility with module reloading
         for supported_market in self.supported_markets:
             if safe_enum_compare(market_type, supported_market):
+                return True
+        return False
+
+    def is_supported_by_provider(self, provider: DataProvider) -> bool:
+        """Check if this chart type is supported by the specified data provider.
+
+        Args:
+            provider: Data provider to check
+
+        Returns:
+            True if this chart type is supported by the specified data provider
+        """
+        # Use name-based comparison for compatibility with module reloading
+        for supported_provider in self.supported_providers:
+            if safe_enum_compare(provider, supported_provider):
                 return True
         return False
 
