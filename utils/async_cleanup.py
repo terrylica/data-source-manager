@@ -25,7 +25,7 @@ class MyAsyncResource:
         self._client = create_client()
         self._other_resource = await create_other_resource()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await direct_resource_cleanup(
             self,
@@ -45,15 +45,15 @@ async def __aexit__(self, exc_type, exc_val, exc_tb):
         # Custom cleanup logic
         self._special_resource.special_sync_cleanup()
         self._special_resource = None
-        
+
     # Then use the utilities for standard resources
     await cleanup_client(self._client, is_external=self._client_is_external)
     await close_resource_with_timeout(
-        self._other_resource, 
+        self._other_resource,
         timeout=0.2,  # Custom timeout
         resource_name="important resource"
     )
-    
+
     # Force garbage collection
     gc.collect()
 ```
@@ -64,7 +64,7 @@ async def __aexit__(self, exc_type, exc_val, exc_tb):
 await close_resource_with_timeout(
     resource=self._websocket,
     close_method="disconnect",  # Method name other than __aexit__
-    close_args=(), 
+    close_args=(),
     timeout=0.5
 )
 ```

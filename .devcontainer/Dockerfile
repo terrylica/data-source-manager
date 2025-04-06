@@ -3,14 +3,14 @@ FROM mcr.microsoft.com/devcontainers/miniconda:1.1-3
 # Configure conda
 RUN conda config --set channel_priority strict
 
-RUN conda install -y python=3.13
+RUN conda install -y python=3.10
 # RUN conda install -y -c conda-forge "ta-lib=0.5.1"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y ripgrep
 
 # Install Python dependencies
-RUN pip3 install httpx pandas tenacity colorlog psutil arrow pyarrow>=19.0.1 filelock
+RUN pip3 install curl_cffi pandas tenacity colorlog psutil arrow pyarrow>=19.0.1 filelock
 
 # Install Python dependencies for development
 RUN pip3 install twine pytest pytest-asyncio pytest-cov pytest-xdist pytest-profiling pylint autoflake
