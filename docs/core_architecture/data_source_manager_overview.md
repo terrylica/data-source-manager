@@ -147,7 +147,7 @@ Both REST and Vision data clients implement consistent timeout handling patterns
 
 The system logs timeout incidents with detailed context:
 
-```
+```json
 2025-04-06 21:15:28,342 [TIMEOUT] Operation 'REST API fetch for BTCUSDT 1m' timed out after 9.0s
 Details: {
   "symbol": "BTCUSDT",

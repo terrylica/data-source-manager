@@ -58,7 +58,7 @@ async def test_timeout_handling():
 
 When a timeout occurs, the system generates a detailed log entry like this:
 
-```
+```log
 2025-04-06 21:15:28,342 [TIMEOUT] Operation 'REST API fetch for BTCUSDT 1m' timed out after 0.1s
 Details: {
   "symbol": "BTCUSDT",

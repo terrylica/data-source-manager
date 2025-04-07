@@ -57,7 +57,7 @@ Key features:
 
 Timeout logs are stored in a dedicated directory structure:
 
-```
+```tree
 /logs
   /timeout_incidents
     timeout_log.txt
