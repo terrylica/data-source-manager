@@ -2,6 +2,9 @@ import logging, os
 import inspect
 from colorlog import ColoredFormatter
 import traceback
+import time
+from datetime import datetime
+from pathlib import Path
 
 try:
     from rich.console import Console
@@ -19,6 +22,13 @@ _root_configured = False
 _module_loggers = {}
 _use_rich = os.environ.get("USE_RICH_LOGGING", "").lower() in ("true", "1", "yes")
 _show_filename = os.environ.get("SHOW_LOG_FILENAME", "").lower() in ("true", "1", "yes")
+
+# Timeout logging
+_timeout_log_file = os.environ.get(
+    "TIMEOUT_LOG_FILE", "./logs/timeout_incidents/timeout_log.txt"
+)
+_timeout_logger_configured = False
+_timeout_logger = None
 
 # Default color scheme
 DEFAULT_LOG_COLORS = {
@@ -461,12 +471,57 @@ class LoggerProxy:
         show_filename(enable=enable, level=level)
         return self
 
+    def log_timeout(self, operation, timeout_value, details=None):
+        """
+        Log a timeout event to the centralized timeout log.
+
+        This method logs timeout events both to the standard logger and to a dedicated
+        timeout log file for easier analysis of performance issues.
+
+        Parameters:
+            operation (str): Description of the operation that timed out
+            timeout_value (float): The timeout value in seconds that was breached
+            details (dict, optional): Additional details about the operation
+
+        Returns:
+            LoggerProxy: Self reference for method chaining support.
+        """
+        # Get caller's module
+        frame = inspect.currentframe().f_back
+        module = inspect.getmodule(frame)
+        module_name = module.__name__ if module else "__main__"
+
+        # Use the global log_timeout function
+        log_timeout(operation, timeout_value, module_name, details)
+
+        # Return self for chaining
+        return self
+
+    def set_timeout_log_file(self, path):
+        """
+        Set the file path for timeout logging with method chaining support.
+
+        Parameters:
+            path (str): Path to the log file
+
+        Returns:
+            LoggerProxy: Self reference for method chaining support.
+        """
+        set_timeout_log_file(path)
+        return self
+
 
 # Create the auto-detecting logger proxy for conventional syntax
 logger = LoggerProxy()
 
 # Hide the get_logger function from imports
-__all__ = ["logger", "show_filename", "use_rich_logging"]
+__all__ = [
+    "logger",
+    "show_filename",
+    "use_rich_logging",
+    "log_timeout",
+    "set_timeout_log_file",
+]
 
 # Test logger if run directly
 if __name__ == "__main__":
@@ -540,3 +595,109 @@ if __name__ == "__main__":
         get_logger()
     except Exception as e:
         print(f"\nSuccessfully disabled get_logger(): {e}")
+
+
+def _configure_timeout_logger():
+    """Configure the dedicated logger for timeout events.
+
+    This creates a separate file-based logger specifically for logging timeout events,
+    which can be used for analyzing performance issues.
+    """
+    global _timeout_logger, _timeout_logger_configured, _timeout_log_file
+
+    if _timeout_logger_configured:
+        return _timeout_logger
+
+    # Create directory if it doesn't exist
+    log_dir = os.path.dirname(_timeout_log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
+    # Set up file handler
+    timeout_logger = logging.getLogger("timeout_logger")
+    timeout_logger.setLevel(logging.INFO)
+
+    # Create a FileHandler that appends to the timeout log file
+    handler = logging.FileHandler(_timeout_log_file, mode="a")
+
+    # Create a formatter that includes timestamp, module name, and message
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    handler.setFormatter(formatter)
+
+    # Add the handler to the logger
+    timeout_logger.handlers.clear()
+    timeout_logger.addHandler(handler)
+
+    # Set flag and store logger
+    _timeout_logger = timeout_logger
+    _timeout_logger_configured = True
+
+    return timeout_logger
+
+
+def log_timeout(
+    operation: str, timeout_value: float, module_name: str = None, details: dict = None
+):
+    """Log a timeout event to the dedicated timeout log file.
+
+    This function provides a centralized way to log timeout events, making it easier
+    to analyze performance issues related to timeouts.
+
+    Args:
+        operation: Description of the operation that timed out
+        timeout_value: The timeout value in seconds that was breached
+        module_name: Optional module name (detected automatically if not provided)
+        details: Optional dictionary with additional details about the operation
+    """
+    global _timeout_logger
+
+    # Configure logger if needed
+    if not _timeout_logger_configured:
+        _configure_timeout_logger()
+
+    # Auto-detect module name if not provided
+    if module_name is None:
+        frame = inspect.currentframe().f_back
+        module = inspect.getmodule(frame)
+        module_name = module.__name__ if module else "__main__"
+
+    # Format the details
+    details_str = ""
+    if details:
+        details_str = " | " + " | ".join([f"{k}={v}" for k, v in details.items()])
+
+    # Create the log message
+    message = f"TIMEOUT EXCEEDED: {operation} (limit: {timeout_value}s){details_str}"
+
+    # Log to both the timeout log and the standard log
+    _timeout_logger.error(message)
+
+    # Get the module-specific logger and log there too
+    module_logger = _get_module_logger(module_name)
+    module_logger.error(message)
+
+    # Return True to indicate the message was logged
+    return True
+
+
+def set_timeout_log_file(path: str):
+    """Set the file path for timeout logging.
+
+    Args:
+        path: Path to the log file
+
+    Returns:
+        bool: True if successful
+    """
+    global _timeout_log_file, _timeout_logger_configured, _timeout_logger
+
+    _timeout_log_file = path
+
+    # Reset the logger so it will be reconfigured with the new path
+    if _timeout_logger_configured:
+        _timeout_logger_configured = False
+        _timeout_logger = None
+
+    return True

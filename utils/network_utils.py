@@ -73,6 +73,16 @@ def create_httpx_client(
         import httpx
         from httpx import AsyncClient, Limits, Timeout
 
+        # Log the kwargs being passed to identify issues
+        logger.debug(f"Creating httpx AsyncClient with kwargs: {kwargs}")
+
+        # Remove known incompatible parameters
+        if "impersonate" in kwargs:
+            logger.warning(
+                "Removing unsupported 'impersonate' parameter from httpx client creation"
+            )
+            kwargs.pop("impersonate")
+
         # Set up timeout with all required parameters defined
         # The error was "httpx.Timeout must either include a default, or set all four parameters explicitly"
         timeout_obj = Timeout(
@@ -124,13 +134,13 @@ def create_client(
     """Create a client for making HTTP requests.
 
     This function provides a unified interface for creating HTTP clients,
-    supporting both curl_cffi and httpx, with automatic fallback.
+    with curl_cffi as the primary implementation for stability.
 
     Args:
         timeout: Request timeout in seconds
         max_connections: Maximum number of connections
         headers: Optional headers to include in all requests
-        use_httpx: Whether to prefer httpx over curl_cffi
+        use_httpx: DEPRECATED - Always uses curl_cffi regardless of this parameter for stability
         **kwargs: Additional keyword arguments to pass to the client
 
     Returns:
@@ -139,29 +149,35 @@ def create_client(
     if max_connections is None:
         max_connections = 50  # Default to 50 connections
 
-    # Try to use httpx if requested
+    # Filter kwargs for curl_cffi
+    curl_kwargs = kwargs.copy()
+
+    # Parameters specific to httpx that curl_cffi doesn't support
+    HTTPX_SPECIFIC_PARAMS = {"http2", "follow_redirects", "h2", "trust_env"}
+
+    # Filter parameters that are not supported by curl_cffi
+    for param in HTTPX_SPECIFIC_PARAMS:
+        if param in curl_kwargs:
+            curl_kwargs.pop(param)
+
     if use_httpx:
-        try:
-            return create_httpx_client(timeout, max_connections, headers, **kwargs)
-        except ImportError:
-            logger.warning("Failed to create httpx client, falling back to curl_cffi")
+        logger.warning(
+            "The use_httpx parameter is deprecated - using curl_cffi instead for stability"
+        )
 
-    # Try curl_cffi
+    # Only try curl_cffi
     try:
-        return create_curl_cffi_client(timeout, max_connections, headers, **kwargs)
+        logger.debug(
+            f"Creating curl_cffi client with {len(curl_kwargs)} additional parameters"
+        )
+        return create_curl_cffi_client(timeout, max_connections, headers, **curl_kwargs)
     except ImportError:
-        logger.warning("curl_cffi not available, trying httpx instead")
-
-        # Fall back to httpx
-        try:
-            return create_httpx_client(timeout, max_connections, headers, **kwargs)
-        except ImportError:
-            logger.error(
-                "Neither curl_cffi nor httpx is available. Please install one of these packages."
-            )
-            raise ImportError(
-                "No HTTP client library available. Please install curl_cffi or httpx."
-            )
+        logger.error(
+            "curl_cffi is not available. Please install curl_cffi: pip install curl-cffi>=0.5.7"
+        )
+        raise ImportError(
+            "curl_cffi is required but not available. Install with: pip install curl-cffi>=0.5.7"
+        )
 
 
 def create_curl_cffi_client(
@@ -189,19 +205,31 @@ def create_curl_cffi_client(
     if headers:
         client_headers.update(headers)
 
+    # Log the kwargs being passed to identify issues
+    logger.debug(f"Creating curl_cffi AsyncSession with kwargs: {kwargs}")
+
     # Remove any incompatible kwargs that might be passed from httpx configuration
-    if "http2" in kwargs:
-        del kwargs["http2"]
-    if "follow_redirects" in kwargs:
-        del kwargs["follow_redirects"]
-    if "h2" in kwargs:
-        del kwargs["h2"]
+    for param in ["http2", "follow_redirects", "h2", "trust_env"]:
+        if param in kwargs:
+            logger.debug(
+                f"Removing unsupported parameter '{param}' from curl_cffi client creation"
+            )
+            kwargs.pop(param)
+
+    # Special handling for 'impersonate' which is only in curl_cffi
+    impersonate = kwargs.pop("impersonate", None)
+    if impersonate:
+        logger.debug(f"Using impersonate={impersonate} for curl_cffi client")
 
     client_kwargs = {
         "timeout": timeout,
         "headers": client_headers,
         "max_clients": max_connections,
     }
+
+    # Add the impersonate parameter back if it was provided
+    if impersonate:
+        client_kwargs["impersonate"] = impersonate
 
     # Add any additional kwargs
     client_kwargs.update(kwargs)

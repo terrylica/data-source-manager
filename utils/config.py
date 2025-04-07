@@ -33,6 +33,7 @@ CACHE_UPDATE_INTERVAL: Final = timedelta(minutes=5)
 MIN_VALID_FILE_SIZE: Final = 1024  # 1KB minimum
 
 # API constraints
+MAX_TIMEOUT: Final = 9.0  # Maximum timeout for any individual operation in seconds
 API_TIMEOUT: Final = 3.0  # Seconds - standardized based on benchmarks
 API_MAX_RETRIES: Final = 3
 API_RETRY_DELAY: Final = 1  # Seconds

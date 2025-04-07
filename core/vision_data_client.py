@@ -35,7 +35,12 @@ from utils.network_utils import (
     create_client,
     VisionDownloadManager,
 )
-from utils.config import create_empty_dataframe, KLINE_COLUMNS, standardize_column_names
+from utils.config import (
+    create_empty_dataframe,
+    KLINE_COLUMNS,
+    standardize_column_names,
+    MAX_TIMEOUT,
+)
 from utils.async_cleanup import direct_resource_cleanup, cleanup_file_handle
 from core.vision_constraints import (
     TimestampedDataFrame,
@@ -371,22 +376,81 @@ class VisionDataClient(Generic[T]):
             logger.error(f"Invalid time boundaries: {str(e)}")
             return TimestampedDataFrame(self._create_empty_dataframe())
 
-        # Download data directly
+        # Download data with timeout protection
         try:
-            df = await self._download_data(start_time, end_time, columns=columns)
-            if not df.empty:
-                # Validate data integrity
-                DataFrameValidator.validate_dataframe(df)
-                # Filter DataFrame to ensure it's within the requested time boundaries
-                df = filter_dataframe_by_time(df, start_time, end_time)
-                logger.debug(f"Successfully fetched {len(df)} records")
-                return df
+            # Create a task for the download operation
+            download_task = asyncio.create_task(
+                self._download_data(start_time, end_time, columns=columns)
+            )
 
-            logger.warning(f"No data available for {start_time} to {end_time}")
-            return TimestampedDataFrame(self._create_empty_dataframe())
+            # Set timeout based on MAX_TIMEOUT
+            effective_timeout = min(
+                MAX_TIMEOUT, 8.0
+            )  # Use slightly less than MAX_TIMEOUT
+
+            # Start timing the operation
+            start_time_op = asyncio.get_event_loop().time()
+
+            try:
+                # Wait for the download task with timeout
+                df = await asyncio.wait_for(download_task, timeout=effective_timeout)
+
+                if not df.empty:
+                    # Validate data integrity
+                    DataFrameValidator.validate_dataframe(df)
+                    # Filter DataFrame to ensure it's within the requested time boundaries
+                    df = filter_dataframe_by_time(df, start_time, end_time)
+                    logger.debug(f"Successfully fetched {len(df)} records")
+                    return df
+
+                logger.warning(f"No data available for {start_time} to {end_time}")
+                return TimestampedDataFrame(self._create_empty_dataframe())
+
+            except asyncio.TimeoutError:
+                # Calculate elapsed time
+                elapsed = asyncio.get_event_loop().time() - start_time_op
+
+                # Log timeout to both console and dedicated log file
+                logger.log_timeout(
+                    operation=f"Vision API fetch for {self.symbol} {self.interval}",
+                    timeout_value=effective_timeout,
+                    details={
+                        "symbol": self.symbol,
+                        "interval": self.interval,
+                        "market_type": str(self.market_type),
+                        "start_time": str(start_time),
+                        "end_time": str(end_time),
+                        "elapsed": f"{elapsed:.2f}s",
+                    },
+                )
+
+                # Cancel the task
+                if not download_task.done():
+                    logger.warning("Cancelling Vision API download task due to timeout")
+                    download_task.cancel()
+
+                    # Wait briefly for cancellation to complete
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.gather(download_task, return_exceptions=True),
+                            timeout=0.5,
+                        )
+                        logger.debug("Successfully cancelled Vision API download task")
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        logger.warning(
+                            "Failed to cancel Vision API download task in time"
+                        )
+
+                # Clean up any hanging tasks
+                await self._cleanup_force_timeout_tasks()
+
+                logger.error(f"Vision API fetch timed out after {effective_timeout}s")
+                return TimestampedDataFrame(self._create_empty_dataframe())
 
         except Exception as e:
             logger.error(f"Failed to fetch data: {e}")
+            # Ensure cleanup of any hanging tasks
+            await self._cleanup_force_timeout_tasks()
             return TimestampedDataFrame(self._create_empty_dataframe())
 
     async def prefetch(

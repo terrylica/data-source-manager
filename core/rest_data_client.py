@@ -40,6 +40,7 @@ from utils.config import (
     DEFAULT_HTTP_TIMEOUT_SECONDS,
     API_TIMEOUT,
     REST_CHUNK_SIZE,
+    MAX_TIMEOUT,
 )
 from utils.validation import DataValidation
 
@@ -80,22 +81,20 @@ class RestDataClient:
 
     def __init__(
         self,
-        market_type: MarketType = MarketType.SPOT,
-        max_concurrent: int = 50,
-        retry_count: int = 5,
-        client: Optional[Any] = None,
-        fetch_timeout: float = API_TIMEOUT,  # Use standardized API_TIMEOUT from config
-        use_httpx: bool = False,  # New parameter to use httpx instead of curl_cffi
+        market_type: MarketType,
+        max_concurrent: int = 5,
+        retry_count: int = 3,
+        fetch_timeout: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+        client=None,
     ):
-        """Initialize a REST API client for Binance data.
+        """Initialize the REST data client.
 
         Args:
-            market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
+            market_type: Market type to use (spot, futures_usdt, futures_coin)
             max_concurrent: Maximum number of concurrent requests
-            retry_count: Number of retries for failed requests
-            client: Optional external HTTP client
-            fetch_timeout: Timeout for fetch operations
-            use_httpx: Whether to use httpx instead of curl_cffi
+            retry_count: Number of retry attempts for failed requests
+            fetch_timeout: Timeout in seconds for fetch operations
+            client: Optional pre-configured HTTP client
         """
         self.market_type = market_type
         self.max_concurrent = max_concurrent
@@ -103,8 +102,20 @@ class RestDataClient:
         self.fetch_timeout = fetch_timeout
         self._client = client
         self._client_is_external = client is not None
-        self._semaphore = asyncio.Semaphore(max_concurrent)
-        self._use_httpx = use_httpx
+        self._active_tasks = []
+
+        # Set base URL based on market type
+        if market_type == MarketType.SPOT:
+            self.base_url = "https://api.binance.com"
+        elif market_type == MarketType.FUTURES_USDT:
+            self.base_url = "https://fapi.binance.com"
+        elif market_type == MarketType.FUTURES_COIN:
+            self.base_url = "https://dapi.binance.com"
+        else:
+            raise ValueError(f"Unsupported market type: {market_type}")
+
+        # Constants for chunking and pagination
+        self.CHUNK_SIZE = 1000  # Maximum number of records per request
 
         # Initialize hardware monitor
         self.hw_monitor = HardwareMonitor()
@@ -118,17 +129,24 @@ class RestDataClient:
 
         logger.debug(
             f"Initialized RestDataClient with market_type={market_type.name}, "
-            f"max_concurrent={max_concurrent}, retry_count={retry_count}, "
-            f"use_httpx={use_httpx}"
+            f"max_concurrent={max_concurrent}, retry_count={retry_count}"
         )
 
-    def _get_klines_endpoint(self) -> str:
-        """Get the klines endpoint URL for the current market type.
+    def _get_klines_endpoint(self):
+        """Get the appropriate endpoint URL for klines data based on market type.
 
         Returns:
-            The fully qualified klines endpoint URL
+            URL string for the klines endpoint
         """
-        return get_endpoint_url(self.market_type, ChartType.KLINES)
+        # Base API URLs
+        if self.market_type == MarketType.SPOT:
+            return f"{self.base_url}/api/v3/klines"
+        elif self.market_type == MarketType.FUTURES_USDT:
+            return f"{self.base_url}/fapi/v1/klines"
+        elif self.market_type == MarketType.FUTURES_COIN:
+            return f"{self.base_url}/dapi/v1/klines"
+        else:
+            raise ValueError(f"Unsupported market type: {self.market_type}")
 
     async def __aenter__(self):
         """Initialize the client session when entering the context."""
@@ -143,53 +161,37 @@ class RestDataClient:
         return self
 
     async def _cleanup_force_timeout_tasks(self):
-        """Find and clean up any _force_timeout tasks that might cause hanging.
+        """Force cleanup of any hanging tasks during timeout.
 
-        This is a proactive approach to prevent hanging issues caused by
-        lingering force_timeout tasks in curl_cffi AsyncCurl objects.
+        This is a special method called when timeout occurs to ensure
+        we don't leave any hanging tasks or connections in the background.
         """
-        # Find all tasks that might be related to _force_timeout
-        force_timeout_tasks = []
-        for task in asyncio.all_tasks():
-            task_str = str(task)
-            # Look specifically for _force_timeout tasks
-            if "_force_timeout" in task_str and not task.done():
-                force_timeout_tasks.append(task)
+        if hasattr(self, "_active_tasks") and self._active_tasks:
+            logger.debug(f"Force cleanup of {len(self._active_tasks)} active tasks")
+            for task in self._active_tasks:
+                if not task.done():
+                    task.cancel()
 
-        if force_timeout_tasks:
-            logger.warning(
-                f"Proactively cancelling {len(force_timeout_tasks)} _force_timeout tasks"
-            )
-            # Cancel all force_timeout tasks
-            for task in force_timeout_tasks:
-                task.cancel()
-
-            # Wait for cancellation to complete with timeout
+            # Wait briefly for tasks to cancel
             try:
                 await asyncio.wait_for(
-                    asyncio.gather(*force_timeout_tasks, return_exceptions=True),
-                    timeout=0.5,  # Short timeout to avoid blocking
+                    asyncio.gather(*self._active_tasks, return_exceptions=True),
+                    timeout=0.5,
                 )
-                logger.debug(
-                    f"Successfully cancelled {len(force_timeout_tasks)} _force_timeout tasks"
-                )
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "Timeout waiting for _force_timeout tasks to cancel, proceeding anyway"
-                )
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                pass
 
-        # Also clean _timeout_handle if it exists on the client
-        if (
-            hasattr(self, "_client")
-            and self._client
-            and hasattr(self._client, "_timeout_handle")
-            and self._client._timeout_handle
-        ):
-            logger.debug("Pre-emptively cleaning _timeout_handle to prevent hanging")
+            # Clear the list
+            self._active_tasks.clear()
+
+        # Ensure client session is closed if we created it internally
+        if self._client and not self._client_is_external:
             try:
-                self._client._timeout_handle = None
+                await self._client.aclose()
+                self._client = None
+                logger.debug("Forcibly closed client session during timeout cleanup")
             except Exception as e:
-                logger.warning(f"Error pre-emptively clearing _timeout_handle: {e}")
+                logger.error(f"Error closing client during force cleanup: {e}")
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Clean up resources when exiting the context."""
@@ -583,15 +585,13 @@ class RestDataClient:
         client = create_client(
             timeout=self.fetch_timeout,
             max_connections=self.max_concurrent,
-            use_httpx=self._use_httpx,
+            use_httpx=False,
             # Set optimized options for data retrieval
             impersonate="chrome",  # Use Chrome's TLS fingerprint
             h2=True,  # Enable HTTP/2 if available
         )
 
-        logger.debug(
-            f"Created {'httpx' if self._use_httpx else 'curl_cffi'} client for data retrieval"
-        )
+        logger.debug(f"Created curl_cffi client for data retrieval")
         return client
 
     def _calculate_chunks(
@@ -764,196 +764,187 @@ class RestDataClient:
         start_time: datetime,
         end_time: datetime,
     ) -> Tuple[pd.DataFrame, Dict[str, int]]:
-        """Fetch market data from Binance API.
+        """Fetch klines data for given symbol and time range.
 
-        This method implements time-based chunking pagination to handle large data requests
-        efficiently. It splits the time range into appropriate chunks based on the interval
-        and fetches them concurrently with proper rate limit handling.
-
-        The pagination strategy:
-        1. Divides the time range into optimal chunks based on interval size
-        2. Executes concurrent requests for all chunks with semaphore control
-        3. Handles rate limiting with endpoint rotation and exponential backoff
-        4. Aggregates results from all chunks into a single DataFrame
-
-        This approach is robust across different interval types and handles API boundary
-        behaviors where startTime is rounded up and endTime is rounded down to interval
-        boundaries.
+        This method handles:
+        - Chunking large time ranges into multiple requests
+        - Handling 1-second data with special optimizations
+        - Validating and filtering results
+        - Rate limit handling and endpoint rotation
 
         Args:
-            symbol: The trading pair symbol
-            interval: Time interval enum
-            start_time: Start datetime (timezone-aware)
-            end_time: End datetime (timezone-aware)
+            symbol: Trading pair symbol (e.g. 'BTCUSDT')
+            interval: Time interval (e.g. Interval.MINUTE_1)
+            start_time: Start time for data retrieval
+            end_time: End time for data retrieval
 
         Returns:
-            Tuple of (DataFrame with market data, statistics dictionary)
+            Tuple of (DataFrame with klines data, stats dictionary)
         """
-        # Initialize client if needed
-        if not self._client:
-            self._client = self._create_optimized_client()
-            self._client_is_external = False
-
-        # Comprehensive validation of time boundaries
-        try:
-            start_time, end_time, metadata = (
-                DataValidation.validate_query_time_boundaries(
-                    start_time, end_time, handle_future_dates="error"
-                )
-            )
-
-            # Log any warnings
-            for warning in metadata.get("warnings", []):
-                logger.warning(warning)
-
-        except ValueError as e:
-            logger.error(f"Invalid time boundaries: {str(e)}")
-            raise ValueError(f"Invalid time boundaries: {str(e)}")
-
-        # Handle symbol formatting for FUTURES_COIN market type
-        formatted_symbol = symbol
-        if self.market_type == MarketType.FUTURES_COIN and "_PERP" not in symbol:
-            # Append _PERP suffix for coin-margined futures
-            formatted_symbol = f"{symbol}_PERP"
-            logger.debug(f"Adjusted symbol for FUTURES_COIN market: {formatted_symbol}")
-
-        # Test connectivity to Binance API with actual endpoint we'll use
-        # Use the klines endpoint with actual parameters for a more accurate test
-        # Get the properly constructed URL using get_endpoint_url with ChartType.KLINES
-        test_url = f"{self._get_klines_endpoint()}?symbol={formatted_symbol}&interval={interval.value}&limit=1"
-
-        logger.debug(f"Testing connectivity to {test_url}")
-
-        try:
-            api_status = await asyncio.wait_for(
-                test_connectivity(
-                    self._client,
-                    url=test_url,
-                    timeout=DEFAULT_HTTP_TIMEOUT_SECONDS,
-                    retry_count=3,  # Increase retry count for more reliability
-                ),
-                timeout=self.fetch_timeout,
-            )
-        except asyncio.TimeoutError:
-            logger.error(
-                f"Connectivity test timed out after {self.fetch_timeout}s for {test_url}"
-            )
-            return self.create_empty_dataframe(), {
-                "error": "connectivity_timeout",
-                "chunks": 0,
-                "total_records": 0,
-            }
-
-        if not api_status:
-            logger.error(f"Cannot connect to Binance API at {test_url}")
-            # Even if connectivity test fails, try to proceed with the actual data fetch
-            # as the test might be failing due to environment restrictions but actual
-            # data retrieval might work
-
-        # Validate request parameters
+        # Validate inputs
+        symbol = symbol.upper()
         self._validate_request_params(symbol, interval, start_time, end_time)
 
-        # Align boundaries to match API behavior
-        # This ensures proper time slicing and avoids rounding issues
-        aligned_start, aligned_end = self._align_interval_boundaries(
+        # Check if date range includes future dates
+        current_time = datetime.now(timezone.utc)
+        if end_time > current_time:
+            logger.warning(
+                f"Data for end time ({end_time.isoformat()}) may not be fully consolidated yet"
+            )
+
+        # Align boundaries for consistency
+        aligned_start, aligned_end = align_time_boundaries(
             start_time, end_time, interval
         )
+        logger.debug(
+            f"REST client aligned boundaries: {start_time} -> {aligned_start}, {end_time} -> {aligned_end}"
+        )
 
-        # Convert aligned datetime objects to milliseconds since epoch
+        # Use centralized interval->seconds conversion
+        seconds_per_bar = interval.to_seconds()
+
+        # Decide on chunk size based on interval
+        records_per_day = 86400 // seconds_per_bar  # seconds in day / seconds per bar
+        days_per_chunk = self.CHUNK_SIZE / records_per_day
+        logger.debug(
+            f"Using chunk size: {days_per_chunk:.4f}d ({self.CHUNK_SIZE} records) for {interval.value}"
+        )
+
+        # Calculate time range in days
+        time_range_days = (aligned_end - aligned_start).total_seconds() / 86400
+        logger.debug(f"Calculated time range: {time_range_days:.2f} days")
+
+        # Calculate number of chunks needed
+        total_chunks = math.ceil(time_range_days / days_per_chunk)
+        # Limit number of chunks to avoid excessive requests
+        MAX_CHUNKS = 5
+        if total_chunks > MAX_CHUNKS and total_chunks * self.CHUNK_SIZE > 10000:
+            total_chunks = MAX_CHUNKS
+            logger.warning(
+                f"Time range too large, limiting to {MAX_CHUNKS} chunks to avoid excessive requests"
+            )
+
+        logger.info(
+            f"Fetching {symbol} {interval.value} data from {aligned_start} to {aligned_end} in {total_chunks} chunks"
+        )
+
+        # Stats to track request info
+        stats = {"requests": 0, "errors": 0, "records": 0, "chunks": total_chunks}
+
+        # Convert times to milliseconds for API
         start_ms = int(aligned_start.timestamp() * 1000)
         end_ms = int(aligned_end.timestamp() * 1000)
 
-        # Reset stats for this fetch
-        self.stats = {
-            "total_records": 0,
-            "chunks_processed": 0,
-            "chunks_failed": 0,
-            "chunks": 0,
-        }
-
-        # Calculate chunk boundaries
+        # Calculate chunks
         chunks = self._calculate_chunks(start_ms, end_ms, interval)
-        num_chunks = len(chunks)
-        self.stats["chunks"] = num_chunks
 
-        logger.info(
-            f"Fetching {symbol} {interval.value} data from "
-            f"{aligned_start} to {aligned_end} in {num_chunks} chunks"
+        # Track time for performance analysis
+        t_start = time.time()
+
+        # Set up timeout for the overall fetch operation
+        effective_timeout = min(
+            MAX_TIMEOUT, self.fetch_timeout * 2
+        )  # Double normal timeout, but cap at MAX_TIMEOUT
+
+        # Create a task for the chunked fetch operation
+        all_chunks_task = asyncio.create_task(
+            self._fetch_all_chunks(symbol, interval, chunks, stats)
         )
 
-        # Get optimal concurrency value
-        optimal_concurrency_result = self.hw_monitor.calculate_optimal_concurrency()
-        optimal_concurrency = optimal_concurrency_result["optimal_concurrency"]
-
-        # Limit semaphore to optimal concurrency
-        sem = asyncio.Semaphore(optimal_concurrency)
-
-        # Create tasks for all chunks with timeout
-        tasks = []
-        for chunk_start, chunk_end in chunks:
-            task = asyncio.create_task(
-                asyncio.wait_for(
-                    self._fetch_chunk_with_semaphore(
-                        symbol, interval, chunk_start, chunk_end, sem
-                    ),
-                    timeout=self.fetch_timeout,
-                )
-            )
-            tasks.append(task)
-
-        # Wait for all tasks to complete
         try:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-        except asyncio.TimeoutError:
-            logger.error(f"Timeout fetching data for {symbol} {interval.value}")
-            return self.create_empty_dataframe(), {
-                "error": "fetch_timeout",
-                "chunks": num_chunks,
-                "chunks_processed": self.stats["chunks_processed"],
-                "chunks_failed": self.stats["chunks_failed"],
-                "total_records": 0,
-            }
+            # Wait for the task with timeout
+            results = await asyncio.wait_for(all_chunks_task, timeout=effective_timeout)
 
-        # Process results
-        successful_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(f"Chunk {i+1}/{num_chunks} failed: {result}")
-                self.stats["chunks_failed"] += 1
-            else:
-                klines, endpoint = result
-                self.stats["chunks_processed"] += 1
-                self.stats["total_records"] += len(klines)
-                successful_results.append(klines)
-                if i == 0 or i == len(results) - 1:
-                    logger.debug(
-                        f"Chunk {i+1}/{num_chunks} retrieved {len(klines)} records from {endpoint}"
-                    )
+            # Calculate the actual time taken
+            t_end = time.time()
+            fetch_time = t_end - t_start
+            records_per_sec = stats["records"] / fetch_time if fetch_time > 0 else 0
 
-        # Combine results and create DataFrame
-        if not successful_results:
+            # Log success if we have data
+            if results and len(results) > 0:
+                logger.info(
+                    f"Successfully retrieved {stats['records']} records for {symbol} from {start_time} to {end_time}"
+                )
+                logger.debug(
+                    f"Fetch completed in {fetch_time:.2f}s ({records_per_sec:.2f} records/s)"
+                )
+
+                # Process the results into a DataFrame
+                if results:
+                    all_data = []
+                    for chunk_data in results:
+                        if chunk_data:
+                            all_data.extend(chunk_data)
+
+                    # Process the accumulated data
+                    if all_data:
+                        df = process_kline_data(all_data)
+                        if not df.empty:
+                            # Filter for the exact requested time range
+                            final_df = df[
+                                (df.index >= start_time) & (df.index <= end_time)
+                            ].copy()
+
+                            # Validate result
+                            if not final_df.empty:
+                                stats["records"] = len(final_df)
+                                return final_df, stats
+
+            # Return empty DataFrame if no results
             logger.warning(
-                f"No data retrieved for {symbol} from {start_time} to {end_time}"
+                f"No data returned for {symbol} from {start_time} to {end_time}"
             )
-            return self.create_empty_dataframe(), self.stats
+            return self.create_empty_dataframe(), stats
 
-        # Combine all chunks
-        all_klines = [item for sublist in successful_results for item in sublist]
+        except asyncio.TimeoutError:
+            # Calculate elapsed time
+            elapsed = time.time() - t_start
 
-        # Process into DataFrame
-        df = process_kline_data(all_klines)
+            # Log timeout to both console and dedicated log file
+            logger.log_timeout(
+                operation=f"REST API fetch for {symbol} {interval.value}",
+                timeout_value=effective_timeout,
+                details={
+                    "symbol": symbol,
+                    "interval": interval.value,
+                    "market_type": self.market_type.name,
+                    "start_time": str(start_time),
+                    "end_time": str(end_time),
+                    "chunks": len(chunks),
+                    "elapsed": f"{elapsed:.2f}s",
+                    "completed_chunks": stats.get("completed_chunks", 0),
+                },
+            )
 
-        # Ensure we have data
-        if df.empty:
-            logger.warning(f"Processed DataFrame is empty for {symbol}")
-            return self.create_empty_dataframe(), self.stats
+            # Cancel the task
+            if not all_chunks_task.done():
+                logger.warning("Cancelling REST API fetch task due to timeout")
+                all_chunks_task.cancel()
 
-        logger.info(
-            f"Successfully retrieved {len(df)} records for {symbol} "
-            f"from {start_time} to {end_time}"
-        )
+                # Wait briefly for cancellation to complete
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(all_chunks_task, return_exceptions=True),
+                        timeout=0.5,
+                    )
+                    logger.debug("Successfully cancelled REST API fetch task")
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    logger.warning("Failed to cancel REST API fetch task in time")
 
-        return df, self.stats
+            # Clean up any hanging tasks
+            await self._cleanup_force_timeout_tasks()
+
+            logger.error(f"REST API fetch timed out after {effective_timeout}s")
+            return self.create_empty_dataframe(), stats
+
+        except Exception as e:
+            logger.error(f"Error fetching data: {e}")
+            stats["errors"] += 1
+
+            # Clean up any hanging tasks
+            await self._cleanup_force_timeout_tasks()
+
+            return self.create_empty_dataframe(), stats
 
     def create_empty_dataframe(self) -> pd.DataFrame:
         """Create an empty DataFrame with the expected structure.
@@ -962,3 +953,224 @@ class RestDataClient:
             Empty DataFrame with proper column structure
         """
         return create_empty_dataframe()
+
+    async def _fetch_all_chunks(self, symbol, interval, chunks, stats):
+        """Fetch all chunks of data and combine results.
+
+        Args:
+            symbol: Trading pair symbol
+            interval: Time interval
+            chunks: List of chunk boundaries (start_ms, end_ms)
+            stats: Stats dictionary to update with progress
+
+        Returns:
+            List of chunk results
+        """
+        # Track active tasks for cleanup in case of timeout
+        self._active_tasks = []
+
+        # Create a semaphore to limit concurrent requests
+        sem = asyncio.Semaphore(self.max_concurrent)
+
+        # Create tasks for all chunks
+        tasks = []
+        for i, (chunk_start, chunk_end) in enumerate(chunks):
+            task = asyncio.create_task(
+                self._fetch_chunk_with_semaphore(
+                    symbol, interval, chunk_start, chunk_end, sem, i, len(chunks)
+                )
+            )
+            tasks.append(task)
+            self._active_tasks.append(task)
+
+        # Wait for all tasks to complete
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        stats["completed_chunks"] = 0
+        successful_results = []
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"Chunk {i+1}/{len(chunks)} failed: {type(result).__name__}: {result}"
+                )
+                stats["errors"] += 1
+            else:
+                stats["completed_chunks"] += 1
+                if result:  # Check if result is not None or empty
+                    successful_results.append(result)
+                    stats["records"] += len(result) if result else 0
+
+        return successful_results
+
+    async def _fetch_chunk_with_semaphore(
+        self, symbol, interval, start_ms, end_ms, semaphore, chunk_idx=0, total_chunks=1
+    ):
+        """Fetch a chunk of data with semaphore control.
+
+        Args:
+            symbol: Trading pair symbol
+            interval: Time interval
+            start_ms: Chunk start time in milliseconds
+            end_ms: Chunk end time in milliseconds
+            semaphore: Semaphore for controlling concurrency
+            chunk_idx: Index of current chunk (for logging)
+            total_chunks: Total number of chunks (for logging)
+
+        Returns:
+            List of klines data for this chunk
+        """
+        async with semaphore:
+            try:
+                logger.debug(
+                    f"Fetching chunk {chunk_idx+1}/{total_chunks} ({symbol} {interval.value})"
+                )
+
+                # Actual fetch logic
+                chunk_data = await self._fetch_klines_chunk(
+                    symbol, interval, start_ms, end_ms
+                )
+
+                stats_msg = f"Chunk {chunk_idx+1}/{total_chunks}: got {len(chunk_data) if chunk_data else 0} records"
+                if chunk_idx == 0 or chunk_idx == total_chunks - 1 or total_chunks <= 5:
+                    logger.info(stats_msg)
+                else:
+                    logger.debug(stats_msg)
+
+                return chunk_data
+            except Exception as e:
+                logger.warning(
+                    f"Error fetching chunk {chunk_idx+1}/{total_chunks}: {e}"
+                )
+                raise
+
+    async def _fetch_klines_chunk(self, symbol, interval, start_ms, end_ms):
+        """Fetch a single chunk of klines data from the REST API.
+
+        Args:
+            symbol: Trading pair symbol (e.g. 'BTCUSDT')
+            interval: Time interval (e.g. Interval.MINUTE_1)
+            start_ms: Chunk start time in milliseconds
+            end_ms: Chunk end time in milliseconds
+
+        Returns:
+            List of klines data for this chunk
+        """
+        # Initialize client if needed
+        if not self._client:
+            self._client = self._create_optimized_client()
+            self._client_is_external = False
+
+        # Format symbol properly for the market type
+        formatted_symbol = symbol
+        if self.market_type == MarketType.FUTURES_COIN and "_PERP" not in symbol:
+            formatted_symbol = f"{symbol}_PERP"
+
+        # Prepare request parameters
+        params = {
+            "symbol": formatted_symbol,
+            "interval": interval.value,
+            "startTime": start_ms,
+            "endTime": end_ms,
+            "limit": self.CHUNK_SIZE,
+        }
+
+        # Get appropriate endpoint URL
+        endpoint_url = self._get_klines_endpoint()
+
+        # Track request stats
+        attempt = 0
+        max_attempts = self.retry_count + 1  # +1 because first attempt isn't a retry
+
+        # Retry logic for robustness
+        while attempt < max_attempts:
+            attempt += 1
+
+            try:
+                # Set up per-request timeout
+                request_timeout = min(
+                    self.fetch_timeout, MAX_TIMEOUT / 2
+                )  # Use half of MAX_TIMEOUT as max request timeout
+
+                # Make the actual API request
+                response = await asyncio.wait_for(
+                    self._client.get(
+                        endpoint_url,
+                        params=params,
+                        headers={"Content-Type": "application/json"},
+                    ),
+                    timeout=request_timeout,
+                )
+
+                # Check status code
+                if response.status_code != 200:
+                    error_info = f"HTTP {response.status_code}"
+                    try:
+                        error_data = response.json()
+                        if isinstance(error_data, dict):
+                            error_info = f"{error_info}: {error_data.get('msg', 'Unknown error')}"
+                    except:
+                        pass
+
+                    logger.warning(f"API error: {error_info}")
+
+                    # Handle specific error cases
+                    if response.status_code == 429:  # Rate limit
+                        retry_after = response.headers.get("Retry-After", "5")
+                        wait_time = min(int(retry_after), 5)  # Cap at 5 seconds
+                        logger.warning(
+                            f"Rate limited. Waiting {wait_time}s before retry."
+                        )
+                        await asyncio.sleep(wait_time)
+                    elif response.status_code in [418, 403]:  # IP ban or forbidden
+                        logger.error(
+                            f"Access denied (code {response.status_code}). API key may be restricted."
+                        )
+                        raise ValueError(f"Access denied: {error_info}")
+                    elif response.status_code >= 500:  # Server error
+                        logger.warning(f"Server error. Retrying in 2s.")
+                        await asyncio.sleep(2)
+                    else:  # Other errors
+                        logger.warning(f"Request failed. Retrying in 1s.")
+                        await asyncio.sleep(1)
+
+                    # Only retry if we haven't exceeded max attempts
+                    if attempt >= max_attempts:
+                        logger.error(
+                            f"Max retry attempts ({max_attempts}) reached for {symbol}."
+                        )
+                        return []
+                    continue
+
+                # Parse response data
+                data = response.json()
+
+                # Validate data structure
+                if not isinstance(data, list):
+                    logger.warning(f"Unexpected response format: {type(data).__name__}")
+                    return []
+
+                # Return the data
+                return data
+
+            except asyncio.TimeoutError:
+                logger.warning(f"Request timeout (attempt {attempt}/{max_attempts})")
+                if attempt >= max_attempts:
+                    logger.error(f"Max retry attempts reached after timeouts")
+                    return []
+                # Backoff on retry
+                await asyncio.sleep(min(1 * attempt, 3))
+
+            except Exception as e:
+                logger.warning(
+                    f"Error during API request (attempt {attempt}/{max_attempts}): {e}"
+                )
+                if attempt >= max_attempts:
+                    logger.error(f"Max retry attempts reached after errors")
+                    return []
+                # Backoff on retry
+                await asyncio.sleep(min(1 * attempt, 3))
+
+        # If we get here, all attempts failed
+        return []
