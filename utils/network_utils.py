@@ -1091,7 +1091,9 @@ async def safely_close_client(client):
             # Use del instead of setting to None to avoid ctype issues
             if hasattr(client, "_curlm"):
                 try:
+                    # Always use delattr for C-pointer attributes to prevent type errors
                     delattr(client, "_curlm")
+                    logger.debug("[ProgressIndicator] Successfully deleted _curlm attribute")
                 except Exception as e:
                     logger.debug(
                         f"[ProgressIndicator] Could not delete _curlm attribute: {e}"
@@ -1111,8 +1113,13 @@ async def safely_close_client(client):
                 "[ProgressIndicator] Pre-emptively cleaning _timeout_handle to prevent hanging"
             )
             try:
+                # Always use delattr for C-pointer attributes to prevent type errors
                 delattr(client, "_timeout_handle")
-            except Exception:
+                logger.debug("[ProgressIndicator] Successfully deleted _timeout_handle attribute")
+            except Exception as e:
+                logger.debug(
+                    f"[ProgressIndicator] Could not delete _timeout_handle attribute: {e}"
+                )
                 # Alternative approach
                 if not isinstance(
                     getattr(client, "_timeout_handle", None), ctypes._CData

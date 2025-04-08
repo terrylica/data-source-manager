@@ -191,13 +191,15 @@ async def cleanup_client(
                     logger.warning(f"Error closing _asynccurl: {e}")
 
             # Clear the Session's attributes to break circular references
+            # For C-pointer attributes, we use delattr instead of setting to None
             for attr in ["_asynccurl", "_curlm", "_timeout_handle"]:
                 if hasattr(client, attr):
                     try:
-                        setattr(client, attr, None)
-                        logger.debug(f"Cleared client.{attr} attribute")
-                    except:
-                        pass
+                        # Use delattr for C-pointer attributes to avoid type errors
+                        delattr(client, attr)
+                        logger.debug(f"Deleted client.{attr} attribute")
+                    except Exception as e:
+                        logger.debug(f"Error deleting client.{attr} attribute: {e}")
 
             # Session doesn't have aclose but has close
             if hasattr(client, "close") and callable(client.close):
@@ -282,14 +284,26 @@ async def cleanup_client(
     except Exception as e:
         logger.warning(f"Error closing HTTP client: {str(e)}")
     finally:
-        # Last resort measure: clear all attributes to help garbage collection
+        # Last resort measure: clean up attributes to help garbage collection
         if client_type == "AsyncSession":
+            # Modified approach: Use delattr for C-pointer attributes, set to None for others
+            c_pointer_attributes = ["_curlm", "_timeout_handle", "_asynccurl"]
+            
             for attr_name in dir(client):
                 if not attr_name.startswith("__") and hasattr(client, attr_name):
                     try:
-                        setattr(client, attr_name, None)
-                    except:
-                        pass
+                        # Use delattr for C-pointer attributes to avoid type errors
+                        if attr_name in c_pointer_attributes:
+                            # Use delattr for C-pointer attributes to avoid type errors with None
+                            if hasattr(client, attr_name):
+                                delattr(client, attr_name)
+                                logger.debug(f"Deleted {attr_name} attribute during final cleanup")
+                        else:
+                            # For non-pointer attributes, we can set to None
+                            setattr(client, attr_name, None)
+                    except Exception as e:
+                        # Just log at debug level as this is last-resort cleanup
+                        logger.debug(f"Error during attribute cleanup for {attr_name}: {e}")
         logger.debug(f"Completed cleanup attempt for HTTP client (type: {client_type})")
 
 
@@ -416,7 +430,33 @@ async def direct_resource_cleanup(
                             logger.debug(
                                 f"Skipping close for {desc} with NULL _curlm handle"
                             )
+                        # Check if this is a curl_cffi client by class name
+                        elif type(resource).__name__ == "AsyncSession":
+                            logger.debug(
+                                f"[ProgressIndicator] Detected curl_cffi AsyncSession, using specialized cleanup"
+                            )
+                            # First try to directly access the _asynccurl if it exists
+                            if hasattr(resource, "_asynccurl") and resource._asynccurl is not None:
+                                try:
+                                    if hasattr(resource._asynccurl, "close"):
+                                        resource._asynccurl.close()
+                                        logger.debug(f"[ProgressIndicator] Closed {desc}._asynccurl directly")
+                                except Exception as e:
+                                    logger.debug(f"[ProgressIndicator] Error closing {desc}._asynccurl: {e}")
+                            
+                            # Delete C pointer attributes instead of trying to use them
+                            for attr in ["_curlm", "_timeout_handle", "_asynccurl"]:
+                                if hasattr(resource, attr):
+                                    try:
+                                        delattr(resource, attr)
+                                        logger.debug(f"[ProgressIndicator] Deleted {desc}.{attr} attribute")
+                                    except Exception as e:
+                                        logger.debug(f"[ProgressIndicator] Error deleting {attr} from {desc}: {e}")
+                            
+                            # Skip the regular close() call which would use these attributes
+                            logger.debug(f"[ProgressIndicator] Skipping regular close() for {desc} curl_cffi client")
                         else:
+                            # For non-curl_cffi clients, call close normally
                             if inspect.iscoroutinefunction(resource.close):
                                 await resource.close()
                             else:
@@ -430,7 +470,25 @@ async def direct_resource_cleanup(
                         cleanup_errors.append(error_msg)
 
                 # Set resource to None to break circular references
-                setattr(obj, attr_name, None)
+                # Check if this is a curl_cffi client with C pointer attributes first
+                if hasattr(resource, "_curlm") or hasattr(resource, "_asynccurl") or hasattr(resource, "_timeout_handle"):
+                    logger.debug(f"[ProgressIndicator] Detected curl_cffi client for {desc}, handling C pointer attributes")
+                    # Use safe cleanup for curl_cffi clients
+                    try:
+                        from utils.network_utils import safely_close_client
+                        await safely_close_client(resource)
+                        logger.debug(f"[ProgressIndicator] Used safely_close_client for {desc} with C pointer attributes")
+                    except Exception as e:
+                        error_msg = f"Error safely closing {desc} with C pointer attributes: {e}"
+                        logger.warning(error_msg)
+                        cleanup_errors.append(error_msg)
+                    
+                    # After safely closing, we can safely remove the reference
+                    setattr(obj, attr_name, None)
+                else:
+                    # For regular resources, just set to None
+                    setattr(obj, attr_name, None)
+                
                 cleaned_resources.append(attr_name)
                 logger.debug(f"[ProgressIndicator] Successfully cleaned up {desc}")
 
