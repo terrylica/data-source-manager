@@ -25,6 +25,7 @@ The goal is to optimize data retrieval by automatically using the most appropria
 The `_should_use_vision_api` method currently uses the following rules to decide whether to use Vision API:
 
 1. Use REST API for small intervals like 1s that Vision doesn't support
+   - Note: This is incorrect for SPOT markets, which DO support 1s intervals in Vision API
 2. Use Vision API for large time ranges that would exceed REST API's chunk limits:
 
    ```python
@@ -67,32 +68,27 @@ The fallback mechanism (if Vision API fails, try REST API) is already implemente
        self, start_time: datetime, end_time: datetime, interval: Interval
    ) -> bool:
        """Determine if Vision API should be used based on time range and interval."""
-       # Use REST API for small intervals like 1s that Vision doesn't support
-       if interval.name == Interval.SECOND_1.name:
-           logger.debug("Using REST API for 1s data (Vision API doesn't support it)")
+       # Use REST API for 1s intervals in non-SPOT markets (Vision API doesn't support it)
+       if interval.name == Interval.SECOND_1.name and self.market_type != MarketType.SPOT:
+           logger.debug("Using REST API for 1s data in non-SPOT markets (Vision API doesn't support it)")
            return False
 
        # Calculate data points to determine if the request exceeds REST API limits
        data_points = self._estimate_data_points(start_time, end_time, interval)
 
-       # Use Vision API for large data ranges that would exceed REST chunk limits
-       if data_points > self.REST_CHUNK_SIZE * self.REST_MAX_CHUNKS:
-           logger.debug(
-               f"Using Vision API due to large data request ({data_points} points, "
-               f"exceeding REST max of {self.REST_CHUNK_SIZE * self.REST_MAX_CHUNKS})"
-           )
-           return True
-
-       # For all other cases, prefer REST API which has better recent data
-       logger.debug("Using REST API for data request (within REST API limits)")
-       return False
+       # Always prefer Vision API for all data retrievals regardless of size
+       # REST API will only be used if Vision API fails or for recent data not yet in Vision
+       logger.debug(
+           f"Using Vision API as preferred source for {data_points} data points"
+       )
+       return True
    ```
 
 2. This simplified logic:
+   - Corrects the inaccurate handling of 1s intervals, only rejecting them for non-SPOT markets
    - Removes the arbitrary historical data threshold (`VISION_DATA_DELAY_HOURS`)
-   - Keeps the chunk size constraint (REST_CHUNK_SIZE=1000, REST_MAX_CHUNKS=5)
-   - Maintains the interval constraint (1s data uses REST API)
-   - Defaults to REST API for all other cases
+   - Always prefers Vision API as the primary source after cache
+   - Maintains the fallback mechanism where REST API is used if Vision API fails
 
 ### 2. Design Updated Data Flow with Split Retrieval
 
@@ -100,9 +96,9 @@ The fallback mechanism (if Vision API fails, try REST API) is already implemente
 
 1. Check cache first for any available data
 2. For any missing data ranges:
-   - Split the time range based on chunk size constraints
-   - For large ranges (exceeding REST_CHUNK_SIZE \* REST_MAX_CHUNKS), use Vision API
-   - For smaller ranges, use REST API
+   - Try Vision API first for all ranges regardless of size
+   - If Vision API fails or data is too recent, use REST API
+   - For REST API requests exceeding 1000 data points, automatically chunk them
 3. Merge all results and return a unified DataFrame
 
 ### 3. Core Function Modifications
@@ -121,34 +117,17 @@ def _split_time_range(
     Optional[Tuple[datetime, datetime]],  # vision_range
     Optional[Tuple[datetime, datetime]]   # rest_range
 ]:
-    """Split a time range into segments for Vision and REST APIs based on chunk size."""
-    # Calculate data points in the range
-    data_points = self._estimate_data_points(start_time, end_time, interval)
+    """Split a time range into segments for Vision and REST APIs based on availability.
 
-    # If the entire range is within REST API limits, use only REST
-    if data_points <= self.REST_CHUNK_SIZE * self.REST_MAX_CHUNKS:
+    Always tries Vision API first, falling back to REST API for recent data not in Vision.
+    """
+    # For 1s intervals in non-SPOT markets, always use REST API only
+    if interval.name == Interval.SECOND_1.name and self.market_type != MarketType.SPOT:
         return None, (start_time, end_time)
 
-    # If using second-level data, always use REST API
-    if interval.name == Interval.SECOND_1.name:
-        return None, (start_time, end_time)
-
-    # For large ranges, we need to split
-    # Calculate how many data points we can get from REST API
-    rest_points = self.REST_CHUNK_SIZE * self.REST_MAX_CHUNKS
-
-    # Calculate the time range for REST API (latest data first)
-    rest_duration = timedelta(seconds=rest_points * interval.to_seconds())
-
-    # Use REST API for the most recent part of the data
-    rest_start = max(start_time, end_time - rest_duration)
-
-    # Use Vision API for the earlier part of the data if needed
-    if rest_start > start_time:
-        return (start_time, rest_start), (rest_start, end_time)
-    else:
-        # The entire range can fit in REST API
-        return None, (start_time, end_time)
+    # For all other cases, try Vision API first for the entire range
+    # If Vision API fails for any portion, the fallback mechanism will use REST API
+    return (start_time, end_time), None
 ```
 
 #### B. Update `_get_data_impl()`
@@ -177,13 +156,21 @@ for missing_start, missing_end in missing_ranges:
         vision_range, rest_range = self._split_time_range(missing_start, missing_end, interval)
 
         if vision_range:
-            vision_df = await self._fetch_from_source(
-                symbol, vision_range[0], vision_range[1], interval, use_vision=True
-            )
-            if not vision_df.empty:
-                # Add source metadata
-                vision_df['_data_source'] = DataSource.VISION.name
-                all_results.append(vision_df)
+            # Try Vision API first
+            try:
+                vision_df = await self._fetch_from_source(
+                    symbol, vision_range[0], vision_range[1], interval, use_vision=True
+                )
+                if not vision_df.empty:
+                    # Add source metadata
+                    vision_df['_data_source'] = DataSource.VISION.name
+                    all_results.append(vision_df)
+                else:
+                    # If Vision API returned empty results, fall back to REST API for this range
+                    rest_range = vision_range
+            except Exception as e:
+                logger.warning(f"Vision API fetch failed, falling back to REST API: {e}")
+                rest_range = vision_range
 
         if rest_range:
             rest_df = await self._fetch_from_source(
@@ -296,9 +283,11 @@ def _timestamps_to_ranges(
 
 Update caching to work with split data sources:
 
-1. Decide whether to cache merged data or keep source-specific caches
-2. Update cache key generation to handle split sources
-3. Ensure cache validation works with multi-source data
+1. Merge all data into a single cache entry regardless of source
+2. Cache the final concatenated DataFrame from all sources
+3. Maintain the existing cache validation logic for merged data
+
+Note: Future enhancement could include metadata tracking of source information in the cache.
 
 ### 6. Testing Plan
 
@@ -308,12 +297,14 @@ Update caching to work with split data sources:
    - Test missing ranges identification
    - Test merging logic for data from multiple sources
    - **Test the updated source selection logic without the historical threshold**
+   - **Test 1s interval handling for SPOT vs non-SPOT markets**
 
 2. Integration tests:
 
    - Test end-to-end data retrieval with various time ranges
    - Test cache/Vision/REST interactions
    - Verify correct behavior when sources fail
+   - **Verify proper handling of 1s data in SPOT markets via Vision API**
 
 3. Performance tests:
    - Measure overhead of split retrieval vs. current approach
@@ -324,13 +315,14 @@ Update caching to work with split data sources:
 
 1. **Phase 1: Update Source Selection Logic**
 
+   - Correct the handling of 1s intervals for SPOT markets
    - Remove the historical threshold rule from `_should_use_vision_api`
    - Update tests for this function
    - Review with team
 
 2. **Phase 2: Core Splitting Logic**
 
-   - Implement `_split_time_range()` based on chunk size
+   - Implement `_split_time_range()` based on the updated strategy
    - Add tests for this function
    - Review with team
 
@@ -345,6 +337,7 @@ Update caching to work with split data sources:
 
    - Update caching strategy for split sources
    - Optimize cache utilization
+   - Implement single cache entry for merged data from all sources
 
 5. **Phase 5: Testing and Validation**
 
@@ -386,4 +379,4 @@ Update caching to work with split data sources:
 
 ## Conclusion
 
-This refactoring will enhance the DataSourceManager to intelligently retrieve data from the most appropriate sources based on chunk size constraints rather than arbitrary time thresholds. By prioritizing cache, then smartly splitting requests between Vision API (for large ranges) and REST API (for smaller/recent ranges), we create a more robust and efficient data retrieval system that better aligns with API capabilities.
+This refactoring will enhance the DataSourceManager to intelligently retrieve data from the most appropriate sources with an emphasis on cache first, then Vision API, followed by REST API as needed. By prioritizing cache, then using Vision API for historical data (including 1s intervals in SPOT markets), and falling back to REST API (with appropriate chunking) for any failures or gaps, we create a more robust and efficient data retrieval system that better aligns with API capabilities.
