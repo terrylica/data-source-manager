@@ -25,7 +25,7 @@ import pandas as pd
 
 from utils.logger_setup import logger
 from utils.validation import DataFrameValidator, DataValidation
-from utils.market_constraints import Interval, MarketType
+from utils.market_constraints import Interval, MarketType, ChartType
 from utils.time_utils import (
     align_time_boundaries,
     filter_dataframe_by_time,
@@ -251,7 +251,7 @@ class VisionDataClient(Generic[T]):
         Returns:
             Empty DataFrame with standardized structure
         """
-        return create_empty_dataframe()
+        return create_empty_dataframe(ChartType.KLINES)
 
     def _adjust_concurrency(self, batch_size: int) -> int:
         """Dynamically adjust concurrency based on batch size.
@@ -345,42 +345,51 @@ class VisionDataClient(Generic[T]):
         return TimestampedDataFrame(result_df)
 
     async def fetch(
-        self,
-        start_time: datetime,
-        end_time: datetime,
-        columns: Optional[Sequence[str]] = None,
+        self, start_time: datetime, end_time: datetime, max_days: int = 90
     ) -> TimestampedDataFrame:
         """Fetch data for the specified time range.
 
         Args:
-            start_time: Start time for data retrieval
-            end_time: End time for data retrieval
-            columns: Optional list of columns to return
+            start_time: Start time
+            end_time: End time
+            max_days: Maximum days to fetch in single request
 
         Returns:
-            DataFrame with market data
+            TimestampedDataFrame with the data
+
+        Notes:
+            - Handles validation and alignment of time boundaries
+            - Applies appropriate timeout mechanisms
+            - Returns TimestampedDataFrame for type safety
         """
         # Comprehensive validation of time boundaries
         try:
             start_time, end_time, metadata = (
                 DataValidation.validate_query_time_boundaries(
-                    start_time, end_time, handle_future_dates="error"
+                    start_time,
+                    end_time,
+                    handle_future_dates="truncate",
+                    interval=self.interval,
                 )
             )
 
-            # Log any warnings
+            # Get data availability info but don't log warnings yet
+            data_availability_message = metadata.get("data_availability_message", "")
+            is_data_likely_available = metadata.get("data_likely_available", True)
+
+            # Log other warnings from validation
             for warning in metadata.get("warnings", []):
                 logger.warning(warning)
 
         except ValueError as e:
-            logger.error(f"Invalid time boundaries: {str(e)}")
+            logger.error(f"Invalid time boundaries for fetch: {str(e)}")
             return TimestampedDataFrame(self._create_empty_dataframe())
 
         # Download data with timeout protection
         try:
             # Create a task for the download operation
             download_task = asyncio.create_task(
-                self._download_data(start_time, end_time, columns=columns)
+                self._download_data(start_time, end_time)
             )
 
             # Set timeout based on MAX_TIMEOUT
@@ -404,6 +413,27 @@ class VisionDataClient(Generic[T]):
                     return df
 
                 logger.warning(f"No data available for {start_time} to {end_time}")
+                # If we have a data availability warning, log it now since the retrieval failed
+                if data_availability_message and not is_data_likely_available:
+                    # Calculate expected records more precisely based on interval
+                    time_diff = (end_time - start_time).total_seconds()
+                    interval_seconds = getattr(
+                        self.interval_obj, "to_seconds", lambda: 60
+                    )()
+                    expected_records = max(1, int(time_diff / interval_seconds))
+                    actual_records = 0
+
+                    # Calculate the shortage and percentage
+                    records_shortage = expected_records - actual_records
+                    completion_pct = 0.0
+
+                    # Only show warning if we're actually missing records
+                    if records_shortage > 0:
+                        logger.warning(
+                            f"{data_availability_message} Retrieved {actual_records}/{expected_records} records "
+                            f"({completion_pct:.1f}% complete, missing {records_shortage} records) "
+                            f"for interval {self.interval}"
+                        )
                 return TimestampedDataFrame(self._create_empty_dataframe())
 
             except asyncio.TimeoutError:
@@ -445,6 +475,27 @@ class VisionDataClient(Generic[T]):
                 await self._cleanup_force_timeout_tasks()
 
                 logger.error(f"Vision API fetch timed out after {effective_timeout}s")
+                # If we have a data availability warning, log it now since the retrieval failed
+                if data_availability_message and not is_data_likely_available:
+                    # Calculate expected records more precisely based on interval
+                    time_diff = (end_time - start_time).total_seconds()
+                    interval_seconds = getattr(
+                        self.interval_obj, "to_seconds", lambda: 60
+                    )()
+                    expected_records = max(1, int(time_diff / interval_seconds))
+                    actual_records = 0
+
+                    # Calculate the shortage and percentage
+                    records_shortage = expected_records - actual_records
+                    completion_pct = 0.0
+
+                    # Only show warning if we're actually missing records
+                    if records_shortage > 0:
+                        logger.warning(
+                            f"{data_availability_message} Retrieved {actual_records}/{expected_records} records "
+                            f"({completion_pct:.1f}% complete, missing {records_shortage} records) "
+                            f"for interval {self.interval}"
+                        )
                 return TimestampedDataFrame(self._create_empty_dataframe())
 
         except Exception as e:
@@ -470,11 +521,18 @@ class VisionDataClient(Generic[T]):
         try:
             start_time, end_time, metadata = (
                 DataValidation.validate_query_time_boundaries(
-                    start_time, end_time, handle_future_dates="truncate"
+                    start_time,
+                    end_time,
+                    handle_future_dates="truncate",
+                    interval=self.interval,
                 )
             )
 
-            # Log any warnings
+            # Get data availability info but don't log warnings yet
+            data_availability_message = metadata.get("data_availability_message", "")
+            is_data_likely_available = metadata.get("data_likely_available", True)
+
+            # Log other warnings from validation
             for warning in metadata.get("warnings", []):
                 logger.warning(warning)
 

@@ -1192,19 +1192,7 @@ async def safely_close_client(client):
 
     # Then try different closing methods with error handling
     try:
-        # Try aclose() method (used by curl_cffi.AsyncSession)
-        if hasattr(client, "aclose") and inspect.iscoroutinefunction(client.aclose):
-            try:
-                logger.debug("Closing client with aclose()")
-                await asyncio.wait_for(client.aclose(), timeout=2.0)
-                logger.debug("Successfully closed client with aclose()")
-                return
-            except asyncio.TimeoutError:
-                logger.warning("Timeout while closing client with aclose()")
-            except Exception as e:
-                logger.warning(f"Exception during client.aclose(): {e}")
-
-        # Try close() method (used by some clients)
+        # Try close() method first (used by curl_cffi.AsyncSession)
         if hasattr(client, "close"):
             if inspect.iscoroutinefunction(client.close):
                 try:
@@ -1226,6 +1214,31 @@ async def safely_close_client(client):
                 except Exception as e:
                     logger.warning(f"Exception during sync client.close(): {e}")
 
+        # Try aclose() method (used by some other clients)
+        if hasattr(client, "aclose") and inspect.iscoroutinefunction(client.aclose):
+            try:
+                logger.debug("Closing client with aclose()")
+                await asyncio.wait_for(client.aclose(), timeout=2.0)
+                logger.debug("Successfully closed client with aclose()")
+                return
+            except asyncio.TimeoutError:
+                logger.warning("Timeout while closing client with aclose()")
+            except Exception as e:
+                logger.warning(f"Exception during client.aclose(): {e}")
+
+        # For curl_cffi AsyncSession, try directly accessing the AsyncCurl and closing it
+        if client_type == "AsyncSession" and hasattr(client, "_asynccurl"):
+            try:
+                logger.debug("Closing curl_cffi AsyncSession via _asynccurl.close()")
+                if hasattr(client._asynccurl, "close") and callable(
+                    client._asynccurl.close
+                ):
+                    client._asynccurl.close()
+                    logger.debug("Successfully closed client via _asynccurl.close()")
+                    return
+            except Exception as e:
+                logger.warning(f"Exception during _asynccurl.close(): {e}")
+
         # For httpx.AsyncClient, try __aexit__
         if hasattr(client, "__aexit__"):
             try:
@@ -1236,9 +1249,19 @@ async def safely_close_client(client):
             except Exception as e:
                 logger.warning(f"Exception during client.__aexit__(): {e}")
 
-        logger.warning(
-            f"No suitable close method found for client of type {client_type}"
+        # Last resort: manually clear attributes to help garbage collection
+        for attr_name in dir(client):
+            if not attr_name.startswith("__") and hasattr(client, attr_name):
+                try:
+                    setattr(client, attr_name, None)
+                except (AttributeError, TypeError):
+                    pass
+
+        logger.debug(
+            "Manually cleared client attributes to help with garbage collection"
         )
+        return
+
     except Exception as e:
         logger.error(f"Unexpected error during client cleanup: {e}")
 

@@ -377,20 +377,160 @@ class DataValidation:
 
     @staticmethod
     def is_data_likely_available(
-        target_date: datetime, consolidation_delay: timedelta = timedelta(hours=48)
+        target_date: datetime,
+        interval: Optional[Union[str, Interval]] = None,
+        consolidation_delay: Optional[timedelta] = None,
     ) -> bool:
-        """Check if data is likely available for the specified date.
+        """Check if data is likely available for the specified date and interval.
+
+        This function determines if data for a given timestamp is likely to be consolidated
+        and available in the API based on:
+        1. The current time
+        2. The interval size (if provided)
+        3. The natural consolidation time needed for data at the interval level
 
         Args:
-            target_date: Date to check
-            consolidation_delay: Delay after which data is considered available
+            target_date: Date to check data availability for
+            interval: Optional interval to use for more precise availability determination
+            consolidation_delay: Optional explicit delay override
 
         Returns:
             True if data is likely available, False otherwise
         """
+        # Ensure timezone awareness
+        target_date = DataValidation.enforce_utc_timestamp(target_date)
         now = datetime.now(timezone.utc)
+
+        logger.debug(
+            f"Checking data availability for target_date={target_date.isoformat()}, interval={interval}, now={now.isoformat()}"
+        )
+
+        # If we're in the future already, data is certainly not available
+        if target_date > now:
+            logger.debug(
+                f"Target date {target_date.isoformat()} is in the future - data not available"
+            )
+            return False
+
+        # If an explicit delay was provided, use it
+        if consolidation_delay is not None:
+            consolidation_threshold = now - consolidation_delay
+            is_available = target_date <= consolidation_threshold
+            logger.debug(
+                f"Using explicit consolidation_delay={consolidation_delay}, threshold={consolidation_threshold.isoformat()}, is_available={is_available}"
+            )
+            return is_available
+
+        # If interval is provided, we can be more precise about consolidation times
+        if interval is not None:
+            # Parse string interval if needed
+            if isinstance(interval, str):
+                try:
+                    from utils.market_constraints import Interval
+
+                    logger.debug(
+                        f"Converting string interval '{interval}' to Interval enum"
+                    )
+                    interval = Interval(interval)
+                except (ValueError, ImportError) as e:
+                    # If we can't parse it, fall back to default delay
+                    logger.debug(
+                        f"Could not parse interval '{interval}' due to {type(e).__name__}: {str(e)}, using default delay"
+                    )
+                    consolidation_delay = timedelta(minutes=5)
+            else:
+                # For real intervals, use interval-specific delays
+                # Import here to avoid circular imports
+                try:
+                    from utils.time_utils import (
+                        align_time_boundaries,
+                        get_interval_seconds,
+                    )
+
+                    # Get interval in seconds
+                    interval_seconds = get_interval_seconds(interval)
+                    logger.debug(f"Interval {interval} is {interval_seconds} seconds")
+
+                    # Align the target date to PREVIOUS interval boundary
+                    # This is how align_time_boundaries works: it aligns to the start of the interval
+                    aligned_target, _ = align_time_boundaries(
+                        target_date, target_date, interval
+                    )
+                    logger.debug(f"Aligned target date to {aligned_target.isoformat()}")
+
+                    # If the aligned time is after the target date, it means we aligned to the next interval
+                    # Adjust to the previous interval in that case
+                    if aligned_target > target_date:
+                        logger.debug(
+                            f"Target date is {target_date.isoformat()}, which is between intervals"
+                        )
+                        aligned_target = aligned_target - timedelta(
+                            seconds=interval_seconds
+                        )
+                        logger.debug(
+                            f"Adjusted to previous interval: {aligned_target.isoformat()}"
+                        )
+                    else:
+                        logger.debug(
+                            f"Target date is {target_date.isoformat()}, which is exactly at interval boundary"
+                        )
+
+                    # Special case: if target_date is very close to the current time AND at interval boundary,
+                    # the data for that interval is likely not consolidated yet
+                    time_since_target = now - target_date
+                    seconds_since_target = time_since_target.total_seconds()
+                    logger.debug(
+                        f"Time since target: {seconds_since_target:.2f} seconds"
+                    )
+
+                    # We only need a small buffer after the aligned target time
+                    buffer_seconds = max(30, interval_seconds * 0.2)
+                    consolidation_buffer = timedelta(seconds=buffer_seconds)
+                    logger.debug(
+                        f"Using consolidation buffer of {buffer_seconds} seconds"
+                    )
+
+                    # If aligned time plus buffer is in the past, data should be available
+                    is_available = (aligned_target + consolidation_buffer) <= now
+                    logger.debug(
+                        f"Threshold time is {(aligned_target + consolidation_buffer).isoformat()}, is_available={is_available}"
+                    )
+
+                    # Special case: if we're extremely close to a new interval starting (within a few seconds),
+                    # the data for the previous interval might not be fully consolidated yet
+                    if is_available and seconds_since_target < buffer_seconds:
+                        logger.debug(
+                            f"Very recent target date ({seconds_since_target:.2f}s ago), treating as potentially not consolidated"
+                        )
+                        is_available = False
+
+                    # Add metadata to target_date if it's a datetime object
+                    if hasattr(target_date, "__dict__"):
+                        # Store buffer information for more detailed warning messages
+                        target_date.metadata = {
+                            "consolidation_buffer_seconds": buffer_seconds,
+                            "seconds_since_target": seconds_since_target,
+                        }
+
+                    return is_available
+                except ImportError as e:
+                    # Fall back to default if imports fail
+                    logger.debug(f"Import error in interval calculation: {str(e)}")
+                    logger.warning("Could not import time utils, using default delay")
+                    consolidation_delay = timedelta(minutes=5)
+
+        # Default fallback - use a reasonable 5-minute delay
+        # This is much less conservative than the previous 48 hours
+        if consolidation_delay is None:
+            consolidation_delay = timedelta(minutes=5)
+            logger.debug(f"Using default consolidation_delay={consolidation_delay}")
+
         consolidation_threshold = now - consolidation_delay
-        return target_date <= consolidation_threshold
+        is_available = target_date <= consolidation_threshold
+        logger.debug(
+            f"Default check: threshold={consolidation_threshold.isoformat()}, is_available={is_available}"
+        )
+        return is_available
 
     @staticmethod
     def validate_future_dates(
@@ -434,6 +574,7 @@ class DataValidation:
         max_future_seconds: int = 0,
         reference_time: Optional[datetime] = None,
         handle_future_dates: str = "error",
+        interval: Optional[Union[str, Interval]] = None,
     ) -> Tuple[datetime, datetime, Dict[str, Any]]:
         """Comprehensive validation of time boundaries for data queries.
 
@@ -449,6 +590,7 @@ class DataValidation:
             reference_time: Reference time for validation (default: current time)
             handle_future_dates: How to handle future dates: "error" (raise exception),
                                 "truncate" (truncate to now), "allow" (allow future dates)
+            interval: Optional interval for more precise data availability checks
 
         Returns:
             Tuple of (normalized_start_time, normalized_end_time, metadata)
@@ -539,11 +681,45 @@ class DataValidation:
                 f"After truncation, start time ({start_time.isoformat()}) must still be before end time ({end_time.isoformat()})"
             )
 
-        # Add data availability warning if needed
-        if DataValidation.is_data_likely_available(end_time) is False:
-            metadata["warnings"].append(
-                f"Data for end time ({end_time.isoformat()}) may not be fully consolidated yet"
+        # Add data availability info but don't warn yet - let caller decide
+        logger.debug(
+            f"Checking data availability for end_time={end_time.isoformat()} with interval={interval}"
+        )
+        is_available = DataValidation.is_data_likely_available(end_time, interval)
+        logger.debug(
+            f"Data availability result for end_time={end_time.isoformat()}: {is_available}"
+        )
+
+        # Copy any metadata from end_time to our metadata
+        if hasattr(end_time, "metadata") and isinstance(end_time.metadata, dict):
+            # Only copy consolidation related metadata
+            for key in ["consolidation_buffer_seconds", "seconds_since_target"]:
+                if key in end_time.metadata:
+                    metadata[key] = end_time.metadata[key]
+
+        # Instead of immediately adding to warnings, add flag to metadata
+        metadata["data_likely_available"] = is_available
+
+        if is_available is False:
+            # Add more details to the warning message
+            seconds_since_target = (reference_time - end_time).total_seconds()
+            buffer = metadata.get(
+                "consolidation_buffer_seconds", 30
+            )  # Default to 30 seconds if not set
+
+            metadata["data_availability_message"] = (
+                f"Data for end time ({end_time.isoformat()}) may not be fully consolidated yet. "
+                f"Time since target: {seconds_since_target:.1f}s, buffer needed: {buffer:.1f}s"
             )
+
+            # Store the time range for reference in the logs
+            metadata["time_range"] = {
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "time_span_seconds": (end_time - start_time).total_seconds(),
+            }
+        else:
+            metadata["data_availability_message"] = ""
 
         return start_time, end_time, metadata
 

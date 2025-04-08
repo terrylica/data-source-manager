@@ -20,6 +20,7 @@ from utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_TIMEZONE,
     create_empty_funding_rate_dataframe,
+    create_empty_dataframe,
 )
 from core.data_client_interface import DataClientInterface
 
@@ -118,7 +119,7 @@ class BinanceFundingRateClient(DataClientInterface):
         Returns:
             Empty DataFrame with correct columns and types
         """
-        return create_empty_funding_rate_dataframe()
+        return create_empty_dataframe(ChartType.FUNDING_RATE)
 
     async def validate_data(self, df: pd.DataFrame) -> Tuple[bool, Optional[str]]:
         """Validate that a DataFrame contains valid funding rate data.

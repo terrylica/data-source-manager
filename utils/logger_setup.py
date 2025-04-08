@@ -428,8 +428,8 @@ class LoggerProxy:
         if configure_root:
             _setup_root_logger(level=level_str, use_rich=_use_rich)
             # Use logging.getLogger directly to avoid circular reference
-            root_logger = logging.getLogger("root")
-            root_logger.debug(f"Logger root configured with level {level_str}")
+            # root_logger = logging.getLogger("root")
+            # root_logger.debug(f"Logger root configured with level {level_str}")
 
         # Get corresponding module
         frame = inspect.currentframe()

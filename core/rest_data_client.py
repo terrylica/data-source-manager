@@ -185,9 +185,10 @@ class RestDataClient:
             self._active_tasks.clear()
 
         # Ensure client session is closed if we created it internally
-        if self._client and not self._client_is_external:
+        if hasattr(self, "_client") and self._client and not self._client_is_external:
             try:
-                await self._client.aclose()
+                # Use close() instead of aclose() for curl_cffi AsyncSession
+                await self._client.close()
                 self._client = None
                 logger.debug("Forcibly closed client session during timeout cleanup")
             except Exception as e:
@@ -785,12 +786,18 @@ class RestDataClient:
         symbol = symbol.upper()
         self._validate_request_params(symbol, interval, start_time, end_time)
 
-        # Check if date range includes future dates
-        current_time = datetime.now(timezone.utc)
-        if end_time > current_time:
-            logger.warning(
-                f"Data for end time ({end_time.isoformat()}) may not be fully consolidated yet"
-            )
+        # Apply comprehensive time boundary validation - avoids redundant checks
+        start_time, end_time, metadata = DataValidation.validate_query_time_boundaries(
+            start_time, end_time, handle_future_dates="error", interval=interval
+        )
+
+        # Get data availability info but don't log warnings yet
+        data_availability_message = metadata.get("data_availability_message", "")
+        is_data_likely_available = metadata.get("data_likely_available", True)
+
+        # Log other warnings from validation
+        for warning in metadata.get("warnings", []):
+            logger.warning(warning)
 
         # Align boundaries for consistency
         aligned_start, aligned_end = align_time_boundaries(
@@ -829,7 +836,13 @@ class RestDataClient:
         )
 
         # Stats to track request info
-        stats = {"requests": 0, "errors": 0, "records": 0, "chunks": total_chunks}
+        stats = {
+            "requests": 0,
+            "errors": 0,
+            "records": 0,
+            "chunks": total_chunks,
+            "completed_chunks": 0,
+        }
 
         # Convert times to milliseconds for API
         start_ms = int(aligned_start.timestamp() * 1000)
@@ -872,28 +885,144 @@ class RestDataClient:
                 # Process the results into a DataFrame
                 if results:
                     all_data = []
-                    for chunk_data in results:
-                        if chunk_data:
-                            all_data.extend(chunk_data)
+                    # Only try to iterate through results if it's not a CancelledError
+                    if not isinstance(results, asyncio.CancelledError) and isinstance(
+                        results, list
+                    ):
+                        for chunk_data in results:
+                            if chunk_data and isinstance(chunk_data, list):
+                                all_data.extend(chunk_data)
 
-                    # Process the accumulated data
-                    if all_data:
-                        df = process_kline_data(all_data)
-                        if not df.empty:
-                            # Filter for the exact requested time range
-                            final_df = df[
-                                (df.index >= start_time) & (df.index <= end_time)
-                            ].copy()
+                        # Process the accumulated data
+                        if all_data:
+                            try:
+                                df = process_kline_data(all_data)
+                                if not df.empty:
+                                    # Filter for the exact requested time range
+                                    final_df = df[
+                                        (df.index >= start_time)
+                                        & (df.index <= end_time)
+                                    ].copy()
 
-                            # Validate result
-                            if not final_df.empty:
-                                stats["records"] = len(final_df)
-                                return final_df, stats
+                                    # Validate result
+                                    if not final_df.empty:
+                                        stats["records"] = len(final_df)
+                                        return final_df, stats
+                            except Exception as e:
+                                logger.error(f"Error processing data: {str(e)}")
+                                stats["errors"] += 1
+                    else:
+                        if isinstance(results, asyncio.CancelledError):
+                            logger.debug(
+                                f"Cannot process results: operation was cancelled (normal during concurrent operations)"
+                            )
+                        else:
+                            logger.warning(
+                                f"Cannot process results: expected list but got {type(results)}"
+                            )
 
             # Return empty DataFrame if no results
-            logger.warning(
-                f"No data returned for {symbol} from {start_time} to {end_time}"
-            )
+            if all_chunks_task.cancelled():
+                # This is expected during cancellations
+                logger.debug(
+                    f"No data available for {symbol} from {start_time} to {end_time} due to task cancellation"
+                )
+            else:
+                # Only log at debug level since empty results are common and expected
+                logger.debug(
+                    f"No data returned for {symbol} from {start_time} to {end_time}"
+                )
+
+                # If we have a data availability warning, log it now since the retrieval failed
+                if data_availability_message and not is_data_likely_available:
+                    # Calculate expected records more precisely based on interval
+                    time_diff = (end_time - start_time).total_seconds()
+                    interval_seconds = interval.to_seconds()
+                    expected_records = max(1, int(time_diff / interval_seconds))
+                    actual_records = stats.get("records", 0)
+
+                    # Calculate the shortage and percentage
+                    records_shortage = expected_records - actual_records
+                    completion_pct = (
+                        (actual_records / expected_records * 100)
+                        if expected_records > 0
+                        else 0
+                    )
+
+                    # Only show warning if we're actually missing records
+                    if records_shortage > 0:
+                        # Get time range information if available
+                        time_range_info = ""
+                        if "time_range" in metadata:
+                            tr = metadata["time_range"]
+                            start_time_str = tr.get("start_time", "unknown")
+                            end_time_str = tr.get("end_time", "unknown")
+                            span_seconds = tr.get("time_span_seconds", 0)
+                            time_range_info = f" [Range: {start_time_str} -> {end_time_str}, span: {span_seconds:.1f}s]"
+
+                        logger.warning(
+                            f"{data_availability_message} Retrieved {actual_records}/{expected_records} records "
+                            f"({completion_pct:.1f}% complete, missing {records_shortage} records) "
+                            f"for symbol {symbol} with interval {interval.value}{time_range_info}"
+                        )
+
+                        # Try to retrieve partial data for historical intervals only
+                        if "time_range" in metadata and metadata.get("time_range"):
+                            # If end time is very recent, try fetching with truncated end time
+                            tr = metadata["time_range"]
+                            current_time = datetime.now(timezone.utc)
+                            cutoff_time = current_time - timedelta(
+                                seconds=60
+                            )  # Use 1 minute as buffer
+
+                            # If end time is extremely recent, truncate to safe boundary
+                            if end_time > cutoff_time:
+                                logger.info(
+                                    f"Attempting to retrieve historical data up to {cutoff_time.isoformat()} for {symbol}"
+                                )
+                                # Create new chunks for the truncated range
+                                modified_end_ms = int(cutoff_time.timestamp() * 1000)
+                                historical_chunks = self._calculate_chunks(
+                                    start_ms, modified_end_ms, interval
+                                )
+
+                                # Get only historical data
+                                try:
+                                    t_start_historical = time.time()
+                                    historical_task = asyncio.create_task(
+                                        self._fetch_all_chunks(
+                                            symbol, interval, historical_chunks, stats
+                                        )
+                                    )
+                                    historical_results = await asyncio.wait_for(
+                                        historical_task, timeout=effective_timeout
+                                    )
+
+                                    # Process historical results
+                                    if (
+                                        historical_results
+                                        and len(historical_results) > 0
+                                    ):
+                                        all_data = []
+                                        for chunk_data in historical_results:
+                                            if chunk_data and isinstance(
+                                                chunk_data, list
+                                            ):
+                                                all_data.extend(chunk_data)
+
+                                        if all_data:
+                                            df = process_kline_data(all_data)
+                                            if not df.empty:
+                                                logger.info(
+                                                    f"Successfully retrieved {len(df)} historical records for {symbol} "
+                                                    f"(up to {cutoff_time.isoformat()})"
+                                                )
+                                                return df, stats
+                                except Exception as e:
+                                    logger.error(
+                                        f"Failed to retrieve historical data: {str(e)}"
+                                    )
+
             return self.create_empty_dataframe(), stats
 
         except asyncio.TimeoutError:
@@ -937,8 +1066,20 @@ class RestDataClient:
             logger.error(f"REST API fetch timed out after {effective_timeout}s")
             return self.create_empty_dataframe(), stats
 
+        except asyncio.CancelledError as e:
+            # Properly handle cancellation without trying to iterate the error
+            logger.debug(
+                f"REST API fetch was cancelled (expected during concurrent operations)"
+            )
+
+            # Clean up any hanging tasks
+            await self._cleanup_force_timeout_tasks()
+
+            stats["errors"] += 1
+            return self.create_empty_dataframe(), stats
+
         except Exception as e:
-            logger.error(f"Error fetching data: {e}")
+            logger.error(f"Error fetching data: {str(e)}")
             stats["errors"] += 1
 
             # Clean up any hanging tasks
@@ -952,16 +1093,16 @@ class RestDataClient:
         Returns:
             Empty DataFrame with proper column structure
         """
-        return create_empty_dataframe()
+        return create_empty_dataframe(ChartType.KLINES)
 
     async def _fetch_all_chunks(self, symbol, interval, chunks, stats):
-        """Fetch all chunks of data and combine results.
+        """Fetch all chunks and aggregate results.
 
         Args:
             symbol: Trading pair symbol
             interval: Time interval
-            chunks: List of chunk boundaries (start_ms, end_ms)
-            stats: Stats dictionary to update with progress
+            chunks: List of (start_ms, end_ms) tuples representing chunks
+            stats: Dictionary to track statistics
 
         Returns:
             List of chunk results
@@ -972,37 +1113,71 @@ class RestDataClient:
         # Create a semaphore to limit concurrent requests
         sem = asyncio.Semaphore(self.max_concurrent)
 
-        # Create tasks for all chunks
-        tasks = []
-        for i, (chunk_start, chunk_end) in enumerate(chunks):
-            task = asyncio.create_task(
-                self._fetch_chunk_with_semaphore(
-                    symbol, interval, chunk_start, chunk_end, sem, i, len(chunks)
-                )
-            )
-            tasks.append(task)
-            self._active_tasks.append(task)
-
-        # Wait for all tasks to complete
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Process results
-        stats["completed_chunks"] = 0
+        # Process chunks sequentially to avoid unnecessary concurrent operations
         successful_results = []
 
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(
-                    f"Chunk {i+1}/{len(chunks)} failed: {type(result).__name__}: {result}"
+        for i, (chunk_start, chunk_end) in enumerate(chunks):
+            try:
+                # Fetch each chunk one at a time using the semaphore
+                logger.debug(
+                    f"Processing chunk {i+1}/{len(chunks)} ({symbol} {interval.value})"
+                )
+
+                result = await self._fetch_chunk_with_semaphore(
+                    symbol, interval, chunk_start, chunk_end, sem, i, len(chunks)
+                )
+
+                # Process the result
+                if isinstance(result, Exception):
+                    if isinstance(result, asyncio.CancelledError):
+                        logger.debug(f"Chunk {i+1}/{len(chunks)} was cancelled")
+                    else:
+                        logger.error(
+                            f"Chunk {i+1}/{len(chunks)} failed: {type(result).__name__}: {result}"
+                        )
+                    stats["errors"] += 1
+                else:
+                    # Only process valid results (lists of kline data)
+                    if isinstance(result, list) and result:
+                        successful_results.append(result)
+                        stats["records"] += len(result)
+                        stats["completed_chunks"] += 1
+                    else:
+                        if not result:
+                            logger.debug(f"Chunk {i+1}/{len(chunks)} returned no data")
+                        elif not isinstance(result, list):
+                            logger.debug(
+                                f"Expected list result but got {type(result)} (normal during concurrent operations)"
+                            )
+
+            except asyncio.CancelledError:
+                # Handle cancellation of the entire operation
+                logger.debug(
+                    f"Operation cancelled while processing chunk {i+1}/{len(chunks)}"
                 )
                 stats["errors"] += 1
-            else:
-                stats["completed_chunks"] += 1
-                if result:  # Check if result is not None or empty
-                    successful_results.append(result)
-                    stats["records"] += len(result) if result else 0
+                break
 
-        return successful_results
+            except Exception as e:
+                logger.error(f"Error processing chunk {i+1}/{len(chunks)}: {str(e)}")
+                stats["errors"] += 1
+
+        # Return the results
+        if successful_results:
+            return successful_results
+        else:
+            logger.debug(f"No successful results obtained from any chunks")
+            return []
+
+    def _force_cleanup_active_tasks(self):
+        """Force cleanup of active tasks."""
+        try:
+            for task in self._active_tasks:
+                if not task.done():
+                    task.cancel()
+            self._active_tasks = []
+        except Exception as e:
+            logger.error(f"Error during active tasks cleanup: {e}")
 
     async def _fetch_chunk_with_semaphore(
         self, symbol, interval, start_ms, end_ms, semaphore, chunk_idx=0, total_chunks=1
@@ -1032,6 +1207,13 @@ class RestDataClient:
                     symbol, interval, start_ms, end_ms
                 )
 
+                # Validate response is a list
+                if not isinstance(chunk_data, list):
+                    logger.warning(
+                        f"Chunk {chunk_idx+1}/{total_chunks}: Expected list result but got {type(chunk_data)}"
+                    )
+                    return []
+
                 stats_msg = f"Chunk {chunk_idx+1}/{total_chunks}: got {len(chunk_data) if chunk_data else 0} records"
                 if chunk_idx == 0 or chunk_idx == total_chunks - 1 or total_chunks <= 5:
                     logger.info(stats_msg)
@@ -1039,11 +1221,18 @@ class RestDataClient:
                     logger.debug(stats_msg)
 
                 return chunk_data
+            except asyncio.CancelledError:
+                # This is expected during high concurrency operations
+                logger.debug(
+                    f"Chunk {chunk_idx+1}/{total_chunks} was cancelled (normal during concurrent operations)"
+                )
+                # Important: Re-raise CancelledError to properly propagate cancellation
+                raise
             except Exception as e:
                 logger.warning(
-                    f"Error fetching chunk {chunk_idx+1}/{total_chunks}: {e}"
+                    f"Error fetching chunk {chunk_idx+1}/{total_chunks}: {str(e)}"
                 )
-                raise
+                return []
 
     async def _fetch_klines_chunk(self, symbol, interval, start_ms, end_ms):
         """Fetch a single chunk of klines data from the REST API.
@@ -1154,6 +1343,13 @@ class RestDataClient:
                 # Return the data
                 return data
 
+            except asyncio.CancelledError:
+                # Important: Re-raise CancelledError to properly propagate it
+                logger.debug(
+                    f"API request was cancelled (normal during high concurrency)"
+                )
+                raise
+
             except asyncio.TimeoutError:
                 logger.warning(f"Request timeout (attempt {attempt}/{max_attempts})")
                 if attempt >= max_attempts:
@@ -1164,7 +1360,7 @@ class RestDataClient:
 
             except Exception as e:
                 logger.warning(
-                    f"Error during API request (attempt {attempt}/{max_attempts}): {e}"
+                    f"Error during API request (attempt {attempt}/{max_attempts}): {str(e)}"
                 )
                 if attempt >= max_attempts:
                     logger.error(f"Max retry attempts reached after errors")

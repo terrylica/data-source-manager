@@ -203,16 +203,43 @@ class FeatureFlags:
 
 
 # Create a standard empty DataFrame with proper structure
-def create_empty_dataframe() -> pd.DataFrame:
+def create_empty_dataframe(chart_type=None) -> pd.DataFrame:
     """Create an empty DataFrame with the standard market data structure.
+
+    Args:
+        chart_type: Optional ChartType enum or string to specify the type of DataFrame to create.
+                   If None, defaults to KLINES.
 
     Returns:
         An empty DataFrame with correct column types and index
     """
-    df = pd.DataFrame([], columns=DEFAULT_COLUMN_ORDER)
+    from utils.market_constraints import ChartType
+
+    # Determine chart type
+    if isinstance(chart_type, str):
+        try:
+            # Use upper() for case insensitivity when converting from string
+            chart_type_str = chart_type.upper()
+            # Try direct enum lookup first (e.g., "KLINES" to ChartType.KLINES)
+            try:
+                chart_type = ChartType[chart_type_str]
+            except KeyError:
+                # Try from_string method as fallback
+                chart_type = ChartType.from_string(chart_type)
+        except (ValueError, AttributeError):
+            # Default to KLINES if conversion fails
+            chart_type = ChartType.KLINES
+
+    # Create appropriate empty DataFrame based on chart type
+    if chart_type == ChartType.FUNDING_RATE:
+        df = pd.DataFrame([], columns=FUNDING_RATE_COLUMN_ORDER)
+        dtypes_to_use = FUNDING_RATE_DTYPES
+    else:  # Default to KLINES
+        df = pd.DataFrame([], columns=DEFAULT_COLUMN_ORDER)
+        dtypes_to_use = OUTPUT_DTYPES
 
     # Set correct data types
-    for col, dtype in OUTPUT_DTYPES.items():
+    for col, dtype in dtypes_to_use.items():
         df[col] = df[col].astype(dtype)
 
     # Set index
@@ -228,18 +255,14 @@ def create_empty_funding_rate_dataframe() -> pd.DataFrame:
 
     Returns:
         An empty DataFrame with correct column types and index
+
+    Note:
+        This function is maintained for backward compatibility.
+        New code should use create_empty_dataframe(ChartType.FUNDING_RATE) instead.
     """
-    df = pd.DataFrame([], columns=FUNDING_RATE_COLUMN_ORDER)
+    from utils.market_constraints import ChartType
 
-    # Set correct data types
-    for col, dtype in FUNDING_RATE_DTYPES.items():
-        df[col] = df[col].astype(dtype)
-
-    # Set index
-    df.index = pd.DatetimeIndex([], name=CANONICAL_INDEX_NAME)
-    df.index = df.index.tz_localize(DEFAULT_TIMEZONE)
-
-    return df
+    return create_empty_dataframe(ChartType.FUNDING_RATE)
 
 
 # Function to standardize column names across different API responses
