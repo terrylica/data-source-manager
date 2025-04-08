@@ -7,8 +7,13 @@ from typing import Dict, Optional, Any
 import pandas as pd
 import os
 import asyncio
+import time
+import gc
+import psutil
 
 from utils.logger_setup import logger
+from utils.config import MAX_TIMEOUT
+from utils.timeout import timeout
 
 
 class UnifiedCacheManager:
@@ -76,13 +81,154 @@ class UnifiedCacheManager:
     async def _save_metadata(self) -> None:
         """Save metadata to file."""
         async with self._cache_lock:
+            logger.debug(f"_save_metadata starting with {len(self.metadata)} entries")
             try:
                 metadata_path = self._get_metadata_path()
-                with open(metadata_path, "w") as f:
-                    json.dump(self.metadata, f, indent=2)
-                logger.debug(f"Saved cache metadata: {len(self.metadata)} entries")
+                file_size_before = (
+                    os.path.getsize(metadata_path)
+                    if os.path.exists(metadata_path)
+                    else 0
+                )
+                logger.debug(
+                    f"Metadata will be saved to {metadata_path} (current size: {file_size_before} bytes)"
+                )
+
+                # Check system resources before proceeding
+                process = psutil.Process()
+                mem_before = process.memory_info().rss / 1024 / 1024
+                logger.debug(f"Memory usage before metadata save: {mem_before:.2f} MB")
+                logger.debug(
+                    f"Available disk space: {psutil.disk_usage(metadata_path.parent).free / (1024*1024):.2f} MB"
+                )
+
+                # Serialize metadata to JSON - this can be slow with large metadata
+                logger.debug("Serializing metadata to JSON")
+                json_start = time.time()
+                try:
+                    json_data = json.dumps(self.metadata, indent=2)
+                    json_size = len(json_data)
+                    json_elapsed = time.time() - json_start
+                    logger.debug(
+                        f"JSON serialization completed in {json_elapsed:.4f}s for {json_size} bytes"
+                    )
+
+                    # Log warning if JSON size is very large
+                    if json_size > 10 * 1024 * 1024:  # 10MB
+                        logger.warning(
+                            f"Metadata JSON is extremely large: {json_size / (1024*1024):.2f} MB"
+                        )
+                except Exception as json_err:
+                    logger.error(f"JSON serialization failed: {json_err}")
+                    return
+
+                # Write to temporary file first with timeout protection
+                temp_path = metadata_path.with_suffix(".tmp")
+                logger.debug(f"Writing metadata to temporary file at {temp_path}")
+                write_start = time.time()
+
+                try:
+                    # Use a timeout for the file write operation
+                    async def write_with_timeout():
+                        """Write metadata with timeout protection."""
+                        with open(temp_path, "w") as f:
+                            f.write(json_data)
+
+                    # Set a timeout for the file write operation
+                    await asyncio.wait_for(write_with_timeout(), timeout=MAX_TIMEOUT)
+
+                    write_elapsed = time.time() - write_start
+                    logger.debug(
+                        f"Temporary metadata file write completed in {write_elapsed:.4f}s"
+                    )
+
+                    # Verify the file was written correctly
+                    if not temp_path.exists():
+                        logger.error(
+                            f"Temporary metadata file was not created: {temp_path}"
+                        )
+                        return
+
+                    temp_size = os.path.getsize(temp_path)
+                    if temp_size == 0:
+                        logger.error("Temporary metadata file is empty")
+                        return
+
+                    # Rename temporary file to actual metadata file (atomic operation)
+                    logger.debug(f"Renaming temporary file to {metadata_path}")
+                    temp_path.replace(metadata_path)
+
+                except asyncio.TimeoutError:
+                    logger.error(
+                        f"Metadata file write operation timed out after {MAX_TIMEOUT}s"
+                    )
+                    # Force garbage collection to free resources
+                    collected = gc.collect()
+                    logger.debug(
+                        f"Emergency garbage collection after timeout: collected {collected} objects"
+                    )
+
+                    # Try to clean up the temporary file if it exists
+                    if temp_path.exists():
+                        try:
+                            temp_path.unlink()
+                            logger.debug(
+                                f"Cleaned up temporary metadata file after timeout"
+                            )
+                        except Exception as cleanup_err:
+                            logger.error(
+                                f"Failed to clean up temporary file: {cleanup_err}"
+                            )
+                    return
+                except Exception as write_err:
+                    logger.error(f"Metadata file write failed: {write_err}")
+                    return
+
+                # Report detailed stats
+                total_elapsed = json_elapsed + write_elapsed
+                logger.debug(
+                    f"Saved cache metadata: {len(self.metadata)} entries in {total_elapsed:.4f}s total"
+                )
+
+                # Check file size after write
+                if metadata_path.exists():
+                    file_size_after = os.path.getsize(metadata_path)
+                    logger.debug(
+                        f"Final metadata file size: {file_size_after} bytes (change: {file_size_after - file_size_before} bytes)"
+                    )
+
+                # Check memory after operation
+                mem_after = process.memory_info().rss / 1024 / 1024
+                logger.debug(
+                    f"Memory usage after metadata save: {mem_after:.2f} MB (change: {mem_after - mem_before:.2f} MB)"
+                )
+
+                # If the operation was slow, log more details
+                if total_elapsed > 1.0:
+                    logger.warning(
+                        f"Metadata save operation was slow ({total_elapsed:.2f}s), size: {len(json_data)/1024:.1f}KB"
+                    )
+                    # Count entries by type for debugging
+                    provider_counts = {}
+                    for key in self.metadata:
+                        parts = key.split("_")
+                        if len(parts) > 0:
+                            provider = parts[0]
+                            if provider not in provider_counts:
+                                provider_counts[provider] = 0
+                            provider_counts[provider] += 1
+                    logger.debug(f"Metadata entries by provider: {provider_counts}")
             except Exception as e:
                 logger.error(f"Failed to save metadata: {e}")
+                # Log more details about the exception
+                import traceback
+
+                logger.error(f"Metadata save error details: {traceback.format_exc()}")
+
+                # Emergency garbage collection
+                collected = gc.collect()
+                logger.debug(
+                    f"Emergency garbage collection after error: collected {collected} objects"
+                )
 
     def get_cache_key(
         self,
@@ -162,37 +308,97 @@ class UnifiedCacheManager:
         Returns:
             DataFrame with cached data or None if not found
         """
+        operation_start = time.time()
+        logger.debug(
+            f"=== BEGIN load_from_cache for {symbol} {interval} {date.date()} ==="
+        )
+
+        # Generate cache key
+        key_gen_start = time.time()
         cache_key = self.get_cache_key(symbol, interval, date, provider, chart_type)
         cache_path = self._get_cache_path(cache_key)
+        key_gen_elapsed = time.time() - key_gen_start
+        logger.debug(f"Cache key generation completed in {key_gen_elapsed:.4f}s")
 
-        if not cache_path.exists():
-            logger.debug(f"Cache miss - file not found: {cache_path}")
+        logger.debug(f"Cache load attempt for {cache_key}")
+        logger.debug(f"Looking for cache file at {cache_path}")
+
+        # Check if file exists
+        exists_check_start = time.time()
+        file_exists = cache_path.exists()
+        exists_check_elapsed = time.time() - exists_check_start
+        logger.debug(f"File existence check completed in {exists_check_elapsed:.4f}s")
+
+        if not file_exists:
+            operation_elapsed = time.time() - operation_start
+            logger.debug(
+                f"Cache miss - file not found: {cache_path}, operation took {operation_elapsed:.4f}s"
+            )
+            logger.debug(f"=== END load_from_cache (file not found) ===")
             return None
 
         try:
             # Check metadata for validation info
+            metadata_check_start = time.time()
+            logger.debug(f"Checking metadata validity for {cache_key}")
+            is_valid = True
             if cache_key in self.metadata:
-                if not self.metadata[cache_key].get("is_valid", True):
+                is_valid = self.metadata[cache_key].get("is_valid", True)
+                if not is_valid:
                     logger.warning(f"Skipping invalid cache: {cache_key}")
+                    operation_elapsed = time.time() - operation_start
+                    logger.debug(
+                        f"=== END load_from_cache (invalid cache) in {operation_elapsed:.4f}s ==="
+                    )
                     return None
+            metadata_check_elapsed = time.time() - metadata_check_start
+            logger.debug(
+                f"Metadata validity check completed in {metadata_check_elapsed:.4f}s, is_valid={is_valid}"
+            )
 
             # Load from Arrow format
+            logger.debug(f"Reading cache file: {cache_path}")
+            read_start = time.time()
             df = pd.read_feather(cache_path)
+            read_elapsed = time.time() - read_start
+            logger.debug(
+                f"Cache file read completed in {read_elapsed:.4f}s, shape: {df.shape}"
+            )
 
             # Ensure index is a DatetimeIndex for time-series data
+            index_conversion_start = time.time()
             if "open_time" in df.columns:
+                logger.debug("Converting open_time column to index")
                 df = df.set_index("open_time")
                 # Ensure timezone info
                 if df.index.tzinfo is None:
+                    logger.debug("Adding UTC timezone to naive index")
                     df.index = df.index.tz_localize(timezone.utc)
+            index_conversion_elapsed = time.time() - index_conversion_start
+            logger.debug(
+                f"Index conversion completed in {index_conversion_elapsed:.4f}s"
+            )
 
-            logger.debug(f"Cache hit: {cache_key}, shape: {df.shape}")
+            operation_elapsed = time.time() - operation_start
+            logger.debug(
+                f"Cache hit: {cache_key}, shape: {df.shape}, operation took {operation_elapsed:.4f}s"
+            )
+            logger.debug(
+                f"=== END load_from_cache (success) in {operation_elapsed:.4f}s ==="
+            )
             return df
 
         except Exception as e:
-            logger.error(f"Failed to load cache: {cache_key}, error: {e}")
+            operation_elapsed = time.time() - operation_start
+            logger.error(
+                f"Failed to load cache: {cache_key}, error: {e}, operation took {operation_elapsed:.4f}s"
+            )
             # Mark as invalid in metadata
+            logger.debug(f"Marking cache as invalid due to error: {e}")
             await self._mark_cache_invalid(cache_key, str(e))
+            logger.debug(
+                f"=== END load_from_cache (error) in {operation_elapsed:.4f}s ==="
+            )
             return None
 
     async def save_to_cache(
@@ -217,28 +423,58 @@ class UnifiedCacheManager:
         Returns:
             True if successful, False otherwise
         """
+        operation_start = time.time()
+        logger.debug(
+            f"=== BEGIN save_to_cache for {symbol} {interval} {date.date()} ==="
+        )
+
         if df.empty:
             logger.debug("Not caching empty DataFrame")
+            logger.debug(f"=== END save_to_cache (empty DataFrame) ===")
             return False
 
+        # Generate cache key and path
+        key_gen_start = time.time()
         cache_key = self.get_cache_key(symbol, interval, date, provider, chart_type)
         cache_path = self._get_cache_path(cache_key)
+        key_gen_elapsed = time.time() - key_gen_start
+        logger.debug(f"Cache key generation completed in {key_gen_elapsed:.4f}s")
+
+        logger.debug(f"Preparing to save cache for {cache_key}")
+        logger.debug(f"Cache file path: {cache_path}")
 
         # Create parent directories if they don't exist
         try:
+            dir_creation_start = time.time()
+            logger.debug(f"Creating cache directory structure: {cache_path.parent}")
             os.makedirs(cache_path.parent, exist_ok=True)
+            dir_creation_elapsed = time.time() - dir_creation_start
+            logger.debug(f"Directory creation completed in {dir_creation_elapsed:.4f}s")
         except Exception as e:
-            logger.error(f"Failed to create cache directory: {e}")
+            operation_elapsed = time.time() - operation_start
+            logger.error(
+                f"Failed to create cache directory: {e}, operation took {operation_elapsed:.4f}s"
+            )
+            logger.debug(f"=== END save_to_cache (directory creation error) ===")
             return False
 
         try:
             # Reset index to include open_time as a column
+            index_reset_start = time.time()
+            logger.debug("Resetting index to prepare for cache save")
             df_reset = df.reset_index()
+            index_reset_elapsed = time.time() - index_reset_start
+            logger.debug(f"Index reset completed in {index_reset_elapsed:.4f}s")
 
             # Save to Arrow format
+            logger.debug(f"Writing DataFrame to cache file, shape: {df_reset.shape}")
+            write_start = time.time()
             df_reset.to_feather(cache_path)
+            write_elapsed = time.time() - write_start
+            logger.debug(f"Cache file write completed in {write_elapsed:.4f}s")
 
             # Update metadata
+            metadata_update_start = time.time()
             metadata_entry = {
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "symbol": symbol,
@@ -250,15 +486,33 @@ class UnifiedCacheManager:
                 "is_valid": True,
             }
 
+            logger.debug(f"Updating metadata for {cache_key}")
             async with self._cache_lock:
                 self.metadata[cache_key] = metadata_entry
+                logger.debug("Saving metadata to disk")
+                metadata_save_start = time.time()
                 await self._save_metadata()
+                metadata_save_elapsed = time.time() - metadata_save_start
+                logger.debug(f"Metadata save completed in {metadata_save_elapsed:.4f}s")
 
-            logger.debug(f"Cached {len(df)} rows to {cache_path}")
+            metadata_update_elapsed = time.time() - metadata_update_start
+            logger.debug(f"Metadata update completed in {metadata_update_elapsed:.4f}s")
+
+            operation_elapsed = time.time() - operation_start
+            logger.debug(
+                f"Cached {len(df)} rows to {cache_path}, operation took {operation_elapsed:.4f}s"
+            )
+            logger.debug(
+                f"=== END save_to_cache (success) in {operation_elapsed:.4f}s ==="
+            )
             return True
 
         except Exception as e:
-            logger.error(f"Failed to save cache: {cache_key}, error: {e}")
+            operation_elapsed = time.time() - operation_start
+            logger.error(
+                f"Failed to save cache: {cache_key}, error: {e}, operation took {operation_elapsed:.4f}s"
+            )
+            logger.debug(f"=== END save_to_cache (error) ===")
             return False
 
     async def _mark_cache_invalid(self, cache_key: str, reason: str) -> None:

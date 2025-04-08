@@ -852,15 +852,20 @@ class DataFrameValidator:
             ValueError: If DataFrame structure is invalid
         """
         if df.empty:
+            logger.debug("Validating empty DataFrame - passing validation")
             return
 
+        logger.debug(f"Starting DataFrame validation for DataFrame with {len(df)} rows")
+
         # Check if index is DatetimeIndex
+        logger.debug(f"Checking index type: {type(df.index).__name__}")
         if not isinstance(df.index, pd.DatetimeIndex):
             raise ValueError(
                 f"DataFrame index must be DatetimeIndex, got {type(df.index).__name__}"
             )
 
         # Check if index is timezone-aware
+        logger.debug("Checking if index is timezone-aware")
         if df.index.tz is None:
             raise ValueError("DataFrame index must be timezone-aware")
 
@@ -871,7 +876,13 @@ class DataFrameValidator:
         logger.debug(f"Are they equal? {df.index.tz == timezone.utc}")
         logger.debug(f"Are they the same object? {df.index.tz is timezone.utc}")
 
+        # Additional logging to track what happens after timezone validation
+        logger.debug("Continuing validation after timezone checks...")
+
         # Check if index is named correctly
+        logger.debug(
+            f"Checking index name: {df.index.name} vs expected: {CANONICAL_INDEX_NAME}"
+        )
         if df.index.name != CANONICAL_INDEX_NAME:
             raise ValueError(
                 f"DataFrame index must be named '{CANONICAL_INDEX_NAME}', "
@@ -879,18 +890,25 @@ class DataFrameValidator:
             )
 
         # Check for duplicate indices
+        logger.debug(f"Checking for duplicate indices in DataFrame with {len(df)} rows")
         if df.index.has_duplicates:
             raise ValueError("DataFrame index contains duplicate timestamps")
 
         # Check if index is sorted
+        logger.debug("Checking if index is monotonically increasing")
         if not df.index.is_monotonic_increasing:
             raise ValueError("DataFrame index must be monotonically increasing")
 
         # Check for required columns
         required_columns = ["open", "high", "low", "close", "volume"]
+        logger.debug(f"Checking for required columns: {required_columns}")
+        logger.debug(f"Available columns: {df.columns.tolist()}")
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             raise ValueError(f"DataFrame missing required columns: {missing_columns}")
+
+        logger.debug("DataFrame validation completed successfully")
+        logger.debug("==== END OF DATAFRAME VALIDATION FUNCTION ====")
 
     @staticmethod
     def format_dataframe(
@@ -920,10 +938,13 @@ class DataFrameValidator:
             )
             logger.debug(f"Empty DataFrame index timezone: {empty_df.index.tz}")
             logger.debug(f"Is timezone.utc? {empty_df.index.tz is timezone.utc}")
+            logger.debug("==== END OF FORMAT_DATAFRAME (EMPTY DF) ====")
             return empty_df
 
         # Copy to avoid modifying original
+        logger.debug(f"Copying DataFrame with shape {df.shape}")
         formatted_df = df.copy()
+        logger.debug(f"Copy created with shape {formatted_df.shape}")
 
         if (
             isinstance(formatted_df.index, pd.DatetimeIndex)
@@ -935,16 +956,20 @@ class DataFrameValidator:
             logger.debug(f"Is timezone.utc? {formatted_df.index.tz is timezone.utc}")
 
         # Ensure index is DatetimeIndex in UTC
+        logger.debug(f"Index type check: {type(formatted_df.index).__name__}")
         if not isinstance(formatted_df.index, pd.DatetimeIndex):
             logger.debug("Converting non-DatetimeIndex to DatetimeIndex")
             if "open_time" in formatted_df.columns:
+                logger.debug("Using open_time column for index")
                 formatted_df = formatted_df.set_index("open_time")
             else:
+                logger.error("Cannot find open_time column for index conversion")
                 raise ValueError(
                     "DataFrame must have 'open_time' column or DatetimeIndex"
                 )
 
         # Ensure index is named correctly
+        logger.debug(f"Setting index name to {CANONICAL_INDEX_NAME}")
         formatted_df.index.name = CANONICAL_INDEX_NAME
 
         # Ensure index is timezone-aware and in UTC
@@ -966,57 +991,8 @@ class DataFrameValidator:
 
         logger.debug(f"Final DataFrame timezone: {formatted_df.index.tz}")
         logger.debug(f"Is timezone.utc? {formatted_df.index.tz is timezone.utc}")
-
-        # Special handling for close_time if it exists - must be datetime64[ns]
-        if "close_time" in formatted_df.columns:
-            if not pd.api.types.is_datetime64_dtype(formatted_df["close_time"]):
-                # Convert close_time to datetime if it's not already
-                if pd.api.types.is_numeric_dtype(formatted_df["close_time"]):
-                    # If it's a numeric type, convert from timestamp
-                    formatted_df["close_time"] = pd.to_datetime(
-                        formatted_df["close_time"], unit="us", utc=True
-                    )
-                else:
-                    # Otherwise try standard conversion
-                    formatted_df["close_time"] = pd.to_datetime(
-                        formatted_df["close_time"], utc=True
-                    )
-
-            # Instead of using astype, which fails when converting from tz-aware to tz-naive,
-            # we'll convert the timestamps properly preserving timezone information
-            if (
-                hasattr(formatted_df["close_time"].dtype, "tz")
-                and formatted_df["close_time"].dtype.tz is not None
-            ):
-                # Convert to UTC first if it has timezone info
-                formatted_df["close_time"] = formatted_df["close_time"].dt.tz_convert(
-                    "UTC"
-                )
-                # Then either keep as is or convert to timezone-naive if needed for compatibility
-                # formatted_df["close_time"] = formatted_df["close_time"].dt.tz_localize(None)
-            else:
-                # If it's already timezone-naive, ensure it's the right dtype
-                formatted_df["close_time"] = pd.to_datetime(formatted_df["close_time"])
-
-        # Convert columns to specified dtypes
-        for col, dtype in output_dtypes.items():
-            if col in formatted_df.columns:
-                try:
-                    formatted_df[col] = formatted_df[col].astype(dtype)
-                except (ValueError, TypeError) as e:
-                    # Handle conversion errors gracefully
-                    formatted_df[col] = pd.Series(
-                        np.nan, index=formatted_df.index, dtype=dtype
-                    )
-
-        # Sort by index
-        if not formatted_df.index.is_monotonic_increasing:
-            formatted_df = formatted_df.sort_index()
-
-        # Remove duplicates if any
-        if formatted_df.index.has_duplicates:
-            formatted_df = formatted_df[~formatted_df.index.duplicated(keep="first")]
-
+        logger.debug(f"Final DataFrame shape: {formatted_df.shape}")
+        logger.debug("==== END OF FORMAT_DATAFRAME FUNCTION ====")
         return formatted_df
 
     @staticmethod

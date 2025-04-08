@@ -72,7 +72,7 @@ await close_resource_with_timeout(
 
 import asyncio
 import gc
-from typing import Any, Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union, Tuple
 import inspect
 import sys
 
@@ -331,103 +331,133 @@ async def cleanup_file_handle(
 
 
 async def direct_resource_cleanup(
-    instance: Any,
-    *resource_tuples: tuple[str, str, bool],
-    force_gc: bool = ENABLE_FORCED_GC,
-) -> None:
-    """Direct cleanup of resources with timeout protection.
-
-    This is the recommended approach for cleaning up resources in __aexit__ methods,
-    providing a simple way to handle cleanup of multiple resources with proper error
-    handling and timeout protection.
+    obj: Any,
+    *resources: Union[Tuple[str, str, bool], Tuple[str, str]],
+):
+    """Directly clean up resources using explicit approach.
 
     Args:
-        instance: The object instance containing the resources
-        *resource_tuples: Variable number of tuples in the format:
-                         (attribute_name, resource_name_for_logs, is_external)
-        force_gc: Whether to force garbage collection after cleanup
-
-    Example:
-    ```python
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await direct_resource_cleanup(
-            self,
-            ("_client", "HTTP client", self._client_is_external),
-            ("_download_manager", "download manager", False),
-        )
-    ```
+        obj: Object containing resources to clean up
+        *resources: Sequence of (attr_name, description, is_external) tuples
     """
-    if instance is None:
-        logger.debug("Skipping resource cleanup: instance is None")
-        return
+    logger.debug(
+        f"[ProgressIndicator] Starting direct resource cleanup for {type(obj).__name__}"
+    )
 
-    logger.debug(f"Starting direct resource cleanup for {type(instance).__name__}")
+    # Track cleanup errors
+    cleanup_errors = []
 
-    # First, break any circular references in curl_cffi clients
-    for attr_name, resource_name, is_external in resource_tuples:
-        # Only handle non-external resources
-        if is_external:
-            continue
+    # Track which resources were successfully cleaned
+    cleaned_resources = []
 
-        # Check if the resource exists
-        if not hasattr(instance, attr_name) or getattr(instance, attr_name) is None:
-            continue
+    for res_spec in resources:
+        if len(res_spec) >= 2:
+            attr_name, desc = res_spec[0], res_spec[1]
+            is_external = res_spec[2] if len(res_spec) >= 3 else False
 
-        resource = getattr(instance, attr_name)
+            # Skip resources we don't own
+            if is_external:
+                logger.debug(
+                    f"[ProgressIndicator] Skipping external {desc} ({attr_name})"
+                )
+                continue
 
-        # Special handling for curl_cffi clients - break circular references first
-        if "curl" in str(type(resource)).lower() or hasattr(resource, "_curlm"):
+            # Get the resource
+            resource = getattr(obj, attr_name, None)
+            if resource is None:
+                logger.debug(
+                    f"[ProgressIndicator] {desc} ({attr_name}) is None, skipping"
+                )
+                continue
+
             logger.debug(
-                f"Found curl_cffi client in {attr_name}, breaking circular references"
+                f"[ProgressIndicator] Cleaning up {desc} ({attr_name}) of type {type(resource).__name__}"
             )
 
-            # Nullify _curlm reference that causes circular dependencies
-            if hasattr(resource, "_curlm") and resource._curlm is not None:
-                logger.debug(f"Nullifying _curlm reference in {resource_name}")
-                resource._curlm = None
+            try:
+                # Handle specific resource types
+                if hasattr(resource, "__aexit__"):
+                    logger.debug(
+                        f"[ProgressIndicator] Using __aexit__ to clean up {desc}"
+                    )
+                    try:
+                        await resource.__aexit__(None, None, None)
+                        logger.debug(
+                            f"[ProgressIndicator] Successfully called __aexit__ on {desc}"
+                        )
+                    except Exception as e:
+                        error_msg = f"Error during __aexit__ for {desc}: {e}"
+                        logger.warning(error_msg)
+                        cleanup_errors.append(error_msg)
 
-            # Also clear _timeout_handle if it exists
-            if (
-                hasattr(resource, "_timeout_handle")
-                and resource._timeout_handle is not None
-            ):
-                logger.debug(f"Nullifying _timeout_handle in {resource_name}")
-                resource._timeout_handle = None
+                # For client resources with _client attribute (HTTP clients)
+                if hasattr(resource, "_client") and resource._client:
+                    logger.debug(
+                        f"[ProgressIndicator] Found nested HTTP client in {desc}"
+                    )
+                    try:
+                        from utils.network_utils import safely_close_client
 
-    # Cancel any _force_timeout tasks that might be lingering
-    await _cancel_force_timeout_tasks()
+                        await safely_close_client(resource._client)
+                        logger.debug(
+                            f"[ProgressIndicator] Successfully closed nested client in {desc}"
+                        )
+                    except Exception as e:
+                        error_msg = f"Error closing nested client in {desc}: {e}"
+                        logger.warning(error_msg)
+                        cleanup_errors.append(error_msg)
 
-    # Now proceed with normal resource cleanup
-    for attr_name, resource_name, is_external in resource_tuples:
-        # Skip if the attribute doesn't exist or is None
-        if not hasattr(instance, attr_name) or getattr(instance, attr_name) is None:
-            logger.debug(f"Skipping cleanup for {resource_name}: not available")
-            continue
+                # Try close method (synchronous or asynchronous)
+                if hasattr(resource, "close"):
+                    logger.debug(f"[ProgressIndicator] Calling close() on {desc}")
+                    try:
+                        # Check if this is a curl_cffi client with a NULL pointer issue
+                        if hasattr(resource, "_curlm") and resource._curlm is None:
+                            logger.debug(
+                                f"Skipping close for {desc} with NULL _curlm handle"
+                            )
+                        else:
+                            if inspect.iscoroutinefunction(resource.close):
+                                await resource.close()
+                            else:
+                                resource.close()
+                            logger.debug(
+                                f"[ProgressIndicator] Successfully called close() on {desc}"
+                            )
+                    except Exception as e:
+                        error_msg = f"Error during close() for {desc}: {e}"
+                        logger.warning(error_msg)
+                        cleanup_errors.append(error_msg)
 
-        # Get the resource
-        resource = getattr(instance, attr_name)
+                # Set resource to None to break circular references
+                setattr(obj, attr_name, None)
+                cleaned_resources.append(attr_name)
+                logger.debug(f"[ProgressIndicator] Successfully cleaned up {desc}")
 
-        # Special handling for HTTP clients
-        if resource_name.lower() in ("http client", "client", "session"):
-            await cleanup_client(resource, is_external)
-        # Special handling for file handles
-        elif resource_name.lower() in ("file", "file handle"):
-            await cleanup_file_handle(resource)
-        # General resource cleanup
-        else:
-            await close_resource_with_timeout(resource, resource_name=resource_name)
+            except Exception as e:
+                error_msg = f"Unexpected error cleaning up {desc}: {e}"
+                logger.error(error_msg)
+                cleanup_errors.append(error_msg)
 
-        # Set the resource to None to break reference cycles
-        if not is_external:
-            setattr(instance, attr_name, None)
-            logger.debug(f"Set {resource_name} to None after cleanup")
+    # Final cleanup status
+    if cleanup_errors:
+        logger.warning(f"Resource cleanup encountered {len(cleanup_errors)} errors")
+        for i, error in enumerate(cleanup_errors, 1):
+            logger.debug(f"Cleanup error {i}: {error}")
 
-    # Force garbage collection if enabled
-    if force_gc:
-        collected = gc.collect()
-        logger.debug(f"Forced garbage collection: collected {collected} objects")
+    if cleaned_resources:
+        logger.debug(
+            f"[ProgressIndicator] Successfully cleaned up {len(cleaned_resources)} resources: {', '.join(cleaned_resources)}"
+        )
+    else:
+        logger.debug("[ProgressIndicator] No resources were cleaned up")
 
-    logger.debug(f"Completed direct resource cleanup for {type(instance).__name__}")
+    # Force garbage collection to help with resources
+    gc.collect()
+
+    logger.debug(
+        f"[ProgressIndicator] Resource cleanup for {type(obj).__name__} completed"
+    )
 
 
 async def _cancel_force_timeout_tasks() -> int:

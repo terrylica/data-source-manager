@@ -999,31 +999,66 @@ class RestDataClient:
                                     )
 
                                     # Process historical results
+                                    logger.debug(
+                                        "Creating empty DataFrame for fallback"
+                                    )
+                                    df = self.create_empty_dataframe()
+
                                     if (
                                         historical_results
-                                        and len(historical_results) > 0
+                                        and isinstance(historical_results, list)
+                                        and all(
+                                            isinstance(x, list)
+                                            for x in historical_results
+                                        )
                                     ):
+                                        logger.debug("Processing historical results")
                                         all_data = []
-                                        for chunk_data in historical_results:
-                                            if chunk_data and isinstance(
-                                                chunk_data, list
-                                            ):
-                                                all_data.extend(chunk_data)
+                                        for chunk in historical_results:
+                                            if chunk:
+                                                all_data.extend(chunk)
 
                                         if all_data:
-                                            df = process_kline_data(all_data)
-                                            if not df.empty:
-                                                logger.info(
-                                                    f"Successfully retrieved {len(df)} historical records for {symbol} "
-                                                    f"(up to {cutoff_time.isoformat()})"
+                                            logger.debug(
+                                                f"Processing {len(all_data)} historical records"
+                                            )
+                                            historical_df = process_kline_data(all_data)
+
+                                            # Filter for exact time range
+                                            filtered_df = historical_df[
+                                                (historical_df.index >= start_time)
+                                                & (historical_df.index <= cutoff_time)
+                                            ].copy()
+
+                                            if not filtered_df.empty:
+                                                logger.debug(
+                                                    f"Successfully processed {len(filtered_df)} historical records"
                                                 )
-                                                return df, stats
+                                                df = filtered_df
+                                        else:
+                                            logger.debug("No historical data available")
+                                    else:
+                                        logger.debug(
+                                            f"Invalid historical results format: {type(historical_results)}"
+                                        )
+
+                                    # Always return what we have, even if empty
+                                    t_end_historical = time.time()
+                                    logger.debug(
+                                        f"Historical data fetch completed in {t_end_historical - t_start_historical:.2f}s"
+                                    )
+                                    return df, stats
                                 except Exception as e:
                                     logger.error(
-                                        f"Failed to retrieve historical data: {str(e)}"
+                                        f"Error retrieving historical data: {str(e)}"
                                     )
+                                    # Continue with return of empty DataFrame
 
-            return self.create_empty_dataframe(), stats
+            # Create empty DataFrame with proper structure if we've reached this point
+            logger.debug("Creating empty DataFrame before final return")
+            df = self.create_empty_dataframe()
+            logger.debug("Returning empty DataFrame")
+            return df, stats
 
         except asyncio.TimeoutError:
             # Calculate elapsed time

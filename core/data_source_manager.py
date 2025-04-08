@@ -14,6 +14,7 @@ import math
 import random
 import inspect
 import traceback
+import time
 
 from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
@@ -775,78 +776,105 @@ class DataSourceManager:
         interval: Interval,
         use_vision: bool = False,
     ) -> pd.DataFrame:
-        """Fetch data from appropriate source based on parameters.
+        """Fetch data from specified source (REST or Vision).
 
         Args:
             symbol: Trading pair symbol
             start_time: Start time
             end_time: End time
             interval: Time interval
-            use_vision: Whether to try Vision API first (with REST API fallback)
+            use_vision: Whether to use Vision API
 
         Returns:
             DataFrame with market data
         """
-        # Initialize with empty DataFrame in case of errors
-        result_df = self.create_empty_dataframe()
-
+        logger.debug(f"=== BEGIN _fetch_from_source for {symbol} {interval.value} ===")
+        logger.debug(f"Using source: {'Vision API' if use_vision else 'REST API'}")
         try:
-            # For non-klines chart types, use the appropriate data client
+            # If chart type is not KLINES, use provider-specific client
             if self.chart_type != ChartType.KLINES:
-                try:
-                    client = await self._get_data_client(symbol, interval)
-
-                    # Fetch data using the client with proper timeout handling
+                logger.debug(f"Using specialized client for {self.chart_type.name}")
+                client = await self._get_data_client(symbol, interval)
+                if client:
+                    logger.debug(f"Client obtained: {type(client).__name__}")
                     try:
-                        # Use the standard API timeout from config, not arbitrary values
-                        result_df = await asyncio.wait_for(
-                            client.fetch(start_time, end_time), timeout=MAX_TIMEOUT
+                        logger.debug(f"Calling specialized client fetch for {symbol}")
+                        fetch_start = time.time()
+                        df = await client.fetch(symbol, interval, start_time, end_time)
+                        fetch_elapsed = time.time() - fetch_start
+                        logger.debug(
+                            f"Specialized client fetch completed in {fetch_elapsed:.4f}s"
                         )
-                        # Clean up any lingering force_timeout tasks immediately
-                        await self._cleanup_force_timeout_tasks()
-                    except asyncio.TimeoutError:
-                        logger.error(
-                            f"Timeout after {MAX_TIMEOUT}s while fetching data for {symbol}"
-                        )
-                        # Log timeout event
-                        self._log_timeout_with_details(
-                            operation=f"Chart data fetch for {symbol}",
-                            timeout_value=MAX_TIMEOUT,
-                            details={
-                                "chart_type": self.chart_type.name,
-                                "start_time": start_time.isoformat(),
-                                "end_time": end_time.isoformat(),
-                            },
-                        )
-                        return self.create_empty_dataframe()
-                except asyncio.TimeoutError:
-                    logger.error(f"Timeout while creating data client for {symbol}")
-                    return self.create_empty_dataframe()
 
-            # For KLINES, we still use the legacy code path with REST/Vision
+                        if df is not None and not df.empty:
+                            return df
+                        else:
+                            logger.debug("Specialized client returned empty result")
+                    except Exception as e:
+                        logger.error(f"Specialized client fetch error: {e}")
+                else:
+                    logger.warning(f"No client found for {self.chart_type.name}")
+
+                # If we got here, client fetch failed or returned empty
+                logger.debug(
+                    "Returning empty DataFrame after specialized client attempt"
+                )
+                return self.create_empty_dataframe()
+
+            # For KLINES with Vision API
             if use_vision:
                 try:
-                    # Get aligned boundaries once and reuse them
+                    logger.debug(
+                        f"Using Vision API for klines: {symbol} {interval.value}"
+                    )
+                    # Calculate effective time window for Vision API
+                    # Align boundaries to minute
                     vision_start, vision_end = align_time_boundaries(
                         start_time, end_time, interval
                     )
-
-                    logger.info(
-                        f"Using Vision API with aligned boundaries: {vision_start} -> {vision_end}"
+                    logger.debug(
+                        f"Aligned Vision boundaries: {vision_start} -> {vision_end}"
                     )
 
-                    # Create Vision client if not exists
+                    # Ensure Vision client is initialized
+                    logger.debug(f"Initializing Vision client for {symbol}")
+                    init_start = time.time()
                     await self._ensure_vision_client(symbol, interval.value)
+                    init_elapsed = time.time() - init_start
+                    logger.debug(
+                        f"Vision client initialization completed in {init_elapsed:.4f}s"
+                    )
 
-                    # Fetch from Vision API with aligned boundaries and proper timeout
+                    if not self._vision_client:
+                        logger.error("Failed to initialize Vision client")
+                        return self.create_empty_dataframe()
+
+                    # Fetch from Vision API with proper timeout handling
                     try:
+                        logger.debug(f"Starting Vision API fetch for {symbol}")
                         # Use the standard API timeout from config, not arbitrary values
+                        fetch_start = time.time()
                         vision_df = await asyncio.wait_for(
-                            self._vision_client.fetch(vision_start, vision_end),
-                            timeout=MAX_TIMEOUT,  # Use MAX_TIMEOUT for Vision API
+                            self._vision_client.fetch(
+                                symbol, interval.value, vision_start, vision_end
+                            ),
+                            timeout=MAX_TIMEOUT,
                         )
-                        # Clean up any lingering force_timeout tasks immediately
-                        await self._cleanup_force_timeout_tasks()
+                        fetch_elapsed = time.time() - fetch_start
+                        logger.debug(
+                            f"Vision API fetch completed in {fetch_elapsed:.4f}s"
+                        )
+
+                        # Clean up any lingering force_timeout tasks
+                        logger.debug(
+                            "Initiating timeout task cleanup after Vision API call"
+                        )
+                        cleanup_start = time.time()
+                        tasks_cancelled = await self._cleanup_force_timeout_tasks()
+                        cleanup_elapsed = time.time() - cleanup_start
+                        logger.debug(
+                            f"Timeout task cleanup completed in {cleanup_elapsed:.4f}s, cancelled {tasks_cancelled} tasks"
+                        )
                     except asyncio.TimeoutError:
                         logger.error(
                             f"Vision API timeout after {MAX_TIMEOUT}s, falling back to REST API"
@@ -865,6 +893,9 @@ class DataSourceManager:
                     else:
                         # Check if we got valid data
                         if not vision_df.empty:
+                            logger.debug(
+                                f"Vision API returned {len(vision_df)} raw records, filtering to exact range"
+                            )
                             # Filter result to exact requested time range if needed
                             result_df = filter_dataframe_by_time(
                                 vision_df, start_time, end_time
@@ -874,6 +905,9 @@ class DataSourceManager:
                             if not result_df.empty:
                                 logger.info(
                                     f"Successfully retrieved {len(result_df)} records from Vision API"
+                                )
+                                logger.debug(
+                                    f"=== END _fetch_from_source for {symbol} (Vision API success) ==="
                                 )
                                 return result_df
 
@@ -892,17 +926,34 @@ class DataSourceManager:
                 )
 
                 # Ensure REST client is initialized
+                logger.debug(f"Initializing REST client for {symbol}")
+                init_start = time.time()
                 await self._ensure_rest_client(symbol, interval)
+                init_elapsed = time.time() - init_start
+                logger.debug(
+                    f"REST client initialization completed in {init_elapsed:.4f}s"
+                )
 
                 # Fetch from REST API with proper timeout handling
                 try:
+                    logger.debug(f"Starting REST API fetch for {symbol}")
                     # Use the standard API timeout from config, not arbitrary values
+                    fetch_start = time.time()
                     rest_result = await asyncio.wait_for(
                         self._rest_client.fetch(symbol, interval, start_time, end_time),
                         timeout=MAX_TIMEOUT,
                     )
+                    fetch_elapsed = time.time() - fetch_start
+                    logger.debug(f"REST API fetch completed in {fetch_elapsed:.4f}s")
+
                     # Clean up any lingering force_timeout tasks immediately
-                    await self._cleanup_force_timeout_tasks()
+                    logger.debug("Initiating timeout task cleanup after REST API call")
+                    cleanup_start = time.time()
+                    tasks_cancelled = await self._cleanup_force_timeout_tasks()
+                    cleanup_elapsed = time.time() - cleanup_start
+                    logger.debug(
+                        f"Timeout task cleanup completed in {cleanup_elapsed:.4f}s, cancelled {tasks_cancelled} tasks"
+                    )
                 except asyncio.TimeoutError:
                     logger.error(
                         f"REST API timeout after {MAX_TIMEOUT}s while fetching data for {symbol}"
@@ -917,17 +968,34 @@ class DataSourceManager:
                             "end_time": end_time.isoformat(),
                         },
                     )
+                    logger.debug(
+                        f"=== END _fetch_from_source for {symbol} (REST API timeout) ==="
+                    )
                     return self.create_empty_dataframe()
 
                 # Unpack the tuple - RestDataClient.fetch returns (df, stats)
                 rest_df, stats = rest_result
+                logger.debug(
+                    f"REST API returned {len(rest_df) if not rest_df.empty else 0} records with stats: {stats}"
+                )
 
                 if not rest_df.empty:
                     logger.info(
                         f"Successfully retrieved {len(rest_df)} records from REST API"
                     )
                     # Validate the DataFrame
+                    logger.debug(
+                        f"Validating DataFrame from REST API with {len(rest_df)} records"
+                    )
+                    validation_start = time.time()
                     DataFrameValidator.validate_dataframe(rest_df)
+                    validation_elapsed = time.time() - validation_start
+                    logger.debug(
+                        f"DataFrame validation completed in {validation_elapsed:.4f}s"
+                    )
+                    logger.debug(
+                        f"=== END _fetch_from_source for {symbol} (REST API success) ==="
+                    )
                     return rest_df
 
                 logger.debug(
@@ -944,6 +1012,7 @@ class DataSourceManager:
         logger.info(
             f"No data returned for {symbol} from {start_time} to {end_time} from any source"
         )
+        logger.debug(f"=== END _fetch_from_source for {symbol} (empty result) ===")
         return self.create_empty_dataframe()
 
     def _get_aligned_cache_date(
@@ -1074,6 +1143,7 @@ class DataSourceManager:
 
         This contains the original get_data implementation to avoid nesting timeouts.
         """
+        logger.debug(f"=== BEGIN _get_data_impl for {symbol} {interval.value} ===")
         # Override provider and chart_type if specified
         original_provider = self.provider
         original_chart_type = self.chart_type
@@ -1089,11 +1159,15 @@ class DataSourceManager:
             symbol = symbol.upper()
 
             # Apply comprehensive time boundary validation
+            logger.debug(
+                f"Validating time boundaries for {symbol} {interval.value} request"
+            )
             start_time, end_time, metadata = (
                 DataValidation.validate_query_time_boundaries(
                     start_time, end_time, handle_future_dates="error", interval=interval
                 )
             )
+            logger.debug(f"Time boundaries validated: {start_time} -> {end_time}")
 
             # Log existing warnings from validation except data availability
             data_availability_message = metadata.get("data_availability_message", "")
@@ -1111,8 +1185,12 @@ class DataSourceManager:
             is_data_likely_available = metadata.get("data_likely_available", True)
 
             # Determine data source to use (only applies to KLINES)
+            logger.debug(f"Determining data source for {symbol} {interval.value}")
             use_vision = self._determine_data_source(
                 start_time, end_time, interval, enforce_source
+            )
+            logger.debug(
+                f"Selected data source: {'Vision API' if use_vision else 'REST API'}"
             )
 
             # Check if we can use cache
@@ -1126,15 +1204,22 @@ class DataSourceManager:
                 "provider": self.provider.name,
                 "chart_type": self.chart_type.name,
             }
+            logger.debug(f"Cache components: {cache_components}")
 
             try:
                 # Attempt to load from cache if enabled
                 if is_valid:
+                    logger.debug(f"CHECKPOINT: Before cache load attempt for {symbol}")
+                    logger.debug(
+                        f"Cache is enabled, attempting to load from cache for {symbol}"
+                    )
                     # Get the aligned cache date
                     cache_date = self._get_aligned_cache_date(
                         start_time, end_time, interval, use_vision
                     )
+                    logger.debug(f"Aligned cache date: {cache_date}")
 
+                    logger.debug(f"Loading from cache for {symbol} {interval.value}")
                     cached_data = await self._cache_manager.load_from_cache(
                         date=cache_date,
                         **{
@@ -1160,18 +1245,38 @@ class DataSourceManager:
                             ),
                         },
                     )
+                    logger.debug(f"CHECKPOINT: After cache load attempt for {symbol}")
+                    logger.debug(
+                        f"Cache load complete, data found: {cached_data is not None}"
+                    )
 
                     if cached_data is not None:
                         # Filter DataFrame based on original requested time range
                         # Use inclusive start, inclusive end consistent with API behavior
+                        logger.debug(
+                            f"CHECKPOINT: Before filtering cached data for {symbol}"
+                        )
+                        logger.debug(
+                            f"Filtering cached data by time range: {start_time} -> {end_time}"
+                        )
                         filtered_data = filter_dataframe_by_time(
                             cached_data, start_time, end_time
+                        )
+                        logger.debug(
+                            f"CHECKPOINT: After filtering cached data for {symbol}"
+                        )
+                        logger.debug(
+                            f"Filtered data shape: {filtered_data.shape if not filtered_data.empty else 'empty'}"
                         )
 
                         if not filtered_data.empty:
                             self._stats["hits"] += 1
                             logger.info(
                                 f"Cache hit for {symbol} {self.chart_type.name} from {start_time}"
+                            )
+                            logger.debug("Returning cached data")
+                            logger.debug(
+                                f"=== END _get_data_impl for {symbol} (cache hit return) ==="
                             )
                             return filtered_data
 
@@ -1191,8 +1296,16 @@ class DataSourceManager:
                 # Continue with fetching from source
 
             # Fetch data from appropriate source
+            logger.debug(f"CHECKPOINT: Before fetching from source for {symbol}")
+            logger.debug(
+                f"Fetching data from {'Vision API' if use_vision else 'REST API'}"
+            )
             df = await self._fetch_from_source(
                 symbol, start_time, end_time, interval, use_vision
+            )
+            logger.debug(f"CHECKPOINT: After fetching from source for {symbol}")
+            logger.debug(
+                f"Data fetch complete, retrieved {len(df) if not df.empty else 0} records"
             )
 
             # If data is partially retrieved or empty and we have a data availability warning, log it now
@@ -1243,12 +1356,24 @@ class DataSourceManager:
 
                             try:
                                 # Try to fetch data up to the safe time boundary
+                                logger.debug(
+                                    f"CHECKPOINT: Before fetching historical data for {symbol}"
+                                )
+                                logger.debug(
+                                    f"Fetching historical data with safe end time: {safe_end_time}"
+                                )
                                 historical_df = await self._fetch_from_source(
                                     symbol,
                                     start_time,
                                     safe_end_time,
                                     interval,
                                     use_vision,
+                                )
+                                logger.debug(
+                                    f"CHECKPOINT: After fetching historical data for {symbol}"
+                                )
+                                logger.debug(
+                                    f"Historical data fetch complete, rows: {len(historical_df) if not historical_df.empty else 0}"
                                 )
 
                                 if not historical_df.empty:
@@ -1265,10 +1390,15 @@ class DataSourceManager:
             # Cache if enabled and data is not empty
             if is_valid and not df.empty and self._cache_manager:
                 try:
+                    logger.debug(f"CHECKPOINT: Before caching data for {symbol}")
+                    logger.debug(
+                        f"Caching {len(df)} records for {symbol} {interval.value}"
+                    )
                     # Get the aligned cache date
                     cache_date = self._get_aligned_cache_date(
                         start_time, end_time, interval, use_vision
                     )
+                    logger.debug(f"Aligned cache date for saving: {cache_date}")
 
                     await self._cache_manager.save_to_cache(
                         df=df,
@@ -1294,18 +1424,24 @@ class DataSourceManager:
                             )
                         ),
                     )
+                    logger.debug(f"CHECKPOINT: After caching data for {symbol}")
                     logger.info(
                         f"Cached {len(df)} records for {symbol} {self.chart_type.name}"
                     )
                 except Exception as e:
                     logger.error(f"Error caching data: {e}")
 
+            logger.debug(
+                f"Returning {len(df) if not df.empty else 0} records for {symbol} {interval.value}"
+            )
+            logger.debug(f"=== END _get_data_impl for {symbol} (regular return) ===")
             return df
 
         finally:
             # Restore original values
             self.provider = original_provider
             self.chart_type = original_chart_type
+            logger.debug("Restored original provider and chart_type values")
 
     def _determine_data_source(
         self,
@@ -1342,50 +1478,144 @@ class DataSourceManager:
 
     async def __aenter__(self):
         """Initialize resources when entering the context."""
-        logger.debug(f"Initializing DataSourceManager for {self.market_type.name}")
+        logger.debug(
+            f"[ProgressIndicator] DataSourceManager: Initializing for {self.market_type.name}"
+        )
 
         # Proactively clean up any force_timeout tasks that might cause hanging
+        logger.debug(
+            "[ProgressIndicator] DataSourceManager: Cleaning up any lingering tasks before initialization"
+        )
         await self._cleanup_force_timeout_tasks()
 
         # Register available client implementations
+        logger.debug(
+            "[ProgressIndicator] DataSourceManager: Registering client implementations"
+        )
         self._register_client_implementations()
 
+        logger.debug("[ProgressIndicator] DataSourceManager: Initialization complete")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Clean up resources when exiting the context."""
-        logger.debug("DataSourceManager starting __aexit__ cleanup")
+        logger.debug(
+            "[ProgressIndicator] DataSourceManager: Starting __aexit__ cleanup"
+        )
+
+        cleanup_errors = []
+
+        # First, clean up any background tasks BEFORE trying to close clients
+        try:
+            # Proactively cancel all force_timeout tasks before cleaning up clients
+            await self._cleanup_force_timeout_tasks()
+
+            # Look for ANY curl-related tasks, not just force_timeout ones
+            lingering_tasks = [
+                t
+                for t in asyncio.all_tasks()
+                if not t.done()
+                and (
+                    "curl" in str(t).lower()
+                    or "_force_timeout" in str(t)
+                    or "http_client" in str(t).lower()
+                )
+            ]
+
+            if lingering_tasks:
+                logger.warning(
+                    f"Found {len(lingering_tasks)} lingering HTTP-related tasks, cancelling"
+                )
+
+                # Cancel in two phases: first cancel, then cancel again with more force
+                # Phase 1: Normal cancellation
+                for task in lingering_tasks:
+                    task.cancel()
+
+                # Wait briefly for cancellation with timeout
+                try:
+                    # Use a short timeout to avoid blocking
+                    await asyncio.wait(lingering_tasks, timeout=0.3)
+                except Exception as e:
+                    logger.warning(f"Error during first phase task cancellation: {e}")
+
+                # Phase 2: More aggressive cancellation for any tasks still not done
+                still_pending = [t for t in lingering_tasks if not t.done()]
+                if still_pending:
+                    logger.warning(
+                        f"{len(still_pending)} tasks still pending after first cancellation"
+                    )
+                    for task in still_pending:
+                        task.cancel()
+                        # Try to force exception into the task's coroutine if possible
+                        if hasattr(task, "_coro"):
+                            try:
+                                task._coro.throw(asyncio.CancelledError)
+                            except (StopIteration, asyncio.CancelledError):
+                                pass
+                            except Exception as e:
+                                logger.debug(f"Error forcing task cancellation: {e}")
+
+                # Force garbage collection to help release resources
+                gc.collect()
+        except Exception as e:
+            error_msg = f"Error during background task cleanup: {e}"
+            logger.warning(error_msg)
+            cleanup_errors.append(error_msg)
 
         # Pre-emptively break circular references that might cause hanging
         if hasattr(self, "_rest_client") and self._rest_client:
+            logger.debug(
+                "[ProgressIndicator] DataSourceManager: Pre-emptively cleaning REST client references"
+            )
             client = self._rest_client
             if hasattr(client, "_client") and client._client:
                 if hasattr(client._client, "_curlm") and client._client._curlm:
                     logger.debug(
-                        "Pre-emptively cleaning _curlm reference in _rest_client"
+                        "[ProgressIndicator] DataSourceManager: Cleaning _curlm reference in _rest_client"
                     )
-                    client._client._curlm = None
+                    try:
+                        client._client._curlm = None
+                    except Exception as e:
+                        error_msg = f"Error clearing REST client _curlm: {e}"
+                        logger.warning(error_msg)
+                        cleanup_errors.append(error_msg)
 
         if hasattr(self, "_vision_client") and self._vision_client:
+            logger.debug(
+                "[ProgressIndicator] DataSourceManager: Pre-emptively cleaning Vision client references"
+            )
             client = self._vision_client
             if hasattr(client, "_client") and client._client:
                 if hasattr(client._client, "_curlm") and client._client._curlm:
                     logger.debug(
-                        "Pre-emptively cleaning _curlm reference in _vision_client"
+                        "[ProgressIndicator] DataSourceManager: Cleaning _curlm reference in _vision_client"
                     )
-                    client._client._curlm = None
+                    try:
+                        client._client._curlm = None
+                    except Exception as e:
+                        error_msg = f"Error clearing Vision client _curlm: {e}"
+                        logger.warning(error_msg)
+                        cleanup_errors.append(error_msg)
 
         # Initialize _funding_rate_client_is_external if it doesn't exist
         if not hasattr(self, "_funding_rate_client_is_external"):
             logger.debug(
-                "Initializing missing _funding_rate_client_is_external attribute"
+                "[ProgressIndicator] DataSourceManager: Initializing missing _funding_rate_client_is_external attribute"
             )
             self._funding_rate_client_is_external = True
+
+        logger.debug(
+            "[ProgressIndicator] DataSourceManager: Preparing to clean up client resources"
+        )
 
         # List of clients to clean up - only include attributes that actually exist
         clients_to_cleanup = []
 
         if hasattr(self, "_rest_client"):
+            logger.debug(
+                "[ProgressIndicator] DataSourceManager: Adding REST client to cleanup list"
+            )
             clients_to_cleanup.append(
                 (
                     "_rest_client",
@@ -1395,6 +1625,9 @@ class DataSourceManager:
             )
 
         if hasattr(self, "_vision_client"):
+            logger.debug(
+                "[ProgressIndicator] DataSourceManager: Adding Vision client to cleanup list"
+            )
             clients_to_cleanup.append(
                 (
                     "_vision_client",
@@ -1404,9 +1637,15 @@ class DataSourceManager:
             )
 
         if hasattr(self, "_cache_manager"):
+            logger.debug(
+                "[ProgressIndicator] DataSourceManager: Adding cache manager to cleanup list"
+            )
             clients_to_cleanup.append(("_cache_manager", "cache manager", False))
 
         if hasattr(self, "_funding_rate_client"):
+            logger.debug(
+                "[ProgressIndicator] DataSourceManager: Adding funding rate client to cleanup list"
+            )
             clients_to_cleanup.append(
                 (
                     "_funding_rate_client",
@@ -1416,9 +1655,34 @@ class DataSourceManager:
             )
 
         # Use direct resource cleanup pattern for consistent handling of resources
-        await direct_resource_cleanup(self, *clients_to_cleanup)
+        try:
+            logger.debug(
+                f"[ProgressIndicator] DataSourceManager: Cleaning up {len(clients_to_cleanup)} client resources"
+            )
+            await direct_resource_cleanup(self, *clients_to_cleanup)
+            logger.debug(
+                "[ProgressIndicator] DataSourceManager: Client resources cleanup completed"
+            )
+        except Exception as e:
+            error_msg = f"Error during direct resource cleanup: {e}"
+            logger.error(error_msg)
+            cleanup_errors.append(error_msg)
 
-        logger.debug("DataSourceManager completed __aexit__ cleanup")
+        # Run garbage collection to help release resources
+        logger.debug(
+            "[ProgressIndicator] DataSourceManager: Running garbage collection"
+        )
+        gc.collect()
+
+        # Log any errors that occurred during cleanup
+        if cleanup_errors:
+            logger.warning(
+                f"DataSourceManager encountered {len(cleanup_errors)} errors during cleanup"
+            )
+            for i, error in enumerate(cleanup_errors, 1):
+                logger.debug(f"Cleanup error {i}: {error}")
+
+        logger.debug("[ProgressIndicator] DataSourceManager: Cleanup completed")
 
     async def _cleanup_force_timeout_tasks(self):
         """Find and clean up any _force_timeout tasks that might cause hanging.
@@ -1426,20 +1690,42 @@ class DataSourceManager:
         This is a proactive approach to prevent hanging issues caused by
         lingering force_timeout tasks in curl_cffi AsyncCurl objects.
         """
+        cleanup_start = time.time()
+        logger.debug("Starting cleanup of timeout tasks")
         # Find all tasks that might be related to _force_timeout
         force_timeout_tasks = []
 
         # Get all tasks
+        task_fetch_start = time.time()
         all_tasks = asyncio.all_tasks()
+        task_fetch_elapsed = time.time() - task_fetch_start
+        logger.debug(
+            f"Task fetch completed in {task_fetch_elapsed:.4f}s, found {len(all_tasks)} total tasks running"
+        )
 
         # First identify curl_cffi force_timeout tasks specifically
+        task_analysis_start = time.time()
+        task_types = {}
         for task in all_tasks:
             task_str = str(task)
+            task_name = task.__class__.__name__
+
+            # Count by type for debugging
+            if task_name not in task_types:
+                task_types[task_name] = 0
+            task_types[task_name] += 1
+
             # Only target actual force_timeout tasks
             if "_force_timeout" in task_str and not task.done():
                 # Check if it's been running for more than 5 seconds
                 if hasattr(task, "_coro") and hasattr(task._coro, "cr_frame"):
                     force_timeout_tasks.append(task)
+
+        task_analysis_elapsed = time.time() - task_analysis_start
+        logger.debug(f"Task analysis completed in {task_analysis_elapsed:.4f}s")
+        # Log task types summary for debugging
+        logger.debug(f"Task types: {task_types}")
+        logger.debug(f"Found {len(force_timeout_tasks)} force_timeout tasks to examine")
 
         # If we have too many tasks, be more selective
         if len(force_timeout_tasks) > 20:
@@ -1447,17 +1733,26 @@ class DataSourceManager:
                 f"Found {len(force_timeout_tasks)} timeout tasks, filtering to avoid excessive cancellation"
             )
             # Keep only the tasks that are most likely to be leaked
+            filtering_start = time.time()
             filtered_tasks = []
             for task in force_timeout_tasks:
                 task_str = str(task)
                 # More selective criteria
                 if "_force_timeout" in task_str and "AsyncCurl" in task_str:
                     filtered_tasks.append(task)
+
+            filtering_elapsed = time.time() - filtering_start
+            logger.debug(f"Task filtering completed in {filtering_elapsed:.4f}s")
+            logger.debug(
+                f"Filtered down to {len(filtered_tasks)} AsyncCurl force_timeout tasks"
+            )
             force_timeout_tasks = filtered_tasks
 
         # Now check for other curl_cffi tasks but only if they look stuck
         # and are not part of active data retrieval operations
+        curl_tasks_count = 0
         if len(force_timeout_tasks) < 10:  # Only if we don't already have too many
+            curl_check_start = time.time()
             for task in all_tasks:
                 if task in force_timeout_tasks:
                     continue  # Skip tasks we've already selected
@@ -1474,6 +1769,14 @@ class DataSourceManager:
                     not in task_str  # Don't cancel active data retrieval
                 ):
                     force_timeout_tasks.append(task)
+                    curl_tasks_count += 1
+
+            curl_check_elapsed = time.time() - curl_check_start
+            logger.debug(f"Curl tasks check completed in {curl_check_elapsed:.4f}s")
+            if curl_tasks_count > 0:
+                logger.debug(
+                    f"Added {curl_tasks_count} additional curl_cffi tasks for cleanup"
+                )
 
         if force_timeout_tasks:
             # Limit the number of tasks we cancel to a reasonable amount
@@ -1486,34 +1789,43 @@ class DataSourceManager:
             logger.warning(
                 f"Proactively cancelling {len(force_timeout_tasks)} timeout/curl_cffi tasks"
             )
+
+            # Log short summaries of tasks being cancelled
+            for i, task in enumerate(force_timeout_tasks[:5]):  # Log first 5 only
+                task_str = str(task)
+                # Extract a brief summary (first 50 chars)
+                summary = task_str[:75] + "..." if len(task_str) > 75 else task_str
+                logger.debug(f"Cancelling task {i+1}: {summary}")
+
             # Cancel all force_timeout tasks
+            cancel_start = time.time()
             for task in force_timeout_tasks:
                 task.cancel()
+            cancel_elapsed = time.time() - cancel_start
+            logger.debug(f"Task cancellation completed in {cancel_elapsed:.4f}s")
 
             # Wait for cancellation to complete with timeout
             try:
-                await asyncio.wait_for(
-                    asyncio.gather(*force_timeout_tasks, return_exceptions=True),
-                    timeout=0.5,  # Short timeout to avoid blocking
-                )
+                logger.debug("Waiting for task cancellation to complete (timeout 0.5s)")
+                wait_start = time.time()
+                done, pending = await asyncio.wait(force_timeout_tasks, timeout=0.5)
+                wait_elapsed = time.time() - wait_start
+                logger.debug(f"Wait for cancellation completed in {wait_elapsed:.4f}s")
                 logger.debug(
-                    f"Successfully cancelled {len(force_timeout_tasks)} timeout/curl_cffi tasks"
-                )
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "Timeout waiting for curl_cffi tasks to cancel, proceeding anyway"
+                    f"Task cancellation complete: {len(done)} done, {len(pending)} pending"
                 )
 
-            # Check if tasks were actually cancelled
-            still_running = [t for t in force_timeout_tasks if not t.done()]
-            if still_running:
-                logger.warning(
-                    f"{len(still_running)} curl_cffi tasks still running after cancel attempt"
-                )
-                for task in still_running:
-                    # Extra cancellation attempt
-                    task.cancel()
+                if pending:
+                    logger.warning(
+                        f"{len(pending)} tasks are still pending after cancellation"
+                    )
+            except Exception as e:
+                logger.warning(f"Error waiting for task cancellation: {e}")
 
+        total_elapsed = time.time() - cleanup_start
+        logger.debug(
+            f"Timeout task cleanup complete, cancelled {len(force_timeout_tasks)} tasks in {total_elapsed:.4f}s"
+        )
         return len(force_timeout_tasks)
 
     async def _ensure_rest_client(self, symbol: str, interval: Interval) -> None:

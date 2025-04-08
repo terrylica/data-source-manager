@@ -20,6 +20,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional, Sequence, TypeVar, Generic, Union
 import gc
+import time
 
 import pandas as pd
 
@@ -34,6 +35,7 @@ from utils.time_utils import (
 from utils.network_utils import (
     create_client,
     VisionDownloadManager,
+    safely_close_client,
 )
 from utils.config import (
     create_empty_dataframe,
@@ -143,35 +145,83 @@ class VisionDataClient(Generic[T]):
 
         This is a proactive approach to prevent hanging issues caused by
         lingering force_timeout tasks in curl_cffi AsyncCurl objects.
+
+        Returns:
+            int: Number of tasks cancelled
         """
         # Find all tasks that might be related to _force_timeout
         force_timeout_tasks = []
         for task in asyncio.all_tasks():
             task_str = str(task)
-            # Look specifically for _force_timeout tasks
-            if "_force_timeout" in task_str and not task.done():
+            # Look specifically for _force_timeout tasks and any curl_cffi related tasks
+            if (
+                "_force_timeout" in task_str or "curl_cffi" in task_str
+            ) and not task.done():
                 force_timeout_tasks.append(task)
 
+        cancelled_count = 0
         if force_timeout_tasks:
             logger.warning(
-                f"Proactively cancelling {len(force_timeout_tasks)} _force_timeout tasks"
+                f"[ProgressIndicator] VisionDataClient: Proactively cancelling {len(force_timeout_tasks)} tasks (force_timeout/curl_cffi)"
             )
-            # Cancel all force_timeout tasks
+            # First cancel any futures being waited on
             for task in force_timeout_tasks:
+                # Try to cancel the future the task is waiting on
+                if (
+                    hasattr(task, "_fut_waiter")
+                    and task._fut_waiter
+                    and not task._fut_waiter.done()
+                ):
+                    try:
+                        logger.debug(
+                            f"[ProgressIndicator] VisionDataClient: Cancelling future for task: {task}"
+                        )
+                        task._fut_waiter.cancel()
+                    except Exception as e:
+                        logger.debug(f"Error cancelling future: {e}")
+
+                # Then cancel the task itself
                 task.cancel()
+                cancelled_count += 1
 
             # Wait for cancellation to complete with timeout
             try:
-                await asyncio.wait_for(
-                    asyncio.gather(*force_timeout_tasks, return_exceptions=True),
-                    timeout=0.5,  # Short timeout to avoid blocking
-                )
-                logger.debug(
-                    f"Successfully cancelled {len(force_timeout_tasks)} _force_timeout tasks"
-                )
-            except asyncio.TimeoutError:
+                # Use wait with timeout instead of wait_for to avoid exceptions
+                done, pending = await asyncio.wait(force_timeout_tasks, timeout=0.5)
+
+                # Check if there are still pending tasks after the timeout
+                if pending:
+                    logger.warning(
+                        f"[ProgressIndicator] VisionDataClient: {len(pending)} tasks still pending after cancellation attempt"
+                    )
+                    # More aggressive cancellation for stubborn tasks
+                    for task in pending:
+                        task.cancel()
+
+                        # Try to force the task to wake up from any wait state
+                        if hasattr(task, "_coro") and task._coro:
+                            try:
+                                if hasattr(task._coro, "throw"):
+                                    task._coro.throw(asyncio.CancelledError())
+                            except Exception:
+                                pass
+            except Exception as e:
                 logger.warning(
-                    "Timeout waiting for _force_timeout tasks to cancel, proceeding anyway"
+                    f"[ProgressIndicator] VisionDataClient: Error during task cancellation wait: {e}"
+                )
+
+            # Force garbage collection to help with lingering references
+            gc.collect()
+
+            # Log the final state of the tasks
+            still_pending = [t for t in force_timeout_tasks if not t.done()]
+            if still_pending:
+                logger.warning(
+                    f"[ProgressIndicator] VisionDataClient: {len(still_pending)} tasks still not cancelled after cleanup"
+                )
+            else:
+                logger.debug(
+                    "[ProgressIndicator] VisionDataClient: All targeted tasks successfully cancelled"
                 )
 
         # Also clean _timeout_handle if it exists on the client
@@ -181,11 +231,17 @@ class VisionDataClient(Generic[T]):
             and hasattr(self._client, "_timeout_handle")
             and self._client._timeout_handle
         ):
-            logger.debug("Pre-emptively cleaning _timeout_handle to prevent hanging")
+            logger.debug(
+                "[ProgressIndicator] VisionDataClient: Pre-emptively cleaning _timeout_handle to prevent hanging"
+            )
             try:
                 self._client._timeout_handle = None
             except Exception as e:
-                logger.warning(f"Error pre-emptively clearing _timeout_handle: {e}")
+                logger.warning(
+                    f"[ProgressIndicator] VisionDataClient: Error pre-emptively clearing _timeout_handle: {e}"
+                )
+
+        return cancelled_count
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Python 3.13 compatible cleanup implementation.
@@ -193,57 +249,198 @@ class VisionDataClient(Generic[T]):
         This uses the direct resource cleanup pattern to guarantee immediate resource
         release without relying on background tasks, preventing hanging during cleanup.
         """
-        logger.debug("VisionDataClient starting __aexit__ cleanup")
+        logger.debug("[ProgressIndicator] VisionDataClient: Starting __aexit__ cleanup")
 
-        # Pre-emptively clean up _curlm objects that might cause hanging
+        cleanup_errors = []
+        cleanup_start_time = time.time()
+
+        # Track all active tasks before cleanup for diagnosis
+        pre_cleanup_tasks = [t for t in asyncio.all_tasks() if not t.done()]
+        logger.debug(
+            f"[ProgressIndicator] VisionDataClient: {len(pre_cleanup_tasks)} active tasks before cleanup"
+        )
+        for i, task in enumerate(pre_cleanup_tasks[:5]):  # Show up to 5 tasks
+            task_str = str(task)
+            short_task = task_str[:200] + "..." if len(task_str) > 200 else task_str
+            logger.debug(
+                f"[ProgressIndicator] VisionDataClient: Pre-cleanup task {i+1}: {short_task}"
+            )
+
+        # STEP 1: Pre-emptively clean up _curlm objects that might cause hanging
         if hasattr(self, "_client") and self._client:
             if hasattr(self._client, "_curlm") and self._client._curlm:
-                logger.debug("Pre-emptively cleaning _curlm object in _client")
+                logger.debug(
+                    "[ProgressIndicator] VisionDataClient: Breaking _curlm circular reference"
+                )
                 try:
-                    # Set to None before cleanup to break circular references
                     self._client._curlm = None
                 except Exception as e:
-                    logger.warning(f"Error pre-emptively clearing _curlm: {e}")
+                    error_msg = f"Error clearing _curlm: {e}"
+                    logger.warning(error_msg)
+                    cleanup_errors.append(error_msg)
 
-        if hasattr(self, "_download_manager") and self._download_manager:
+            # Also clear _timeout_handle if it exists
             if (
-                hasattr(self._download_manager, "_client")
-                and self._download_manager._client
+                hasattr(self._client, "_timeout_handle")
+                and self._client._timeout_handle
             ):
-                if (
-                    hasattr(self._download_manager._client, "_curlm")
-                    and self._download_manager._client._curlm
-                ):
-                    logger.debug(
-                        "Pre-emptively cleaning _curlm object in _download_manager._client"
-                    )
-                    try:
-                        self._download_manager._client._curlm = None
-                    except Exception as e:
+                logger.debug(
+                    "[ProgressIndicator] VisionDataClient: Breaking _timeout_handle reference"
+                )
+                try:
+                    self._client._timeout_handle = None
+                except Exception as e:
+                    error_msg = f"Error clearing _timeout_handle: {e}"
+                    logger.warning(error_msg)
+                    cleanup_errors.append(error_msg)
+
+        # STEP 2: Clean up tasks that might cause hanging
+        try:
+            logger.debug(
+                "[ProgressIndicator] VisionDataClient: Cancelling _force_timeout tasks"
+            )
+            cancelled_count = await self._cleanup_force_timeout_tasks()
+            logger.debug(
+                f"[ProgressIndicator] VisionDataClient: Cancelled {cancelled_count} _force_timeout tasks"
+            )
+        except Exception as e:
+            error_msg = f"Error during force timeout task cleanup: {e}"
+            logger.error(error_msg)
+            cleanup_errors.append(error_msg)
+
+        # STEP 3: Cancel any other curl_cffi related tasks directly
+        try:
+            # Find any curl_cffi related tasks that might be still running
+            curl_tasks = [
+                t
+                for t in asyncio.all_tasks()
+                if not t.done()
+                and (
+                    "curl_cffi" in str(t)
+                    or "vision" in str(t).lower()
+                    or "download" in str(t).lower()
+                )
+            ]
+
+            if curl_tasks:
+                logger.warning(
+                    f"[ProgressIndicator] VisionDataClient: Found {len(curl_tasks)} lingering curl/vision tasks, cancelling"
+                )
+                for task in curl_tasks:
+                    task.cancel()
+
+                try:
+                    # Wait briefly for cancellation with a shorter timeout
+                    await asyncio.wait(curl_tasks, timeout=0.5)
+
+                    # Log tasks that are still running after cancellation attempt
+                    still_running = [t for t in curl_tasks if not t.done()]
+                    if still_running:
                         logger.warning(
-                            f"Error pre-emptively clearing _download_manager._client._curlm: {e}"
+                            f"[ProgressIndicator] VisionDataClient: {len(still_running)} tasks still running after cancellation"
                         )
+                except Exception as e:
+                    logger.warning(
+                        f"[ProgressIndicator] VisionDataClient: Error waiting for task cancellation: {e}"
+                    )
+        except Exception as e:
+            error_msg = f"Error cancelling lingering tasks: {e}"
+            logger.error(error_msg)
+            cleanup_errors.append(error_msg)
 
-        # For Python 3.13 compatibility, we need to specify the client as external
-        # if it's managed by the download manager
-        client_is_external = False
-        if hasattr(self, "_download_manager") and self._download_manager:
-            if (
-                hasattr(self._download_manager, "_client")
-                and self._download_manager._client
-                and self._download_manager._client is self._client
-            ):
-                # Client is managed by download manager, so we shouldn't close it twice
-                client_is_external = True
+        # STEP 4: Use direct resource cleanup for better reliability
+        try:
+            # A. Clean up download manager first (most important)
+            if hasattr(self, "_download_manager") and self._download_manager:
+                logger.debug(
+                    "[ProgressIndicator] VisionDataClient: Cleaning up download manager"
+                )
+                try:
+                    # First try using its cleanup method if available
+                    if hasattr(
+                        self._download_manager, "_cleanup_resources"
+                    ) and callable(self._download_manager._cleanup_resources):
+                        await self._download_manager._cleanup_resources()
 
-        # Then proceed with normal resource cleanup
-        await direct_resource_cleanup(
-            self,
-            ("_client", "HTTP client", client_is_external),
-            ("_download_manager", "download manager", False),
+                    # Then clear all possible references within the download manager
+                    if hasattr(self._download_manager, "client"):
+                        if (
+                            self._download_manager.client is not self._client
+                        ):  # Only if it's a different client
+                            from utils.network_utils import safely_close_client
+
+                            logger.debug(
+                                "[ProgressIndicator] VisionDataClient: Closing download manager's client"
+                            )
+                            await safely_close_client(self._download_manager.client)
+                        self._download_manager.client = None
+
+                    # Then clear the reference to the download manager
+                    self._download_manager = None
+                    logger.debug(
+                        "[ProgressIndicator] VisionDataClient: Download manager cleaned up"
+                    )
+                except Exception as e:
+                    error_msg = f"Error cleaning up download manager: {e}"
+                    logger.error(error_msg)
+                    cleanup_errors.append(error_msg)
+
+            # B. Clean up HTTP client using safely_close_client
+            if hasattr(self, "_client") and self._client:
+                logger.debug(
+                    "[ProgressIndicator] VisionDataClient: Cleaning up HTTP client"
+                )
+                try:
+                    from utils.network_utils import safely_close_client
+
+                    await safely_close_client(self._client)
+                    self._client = None
+                    logger.debug(
+                        "[ProgressIndicator] VisionDataClient: HTTP client cleaned up"
+                    )
+                except Exception as e:
+                    error_msg = f"Error cleaning up HTTP client: {e}"
+                    logger.error(error_msg)
+                    cleanup_errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"Unexpected error during resource cleanup: {e}"
+            logger.error(error_msg)
+            cleanup_errors.append(error_msg)
+
+        # STEP 5: Multiple rounds of garbage collection to fix curl references in memory
+        logger.debug(
+            "[ProgressIndicator] VisionDataClient: Running multiple rounds of garbage collection"
+        )
+        collected_total = 0
+        for i in range(3):
+            collected = gc.collect()
+            collected_total += collected
+            logger.debug(
+                f"[ProgressIndicator] VisionDataClient: GC round {i+1} collected {collected} objects"
+            )
+
+        # Log active tasks for diagnostics
+        active_tasks = [t for t in asyncio.all_tasks() if not t.done()]
+        logger.debug(
+            f"[ProgressIndicator] VisionDataClient: {len(active_tasks)} tasks active after cleanup (was {len(pre_cleanup_tasks)})"
         )
 
-        logger.debug("VisionDataClient completed __aexit__ cleanup")
+        # Final status report
+        cleanup_duration = time.time() - cleanup_start_time
+        logger.debug(
+            f"[ProgressIndicator] VisionDataClient: Cleanup completed in {cleanup_duration:.3f}s with {len(cleanup_errors)} errors"
+        )
+        if cleanup_errors:
+            logger.warning(
+                f"VisionDataClient cleanup encountered {len(cleanup_errors)} errors"
+            )
+            for i, error in enumerate(cleanup_errors, 1):
+                logger.debug(f"Cleanup error {i}: {error}")
+        else:
+            logger.debug(
+                "[ProgressIndicator] VisionDataClient: Clean exit with no errors"
+            )
 
     def _create_empty_dataframe(self) -> pd.DataFrame:
         """Create an empty DataFrame with correct structure.
