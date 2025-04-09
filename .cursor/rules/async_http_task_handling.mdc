@@ -1,0 +1,174 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Async HTTP Client Task Handling Best Practices
+
+## Tiered Implementation Priorities
+
+## 🔝 Tier 1 – Critical Practices (Must-Haves)
+
+1. **Handle CancelledError Properly (Including Propagation)**
+   - Essential for graceful cancellation and proper shutdown
+   - Always re-raise CancelledError to propagate correctly
+   - ⚠️ Suppressing it can lead to stuck or hidden tasks
+   ```python
+   try:
+       result = await task
+       return result
+   except asyncio.CancelledError:
+       logger.warning(f"Fetch operation for {self.symbol} was cancelled")
+       # Clean up resources
+       raise  # Re-raise to propagate cancellation
+   finally:
+       # Ensure cleanup happens regardless of outcome
+       if not self.completion_event.is_set():
+           self.completion_event.set()
+   ```
+
+2. **Track All Tasks**
+   - Enables lifecycle management and cleanup
+   - ⚠️ Prevents task leaks and dangling operations
+   ```python
+   self.tasks = set()
+   task = asyncio.create_task(coro)
+   self.tasks.add(task)
+   task.add_done_callback(lambda t: self.tasks.discard(t))
+   ```
+
+3. **Use cancel_and_wait() Instead of task.cancel()**
+   - Ensures that cancelled tasks fully complete and don't linger
+   ```python
+   async def cancel_and_wait(task, timeout=1.0):
+       """Cancel a task and wait for it to complete."""
+       task.cancel()
+       try:
+           # Only use shields and timeout here for task cleanup, not for business logic
+           await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+       except (asyncio.CancelledError, asyncio.TimeoutError):
+           pass  # Expected
+   ```
+
+4. **Event-Based Cancellation & Propagation**
+   - Use asyncio.Event() or similar mechanisms for structured cancellation
+   - Enables pausing, resuming, and clean coordination between tasks
+   - Ensures parent task cancellation propagates cleanly to subtasks
+   - 🧩 Recommended over timeout-based logic or signal traps
+   ```python
+   # Create events for control
+   self.cancel_event = asyncio.Event()
+   self.pause_event = asyncio.Event()
+   self.resume_event = asyncio.Event()
+   self.resume_event.set()  # Set initially to allow execution
+   
+   # Check for cancellation
+   if self.cancel_event.is_set() or asyncio.current_task().cancelled():
+       logger.info(f"Cancel event detected for {self.symbol}")
+       await cancel_and_wait(fetch_task, timeout=1.0)
+       break
+   ```
+
+5. **Clean Up Resources Before Exit**
+   - Prevents memory/resource leaks; ensures file/network handles are closed
+   ```python
+   async def cleanup_lingering_tasks():
+       """Clean up any lingering tasks to prevent leakage."""
+       tasks = [t for t in asyncio.all_tasks() if t != asyncio.current_task()]
+       for task in tasks:
+           if not task.done() and not task.cancelled():
+               task.cancel()
+       if tasks:
+           # This timeout is for cleanup only, not application logic
+           await asyncio.wait(tasks, timeout=2.0)
+       
+       # Force garbage collection to clean up resources
+       gc.collect()
+   ```
+
+## 🟡 Tier 2 – High-Value Enhancements
+
+6. **Cancellation Checkpoints**
+   - Ensures responsiveness in long loops or heavy logic
+   - ✅ Use to break safely out of long-running work
+   ```python
+   # Split the work into chunks and check for cancellation
+   for i in range(total_work_items):
+       # Check if cancellation was requested
+       if self.cancel_event.is_set() or asyncio.current_task().cancelled():
+           raise asyncio.CancelledError("Operation cancelled")
+       
+       # Do a small unit of work
+       await process_item(items[i])
+       
+       # Yield control briefly
+       await asyncio.sleep(0)
+   ```
+
+7. **Log All Cancellations and Errors**
+   - Helps with observability and debugging in production
+   - 🔍 Track cancellations with context (task name, symbol, etc.)
+   ```python
+   logger.warning(f"Fetch operation for {self.symbol} was cancelled during {self.progress['stage']}")
+   ```
+
+8. **Monitor for Task Leakage**
+   - Identifies runaway tasks after cleanup
+   - 🛑 Helps detect subtle bugs
+   ```python
+   tasks_before = len(asyncio.all_tasks())
+   # Run operations
+   tasks_after = len(asyncio.all_tasks())
+   if tasks_after > tasks_before:
+       logger.warning(f"Task leakage detected: {tasks_after - tasks_before} more tasks")
+   ```
+
+9. **Maintain and Update Progress State**
+   - Useful for transparency, retries, and monitoring
+   - 📊 Especially valuable in batch or UI-integrated systems
+   ```python
+   self.progress = {
+       "stage": "initialized",
+       "delay_progress": "0%",
+       "completed": False
+   }
+   
+   # Update progress at key points
+   self.progress["stage"] = "processing"
+   self.progress["delay_progress"] = f"{(i+1)/total*100:.0f}%"
+   ```
+
+## 🔻 Tier 3 – Least Important (Fallback Only)
+
+10. **Timeout-Based Cancellation**
+    - Use when external service latency must be bounded
+    - ⚠️ Avoid as primary control due to tuning difficulty
+    - Only implement when explicitly requested by project users
+    ```python
+    # Alternative approach using events instead of timeouts
+    async def wait_with_cancellation(completion_event, cancel_event, check_interval=0.1):
+        """Wait for completion or cancellation without using timeouts."""
+        while not completion_event.is_set():
+            if cancel_event.is_set():
+                return False  # Cancelled
+            await asyncio.sleep(check_interval)  # Small sleep to prevent CPU spinning
+        return True  # Completed
+    ```
+
+11. **Concurrency: Use Concurrent Tasks Appropriately**
+    - Valuable for parallel work, but adds failure complexity
+    - ⚖️ Manage carefully, especially with shared resources
+    - Handle individual task cancellation within the concurrent operation
+    - Ensure cancellation of the main task propagates to all subtasks
+
+## Additional Guidelines
+
+1. **Avoid Signal-Based Cancellation**
+   - Don't rely on signal handlers (e.g., SIGINT for Ctrl+C) as the primary cancellation mechanism
+   - Scripts will run as backend processes where signal handling is inappropriate
+   - If signals must be handled, ensure they convert to event-based cancellation for clean shutdown
+
+2. **Use Event-Based State Machines**
+   - Design operations as state machines with clear transitions
+   - Use events to signal state changes rather than relying on timing
+   - Provide explicit methods to check operation status
