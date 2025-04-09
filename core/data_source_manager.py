@@ -62,8 +62,8 @@ class DataSourceConfig:
     Attributes:
         market_type (MarketType): Market type (SPOT, FUTURES_USDT, FUTURES_COIN).
             Mandatory parameter that determines which market data to retrieve.
-        provider (DataProvider): Data provider (currently only BINANCE is supported).
-            Default is BINANCE.
+        provider (DataProvider): Data provider (BINANCE).
+            Mandatory parameter that determines which data provider to use.
         chart_type (ChartType): Chart type (KLINES, FUNDING_RATE).
             Default is KLINES (candlestick data).
         cache_dir (Optional[Path]): Directory to store cache files.
@@ -88,9 +88,9 @@ class DataSourceConfig:
 
     # Mandatory parameters
     market_type: MarketType
+    provider: DataProvider
 
     # Optional parameters with defaults
-    provider: DataProvider = DataProvider.BINANCE
     chart_type: ChartType = ChartType.KLINES
     cache_dir: Optional[Path] = None
     use_cache: bool = True
@@ -144,29 +144,33 @@ class DataSourceConfig:
             )
 
     @classmethod
-    def create(cls: Type[T], market_type: MarketType, **kwargs) -> T:
-        """Create a DataSourceConfig with the given market_type and optional overrides.
+    def create(
+        cls: Type[T], market_type: MarketType, provider: DataProvider, **kwargs
+    ) -> T:
+        """Create a DataSourceConfig with the given market_type, provider and optional overrides.
 
         This is a convenience builder method that allows for a more fluent interface.
 
         Args:
             market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
+            provider: Data provider (currently only BINANCE is supported)
             **kwargs: Optional parameter overrides
 
         Returns:
             Configured DataSourceConfig instance
 
         Raises:
-            TypeError: If market_type is not a MarketType enum
+            TypeError: If market_type is not a MarketType enum or provider is not a DataProvider enum
             ValueError: If any parameter values are invalid
 
         Examples:
-            # Basic config for SPOT market
-            config = DataSourceConfig.create(MarketType.SPOT)
+            # Basic config for SPOT market with Binance provider
+            config = DataSourceConfig.create(MarketType.SPOT, DataProvider.BINANCE)
 
             # Config for FUTURES with custom cache directory and HTTP client
             config = DataSourceConfig.create(
                 MarketType.FUTURES_USDT,
+                DataProvider.BINANCE,
                 cache_dir=Path("./my_cache"),
                 use_httpx=True
             )
@@ -175,7 +179,11 @@ class DataSourceConfig:
             raise TypeError(
                 f"market_type must be a MarketType enum, got {type(market_type)}"
             )
-        return cls(market_type=market_type, **kwargs)
+        if not isinstance(provider, DataProvider):
+            raise TypeError(
+                f"provider must be a DataProvider enum, got {type(provider)}"
+            )
+        return cls(market_type=market_type, provider=provider, **kwargs)
 
 
 @dataclass
@@ -198,7 +206,8 @@ class DataQueryConfig:
         enforce_source (DataSource): Force specific data source.
             Default is AUTO (smart selection). Override to force REST or VISION API.
         provider (Optional[DataProvider]): Override provider for this query.
-            Default is None (use the DataSourceManager's provider).
+            Default is None (use the DataSourceManager's provider). When specified,
+            this will override the manager's provider for this specific query.
         chart_type (Optional[ChartType]): Override chart type for this query.
             Default is None (use the DataSourceManager's chart type).
     """
@@ -277,7 +286,12 @@ class DataQueryConfig:
             symbol: Trading pair symbol (e.g., "BTCUSDT")
             start_time: Start time for data retrieval (timezone-aware)
             end_time: End time for data retrieval (timezone-aware)
-            **kwargs: Optional parameter overrides
+            **kwargs: Optional parameter overrides, which may include:
+                - interval: Time interval between data points
+                - use_cache: Whether to use cache for this query
+                - enforce_source: Force specific data source
+                - provider: Override the manager's provider for this query
+                - chart_type: Override the manager's chart type for this query
 
         Returns:
             Configured DataQueryConfig instance
@@ -301,6 +315,14 @@ class DataQueryConfig:
                 start_time,
                 end_time,
                 enforce_source=DataSource.VISION
+            )
+
+            # Override provider for a specific query (if using a manager with a different provider)
+            query = DataQueryConfig.create(
+                "BTCUSDT",
+                start_time,
+                end_time,
+                provider=DataProvider.BINANCE
             )
         """
         if not symbol:
@@ -363,7 +385,12 @@ class DataSourceManager:
         return cls.OUTPUT_DTYPES.copy()
 
     @classmethod
-    def create(cls, market_type: Optional[MarketType] = None, **kwargs):
+    def create(
+        cls,
+        market_type: Optional[MarketType] = None,
+        provider: Optional[DataProvider] = None,
+        **kwargs,
+    ):
         """Create a DataSourceManager with a more Pythonic interface.
 
         This factory method provides a cleaner way to instantiate the DataSourceManager
@@ -372,21 +399,24 @@ class DataSourceManager:
         Args:
             market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
                 If None, uses the class's DEFAULT_MARKET_TYPE
+            provider: Data provider (BINANCE)
+                If None, raises ValueError as provider is now mandatory
             **kwargs: Additional parameters as needed
 
         Returns:
             Initialized DataSourceManager
 
-        Examples:
-            # Create a basic manager with default market type
-            manager = DataSourceManager.create()
+        Raises:
+            ValueError: If provider is None
 
-            # Create a manager for spot market
-            manager = DataSourceManager.create(MarketType.SPOT)
+        Examples:
+            # Create a manager for spot market with Binance provider
+            manager = DataSourceManager.create(MarketType.SPOT, DataProvider.BINANCE)
 
             # Create a manager for futures with custom settings
             manager = DataSourceManager.create(
                 MarketType.FUTURES_USDT,
+                DataProvider.BINANCE,
                 chart_type=ChartType.FUNDING_RATE,
                 cache_dir=Path("./my_cache"),
                 use_httpx=True
@@ -397,7 +427,11 @@ class DataSourceManager:
             market_type = cls.DEFAULT_MARKET_TYPE
             logger.debug(f"Using default market type: {market_type.name}")
 
-        config = DataSourceConfig.create(market_type, **kwargs)
+        # Provider is now mandatory
+        if provider is None:
+            raise ValueError("Data provider must be specified")
+
+        config = DataSourceConfig.create(market_type, provider, **kwargs)
         return cls(
             market_type=config.market_type,
             provider=config.provider,
@@ -436,7 +470,7 @@ class DataSourceManager:
     def __init__(
         self,
         market_type: MarketType = MarketType.SPOT,
-        provider: DataProvider = DataProvider.BINANCE,
+        provider: DataProvider = None,  # Now mandatory but with default=None for backwards compatibility
         chart_type: ChartType = ChartType.KLINES,
         rest_client: Optional[RestDataClient] = None,
         cache_dir: Optional[Path] = None,
@@ -452,7 +486,7 @@ class DataSourceManager:
 
         Args:
             market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
-            provider: Data provider (BINANCE)
+            provider: Data provider (BINANCE) - Now mandatory
             chart_type: Chart type (KLINES, FUNDING_RATE)
             rest_client: Optional external REST API client
             cache_dir: Directory to store cache files (default: './cache')
@@ -463,7 +497,14 @@ class DataSourceManager:
             vision_client: Optional external Vision API client
             cache_expires_minutes: Cache expiration time in minutes (default: 60)
             use_httpx: Whether to use httpx instead of curl_cffi for HTTP clients
+
+        Raises:
+            ValueError: If provider is None
         """
+        # Enforce provider as mandatory
+        if provider is None:
+            raise ValueError("Data provider must be specified")
+
         # Store initialization settings
         self.market_type = market_type
         self.provider = provider
@@ -1059,6 +1100,7 @@ class DataSourceManager:
             use_cache: Whether to use cache for this specific query
             enforce_source: Force specific data source (AUTO, REST, VISION)
             provider: Optional override for data provider (default: use the manager's provider)
+                This allows temporary overriding of the provider for this specific query.
             chart_type: Optional override for chart type (default: use the manager's chart type)
 
         Returns:
@@ -1068,7 +1110,7 @@ class DataSourceManager:
             ValueError: If time boundaries are invalid (e.g., future dates)
 
         Examples:
-            # Basic usage with defaults
+            # Basic usage with defaults (using manager's provider)
             df = await manager.get_data("BTCUSDT", start_time, end_time)
 
             # Specify interval and force REST API
@@ -2014,7 +2056,8 @@ class DataSourceManager:
         to organize all the query parameters.
 
         Args:
-            query_config: Configuration object containing all query parameters
+            query_config: Configuration object containing all query parameters.
+                If query_config.provider is None, the manager's provider will be used.
 
         Returns:
             DataFrame with market data in standardized format
@@ -2037,7 +2080,7 @@ class DataSourceManager:
             interval=query_config.interval,
             use_cache=query_config.use_cache,
             enforce_source=query_config.enforce_source,
-            provider=query_config.provider,
+            provider=query_config.provider,  # Will be None if not specified, using manager's provider
             chart_type=query_config.chart_type,
         )
 

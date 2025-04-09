@@ -46,7 +46,7 @@ class DataClientFactory:
     @classmethod
     def create_data_client(
         cls,
-        provider: DataProvider = DataProvider.BINANCE,
+        provider: DataProvider,
         market_type: MarketType = MarketType.SPOT,
         chart_type: ChartType = ChartType.KLINES,
         symbol: str = "BTCUSDT",
@@ -63,7 +63,7 @@ class DataClientFactory:
         """Create a data client for the specified provider, market type, and chart type.
 
         Args:
-            provider: Data provider
+            provider: Data provider (must be specified, currently only BINANCE is supported)
             market_type: Market type
             chart_type: Chart type
             symbol: Trading pair symbol
