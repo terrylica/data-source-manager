@@ -7,6 +7,11 @@ Tests multiple scenarios:
 2. Extended historical data - Tests retrieving larger historical datasets
 3. Recent hourly data - Tests retrieving recent data that may not be fully consolidated
 4. Partial data retrieval - Tests data spanning from available past data to recent data
+
+Note:
+    Currently, Binance is the only supported data provider, but the system
+    is designed to support additional providers like TradeStation in the future.
+    This is why we explicitly set Binance as the provider when creating a DataSourceManager.
 """
 
 import asyncio
@@ -19,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 from core.data_source_manager import DataSourceManager, DataSource
-from utils.market_constraints import MarketType, Interval
+from utils.market_constraints import MarketType, Interval, DataProvider
 from utils.logger_setup import logger
 from utils.async_cleanup import cancel_and_wait
 from utils.error_handling import (
@@ -65,7 +70,10 @@ async def with_manager(func, *args, **kwargs):
     """Run a function with a DataSourceManager, handling cleanup and errors."""
     manager = None
     try:
-        manager = DataSourceManager(market_type=MarketType.SPOT, use_cache=False)
+        # Explicitly set Binance as the data provider
+        manager = DataSourceManager(
+            market_type=MarketType.SPOT, provider=DataProvider.BINANCE, use_cache=False
+        )
         return await func(manager, *args, **kwargs)
     except Exception as e:
         logger.error(f"Error in {func.__name__}: {str(e)}")
@@ -91,6 +99,8 @@ async def get_data_with_timeout(
         end_time=end_time,
         interval=interval,
         enforce_source=source,
+        # We don't need to pass provider explicitly in the get_data call
+        # as it's already set in the manager during initialization
     )
     return result, elapsed
 
@@ -184,7 +194,7 @@ async def _verify_concurrent_data_retrieval(manager):
                             f"\n===== CONCURRENT DATA RETRIEVAL EXAMPLE ({symbol}) ====="
                         )
                         print(
-                            f"Data Source: {DataSource.REST.name}, Records: {len(df_data)}"
+                            f"Data Provider: {manager.provider.name}, Data Source: {DataSource.REST.name}, Records: {len(df_data)}"
                         )
                         print(
                             f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}"
@@ -249,7 +259,9 @@ async def _verify_extended_historical_data(manager):
 
         # Print the DataFrame summary
         print("\n===== EXTENDED HISTORICAL DATA RETRIEVAL =====")
-        print(f"Symbol: {symbol}, Interval: {interval.value}")
+        print(
+            f"Data Provider: {manager.provider.name}, Symbol: {symbol}, Interval: {interval.value}"
+        )
         print(f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}")
         print(f"Retrieval Time: {elapsed:.2f}s, Records: {len(df)}")
 
@@ -291,7 +303,9 @@ async def _verify_very_recent_hourly_data(manager):
 
         # Print minimal summary
         print("\n===== RECENT HOURLY DATA RETRIEVAL =====")
-        print(f"Symbol: BTCUSDT, Interval: {Interval.HOUR_1.value}")
+        print(
+            f"Data Provider: {manager.provider.name}, Symbol: BTCUSDT, Interval: {Interval.HOUR_1.value}"
+        )
         print(f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}")
         print(
             f"Expected Records: ~{int(total_hours)}, Actual: {len(df)} ({completion_pct:.1f}%)"
@@ -341,7 +355,9 @@ async def _verify_partial_hour_data(manager):
 
         # Print data summary focusing on the natural partial data scenario
         print("\n===== PARTIAL HOUR DATA RETRIEVAL =====")
-        print(f"Symbol: BTCUSDT, Interval: {Interval.HOUR_1.value}")
+        print(
+            f"Data Provider: {manager.provider.name}, Symbol: BTCUSDT, Interval: {Interval.HOUR_1.value}"
+        )
         print(
             f"Time Range: {start_time.isoformat()} to {end_time.isoformat()} (current time)"
         )
@@ -402,6 +418,12 @@ async def main():
     """Run all verification tests."""
     logger.info("===== STARTING DATA RETRIEVAL VERIFICATION =====")
     print("STARTING DATA RETRIEVAL VERIFICATION")
+
+    # Add a prominent notice about using Binance as the data provider
+    print("\n" + "=" * 60)
+    print("NOTICE: Using BINANCE as the explicit data provider for all tests")
+    print("This system is designed to support additional providers in the future")
+    print("=" * 60 + "\n")
 
     # Ensure logs directory exists
     Path("logs/timeout_incidents").mkdir(parents=True, exist_ok=True)
