@@ -1783,7 +1783,8 @@ class DataSourceManager:
                 )
                 force_timeout_tasks = force_timeout_tasks[:20]
 
-            logger.warning(
+            # Change this from warning to debug level since we're handling it properly
+            logger.debug(
                 f"Proactively cancelling {len(force_timeout_tasks)} timeout/curl_cffi tasks"
             )
 

@@ -173,10 +173,14 @@ async def cleanup_client(
     try:
         # Simplified implementation: Use safely_close_client directly with timeout protection
         from utils.network_utils import safely_close_client
-        
+
         try:
-            await asyncio.shield(asyncio.wait_for(safely_close_client(client), timeout=timeout))
-            logger.debug(f"Successfully closed HTTP client (type: {client_type}) using safely_close_client")
+            await asyncio.shield(
+                asyncio.wait_for(safely_close_client(client), timeout=timeout)
+            )
+            logger.debug(
+                f"Successfully closed HTTP client (type: {client_type}) using safely_close_client"
+            )
         except asyncio.TimeoutError:
             logger.warning(f"safely_close_client() timed out after {timeout}s")
         except asyncio.CancelledError:
@@ -319,25 +323,38 @@ async def direct_resource_cleanup(
                                 f"[ProgressIndicator] Detected curl_cffi AsyncSession, using specialized cleanup"
                             )
                             # First try to directly access the _asynccurl if it exists
-                            if hasattr(resource, "_asynccurl") and resource._asynccurl is not None:
+                            if (
+                                hasattr(resource, "_asynccurl")
+                                and resource._asynccurl is not None
+                            ):
                                 try:
                                     if hasattr(resource._asynccurl, "close"):
                                         resource._asynccurl.close()
-                                        logger.debug(f"[ProgressIndicator] Closed {desc}._asynccurl directly")
+                                        logger.debug(
+                                            f"[ProgressIndicator] Closed {desc}._asynccurl directly"
+                                        )
                                 except Exception as e:
-                                    logger.debug(f"[ProgressIndicator] Error closing {desc}._asynccurl: {e}")
-                            
+                                    logger.debug(
+                                        f"[ProgressIndicator] Error closing {desc}._asynccurl: {e}"
+                                    )
+
                             # Delete C pointer attributes instead of trying to use them
                             for attr in ["_curlm", "_timeout_handle", "_asynccurl"]:
                                 if hasattr(resource, attr):
                                     try:
                                         delattr(resource, attr)
-                                        logger.debug(f"[ProgressIndicator] Deleted {desc}.{attr} attribute")
+                                        logger.debug(
+                                            f"[ProgressIndicator] Deleted {desc}.{attr} attribute"
+                                        )
                                     except Exception as e:
-                                        logger.debug(f"[ProgressIndicator] Error deleting {attr} from {desc}: {e}")
-                            
+                                        logger.debug(
+                                            f"[ProgressIndicator] Error deleting {attr} from {desc}: {e}"
+                                        )
+
                             # Skip the regular close() call which would use these attributes
-                            logger.debug(f"[ProgressIndicator] Skipping regular close() for {desc} curl_cffi client")
+                            logger.debug(
+                                f"[ProgressIndicator] Skipping regular close() for {desc} curl_cffi client"
+                            )
                         else:
                             # For non-curl_cffi clients, call close normally
                             if inspect.iscoroutinefunction(resource.close):
@@ -354,24 +371,33 @@ async def direct_resource_cleanup(
 
                 # Set resource to None to break circular references
                 # Check if this is a curl_cffi client with C pointer attributes first
-                if hasattr(resource, "_curlm") or hasattr(resource, "_asynccurl") or hasattr(resource, "_timeout_handle"):
-                    logger.debug(f"[ProgressIndicator] Detected curl_cffi client for {desc}, handling C pointer attributes")
+                if (
+                    hasattr(resource, "_curlm")
+                    or hasattr(resource, "_asynccurl")
+                    or hasattr(resource, "_timeout_handle")
+                ):
+                    logger.debug(
+                        f"[ProgressIndicator] Detected curl_cffi client for {desc}, handling C pointer attributes"
+                    )
                     # Use safe cleanup for curl_cffi clients
                     try:
                         from utils.network_utils import safely_close_client
+
                         await safely_close_client(resource)
-                        logger.debug(f"[ProgressIndicator] Used safely_close_client for {desc} with C pointer attributes")
+                        logger.debug(
+                            f"[ProgressIndicator] Used safely_close_client for {desc} with C pointer attributes"
+                        )
                     except Exception as e:
                         error_msg = f"Error safely closing {desc} with C pointer attributes: {e}"
                         logger.warning(error_msg)
                         cleanup_errors.append(error_msg)
-                    
+
                     # After safely closing, we can safely remove the reference
                     setattr(obj, attr_name, None)
                 else:
                     # For regular resources, just set to None
                     setattr(obj, attr_name, None)
-                
+
                 cleaned_resources.append(attr_name)
                 logger.debug(f"[ProgressIndicator] Successfully cleaned up {desc}")
 
@@ -436,6 +462,70 @@ async def _cancel_force_timeout_tasks() -> int:
         logger.warning(f"Error cancelling force_timeout tasks: {e}")
 
     return cancelled_count
+
+
+async def cancel_and_wait(task, timeout=2.0):
+    """
+    Safely cancel a task and wait for it to complete.
+
+    This utility uses asyncio.wait() instead of direct await to prevent
+    CancelledError propagation, which can cause issues with curl_cffi tasks.
+    It also handles the cleanup of any _force_timeout tasks that might be created
+    during task cancellation.
+
+    Args:
+        task: The asyncio.Task to cancel
+        timeout: Maximum time to wait for the task to complete after cancellation
+
+    Returns:
+        bool: True if task was successfully cancelled and completed, False otherwise
+    """
+    if task is None or task.done():
+        return True
+
+    # Step 1: Cancel the task
+    task.cancel()
+
+    # Step 2: Wait for the task to complete (without propagating CancelledError)
+    try:
+        done, pending = await asyncio.wait([task], timeout=timeout)
+
+        if pending:
+            logger.debug(
+                f"Task {task!r} did not complete cancellation within {timeout}s timeout"
+            )
+            # Don't return yet, we still need to clean up any _force_timeout tasks
+
+        # Step 3: Check for _force_timeout curl_cffi tasks that might have been created
+        # This helps prevent the "Proactively cancelling X timeout/curl_cffi tasks" warning
+        force_timeout_tasks = []
+        for t in asyncio.all_tasks():
+            task_str = str(t)
+            if (
+                not t.done()
+                and t != task  # Avoid the task we just cancelled
+                and (
+                    "_force_timeout" in task_str
+                    or ("curl_cffi" in task_str and "AsyncSession.request" in task_str)
+                )
+            ):
+                force_timeout_tasks.append(t)
+
+        # Cancel any found _force_timeout tasks
+        if force_timeout_tasks:
+            logger.debug(
+                f"Cleaning up {len(force_timeout_tasks)} related curl_cffi timeout tasks"
+            )
+            for t in force_timeout_tasks:
+                t.cancel()
+
+            # Wait briefly for them to complete
+            await asyncio.wait(force_timeout_tasks, timeout=0.5)
+
+        return len(pending) == 0  # Return True if the task completed successfully
+    except Exception as e:
+        logger.warning(f"Error during cancel_and_wait: {e}")
+        return False
 
 
 async def cleanup_all_force_timeout_tasks():
