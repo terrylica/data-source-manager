@@ -225,3 +225,71 @@ async def cleanup_tasks(tasks: List[asyncio.Task], timeout: float = 5.0) -> None
     for task in tasks:
         if not task.done():
             await cancel_and_wait(task, timeout=timeout)
+
+
+def display_verification_results(
+    df,
+    symbol,
+    interval,
+    start_time,
+    end_time,
+    manager,
+    elapsed=None,
+    test_name="",
+    warnings_detected=None,
+    additional_info=None,
+):
+    """Common function to display verification results with consistent formatting.
+
+    Args:
+        df: DataFrame with retrieved data
+        symbol: Trading symbol
+        interval: Data interval
+        start_time: Query start time
+        end_time: Query end time
+        manager: DataSourceManager instance
+        elapsed: Optional elapsed time for the operation
+        test_name: Name of the verification test
+        warnings_detected: Optional list of warnings detected during fetch
+        additional_info: Optional dictionary with additional information to display
+    """
+    if df is None or df.empty:
+        print(f"Warning: No data retrieved for {symbol}")
+        return
+
+    # Print header
+    print(f"\n===== {test_name} =====")
+
+    # Print basic info
+    print(
+        f"Data Provider: {manager.provider.name}, Symbol: {symbol}, "
+        f"Interval: {interval.value if hasattr(interval, 'value') else interval}"
+    )
+    print(f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}")
+
+    # Print retrieval stats
+    if elapsed:
+        print(f"Retrieval Time: {elapsed:.2f}s, ", end="")
+    print(f"Records: {len(df)}")
+
+    # Print data range
+    if not df.empty:
+        data_range = f"{df.index.min()} to {df.index.max()}"
+        print(f"Data Range: {data_range}")
+
+    # Print warnings if any
+    if warnings_detected:
+        print(f"Warnings: {len(warnings_detected)}")
+        if warnings_detected and len(warnings_detected) > 0:
+            print(f"Sample warning: {warnings_detected[0]}")
+
+    # Print additional info if provided
+    if additional_info:
+        for key, value in additional_info.items():
+            print(f"{key}: {value}")
+
+    # Display data summary
+    display_df_summary(df, f"{test_name}")
+
+    # Print separator
+    print("=" * 50)

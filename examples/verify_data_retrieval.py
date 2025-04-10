@@ -18,7 +18,6 @@ import asyncio
 import time
 import logging
 import warnings
-import contextlib
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import pandas as pd
@@ -34,36 +33,13 @@ from utils.error_handling import (
     execute_with_task_cleanup,
     display_df_summary,
     cleanup_tasks,
+    suppress_consolidation_warnings,
+    display_verification_results,
 )
 from rich import print
 
 # Set up logging for the verification script
 logger.setup_root(level="WARNING", show_filename=True)
-
-
-@contextlib.contextmanager
-def suppress_consolidation_warnings():
-    """Context manager to suppress specific consolidation warnings during verification tests.
-
-    This temporarily filters out warnings about unconsolidated data that are expected
-    during verification testing.
-    """
-    # Store original log levels to restore later
-    original_levels = {}
-    for logger_name in ["core.rest_data_client", "core.data_source_manager"]:
-        logger_instance = logging.getLogger(logger_name)
-        original_levels[logger_name] = logger_instance.level
-
-    # Temporarily increase log level for specific loggers to hide consolidation warnings
-    for logger_name in ["core.rest_data_client", "core.data_source_manager"]:
-        logging.getLogger(logger_name).setLevel(logging.ERROR)
-
-    try:
-        yield
-    finally:
-        # Restore original log levels
-        for logger_name, level in original_levels.items():
-            logging.getLogger(logger_name).setLevel(level)
 
 
 async def with_manager(func, *args, **kwargs):
@@ -190,20 +166,20 @@ async def _verify_concurrent_data_retrieval(manager):
                     df_data = result[2]
                     if df_data is not None and isinstance(df_data, pd.DataFrame):
                         symbol = result[1]
-                        print(
-                            f"\n===== CONCURRENT DATA RETRIEVAL EXAMPLE ({symbol}) ====="
+                        additional_info = {
+                            "Summary": f"{success_count}/{total_operations} successful operations, {error_count} errors"
+                        }
+                        display_verification_results(
+                            df=df_data,
+                            symbol=symbol,
+                            interval=Interval.MINUTE_1,
+                            start_time=start_time,
+                            end_time=end_time,
+                            manager=manager,
+                            elapsed=elapsed,
+                            test_name=f"CONCURRENT DATA RETRIEVAL EXAMPLE ({symbol})",
+                            additional_info=additional_info,
                         )
-                        print(
-                            f"Data Provider: {manager.provider.name}, Data Source: {DataSource.REST.name}, Records: {len(df_data)}"
-                        )
-                        print(
-                            f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}"
-                        )
-                        display_df_summary(df_data, f"{symbol} Data")
-                        print(
-                            f"Summary: {success_count}/{total_operations} successful operations, {error_count} errors"
-                        )
-                        print("=" * 50)
                         break  # Only show one example
 
             return success_count
@@ -257,19 +233,17 @@ async def _verify_extended_historical_data(manager):
             print(f"Warning: No historical data retrieved for {symbol}")
             return False
 
-        # Print the DataFrame summary
-        print("\n===== EXTENDED HISTORICAL DATA RETRIEVAL =====")
-        print(
-            f"Data Provider: {manager.provider.name}, Symbol: {symbol}, Interval: {interval.value}"
+        # Use common display function
+        display_verification_results(
+            df=df,
+            symbol=symbol,
+            interval=interval,
+            start_time=start_time,
+            end_time=end_time,
+            manager=manager,
+            elapsed=elapsed,
+            test_name="EXTENDED HISTORICAL DATA RETRIEVAL",
         )
-        print(f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}")
-        print(f"Retrieval Time: {elapsed:.2f}s, Records: {len(df)}")
-
-        data_range = f"{df.index.min()} to {df.index.max()}"
-        print(f"Data Range: {data_range}")
-        display_df_summary(df, "Historical Data")
-
-        print("=" * 50)
         return True
 
     except Exception as e:
@@ -301,23 +275,25 @@ async def _verify_very_recent_hourly_data(manager):
         total_hours = (end_time - start_time).total_seconds() / 3600
         completion_pct = (len(df) / int(total_hours)) * 100 if total_hours > 0 else 0
 
-        # Print minimal summary
-        print("\n===== RECENT HOURLY DATA RETRIEVAL =====")
-        print(
-            f"Data Provider: {manager.provider.name}, Symbol: BTCUSDT, Interval: {Interval.HOUR_1.value}"
-        )
-        print(f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}")
-        print(
-            f"Expected Records: ~{int(total_hours)}, Actual: {len(df)} ({completion_pct:.1f}%)"
-        )
-        print(
-            f"Warnings: {len([w for w in warnings_detected if 'may not be fully consolidated' in w])}"
-        )
+        # Use common display function with additional info
+        additional_info = {
+            "Expected Records": f"~{int(total_hours)}",
+            "Completion": f"{completion_pct:.1f}%",
+            "Warnings": f"{len([w for w in warnings_detected if 'may not be fully consolidated' in w])}",
+        }
 
-        print(f"Data Range: {df.index.min()} to {df.index.max()}")
-        display_df_summary(df, "Recent Hourly Data")
-
-        print("=" * 50)
+        display_verification_results(
+            df=df,
+            symbol="BTCUSDT",
+            interval=Interval.HOUR_1,
+            start_time=start_time,
+            end_time=end_time,
+            manager=manager,
+            elapsed=elapsed,
+            test_name="RECENT HOURLY DATA RETRIEVAL",
+            warnings_detected=warnings_detected,
+            additional_info=additional_info,
+        )
         return True
 
     except Exception:
@@ -353,22 +329,16 @@ async def _verify_partial_hour_data(manager):
         completion_pct = (len(df) / actual_expected) * 100 if actual_expected > 0 else 0
         missing_records = actual_expected - len(df)
 
-        # Print data summary focusing on the natural partial data scenario
-        print("\n===== PARTIAL HOUR DATA RETRIEVAL =====")
-        print(
-            f"Data Provider: {manager.provider.name}, Symbol: BTCUSDT, Interval: {Interval.HOUR_1.value}"
-        )
-        print(
-            f"Time Range: {start_time.isoformat()} to {end_time.isoformat()} (current time)"
-        )
-        print(
-            f"Expected: ~{actual_expected}, Actual: {len(df)} ({completion_pct:.1f}%)"
-        )
+        # Prepare additional info
+        additional_info = {
+            "Expected": f"~{actual_expected}",
+            "Completion": f"{completion_pct:.1f}%",
+        }
 
         # Check if data is missing (likely the current incomplete hour)
         if missing_records > 0:
-            print(
-                f"Missing: {missing_records} record(s) (likely the current incomplete hour)"
+            additional_info["Missing"] = (
+                f"{missing_records} record(s) (likely the current incomplete hour)"
             )
 
             # Find the most recent hour timestamp
@@ -378,23 +348,30 @@ async def _verify_partial_hour_data(manager):
             # Check if the current hour is missing from the dataset
             if most_recent_data < current_hour:
                 time_diff = current_hour - most_recent_data
-                print(f"Current hour data missing: Latest data is from {time_diff} ago")
+                additional_info["Current hour data missing"] = (
+                    f"Latest data is from {time_diff} ago"
+                )
 
-            print(f"Warnings: {len(warnings_detected)}")
-
-            if len(warnings_detected) > 0:
-                print("Sample warning: " + next(iter(warnings_detected)))
-
-        print(f"Data Range: {df.index.min()} to {df.index.max()}")
+        # Use common display function
+        display_verification_results(
+            df=df,
+            symbol="BTCUSDT",
+            interval=Interval.HOUR_1,
+            start_time=start_time,
+            end_time=end_time,
+            manager=manager,
+            elapsed=elapsed,
+            test_name="PARTIAL HOUR DATA RETRIEVAL",
+            warnings_detected=warnings_detected,
+            additional_info=additional_info,
+        )
 
         # Show the most recent available data point
-        print("\nMost recent available data:")
-        print(df.iloc[-1:])
+        if not df.empty:
+            print("\nMost recent available data:")
+            print(df.iloc[-1:])
+            print("=" * 50)
 
-        # Show complete data summary
-        display_df_summary(df, "Partial Hour Dataset")
-
-        print("=" * 50)
         return True
 
     except Exception as e:
@@ -402,16 +379,24 @@ async def _verify_partial_hour_data(manager):
         return False
 
 
-# Define verification functions with manager handling
-verify_concurrent_data_retrieval = lambda: with_manager(
-    _verify_concurrent_data_retrieval
-)
+# Define verification functions with manager handling - simplified using a consistent pattern
+verification_funcs = [
+    ("concurrent data retrieval", _verify_concurrent_data_retrieval),
+    ("extended historical data", _verify_extended_historical_data),
+    ("recent hourly data", _verify_very_recent_hourly_data),
+    ("partial hour data", _verify_partial_hour_data),
+]
 
-# Fix the extended historical data function to return a callable function
-verify_extended_historical_data = lambda: with_manager(_verify_extended_historical_data)
+# Create verification functions that handle manager creation and cleanup
+verify_functions = {
+    name: lambda f=func: with_manager(f) for name, func in verification_funcs
+}
 
-verify_very_recent_hourly_data = lambda: with_manager(_verify_very_recent_hourly_data)
-verify_partial_hour_data = lambda: with_manager(_verify_partial_hour_data)
+# Extract individual verification functions for backward compatibility
+verify_concurrent_data_retrieval = verify_functions["concurrent data retrieval"]
+verify_extended_historical_data = verify_functions["extended historical data"]
+verify_very_recent_hourly_data = verify_functions["recent hourly data"]
+verify_partial_hour_data = verify_functions["partial hour data"]
 
 
 async def main():
@@ -435,16 +420,9 @@ async def main():
     # Run all tests sequentially but with consolidated error handling
     # Wrap the entire verification process in our custom context manager to suppress warnings
     with suppress_consolidation_warnings():
-        verification_tests = [
-            ("concurrent data retrieval", verify_concurrent_data_retrieval),
-            ("extended historical data", verify_extended_historical_data),
-            ("recent hourly data", verify_very_recent_hourly_data),
-            ("partial hour data", verify_partial_hour_data),
-        ]
-
-        for name, test_func in verification_tests:
+        for name, test_func in verification_funcs:
             print(f"Starting test: {name}")
-            result = await safe_execute_verification(test_func, name)
+            result = await safe_execute_verification(verify_functions[name], name)
             print(f"Completed test: {name}, result: {result}")
 
     # Check for task leakage at the end
