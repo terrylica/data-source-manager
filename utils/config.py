@@ -43,6 +43,20 @@ HTTP_CLIENT_CLEANUP_TIMEOUT: Final = (
 FILE_CLEANUP_TIMEOUT: Final = 0.3  # Seconds - for file handle cleanup
 ENABLE_FORCED_GC: Final = True  # Whether to force garbage collection after cleanup
 
+# Task cancellation timeouts
+TASK_CANCEL_WAIT_TIMEOUT: Final = (
+    1.0  # Seconds - default timeout for cancel_and_wait operations
+)
+LINGERING_TASK_CLEANUP_TIMEOUT: Final = (
+    0.5  # Seconds - timeout for lingering task cleanup
+)
+AGGRESSIVE_TASK_CLEANUP_TIMEOUT: Final = (
+    0.2  # Seconds - timeout for aggressive cleanup after initial failure
+)
+DEMO_SIMULATED_DELAY: Final = (
+    3  # Seconds - delay for the task cancellation demonstration
+)
+
 # Canonical column names
 CANONICAL_CLOSE_TIME: Final[str] = "close_time"
 
