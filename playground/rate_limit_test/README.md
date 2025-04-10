@@ -24,10 +24,10 @@ Our tests have revealed several key insights about Binance's REST API rate limit
 
 | Parameter  | Value | Requests | Initial Weight | Final Weight | Net Weight | Weight/Request |
 | ---------- | ----- | -------- | -------------- | ------------ | ---------- | -------------- |
-| limit=1000 | 500   | 0\*      | 938            | ~938         | 1.88       |
-| limit=100  | 450   | 24       | 844            | 820          | 1.82       |
-| limit=10   | 500   | 0\*      | 990            | ~990         | 1.98       |
-| limit=5    | 550   | 20       | 1074           | 1054         | 1.92       |
+| limit=1000 | 500   | 0\*      | 938            | ~938         | 1.88       | 1.88           |
+| limit=100  | 450   | 24       | 844            | 820          | 1.82       | 1.82           |
+| limit=10   | 500   | 0\*      | 990            | ~990         | 1.98       | 1.98           |
+| limit=5    | 550   | 20       | 1074           | 1054         | 1.92       | 1.92           |
 
 \*Estimated based on consistent patterns in other tests
 
