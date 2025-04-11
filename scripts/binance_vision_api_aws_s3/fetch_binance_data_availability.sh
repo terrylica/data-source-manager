@@ -135,8 +135,8 @@ check_dependencies() {
 OUTPUT_DIR="scripts/binance_vision_api_aws_s3/reports"
 DATA_STORE_DIR="scripts/binance_vision_api_aws_s3/historical_data/earliest_dates"
 PERF_LOG="${OUTPUT_DIR}/performance.log"  # Performance log file
-MAX_PARALLEL=100
-TIMEOUT=30
+MAX_PARALLEL=300  # High parallel processing
+TIMEOUT=10  # Shorter timeout
 VERBOSE=true
 DEBUG=false
 TEST_MODE=false
@@ -146,6 +146,11 @@ MARKETS=("spot" "um" "cm")
 DEFAULT_INTERVAL="1d"
 S3_BUCKET="s3://data.binance.vision"
 SHOW_PERFORMANCE=true  # Whether to show performance stats
+# New settings
+USE_CACHED_AWS_RESULTS=true # Cache AWS S3 results during a run
+SKIP_RECENT_DATA_CHECK=false # Option to skip recency check to speed up processing
+COMBINE_S3_OPERATIONS=true # Reduce number of S3 calls
+CACHE_DIR="${OUTPUT_DIR}/aws_cache" # Cache directory for AWS S3 results
 
 # ANSI color codes
 GREEN='\033[0;32m'
@@ -393,6 +398,19 @@ parse_arguments() {
                 AUTO_INSTALL_DEPS=true
                 shift
                 ;;
+            # New command line arguments
+            --no-recency-check)
+                SKIP_RECENT_DATA_CHECK=true
+                shift
+                ;;
+            --no-aws-cache)
+                USE_CACHED_AWS_RESULTS=false
+                shift
+                ;;
+            --no-combine-s3)
+                COMBINE_S3_OPERATIONS=false
+                shift
+                ;;
             -h|--help)
                 usage
                 ;;
@@ -483,26 +501,56 @@ get_s3_prefix() {
     echo "$base_prefix"
 }
 
-# Run aws s3 ls command and capture results
-# Args:
-#   $1: S3 prefix to list
-#   $2: Output file to save results
-# Returns:
-#   0 on success, 1 on failure
+# Enhanced version of run_s3_ls with caching
 run_s3_ls() {
     local prefix="$1"
     local output_file="$2"
     
-    log_debug "Running aws s3 ls --no-sign-request ${S3_BUCKET}/${prefix}/"
+    log_debug "Running aws s3 ls for prefix: ${S3_BUCKET}/${prefix}/"
     
-    if ! aws s3 ls --no-sign-request "${S3_BUCKET}/${prefix}/" > "$output_file" 2>/dev/null; then
-        log_debug "Error: AWS S3 LS command failed for ${S3_BUCKET}/${prefix}/"
-        return 1
+    # If caching is enabled, set up the cache path
+    local cache_hit=false
+    local cache_file=""
+    if [[ "$USE_CACHED_AWS_RESULTS" == "true" ]]; then
+        # Create cache directories if they don't exist
+        mkdir -p "$CACHE_DIR"
+        
+        # Create a cache file path based on the prefix
+        # Replace "/" with "_" for file path safety
+        local cache_key=$(echo "$prefix" | tr '/' '_')
+        cache_file="${CACHE_DIR}/${cache_key}.cache"
+        
+        # Check if cache file exists and is less than 24 hours old
+        if [[ -f "$cache_file" ]] && [[ $(($(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || stat -f %m "$cache_file"))) -lt 86400 ]]; then
+            log_debug "Cache hit for ${S3_BUCKET}/${prefix}/"
+            cp "$cache_file" "$output_file"
+            cache_hit=true
+            return 0
+        fi
     fi
     
-    if [[ ! -s "$output_file" ]]; then
-        log_debug "No results found for ${S3_BUCKET}/${prefix}/"
-        return 1
+    # If no cache hit, proceed with the AWS S3 command
+    if [[ "$cache_hit" == "false" ]]; then
+        # Capture both stdout and stderr for debugging
+        local temp_stderr="${output_file}.stderr"
+        
+        # Use timeout to prevent hanging on slow connections
+        if ! timeout $TIMEOUT aws s3 ls --no-sign-request --no-paginate "${S3_BUCKET}/${prefix}/" > "$output_file" 2>"$temp_stderr"; then
+            log_debug "Error: AWS S3 LS command failed for ${S3_BUCKET}/${prefix}/"
+            rm -f "$temp_stderr"
+            return 1
+        fi
+        
+        rm -f "$temp_stderr"
+        
+        # Save to cache if we got valid results
+        if [[ -s "$output_file" && "$USE_CACHED_AWS_RESULTS" == "true" ]]; then
+            cp "$output_file" "$cache_file"
+            log_debug "Saved S3 results to cache: $cache_file"
+        elif [[ ! -s "$output_file" ]]; then
+            log_debug "No results found for ${S3_BUCKET}/${prefix}/"
+            return 1
+        fi
     fi
     
     return 0
@@ -518,11 +566,51 @@ extract_dirs_from_listing() {
     local input_file="$1"
     local output_file="$2"
     
+    # Special debugging for test symbol
+    if [[ "$DEBUG" == "true" && -n "$TEST_SYMBOL" ]] && grep -q "$TEST_SYMBOL" <<< "$input_file"; then
+        echo "DEBUG: extract_dirs_from_listing for file related to $TEST_SYMBOL" >&2
+        echo "DEBUG: Input file contents:" >&2
+        cat "$input_file" >&2
+    fi
+    
+    # Check if file exists and is not empty
+    if [[ ! -f "$input_file" || ! -s "$input_file" ]]; then
+        echo "ERROR: Input file for extract_dirs_from_listing does not exist or is empty: $input_file" >&2
+        return 1
+    fi
+    
+    # Original extraction logic
     awk '{print $2}' "$input_file" | \
         sed 's/PRE //g' | \
         sed 's/\///g' > "$output_file"
     
-    return $?
+    # Special debugging for test symbol - show what was extracted
+    if [[ "$DEBUG" == "true" && -n "$TEST_SYMBOL" ]] && grep -q "$TEST_SYMBOL" <<< "$input_file"; then
+        echo "DEBUG: extract_dirs_from_listing output for $TEST_SYMBOL:" >&2
+        cat "$output_file" >&2
+        
+        # Special handling for ANIMEFDUSD if needed
+        if grep -q "ANIMEFDUSD" <<< "$input_file"; then
+            echo "DEBUG: Special handling for ANIMEFDUSD - examining raw listing format" >&2
+            echo "DEBUG: Columns from raw listing:" >&2
+            awk '{print "Column 1: " $1 ", Column 2: " $2 ", Column 3: " $3}' "$input_file" >&2
+            
+            # If output is empty, let's try an alternative approach
+            if [[ ! -s "$output_file" ]]; then
+                echo "DEBUG: Output file is empty, trying alternative extraction approach" >&2
+                awk '{print $NF}' "$input_file" | sed 's/\///g' > "$output_file"
+                cat "$output_file" >&2
+            fi
+        fi
+    fi
+    
+    # Return failure if output is empty
+    if [[ ! -s "$output_file" ]]; then
+        echo "ERROR: extract_dirs_from_listing produced empty output" >&2
+        return 1
+    fi
+    
+    return 0
 }
 
 ###########################################
@@ -538,6 +626,19 @@ fetch_symbols_for_market() {
     local market="$1"
     local output_file="${TEMP_DIR}/${market}_symbols.txt"
     local raw_listing="${TEMP_DIR}/${market}_raw_listing.txt"
+    
+    # Check if we're running a custom test for a specific symbol
+    if [[ "$CUSTOM_SYMBOL_TEST" == "true" && -n "$TEST_SYMBOL" ]]; then
+        log_debug "CUSTOM TEST MODE: Only testing symbol $TEST_SYMBOL"
+        echo "$TEST_SYMBOL" > "$output_file"
+        
+        if [[ "$VERBOSE" == "true" ]]; then
+            print_colored "$YELLOW" "CUSTOM TEST MODE: Only testing symbol $TEST_SYMBOL for $market market"
+        fi
+        
+        return 0
+    fi
+    
     local prefix=$(get_s3_prefix "$market")
     
     if [[ -z "$prefix" ]]; then
@@ -603,17 +704,50 @@ get_intervals() {
     
     log_debug "Getting intervals for ${market}/${symbol} from ${S3_BUCKET}/${prefix}/"
     
+    # More verbose debug for our test symbol
+    if [[ "$symbol" == "$TEST_SYMBOL" && "$DEBUG" == "true" ]]; then
+        echo "DEBUG: S3 command to be executed: aws s3 ls --no-sign-request ${S3_BUCKET}/${prefix}/" >&2
+    fi
+    
     # Use aws s3 ls to get the intervals
     if ! run_s3_ls "$prefix" "$raw_file"; then
-        log_debug "Error getting intervals for ${market}/${symbol}"
+        log_debug "Error getting intervals for ${market}/${symbol}: Command failed or returned empty results"
+        
+        # More verbose debug for our test symbol
+        if [[ "$symbol" == "$TEST_SYMBOL" && "$DEBUG" == "true" ]]; then
+            echo "DEBUG: run_s3_ls failed for ${market}/${symbol}" >&2
+            echo "DEBUG: Attempting direct command..." >&2
+            aws s3 ls --no-sign-request "${S3_BUCKET}/${prefix}/" >&2
+        fi
+        
         return 1
+    fi
+    
+    # More verbose debug for our test symbol
+    if [[ "$symbol" == "$TEST_SYMBOL" && "$DEBUG" == "true" ]]; then
+        echo "DEBUG: Raw S3 listing for ${market}/${symbol}:" >&2
+        cat "$raw_file" >&2
     fi
     
     # Extract intervals
     if ! extract_dirs_from_listing "$raw_file" "$temp_file"; then
         log_debug "Error extracting intervals for ${market}/${symbol}"
+        
+        # More verbose debug for our test symbol
+        if [[ "$symbol" == "$TEST_SYMBOL" && "$DEBUG" == "true" ]]; then
+            echo "DEBUG: extract_dirs_from_listing failed for ${market}/${symbol}" >&2
+            echo "DEBUG: Raw file contents:" >&2
+            cat "$raw_file" >&2
+        fi
+        
         rm -f "$raw_file"
         return 1
+    fi
+    
+    # More verbose debug for our test symbol
+    if [[ "$symbol" == "$TEST_SYMBOL" && "$DEBUG" == "true" ]]; then
+        echo "DEBUG: Extracted intervals for ${market}/${symbol}:" >&2
+        cat "$temp_file" >&2
     fi
     
     cat "$temp_file"
@@ -674,18 +808,13 @@ find_earliest_date() {
     return 0
 }
 
-# Add the new function to check for recent data availability
+# Check for recent data availability - optimized version
 check_recent_data_availability() {
-    # Check if a symbol has data available within the last 5 days
-    # This function verifies recent data availability which is required for all symbols.
-    # Any symbol without data in the last 5 days will be excluded from final reports.
-    # 
-    # Args:
-    #   $1: Market (spot, um, cm)
-    #   $2: Symbol
-    #   $3: Interval
-    # Returns:
-    #   0 if recent data is available, 1 if not available
+    # Skip check if the flag is set
+    if [[ "$SKIP_RECENT_DATA_CHECK" == "true" ]]; then
+        return 0  # Always return success if check is skipped
+    fi
+    
     local market="$1"
     local symbol="$2"
     local interval="$3"
@@ -698,7 +827,7 @@ check_recent_data_availability() {
         return 1
     fi
     
-    log_debug "Checking recent data availability for ${market}/${symbol}/${interval} from ${S3_BUCKET}/${prefix}/"
+    log_debug "Checking recent data availability for ${market}/${symbol}/${interval}"
     
     # Check if directory exists
     if ! run_s3_ls "$prefix" "$raw_file"; then
@@ -706,9 +835,9 @@ check_recent_data_availability() {
         return 1
     fi
     
-    # Extract dates from the files
-    if ! grep -v "CHECKSUM" "$raw_file" | \
-         grep -o "[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" > "$temp_file"; then
+    # Extract dates from the files - more efficient grep with -m 10 to limit matches
+    # We only need to check if there's any data in the last 5 days, not all data
+    if ! grep -v "CHECKSUM" "$raw_file" | grep -m 10 -o "[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" > "$temp_file"; then
         log_debug "No dates found in listing for ${market}/${symbol}/${interval}"
         rm -f "$raw_file" "$temp_file"
         return 1
@@ -720,99 +849,112 @@ check_recent_data_availability() {
         return 1
     fi
     
-    # Calculate dates for checking availability
-    # Current date in YYYY-MM-DD format
-    local current_date=$(date +%Y-%m-%d)
+    # Calculate date 5 days ago - simplify and optimize date calculation
+    local five_days_ago=$(date -d "5 days ago" +%Y-%m-%d 2>/dev/null || date -v-5d +%Y-%m-%d 2>/dev/null)
     
-    # Calculate date 5 days ago in a cross-platform way
-    local five_days_ago=""
-    
-    # Try GNU date (Linux)
-    five_days_ago=$(date -d "$current_date - 5 days" +%Y-%m-%d 2>/dev/null)
-    
-    # If GNU date failed, try BSD date (macOS)
-    if [ $? -ne 0 ]; then
-        five_days_ago=$(date -v-5d +%Y-%m-%d 2>/dev/null)
+    # If both date commands failed, use a hardcoded backup approach for testing
+    if [ -z "$five_days_ago" ]; then
+        # Assuming current date is within the last month for simplicity
+        local current_date=$(date +%Y-%m-%d)
+        local year=$(echo "$current_date" | cut -d'-' -f1)
+        local month=$(echo "$current_date" | cut -d'-' -f2)
+        local day=$(echo "$current_date" | cut -d'-' -f3)
         
-        # If that also failed, try a more manual approach
-        if [ $? -ne 0 ]; then
-            # Parse current date
-            local year=$(echo "$current_date" | cut -d'-' -f1)
-            local month=$(echo "$current_date" | cut -d'-' -f2)
-            local day=$(echo "$current_date" | cut -d'-' -f3)
-            
-            # Convert to number
-            day=$((10#$day))  # Force base-10 interpretation
-            
-            # Calculate 5 days ago
-            day=$((day - 5))
-            
-            # Handle month/year rollover for negative days
-            if [ $day -le 0 ]; then
-                month=$((10#$month - 1))
-                if [ $month -le 0 ]; then
-                    month=12
-                    year=$((year - 1))
-                fi
-                
-                # Days in the previous month
-                case $month in
-                    1|3|5|7|8|10|12) day=$((day + 31)) ;;
-                    4|6|9|11) day=$((day + 30)) ;;
-                    2)
-                        # Check for leap year
-                        if [ $((year % 4)) -eq 0 ] && ([ $((year % 100)) -ne 0 ] || [ $((year % 400)) -eq 0 ]); then
-                            day=$((day + 29))
-                        else
-                            day=$((day + 28))
-                        fi
-                        ;;
-                esac
-            fi
-            
-            # Format back to YYYY-MM-DD
-            if [ $month -lt 10 ]; then month="0$month"; fi
-            if [ $day -lt 10 ]; then day="0$day"; fi
-            five_days_ago="$year-$month-$day"
+        day=$((10#$day - 5))
+        if [ $day -le 0 ]; then
+            day=$((day + 30)) # Simplified approximation
+        fi
+        
+        # Format back to YYYY-MM-DD
+        if [ $day -lt 10 ]; then day="0$day"; fi
+        five_days_ago="$year-$month-$day"
+    fi
+    
+    # Optimize the check for recent data - use grep instead of reading line by line
+    if grep -q -m 1 "^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}$" "$temp_file" | sort -r | grep -q -m 1 "^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]$"; then
+        # We have at least one valid date
+        # Now check if any date is recent enough
+        if grep -q "^[^_]*$five_days_ago[^_]*$" "$temp_file" || grep -q -m 1 "^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}$" "$temp_file" | sort -r | head -1 | grep -q -v "^$five_days_ago$"; then
+            log_debug "Found recent data for ${market}/${symbol}/${interval}"
+            rm -f "$raw_file" "$temp_file"
+            return 0
         fi
     fi
     
-    log_debug "Current date: $current_date, Five days ago: $five_days_ago"
+    rm -f "$raw_file" "$temp_file"
+    log_debug "No recent data found for ${market}/${symbol}/${interval}"
+    return 1
+}
+
+# Combined check_and_find_dates function to reduce duplicate S3 calls
+check_and_find_dates() {
+    local market="$1"
+    local symbol="$2"
+    local interval="$3"
+    local temp_file="${TEMP_DIR}/${market}_${symbol}_${interval}_combined_dates.txt"
+    local raw_file="${temp_file}.raw"
+    local prefix=$(get_s3_prefix "$market" "$symbol" "$interval")
     
-    # Check if there's data within the last 5 days
-    local has_recent_data=0
+    if [[ -z "$prefix" ]]; then
+        log_debug "Error: Could not determine S3 prefix for $market/$symbol/$interval"
+        return 1
+    fi
+    
+    # Do a single S3 call to get all dates
+    if ! run_s3_ls "$prefix" "$raw_file"; then
+        log_debug "No data found for ${market}/${symbol}/${interval}"
+        echo "NO_DATA_FOUND"
+        return 1
+    fi
+    
+    # Extract dates from the files
+    if ! grep -v "CHECKSUM" "$raw_file" | grep -o "[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" > "$temp_file"; then
+        log_debug "No dates found in listing for ${market}/${symbol}/${interval}"
+        rm -f "$raw_file" "$temp_file"
+        echo "NO_DATES_FOUND"
+        return 1
+    fi
+    
+    if [[ ! -s "$temp_file" ]]; then
+        log_debug "Empty dates file for ${market}/${symbol}/${interval}"
+        rm -f "$raw_file" "$temp_file"
+        echo "EMPTY_DATES_FILE"
+        return 1
+    fi
+    
+    # Calculate five days ago
+    local five_days_ago=$(date -d "5 days ago" +%Y-%m-%d 2>/dev/null || date -v-5d +%Y-%m-%d 2>/dev/null)
+    
+    # Check for recent data
+    local recent_data=false
     while IFS= read -r date_str; do
         if [[ "$date_str" > "$five_days_ago" ]]; then
-            has_recent_data=1
+            recent_data=true
             log_debug "Found recent data for ${market}/${symbol}/${interval}: $date_str"
             break
         fi
-    done < <(sort -r "$temp_file")  # Sort in reverse to check most recent dates first
+    done < <(sort -r "$temp_file" | head -5)  # Only check the 5 most recent dates
     
+    # Find earliest date
+    local earliest_date=$(sort "$temp_file" | head -1)
+    
+    # Clean up
     rm -f "$raw_file" "$temp_file"
     
-    if [[ $has_recent_data -eq 1 ]]; then
-        return 0  # Success - found recent data
-    else
-        log_debug "No recent data found for ${market}/${symbol}/${interval} within the last 5 days"
-        return 1  # No recent data
+    # Return result
+    if [[ "$recent_data" != "true" ]]; then
+        log_debug "No recent data found for ${market}/${symbol}/${interval}"
+        echo "NO_RECENT_DATA"
+        return 1
     fi
+    
+    log_debug "Earliest date for ${market}/${symbol}/${interval}: ${earliest_date}"
+    echo "$earliest_date"
+    return 0
 }
 
-# Replace process_symbol() with the updated version
+# Updated process_symbol function to use combined data fetch
 process_symbol() {
-    # Process a single symbol to find its earliest date and check recent data availability
-    # This function processes a symbol to determine its earliest available date and
-    # validates that the symbol has data available within the last 5 days.
-    # Symbols without recent data will be marked with NO_RECENT_DATA status and excluded from reports.
-    #
-    # Args:
-    #   $1: Market (spot, um, cm)
-    #   $2: Symbol
-    # Creates:
-    #   Result file with symbol info in CSV format or a status message indicating why no data was found
-    # Returns:
-    #   0 on success
     local market="$1"
     local symbol="$2"
     local result_file="${TEMP_DIR}/${market}_${symbol}_result.txt"
@@ -825,19 +967,11 @@ process_symbol() {
         return 0
     fi
     
-    # If not in data store, proceed with regular processing
-    if [[ "$USE_DATA_STORE" != "true" ]]; then
-        log_debug "Data store disabled, fetching data for ${market}/${symbol}"
-    else
-        log_debug "Fetching data for ${market}/${symbol} (not in data store)"
-    fi
-    
-    # Check if the default interval exists for this symbol
+    # Get intervals
     local intervals_file="${TEMP_DIR}/${market}_${symbol}_all_intervals.txt"
     if ! get_intervals "$market" "$symbol" > "$intervals_file"; then
         log_debug "Failed to get intervals for ${market}/${symbol}"
         echo "$market,$symbol,NO_INTERVALS_AVAILABLE,\"\"" > "$result_file"
-        # Still write to data store to avoid re-fetching failed symbols
         write_to_data_store "$market" "$symbol" "$result_file"
         return 0
     fi
@@ -850,11 +984,10 @@ process_symbol() {
         return 0
     fi
     
-    # Read intervals into an array
+    # Read intervals into an array and determine interval to use
     mapfile -t intervals < "$intervals_file"
     local interval_to_use="${DEFAULT_INTERVAL}"
     
-    # If the default interval isn't available, use the first available one
     if ! grep -q "^${DEFAULT_INTERVAL}$" "$intervals_file"; then
         if [[ ${#intervals[@]} -gt 0 ]]; then
             interval_to_use="${intervals[0]}"
@@ -868,37 +1001,60 @@ process_symbol() {
         fi
     fi
     
-    # Check for recent data availability within the last 5 days
-    if ! check_recent_data_availability "$market" "$symbol" "$interval_to_use"; then
-        log_debug "Symbol ${market}/${symbol} does not have recent data (last 5 days)"
-        echo "$market,$symbol,NO_RECENT_DATA,\"\"" > "$result_file"
-        write_to_data_store "$market" "$symbol" "$result_file"
-        rm -f "$intervals_file"
-        return 0
+    # Use the combined function if enabled
+    local earliest_date=""
+    if [[ "$COMBINE_S3_OPERATIONS" == "true" ]]; then
+        # Get date info with one S3 call
+        earliest_date=$(check_and_find_dates "$market" "$symbol" "$interval_to_use")
+        
+        # Check if there was an error
+        if [[ "$earliest_date" == "NO_RECENT_DATA" ]]; then
+            log_debug "Symbol ${market}/${symbol} does not have recent data (last 5 days)"
+            echo "$market,$symbol,NO_RECENT_DATA,\"\"" > "$result_file"
+            write_to_data_store "$market" "$symbol" "$result_file"
+            rm -f "$intervals_file"
+            return 0
+        elif [[ "$earliest_date" == "NO_DATA_FOUND" || "$earliest_date" == "NO_DATES_FOUND" || "$earliest_date" == "EMPTY_DATES_FILE" ]]; then
+            log_debug "No valid data found for ${market}/${symbol}/${interval_to_use}"
+            echo "$market,$symbol,NO_DATA_FOUND,\"\"" > "$result_file"
+            write_to_data_store "$market" "$symbol" "$result_file"
+            rm -f "$intervals_file"
+            return 0
+        fi
+    else {
+        # Use separate functions (original approach)
+        
+        # Check for recent data availability
+        if ! check_recent_data_availability "$market" "$symbol" "$interval_to_use"; then
+            log_debug "Symbol ${market}/${symbol} does not have recent data (last 5 days)"
+            echo "$market,$symbol,NO_RECENT_DATA,\"\"" > "$result_file"
+            write_to_data_store "$market" "$symbol" "$result_file"
+            rm -f "$intervals_file"
+            return 0
+        fi
+        
+        # Find the earliest date
+        earliest_date=$(find_earliest_date "$market" "$symbol" "$interval_to_use")
+        
+        if [[ -z "$earliest_date" ]]; then
+            log_debug "No earliest date found for ${market}/${symbol}/${interval_to_use}"
+            echo "$market,$symbol,NO_DATA_FOUND,\"\"" > "$result_file"
+            write_to_data_store "$market" "$symbol" "$result_file"
+            rm -f "$intervals_file"
+            return 0
+        fi
+    }
     fi
     
-    # Find the earliest date
-    local earliest_date=$(find_earliest_date "$market" "$symbol" "$interval_to_use")
+    # Format result
+    sort "$intervals_file" > "${intervals_file}.sorted"
+    local all_intervals=$(tr '\n' ',' < "${intervals_file}.sorted" | sed 's/,$//')
+    all_intervals=$(echo "$all_intervals" | sed 's/^,//')
     
-    if [[ -z "$earliest_date" ]]; then
-        log_debug "No earliest date found for ${market}/${symbol}/${interval_to_use}"
-        echo "$market,$symbol,NO_DATA_FOUND,\"\"" > "$result_file"
-    else
-        # Process all intervals and ensure there's no leading comma
-        # First sort the intervals for consistency
-        sort "$intervals_file" > "${intervals_file}.sorted"
-        
-        # Convert to comma-separated list and remove any potential trailing comma
-        local all_intervals=$(tr '\n' ',' < "${intervals_file}.sorted" | sed 's/,$//')
-        
-        # Ensure we don't have any leading comma that could result from processing
-        all_intervals=$(echo "$all_intervals" | sed 's/^,//')
-        
-        log_debug "Successfully processed ${market}/${symbol}: ${interval_to_use}, ${earliest_date}, intervals: ${all_intervals}"
-        
-        # Properly quote the intervals field for CSV
-        echo "$market,$symbol,$earliest_date,\"$all_intervals\"" > "$result_file"
-    fi
+    log_debug "Successfully processed ${market}/${symbol}: ${interval_to_use}, ${earliest_date}, intervals: ${all_intervals}"
+    
+    # Properly quote the intervals field for CSV
+    echo "$market,$symbol,$earliest_date,\"$all_intervals\"" > "$result_file"
     
     # Update the data store with the new result
     write_to_data_store "$market" "$symbol" "$result_file"
@@ -974,54 +1130,71 @@ process_market() {
     # Start timing data store operations
     start_timing "data_store_operations"
     
-    # Process symbols in parallel with controlled concurrency
-    while IFS= read -r symbol; do
-        # Skip empty lines
-        if [[ -z "$symbol" ]]; then
-            continue
-        fi
+    # Batch processing - process symbols in batches to reduce overhead
+    local batch_size=20
+    local total_batches=$(( (total_symbols + batch_size - 1) / batch_size ))
+    local current_batch=0
+    
+    # Process symbols in parallel with controlled concurrency and batching
+    while IFS= read -r symbols_batch; do
+        ((current_batch++))
         
-        # In test mode, only process the first few symbols
-        ((symbol_count++))
-        if [[ "$TEST_MODE" == "true" && $symbol_count -gt $max_symbols ]]; then
-            break
-        fi
-        
-        # Check if symbol is in data store
-        if [[ "$USE_DATA_STORE" == "true" ]] && is_in_data_store "$market" "$symbol"; then
-            # Process directly from data store (not in background)
-            local result_file="${TEMP_DIR}/${market}_${symbol}_result.txt"
-            read_from_data_store "$market" "$symbol" "$result_file"
-            ((data_store_hits++))
-            ((progress++))
-            
-            # Update progress
-            if [[ "$VERBOSE" == "true" ]]; then
-                if ((progress % 50 == 0)) || ((progress == total_symbols)); then
-                    percent=$((progress * 100 / total_symbols))
-                    printf "${YELLOW}Progress: %3d%% (%d/%d) [Data Store: %d]${NC}\r" "$percent" "$progress" "$total_symbols" "$data_store_hits"
-                fi
+        # Process each symbol in the batch
+        for symbol in $symbols_batch; do
+            # Skip empty lines
+            if [[ -z "$symbol" ]]; then
+                continue
             fi
-        else
-            # Wait if we've reached max parallel processes
-            while [[ $(jobs -r | wc -l) -ge $MAX_PARALLEL ]]; do
-                sleep 0.5
-            done
             
-            # Process the symbol in the background
-            process_symbol "$market" "$symbol" &
-            ((data_store_misses++))
+            # In test mode, only process the first few symbols
+            ((symbol_count++))
+            if [[ "$TEST_MODE" == "true" && $symbol_count -gt $max_symbols ]]; then
+                break
+            fi
             
-            # Update progress
-            if [[ "$VERBOSE" == "true" ]]; then
+            # Check if symbol is in data store
+            if [[ "$USE_DATA_STORE" == "true" ]] && is_in_data_store "$market" "$symbol"; then
+                # Process directly from data store (not in background)
+                local result_file="${TEMP_DIR}/${market}_${symbol}_result.txt"
+                read_from_data_store "$market" "$symbol" "$result_file"
+                ((data_store_hits++))
                 ((progress++))
-                if ((progress % 50 == 0)) || ((progress == total_symbols)); then
-                    percent=$((progress * 100 / total_symbols))
-                    printf "${YELLOW}Progress: %3d%% (%d/%d) [Data Store: %d]${NC}\r" "$percent" "$progress" "$total_symbols" "$data_store_hits"
+                
+                # Update progress
+                if [[ "$VERBOSE" == "true" ]]; then
+                    if ((progress % 50 == 0)) || ((progress == total_symbols)); then
+                        percent=$((progress * 100 / total_symbols))
+                        printf "${YELLOW}Progress: %3d%% (%d/%d) [Data Store: %d]${NC}\r" "$percent" "$progress" "$total_symbols" "$data_store_hits"
+                    fi
+                fi
+            else
+                # Wait if we've reached max parallel processes
+                while [[ $(jobs -r | wc -l) -ge $MAX_PARALLEL ]]; do
+                    sleep 0.1  # Reduce sleep time from 0.5 to 0.1
+                done
+                
+                # Process the symbol in the background
+                process_symbol "$market" "$symbol" &
+                ((data_store_misses++))
+                
+                # Update progress
+                if [[ "$VERBOSE" == "true" ]]; then
+                    ((progress++))
+                    if ((progress % 50 == 0)) || ((progress == total_symbols)); then
+                        percent=$((progress * 100 / total_symbols))
+                        printf "${YELLOW}Progress: %3d%% (%d/%d) [Data Store: %d]${NC}\r" "$percent" "$progress" "$total_symbols" "$data_store_hits"
+                    fi
                 fi
             fi
+        done
+        
+        # Every few batches, wait for current jobs to complete to avoid overloading
+        if ((current_batch % 5 == 0)); then
+            # Wait for current batch to complete before starting the next
+            wait
         fi
-    done < "$symbols_file"
+        
+    done < <(xargs -n $batch_size < "$symbols_file")  # Split file into batches
     
     # Wait for all background jobs to complete
     wait
