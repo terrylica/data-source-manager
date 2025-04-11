@@ -18,6 +18,7 @@ A high-performance, robust package for efficient market data retrieval from mult
 
 - Execute `to-be-constructed.sh` to build `.cache/BINANCE/KLINES/...`
 - Locally hosted cached files organized in a hierarchical structure using Apache Arrow format for high-performance columnar memory-mapped access, enabling efficient zero-copy reads and optimal performance for time series analysis.
+- Refer to [Arrow Cache Builder documentation](scripts/arrow_cache/README.md) for more information.
 
 ## Features
 
