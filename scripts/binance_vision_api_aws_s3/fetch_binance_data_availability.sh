@@ -8,9 +8,14 @@
 #   and their earliest available data date from Binance Vision data 
 #   repository. It works with spot, um (USDT-M futures), and cm (COIN-M futures)
 #   markets and creates filtered lists based on specified criteria.
+#   
+#   Only symbols with data available within the last 5 days are included
+#   in the filtered output files to ensure all symbols are currently active
+#   and available for trading/analysis.
 #
 # Features:
 #   - Multi-market support (spot, USDT-M futures, COIN-M futures)
+#   - Data recency validation (symbols must have data within the last 5 days)
 #   - Parallel processing for faster data retrieval
 #   - Automatic generation of market-specific and combined reports
 #   - Cross-market symbol filtering based on quote currencies
@@ -331,6 +336,10 @@ usage() {
     echo "  --no-perf              Disable performance statistics"
     echo "  --auto-install-deps    Automatically install missing dependencies"
     echo "  -h, --help             Display this help message and exit"
+    echo ""
+    echo "Notes:"
+    echo "  - Only symbols with data available within the last 5 days are included in filtered lists"
+    echo "  - The final reports (spot_synchronal.csv, etc.) will only contain symbols with recent data"
     echo ""
     echo "Example: $0 --output results --markets spot,um --parallel 30"
     exit 1
@@ -665,15 +674,145 @@ find_earliest_date() {
     return 0
 }
 
-# Process a single symbol to find its earliest date
-# Args:
-#   $1: Market (spot, um, cm)
-#   $2: Symbol
-# Creates:
-#   Result file with symbol info in CSV format
-# Returns:
-#   0 on success
+# Add the new function to check for recent data availability
+check_recent_data_availability() {
+    # Check if a symbol has data available within the last 5 days
+    # This function verifies recent data availability which is required for all symbols.
+    # Any symbol without data in the last 5 days will be excluded from final reports.
+    # 
+    # Args:
+    #   $1: Market (spot, um, cm)
+    #   $2: Symbol
+    #   $3: Interval
+    # Returns:
+    #   0 if recent data is available, 1 if not available
+    local market="$1"
+    local symbol="$2"
+    local interval="$3"
+    local temp_file="${TEMP_DIR}/${market}_${symbol}_${interval}_recent_dates.txt"
+    local raw_file="${temp_file}.raw"
+    local prefix=$(get_s3_prefix "$market" "$symbol" "$interval")
+    
+    if [[ -z "$prefix" ]]; then
+        log_debug "Error: Could not determine S3 prefix for $market/$symbol/$interval"
+        return 1
+    fi
+    
+    log_debug "Checking recent data availability for ${market}/${symbol}/${interval} from ${S3_BUCKET}/${prefix}/"
+    
+    # Check if directory exists
+    if ! run_s3_ls "$prefix" "$raw_file"; then
+        log_debug "No data found for ${market}/${symbol}/${interval}"
+        return 1
+    fi
+    
+    # Extract dates from the files
+    if ! grep -v "CHECKSUM" "$raw_file" | \
+         grep -o "[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}" > "$temp_file"; then
+        log_debug "No dates found in listing for ${market}/${symbol}/${interval}"
+        rm -f "$raw_file" "$temp_file"
+        return 1
+    fi
+    
+    if [[ ! -s "$temp_file" ]]; then
+        log_debug "Empty dates file for ${market}/${symbol}/${interval}"
+        rm -f "$raw_file" "$temp_file"
+        return 1
+    fi
+    
+    # Calculate dates for checking availability
+    # Current date in YYYY-MM-DD format
+    local current_date=$(date +%Y-%m-%d)
+    
+    # Calculate date 5 days ago in a cross-platform way
+    local five_days_ago=""
+    
+    # Try GNU date (Linux)
+    five_days_ago=$(date -d "$current_date - 5 days" +%Y-%m-%d 2>/dev/null)
+    
+    # If GNU date failed, try BSD date (macOS)
+    if [ $? -ne 0 ]; then
+        five_days_ago=$(date -v-5d +%Y-%m-%d 2>/dev/null)
+        
+        # If that also failed, try a more manual approach
+        if [ $? -ne 0 ]; then
+            # Parse current date
+            local year=$(echo "$current_date" | cut -d'-' -f1)
+            local month=$(echo "$current_date" | cut -d'-' -f2)
+            local day=$(echo "$current_date" | cut -d'-' -f3)
+            
+            # Convert to number
+            day=$((10#$day))  # Force base-10 interpretation
+            
+            # Calculate 5 days ago
+            day=$((day - 5))
+            
+            # Handle month/year rollover for negative days
+            if [ $day -le 0 ]; then
+                month=$((10#$month - 1))
+                if [ $month -le 0 ]; then
+                    month=12
+                    year=$((year - 1))
+                fi
+                
+                # Days in the previous month
+                case $month in
+                    1|3|5|7|8|10|12) day=$((day + 31)) ;;
+                    4|6|9|11) day=$((day + 30)) ;;
+                    2)
+                        # Check for leap year
+                        if [ $((year % 4)) -eq 0 ] && ([ $((year % 100)) -ne 0 ] || [ $((year % 400)) -eq 0 ]); then
+                            day=$((day + 29))
+                        else
+                            day=$((day + 28))
+                        fi
+                        ;;
+                esac
+            fi
+            
+            # Format back to YYYY-MM-DD
+            if [ $month -lt 10 ]; then month="0$month"; fi
+            if [ $day -lt 10 ]; then day="0$day"; fi
+            five_days_ago="$year-$month-$day"
+        fi
+    fi
+    
+    log_debug "Current date: $current_date, Five days ago: $five_days_ago"
+    
+    # Check if there's data within the last 5 days
+    local has_recent_data=0
+    while IFS= read -r date_str; do
+        if [[ "$date_str" > "$five_days_ago" ]]; then
+            has_recent_data=1
+            log_debug "Found recent data for ${market}/${symbol}/${interval}: $date_str"
+            break
+        fi
+    done < <(sort -r "$temp_file")  # Sort in reverse to check most recent dates first
+    
+    rm -f "$raw_file" "$temp_file"
+    
+    if [[ $has_recent_data -eq 1 ]]; then
+        return 0  # Success - found recent data
+    else
+        log_debug "No recent data found for ${market}/${symbol}/${interval} within the last 5 days"
+        return 1  # No recent data
+    fi
+}
+
+# Replace process_symbol() with the updated version
 process_symbol() {
+    # Process a single symbol to find its earliest date and check recent data availability
+    # This function processes a symbol to determine its earliest available date and
+    # validates that the symbol has data available within the last 5 days.
+    # Symbols without recent data will be marked with NO_RECENT_DATA status and excluded from reports.
+    #
+    # Args:
+    #   $1: Market (spot, um, cm)
+    #   $2: Symbol
+    # Creates:
+    #   Result file with symbol info in CSV format or a status message indicating why no data was found
+    # Returns:
+    #   0 on success
     local market="$1"
     local symbol="$2"
     local result_file="${TEMP_DIR}/${market}_${symbol}_result.txt"
@@ -727,6 +866,15 @@ process_symbol() {
             rm -f "$intervals_file"
             return 0
         fi
+    fi
+    
+    # Check for recent data availability within the last 5 days
+    if ! check_recent_data_availability "$market" "$symbol" "$interval_to_use"; then
+        log_debug "Symbol ${market}/${symbol} does not have recent data (last 5 days)"
+        echo "$market,$symbol,NO_RECENT_DATA,\"\"" > "$result_file"
+        write_to_data_store "$market" "$symbol" "$result_file"
+        rm -f "$intervals_file"
+        return 0
     fi
     
     # Find the earliest date
@@ -922,10 +1070,20 @@ create_csv_with_header() {
 # Args:
 #   $1: Market (spot, um, cm)
 # Creates:
-#   CSV file with combined results for the market
+#   CSV file with combined results for the market (excluding symbols without recent data)
 # Returns:
 #   0 on success, 1 on failure
 combine_market_results() {
+    # Combine results for a market, excluding symbols without recent data
+    # Creates a CSV file with combined results for a single market,
+    # filtering out symbols that don't have data available in the last 5 days.
+    #
+    # Args:
+    #   $1: Market (spot, um, cm)
+    # Creates:
+    #   CSV file with combined results for the market (excluding symbols without recent data)
+    # Returns:
+    #   0 on success, 1 on failure
     local market="$1"
     local output_file="${OUTPUT_DIR}/${market}_earliest_dates.csv"
     local header="market,symbol,earliest_date,available_intervals"
@@ -947,17 +1105,39 @@ combine_market_results() {
         return 1
     fi
     
-    # Combine all result files
-    cat "${TEMP_DIR}/${market}_"*"_result.txt" | sort >> "$output_file"
+    # Create a temp file for all results
+    local all_results="${TEMP_DIR}/${market}_all_results.txt"
+    cat "${TEMP_DIR}/${market}_"*"_result.txt" > "$all_results"
+    
+    # Count total results
+    local total_count=$(wc -l < "$all_results")
+    
+    # Filter out NO_RECENT_DATA entries
+    local filtered_results="${TEMP_DIR}/${market}_filtered_results.txt"
+    grep -v "NO_RECENT_DATA" "$all_results" > "$filtered_results"
+    
+    # Count results after filtering
+    local filtered_count=$(wc -l < "$filtered_results")
+    local removed_count=$((total_count - filtered_count))
+    
+    # Sort and append to output file
+    sort "$filtered_results" >> "$output_file"
     
     local count=$(wc -l < "$output_file")
     ((count--)) # Subtract header line
     
     if [[ "$VERBOSE" == "true" ]]; then
         print_colored "$GREEN" "Saved $count results for $market market to $output_file"
+        if [[ $removed_count -gt 0 ]]; then
+            print_colored "$YELLOW" "Excluded $removed_count entries with no recent data for $market market"
+        fi
     fi
     
-    log_debug "Saved $count results for $market market to $output_file"
+    log_debug "Saved $count results for $market market to $output_file (excluded $removed_count with no recent data)"
+    
+    # Clean up temp files
+    rm -f "$all_results" "$filtered_results"
+    
     return 0
 }
 
@@ -1445,8 +1625,25 @@ create_consolidated_base_symbol_file() {
     return 0
 }
 
-# Filter CSV files for spot+um and spot+um+cm combinations
+# Replace the filter_and_combine_markets function to exclude NO_RECENT_DATA entries
 filter_and_combine_markets() {
+    # Filter and combine market data, excluding symbols without recent data
+    # Creates filtered CSVs with only symbols that:
+    # 1. Have data available within the last 5 days
+    # 2. Exist across multiple markets as required by each report
+    # 
+    # Args:
+    #   $1: Spot market CSV input
+    #   $2: USDT-M futures market CSV input
+    #   $3: COIN-M futures market CSV input
+    #   $4: Output directory
+    #   $5: Temporary directory for processing
+    # Creates:
+    #   - spot_um_usdt_filtered.csv: Symbols available in both spot and USDT-M markets
+    #   - spot_synchronal.csv: Symbols available in all three markets
+    #   - consolidated_base_symbols.csv: Consolidated information across markets
+    # Returns:
+    #   0 on success
     # Start timing for filtering operation
     start_timing "filtering"
     
@@ -1472,15 +1669,58 @@ filter_and_combine_markets() {
     # New output file for consolidated base symbol data
     local consolidated_base_file="${output_dir}/consolidated_base_symbols.csv"
     
+    # First, filter out any symbols with NO_RECENT_DATA
+    local spot_file_filtered="${temp_dir}/spot_recent_only.csv"
+    local um_file_filtered="${temp_dir}/um_recent_only.csv"
+    local cm_file_filtered="${temp_dir}/cm_recent_only.csv"
+    
+    # Create filtered versions of the input files excluding NO_RECENT_DATA entries
+    log_debug "Filtering out symbols with NO_RECENT_DATA"
+    
+    # Copy header line
+    head -n 1 "$spot_file" > "$spot_file_filtered"
+    head -n 1 "$um_file" > "$um_file_filtered"
+    if [[ -f "$cm_file" ]]; then
+        head -n 1 "$cm_file" > "$cm_file_filtered"
+    fi
+    
+    # Filter spot market file
+    grep -v "NO_RECENT_DATA" "$spot_file" | grep -v "NO_INTERVALS_AVAILABLE" | grep -v "NO_DATA_FOUND" >> "$spot_file_filtered"
+    local spot_original_count=$(( $(wc -l < "$spot_file") - 1 ))
+    local spot_filtered_count=$(( $(wc -l < "$spot_file_filtered") - 1 ))
+    local spot_removed=$((spot_original_count - spot_filtered_count))
+    log_debug "Removed $spot_removed symbols with no recent data from spot market ($spot_filtered_count remain)"
+    
+    # Filter um market file
+    grep -v "NO_RECENT_DATA" "$um_file" | grep -v "NO_INTERVALS_AVAILABLE" | grep -v "NO_DATA_FOUND" >> "$um_file_filtered"
+    local um_original_count=$(( $(wc -l < "$um_file") - 1 ))
+    local um_filtered_count=$(( $(wc -l < "$um_file_filtered") - 1 ))
+    local um_removed=$((um_original_count - um_filtered_count))
+    log_debug "Removed $um_removed symbols with no recent data from um market ($um_filtered_count remain)"
+    
+    # Filter cm market file if it exists
+    if [[ -f "$cm_file" ]]; then
+        grep -v "NO_RECENT_DATA" "$cm_file" | grep -v "NO_INTERVALS_AVAILABLE" | grep -v "NO_DATA_FOUND" >> "$cm_file_filtered"
+        local cm_original_count=$(( $(wc -l < "$cm_file") - 1 ))
+        local cm_filtered_count=$(( $(wc -l < "$cm_file_filtered") - 1 ))
+        local cm_removed=$((cm_original_count - cm_filtered_count))
+        log_debug "Removed $cm_removed symbols with no recent data from cm market ($cm_filtered_count remain)"
+    fi
+    
+    # Use the filtered files for the rest of the processing
+    local spot_file_for_processing="$spot_file_filtered"
+    local um_file_for_processing="$um_file_filtered"
+    local cm_file_for_processing="$cm_file_filtered"
+    
     # Extract USDT pairs from spot market
-    extract_pairs_with_quote "$spot_file" "USDT" "$spot_usdt_file"
+    extract_pairs_with_quote "$spot_file_for_processing" "USDT" "$spot_usdt_file"
     
     # Debug: View the first few lines of the spot USDT file
     log_debug "First 3 lines of spot_usdt_file:"
     head -n 3 "$spot_usdt_file" >> "${LOG_FILE}"
     
     # Extract USDT pairs from um market
-    extract_pairs_with_quote "$um_file" "USDT" "$um_usdt_file"
+    extract_pairs_with_quote "$um_file_for_processing" "USDT" "$um_usdt_file"
     
     # Debug: View the first few lines of the um USDT file
     log_debug "First 3 lines of um_usdt_file:"
@@ -1497,9 +1737,9 @@ filter_and_combine_markets() {
     create_filtered_list "$spot_usdt_file" "$common_spot_um_bases" "$spot_um_filtered" "$temp_dir"
     
     # If cm_file is provided, also create spot+um+cm filtered list
-    if [[ -n "$cm_file" && -f "$cm_file" ]]; then
+    if [[ -n "$cm_file" && -f "$cm_file_for_processing" ]]; then
         # Extract USD_PERP pairs from cm market
-        extract_pairs_with_quote "$cm_file" "USD_PERP" "$cm_usd_perp_file"
+        extract_pairs_with_quote "$cm_file_for_processing" "USD_PERP" "$cm_usd_perp_file"
         
         # Get base symbols that exist in all three markets
         find_common_bases "$common_spot_um_bases" "$cm_usd_perp_file" "$common_all_bases" "$temp_dir"
@@ -1548,8 +1788,20 @@ filter_and_combine_markets() {
     
     local consolidated_count=$(( $(wc -l < "$consolidated_base_file") - 1 ))
     
+    # Add summary of how many symbols were filtered out due to recency requirement
+    local total_removed=$((spot_removed + um_removed))
+    if [[ -f "$cm_file" ]]; then
+        total_removed=$((total_removed + cm_removed))
+        log_info "Filtered out $total_removed total symbols due to recency requirement (spot: $spot_removed, um: $um_removed, cm: $cm_removed)"
+    else
+        log_info "Filtered out $total_removed total symbols due to recency requirement (spot: $spot_removed, um: $um_removed)"
+    fi
+    
     log_info "Created filtered instrument lists: $spot_um_filtered with $spot_um_count records, $spot_synchronal with $spot_um_cm_count records"
     log_info "Created consolidated base symbol file: $consolidated_base_file with $consolidated_count records"
+    
+    # Clean up temporary filtered files
+    rm -f "$spot_file_filtered" "$um_file_filtered" "$cm_file_filtered"
     
     # End timing for filtering operation
     end_timing "filtering"
@@ -1611,6 +1863,7 @@ main() {
     # Show summary
     print_colored "$GREEN" "All done! Found earliest dates for $count symbols across all markets."
     print_colored "$GREEN" "Combined results saved to ${all_markets_file}"
+    print_colored "$YELLOW" "NOTE: Only symbols with data available within the last 5 days are included in filtered lists."
     print_colored "$GREEN" "Filtered lists saved to ${OUTPUT_DIR}/spot_um_usdt_filtered.csv and ${OUTPUT_DIR}/spot_synchronal.csv"
     print_colored "$GREEN" "Consolidated base symbol file saved to ${OUTPUT_DIR}/consolidated_base_symbols.csv"
     
