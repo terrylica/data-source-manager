@@ -27,6 +27,12 @@ _timeout_log_file = os.environ.get(
 _timeout_logger_configured = False
 _timeout_logger = None
 
+# Error logging
+_error_log_file = os.environ.get("ERROR_LOG_FILE", "./logs/error_logs/error_log.txt")
+_error_logger_configured = False
+_error_logger = None
+_error_logging_enabled = False
+
 # Default color scheme
 DEFAULT_LOG_COLORS = {
     "DEBUG": "cyan",
@@ -507,6 +513,30 @@ class LoggerProxy:
         set_timeout_log_file(path)
         return self
 
+    def enable_error_logging(self, error_log_file=None):
+        """Enable logging of all errors, warnings, and critical messages to a dedicated file.
+
+        Args:
+            error_log_file (str, optional): Path to the error log file.
+
+        Returns:
+            LoggerProxy: Self reference for method chaining
+        """
+        enable_error_logging(error_log_file)
+        return self
+
+    def set_error_log_file(self, path):
+        """Set the file path for error logging with method chaining support.
+
+        Args:
+            path (str): Path to the log file
+
+        Returns:
+            LoggerProxy: Self reference for method chaining support.
+        """
+        set_error_log_file(path)
+        return self
+
 
 # Create the auto-detecting logger proxy for conventional syntax
 logger = LoggerProxy()
@@ -518,6 +548,9 @@ __all__ = [
     "use_rich_logging",
     "log_timeout",
     "set_timeout_log_file",
+    "enable_error_logging",
+    "set_error_log_file",
+    "get_error_log_file",
 ]
 
 # Test logger if run directly
@@ -696,5 +729,141 @@ def set_timeout_log_file(path: str):
     if _timeout_logger_configured:
         _timeout_logger_configured = False
         _timeout_logger = None
+
+    return True
+
+
+# Function to configure and enable error logging
+def _configure_error_logger():
+    """Configure the dedicated logger for error, warning, and critical events.
+
+    This creates a separate file-based logger specifically for logging error level
+    and above events, which can be used for monitoring and troubleshooting.
+    """
+    global _error_logger, _error_logger_configured, _error_log_file
+
+    if _error_logger_configured:
+        return _error_logger
+
+    # Create directory if it doesn't exist
+    log_dir = os.path.dirname(_error_log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
+    # Set up file handler
+    error_logger = logging.getLogger("error_logger")
+    error_logger.setLevel(logging.WARNING)  # Capture WARNING and above
+    error_logger.propagate = False  # Don't propagate to the root logger
+
+    # Create a FileHandler that appends to the error log file
+    handler = logging.FileHandler(_error_log_file, mode="a")
+    handler.setLevel(logging.WARNING)  # Only WARNING, ERROR, and CRITICAL
+
+    # Create a formatter that includes timestamp, module name, and message
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s (%(filename)s:%(lineno)d)",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+
+    # Add the handler to the logger
+    error_logger.handlers.clear()
+    error_logger.addHandler(handler)
+
+    # Set flag and store logger
+    _error_logger = error_logger
+    _error_logger_configured = True
+
+    return error_logger
+
+
+# Function to enable error logging for all modules
+def enable_error_logging(error_log_file=None):
+    """Enable logging of all errors, warnings, and critical messages to a dedicated file.
+
+    This configures a separate logger that captures all WARNING, ERROR, and CRITICAL
+    level messages from all modules and writes them to a centralized log file.
+
+    Args:
+        error_log_file (str, optional): Path to the error log file.
+                                       If None, uses the default path.
+
+    Returns:
+        bool: True if successful
+    """
+    global _error_log_file, _error_logger_configured, _error_logger, _error_logging_enabled
+
+    # Update log file path if provided
+    if error_log_file:
+        _error_log_file = error_log_file
+        # Reset the logger so it will be reconfigured with the new path
+        if _error_logger_configured:
+            _error_logger_configured = False
+            _error_logger = None
+
+    # Configure error logger
+    _configure_error_logger()
+
+    # Set up root logger handler to forward error messages
+    if _root_configured:
+        root_logger = logging.getLogger()
+
+        # Add filter to only forward WARNING and above
+        class ErrorFilter(logging.Filter):
+            def filter(self, record):
+                return record.levelno >= logging.WARNING
+
+        # Create a handler that sends to error logger
+        handler = logging.Handler()
+        handler.setLevel(logging.WARNING)
+        handler.addFilter(ErrorFilter())
+
+        # Create the formatter
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s (%(filename)s:%(lineno)d)",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(formatter)
+
+        # Custom emit method to send to error log file
+        def custom_emit(record):
+            if _error_logger:
+                _error_logger.handle(record)
+
+        handler.emit = custom_emit
+
+        # Add handler to root logger
+        root_logger.addHandler(handler)
+
+    _error_logging_enabled = True
+    return True
+
+
+def get_error_log_file():
+    """Get the current error log file path.
+
+    Returns:
+        str: Path to the error log file
+    """
+    return _error_log_file
+
+
+def set_error_log_file(path):
+    """Set the file path for error logging.
+
+    Args:
+        path (str): Path to the log file
+
+    Returns:
+        bool: True if successful
+    """
+    global _error_log_file, _error_logger_configured, _error_logger
+
+    _error_log_file = path
+
+    # Reset the logger so it will be reconfigured with the new path
+    if _error_logger_configured:
+        _error_logger_configured = False
+        _error_logger = None
 
     return True
