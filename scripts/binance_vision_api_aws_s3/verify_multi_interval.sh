@@ -56,12 +56,6 @@ check_dependencies() {
         missing_deps+=("curl")
     fi
     
-    # Check for aria2c (preferred but can fallback to curl)
-    if ! check_command aria2c; then
-        echo "⚠️ Missing preferred dependency: aria2c (will fallback to curl if not installed)"
-        missing_deps+=("aria2")
-    fi
-    
     # Check for other utilities
     if ! check_command unzip; then
         echo "⚠️ Missing required dependency: unzip"
@@ -137,10 +131,9 @@ MARKET_TYPE="spot"
 # - For SPOT and UM: typically like "BTCUSDT", "ETHUSDT", etc.
 # - For CM: typically like "BTCUSD_PERP", "ETHUSD_PERP" or "BCHUSD_PERP", etc.
 # For multiple symbols, use space-separated list: "BTCUSDT ETHUSDT XRPUSDT"
-# SYMBOLS="BTCUSDT ETHUSDT BNBUSDT LTCUSDT ADAUSDT XRPUSDT EOSUSDT XLMUSDT TRXUSDT ETCUSDT ICXUSDT VETUSDT LINKUSDT ZILUSDT XMRUSDT THETAUSDT MATICUSDT ATOMUSDT FTMUSDT ALGOUSDT DOGEUSDT CHZUSDT XTZUSDT BCHUSDT KNCUSDT MANAUSDT SOLUSDT SANDUSDT CRVUSDT DOTUSDT LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
+SYMBOLS="BTCUSDT ETHUSDT BNBUSDT LTCUSDT ADAUSDT XRPUSDT EOSUSDT XLMUSDT TRXUSDT ETCUSDT ICXUSDT VETUSDT LINKUSDT ZILUSDT XMRUSDT THETAUSDT MATICUSDT ATOMUSDT FTMUSDT ALGOUSDT DOGEUSDT CHZUSDT XTZUSDT BCHUSDT KNCUSDT MANAUSDT SOLUSDT SANDUSDT CRVUSDT DOTUSDT LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
 # SYMBOLS="XMRUSDT THETAUSDT MATICUSDT ATOMUSDT FTMUSDT ALGOUSDT DOGEUSDT CHZUSDT XTZUSDT BCHUSDT KNCUSDT MANAUSDT SOLUSDT SANDUSDT CRVUSDT DOTUSDT LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
 # SYMBOLS="LUNAUSDT EGLDUSDT RUNEUSDT UNIUSDT AVAXUSDT NEARUSDT AAVEUSDT FILUSDT AXSUSDT ROSEUSDT GALAUSDT ENSUSDT GMTUSDT APEUSDT OPUSDT APTUSDT SUIUSDT WLDUSDT WIFUSDT DOGSUSDT"
-SYMBOLS="LUNAUSDT"
 
 # Time intervals to process (space-separated list)
 # Available intervals:
@@ -149,7 +142,6 @@ SYMBOLS="LUNAUSDT"
 # - "1h", "2h", "4h", "6h", "8h", "12h"
 # - "1d"
 INTERVALS="1s 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h 1d"
-INTERVALS="1s 1m"
 
 # Test mode - process a shorter date range for testing
 TEST_MODE=false
@@ -181,7 +173,7 @@ RETRY_FROM=""           # Path to CSV file to retry from (empty for fresh run)
 # PERFORMANCE CONFIGURATION
 #--------------------------------------
 MAX_PARALLEL=50          # Number of parallel processes (lower for testing, increase for production)
-ARIA_CONNECTIONS=1       # Number of connections per download
+ARIA_CONNECTIONS=1       # Number of connections per download (ignored in curl-only version)
 DOWNLOAD_TIMEOUT=30      # Download timeout in seconds
 MAX_RETRIES=10           # Maximum number of download retries (increased from 3 to 10)
 
@@ -458,11 +450,11 @@ get_http_headers() {
     echo "$last_modified,$etag,$server,$content_type,$content_length,$x_cache,$x_amz_cf_id"
 }
 
-# Function to download file with aria2 or curl as fallback
+# Function to download file with curl
 download_file() {
     local url=$1
     local output_file=$2
-    local connections=$3
+    local connections=$3  # Ignored in curl-only version
     local timeout=$4
     local max_retries=$5
     
@@ -484,18 +476,9 @@ download_file() {
     local wait_time=1  # Initial wait time in seconds
     
     while [ $retry -lt $max_retries ]; do
-        # Attempt to download the file using aria2c if available, otherwise fallback to curl
-        if check_command aria2c; then
-            aria2c --quiet --max-connection-per-server="${connections}" \
-                   --connect-timeout="${timeout}" --timeout="${timeout}" \
-                   --allow-overwrite=true \
-                   --auto-file-renaming=false \
-                   --out="${output_file}" "${url}"
-        else
-            # Fallback to curl if aria2c is not available
-            curl -s -L --connect-timeout "${timeout}" --max-time "${timeout}" \
-                 -o "${output_file}" "${url}"
-        fi
+        # Download the file using curl
+        curl -s -L --connect-timeout "${timeout}" --max-time "${timeout}" \
+             -o "${output_file}" "${url}"
         
         local result=$?
         
@@ -658,7 +641,7 @@ analyze_file() {
     # Extract HTTP headers
     header_values=$(get_http_headers "${url}" "${headers_file}")
     
-    # Download files with aria2 - we already checked existence, so we can ignore 404 return code
+    # Download files with curl - we already checked existence, so we can ignore 404 return code
     local dl_result=0
     download_file "${url}" "${filename}" "${ARIA_CONNECTIONS}" "${DOWNLOAD_TIMEOUT}" "${MAX_RETRIES}"
     dl_result=$?
