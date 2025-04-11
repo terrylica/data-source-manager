@@ -2,6 +2,23 @@
 
 A high-performance, robust package for efficient market data retrieval from multiple data providers, including Binance Vision, using Apache Arrow MMAP for optimal performance.
 
+## Operational
+
+1. Initialization
+
+- Execute `scripts/binance_vision_api_aws_s3/fetch_binance_data_availability.sh` to build `scripts/binance_vision_api_aws_s3/reports/spot_synchronal.csv`
+- The archaic word _synchronal_ contextually means the Binance Exchanges crypto base pair that we're interested in monitoring, because they must be active in the SPOT, UM and CM market of the Binance Exchange.
+- `scripts/binance_vision_api_aws_s3/reports/spot_synchronal.csv` contains only the Binance SPOT market symbols, their earliest date available, and their available intervals (i.e. 1s, 1m, 3m, ..., 1d), and which base pairs (e.g. BTC) are also on the UM and CM markets.
+
+1. Shortlisting
+
+- To exclude specific symbols from subsequent operations below, simply remove their corresponding lines from `spot_synchronal.csv`
+
+1. Cache Building
+
+- Execute `to-be-constructed.sh` to build `.cache/BINANCE/KLINES/...`
+- Locally hosted cached files organized in a hierarchical structure using Apache Arrow format for high-performance columnar memory-mapped access, enabling efficient zero-copy reads and optimal performance for time series analysis.
+
 ## Features
 
 - **Multi-Provider Support**: Supports multiple data providers (currently Binance with TradeStation coming soon)
