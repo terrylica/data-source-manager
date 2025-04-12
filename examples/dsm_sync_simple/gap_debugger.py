@@ -49,7 +49,7 @@ log_file = log_dir / f"gap_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 logger.enable_error_logging(str(log_file))
 logger.show_filename(True)
 logger.use_rich(True)
-logger.setLevel("INFO")
+logger.setLevel("DEBUG")
 
 
 def analyze_timestamp_continuity(

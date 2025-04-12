@@ -135,31 +135,23 @@ class VisionDataClient(Generic[T]):
             if hasattr(self._client, "close") and callable(self._client.close):
                 self._client.close()
 
-    def _create_empty_dataframe(self) -> TimestampedDataFrame:
+    @staticmethod
+    def _create_empty_dataframe() -> TimestampedDataFrame:
         """Create an empty dataframe with the correct structure.
 
         Returns:
             Empty TimestampedDataFrame with the correct columns
         """
-        # Define standard OHLCV columns directly
-        columns = [
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "quote_asset_volume",
-            "number_of_trades",
-            "taker_buy_base_asset_volume",
-            "taker_buy_quote_asset_volume",
-        ]
+        # Use the standardized empty dataframe function from config
+        from utils.config import create_empty_dataframe
 
-        df = pd.DataFrame(columns=columns)
-        df["open_time_us"] = pd.Series(dtype="int64")
-        df["close_time_us"] = pd.Series(dtype="int64")
+        # Create empty dataframe and convert to TimestampedDataFrame format
+        df = create_empty_dataframe()
 
-        # Set index to open_time_us and convert to TimestampedDataFrame
-        df = df.set_index("open_time_us")
+        # Set index to open_time_us (required by TimestampedDataFrame)
+        if "open_time_us" not in df.columns:
+            df["open_time_us"] = pd.Series(dtype="int64")
+            df = df.set_index("open_time_us")
 
         return TimestampedDataFrame(df)
 
@@ -229,6 +221,64 @@ class VisionDataClient(Generic[T]):
                 f"Date {date.isoformat()} caused timestamp validation error: {e}"
             )
             return False
+
+    def _process_timestamp_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Process timestamp columns in the dataframe, handling various formats.
+
+        Args:
+            df: DataFrame with timestamp columns to process
+
+        Returns:
+            DataFrame with processed timestamp columns
+        """
+        if df.empty:
+            return df
+
+        try:
+            # Check timestamp format if dataframe has rows
+            if len(df) > 0:
+                first_ts = df.iloc[0, 0]  # First timestamp in first column
+
+                try:
+                    # Detect timestamp unit using the standardized function
+                    timestamp_unit = detect_timestamp_unit(first_ts)
+
+                    # Log the first and last timestamps for debugging
+                    logger.debug(f"First timestamp: {first_ts} ({timestamp_unit})")
+                    if len(df) > 1:
+                        last_ts = df.iloc[-1, 0]
+                        logger.debug(f"Last timestamp: {last_ts} ({timestamp_unit})")
+
+                    # Convert timestamps to datetime using the detected unit
+                    if "open_time" in df.columns:
+                        df["open_time"] = pd.to_datetime(
+                            df["open_time"], unit=timestamp_unit, utc=True
+                        )
+                    if "close_time" in df.columns:
+                        df["close_time"] = pd.to_datetime(
+                            df["close_time"], unit=timestamp_unit, utc=True
+                        )
+
+                    logger.debug(
+                        f"Converted timestamps to datetime using {timestamp_unit} unit"
+                    )
+
+                except ValueError as e:
+                    logger.warning(f"Error detecting timestamp unit: {e}")
+                    # Fall back to default handling with microseconds as unit
+                    if "open_time" in df.columns:
+                        df["open_time"] = pd.to_datetime(
+                            df["open_time"], unit="us", utc=True
+                        )
+                    if "close_time" in df.columns:
+                        df["close_time"] = pd.to_datetime(
+                            df["close_time"], unit="us", utc=True
+                        )
+
+        except Exception as e:
+            logger.error(f"Error processing timestamp columns: {e}")
+
+        return df
 
     def _download_file(self, date: datetime) -> Optional[pd.DataFrame]:
         """Download and process data file for a specific date.
@@ -348,95 +398,20 @@ class VisionDataClient(Generic[T]):
 
                         # Process the data
                         if not df.empty:
-                            # Check timestamp format - determine if microseconds or milliseconds
-                            if len(df) > 0:
-                                first_ts = df.iloc[
-                                    0, 0
-                                ]  # First timestamp in first column
+                            # If number of columns match, use the standard names
+                            if len(df.columns) == len(KLINE_COLUMNS):
+                                df.columns = KLINE_COLUMNS
+                            else:
+                                logger.warning(
+                                    f"Column count mismatch: expected {len(KLINE_COLUMNS)}, got {len(df.columns)}"
+                                )
 
-                                try:
-                                    # Detect timestamp unit using the standardized function
-                                    timestamp_unit = detect_timestamp_unit(first_ts)
+                            # Store original timestamp info for later analysis if not already present
+                            if "original_timestamp" not in df.columns:
+                                df["original_timestamp"] = df.iloc[:, 0].astype(str)
 
-                                    # Log the first and last timestamps for debugging
-                                    logger.debug(
-                                        f"First timestamp: {first_ts} ({timestamp_unit})"
-                                    )
-                                    if len(df) > 1:
-                                        last_ts = df.iloc[-1, 0]
-                                        logger.debug(
-                                            f"Last timestamp: {last_ts} ({timestamp_unit})"
-                                        )
-
-                                    # Standardize column names from the KLINE_COLUMNS in config
-
-                                    # If number of columns match, use the standard names
-                                    if len(df.columns) == len(KLINE_COLUMNS):
-                                        df.columns = KLINE_COLUMNS
-                                    else:
-                                        logger.warning(
-                                            f"Column count mismatch: expected {len(KLINE_COLUMNS)}, got {len(df.columns)}"
-                                        )
-
-                                    # Directly convert timestamps to datetime using the detected unit
-                                    # No need for intermediate columns
-                                    if "open_time" in df.columns:
-                                        df["open_time"] = pd.to_datetime(
-                                            df["open_time"],
-                                            unit=timestamp_unit,
-                                            utc=True,
-                                        )
-                                    if "close_time" in df.columns:
-                                        df["close_time"] = pd.to_datetime(
-                                            df["close_time"],
-                                            unit=timestamp_unit,
-                                            utc=True,
-                                        )
-
-                                    logger.debug(
-                                        f"Converted timestamps to datetime using {timestamp_unit} unit"
-                                    )
-
-                                except ValueError as e:
-                                    logger.warning(
-                                        f"Error detecting timestamp unit: {e}"
-                                    )
-                                    # Fall back to default handling with standard column names
-
-                                    # If number of columns match, use the standard names
-                                    if len(df.columns) == len(KLINE_COLUMNS):
-                                        df.columns = KLINE_COLUMNS
-
-                                    # Use microsecond as default (safer)
-                                    if "open_time" in df.columns:
-                                        df["open_time"] = pd.to_datetime(
-                                            df["open_time"], unit="us", utc=True
-                                        )
-                                    if "close_time" in df.columns:
-                                        df["close_time"] = pd.to_datetime(
-                                            df["close_time"], unit="us", utc=True
-                                        )
-
-                            # Standardize column names if not already done
-                            if df.columns[0] != "open_time":
-                                # Only rename if column counts match
-                                if len(df.columns) == len(KLINE_COLUMNS):
-                                    df.columns = KLINE_COLUMNS
-
-                                    # Convert timestamp columns to datetime if not already done
-                                    if not pd.api.types.is_datetime64_dtype(
-                                        df["open_time"]
-                                    ):
-                                        # Use a safe default of microseconds
-                                        df["open_time"] = pd.to_datetime(
-                                            df["open_time"], unit="us", utc=True
-                                        )
-                                    if not pd.api.types.is_datetime64_dtype(
-                                        df["close_time"]
-                                    ):
-                                        df["close_time"] = pd.to_datetime(
-                                            df["close_time"], unit="us", utc=True
-                                        )
+                            # Process timestamp columns
+                            df = self._process_timestamp_columns(df)
 
                             return df
                         else:
@@ -464,6 +439,19 @@ class VisionDataClient(Generic[T]):
         columns: Optional[Sequence[str]] = None,
     ) -> TimestampedDataFrame:
         """Download data for a specific time range.
+
+        This method handles the core logic for retrieving data from Binance Vision API:
+        1. It downloads individual daily files in parallel
+        2. Merges them together in chronological order
+        3. Handles day boundary transitions carefully to ensure data continuity
+        4. Uses REST API to fill specific gaps at day boundaries when detected
+
+        The day boundary handling is critical because:
+        - For most intervals, the CSV files have continuous data when combined
+        - However, for hourly (1h) klines, the raw CSV files typically start at 01:00:00
+          with the midnight (00:00:00) record missing completely
+        - When day boundary gaps are detected, REST API is used to fetch just those specific missing points
+        - This ensures complete data without requiring interpolation
 
         Args:
             start_time: Start time for data
@@ -605,208 +593,138 @@ class VisionDataClient(Generic[T]):
             combined_df = pd.concat(dfs, ignore_index=True)
 
             try:
-                # First, sort by open_time to ensure chronological order
+                # Create a TimeStampedDataFrame with a proper index
+                combined_df.reset_index(drop=True, inplace=True)
+
+                # Log some basic information about the raw data
+                logger.debug(f"Raw combined data has {len(combined_df)} records")
+                if not combined_df.empty:
+                    logger.debug(
+                        f"Time range: {combined_df['open_time'].min()} to {combined_df['open_time'].max()}"
+                    )
+
+                    # Count unique days
+                    unique_days = combined_df["open_time"].dt.date.unique()
+                    logger.debug(f"Data spans {len(unique_days)} unique days")
+
+                    # Print first and last rows of each day to help diagnose boundary issues
+                    first_times = {}
+                    last_times = {}
+                    for day in sorted(unique_days):
+                        day_data = combined_df[combined_df["open_time"].dt.date == day]
+                        if not day_data.empty:
+                            first_row = day_data.iloc[0]
+                            last_row = day_data.iloc[-1]
+                            first_times[day] = first_row["open_time"]
+                            last_times[day] = last_row["open_time"]
+                            logger.debug(
+                                f"Day {day}: First record at {first_row['open_time'].strftime('%H:%M:%S')}, Last record at {last_row['open_time'].strftime('%H:%M:%S')}, Total: {len(day_data)}"
+                            )
+
+                    # Special detection for hourly data patterns
+                    if self.interval_obj == Interval.HOUR_1:
+                        first_hours = [dt.hour for dt in first_times.values()]
+                        if all(hour == 1 for hour in first_hours):
+                            logger.info(
+                                "Detected hourly (1h) kline pattern: All days start at 01:00:00, missing midnight records. "
+                                "This is a known limitation of Binance Vision API hourly data files."
+                            )
+
+                # Get expected interval in seconds for gap detection
+                expected_interval = self._get_interval_seconds(self.interval)
+
+                # Sort by open_time to ensure chronological order
                 combined_df = combined_df.sort_values("open_time")
 
-                # Calculate time differences between consecutive rows
+                # Calculate time differences between consecutive rows for gap detection only
                 combined_df.loc[:, "time_diff"] = (
                     combined_df["open_time"].diff().dt.total_seconds()
                 )
 
-                # Get expected interval in seconds
-                expected_interval = self._get_interval_seconds(self.interval)
+                # Track gaps for diagnostic purposes only (no fixing/interpolation)
+                missing_midnight_detected = False
 
-                # Look for gaps significantly larger than expected interval at day boundaries
-                # Focus on midnight transitions (23:00-01:00)
-                combined_df.loc[:, "hour"] = combined_df["open_time"].dt.hour
-                combined_df.loc[:, "minute"] = combined_df["open_time"].dt.minute
-                combined_df.loc[:, "day"] = combined_df["open_time"].dt.day
-                combined_df.loc[:, "month"] = combined_df["open_time"].dt.month
-                combined_df.loc[:, "year"] = combined_df["open_time"].dt.year
-
-                # Before day boundary analysis, check for 00:00:00 records at each day boundary
-                # since these are critical for continuous data
-                day_boundaries = {}
-                current_days = sorted(combined_df["open_time"].dt.date.unique())
-
-                for day in current_days:
-                    next_day = day + timedelta(days=1)
-                    # Check if next day data is available in our dataset
-                    if next_day in current_days:
-                        # Check for 23:59 in current day
-                        has_2359 = False
-                        day_data = combined_df[combined_df["open_time"].dt.date == day]
-                        if not day_data.empty:
-                            last_record = day_data.iloc[-1]
-                            if (
-                                last_record["hour"] == 23
-                                and last_record["minute"] == 59
-                            ):
-                                has_2359 = True
-
-                        # Check for 00:00 in next day
-                        has_0000 = False
-                        next_day_data = combined_df[
-                            combined_df["open_time"].dt.date == next_day
-                        ]
-                        if not next_day_data.empty:
-                            first_record = next_day_data.iloc[0]
-                            if (
-                                first_record["hour"] == 0
-                                and first_record["minute"] == 0
-                            ):
-                                has_0000 = True
-
-                        # Check for 00:01 in next day (backup check)
-                        has_0001 = False
-                        if not next_day_data.empty and len(next_day_data) > 1:
-                            second_record = (
-                                next_day_data.iloc[1]
-                                if len(next_day_data) > 1
-                                else None
-                            )
-                            if (
-                                second_record is not None
-                                and second_record["hour"] == 0
-                                and second_record["minute"] == 1
-                            ):
-                                has_0001 = True
-
-                        day_boundaries[day] = {
-                            "has_2359": has_2359,
-                            "has_0000": has_0000,
-                            "has_0001": has_0001,
-                            "continuous": has_2359 and has_0000,
-                            "needs_interpolation": has_2359
-                            and not has_0000
-                            and has_0001,
-                        }
-
-                        logger.debug(
-                            f"Day boundary {day} -> {next_day}: 23:59={has_2359}, 00:00={has_0000}, 00:01={has_0001}"
-                        )
-
-                # Properly fix the Series boolean comparison issue
-                # Filter for records at midnight
-                midnight_filter = (combined_df["hour"] == 0) & (
-                    combined_df["minute"] == 0
-                )
-                # Filter for records at last minute of day
-                last_minute_filter = (combined_df["hour"] == 23) & (
-                    combined_df["minute"] == 59
-                )
-
-                # Get rows matching these filters
-                midnight_rows = combined_df[midnight_filter]
-                last_minute_rows = combined_df[last_minute_filter]
-
-                if not midnight_rows.empty:
-                    logger.debug(f"Found {len(midnight_rows)} midnight (00:00) records")
-                if not last_minute_rows.empty:
-                    logger.debug(
-                        f"Found {len(last_minute_rows)} last minute (23:59) records"
-                    )
-
-                # List to store any midnight records that actually need to be added
-                midnight_records = []
-
-                # Detect true gaps at day boundaries where 00:00 is missing but should exist
                 for i in range(1, len(combined_df)):
                     prev_row = combined_df.iloc[i - 1]
                     curr_row = combined_df.iloc[i]
 
-                    prev_time = prev_row["open_time"]
-                    curr_time = curr_row["open_time"]
-
-                    # Only look at day transitions (where days differ)
-                    if prev_time.date() != curr_time.date():
-                        # Check if this is a 23:59 -> 00:01 transition (skipping 00:00)
-                        if (
-                            prev_row["hour"] == 23
-                            and prev_row["minute"] == 59
-                            and curr_row["hour"] == 0
-                            and curr_row["minute"] == 1
-                        ):
-
-                            # Check our day boundary analysis
-                            day = prev_time.date()
-                            if (
-                                day in day_boundaries
-                                and day_boundaries[day]["needs_interpolation"]
-                            ):
-                                # Calculate expected midnight datetime
-                                midnight = datetime.combine(
-                                    curr_time.date(),
-                                    datetime.min.time(),
-                                    tzinfo=timezone.utc,
-                                )
-
-                                logger.warning(
-                                    f"True midnight gap detected: {prev_time} → {curr_time}, "
-                                    f"missing {midnight}"
-                                )
-
-                                # Now we need to create a midnight record through interpolation
-                                interpolated_row = prev_row.copy()
-                                interpolated_row["open_time"] = midnight
-
-                                # Calculate interpolation weight (what % of the way from prev to curr time)
-                                time_diff_seconds = (
-                                    curr_time - prev_time
-                                ).total_seconds()
-                                prev_to_midnight_seconds = (
-                                    midnight - prev_time
-                                ).total_seconds()
-                                weight = prev_to_midnight_seconds / time_diff_seconds
-
-                                # Linear interpolation for numeric columns
-                                for col in ["open", "high", "low", "close", "volume"]:
-                                    if col in prev_row and col in curr_row:
-                                        try:
-                                            interpolated_row[col] = prev_row[
-                                                col
-                                            ] + weight * (curr_row[col] - prev_row[col])
-                                        except Exception as e:
-                                            logger.warning(
-                                                f"Error interpolating column {col}: {e}"
-                                            )
-
-                                # Add boundary flag for reference
-                                interpolated_row["boundary_record"] = (
-                                    "interpolated_midnight"
-                                )
-                                midnight_records.append(interpolated_row)
-                            else:
-                                logger.debug(
-                                    f"Day boundary transition: {prev_time} → {curr_time} "
-                                    f"(not missing 00:00, no interpolation needed)"
-                                )
-                    # For general gap detection (not at day boundaries)
-                    elif (
+                    if (
                         curr_row["time_diff"] is not None
                         and curr_row["time_diff"] > expected_interval * 1.5
                     ):
-                        logger.warning(
-                            f"Non-boundary gap detected: {prev_time} → {curr_time} "
-                            f"({curr_row['time_diff']:.1f}s, expected {expected_interval:.1f}s)"
-                        )
+                        # This is a gap in the data
+                        prev_time = prev_row["open_time"]
+                        curr_time = curr_row["open_time"]
 
-                # Add any interpolated midnight records
-                if midnight_records:
-                    logger.debug(
-                        f"Adding {len(midnight_records)} interpolated midnight records"
+                        # Special handling for day boundaries
+                        if prev_time.date() != curr_time.date():
+                            # For day boundaries, check if there's really a gap
+                            # Check specifically for a missing midnight (00:00:00) timestamp
+                            midnight_time = datetime.combine(
+                                curr_time.date(),
+                                datetime.min.time(),
+                                tzinfo=timezone.utc,
+                            )
+
+                            # Check if the midnight timestamp exists in our dataset
+                            midnight_exists = any(
+                                abs((t - midnight_time).total_seconds()) < 1
+                                for t in combined_df["open_time"]
+                            )
+
+                            if (
+                                not midnight_exists
+                                and prev_time.hour == 23
+                                and curr_time.hour > 0
+                            ):
+                                missing_midnight_detected = True
+
+                                # Log detailed information about the gap
+                                if self.interval_obj == Interval.HOUR_1:
+                                    logger.debug(
+                                        f"Day boundary gap at {prev_time.date()} to {curr_time.date()}: missing midnight record. "
+                                        f"This is expected with hourly klines from Vision API files which typically start at 01:00:00."
+                                    )
+                                else:
+                                    logger.debug(
+                                        f"Day boundary gap detected: {prev_time} → {curr_time}, "
+                                        f"({curr_row['time_diff']:.1f}s, expected {expected_interval:.1f}s)"
+                                    )
+                            else:
+                                logger.debug(
+                                    f"Day boundary transition from {prev_time} → {curr_time} "
+                                    f"(midnight record {'exists' if midnight_exists else 'missing'})"
+                                )
+                        else:
+                            # Regular (non-boundary) gap
+                            logger.debug(
+                                f"Gap detected: {prev_time} → {curr_time} "
+                                f"({curr_row['time_diff']:.1f}s, expected {expected_interval:.1f}s)"
+                            )
+
+                # Add a special note if using hourly interval and midnight gaps were detected
+                if self.interval_obj == Interval.HOUR_1 and missing_midnight_detected:
+                    logger.info(
+                        "Midnight (00:00:00) records are missing in the hourly (1h) data from Binance Vision API CSV files. "
+                        "This is a known limitation but no interpolation is needed as the day boundary is properly handled."
                     )
-                    combined_df = pd.concat(
-                        [combined_df, pd.DataFrame(midnight_records)], ignore_index=True
+                elif missing_midnight_detected:
+                    logger.info(
+                        "Some midnight (00:00:00) records appear to be missing at day boundaries. "
+                        "This should be rare with 1-minute data but should be properly handled without interpolation."
                     )
 
-                    # Sort and reset index
-                    combined_df = combined_df.sort_values("open_time").reset_index(
-                        drop=True
-                    )
+                # Drop the time_diff column as we don't need it anymore
+                if "time_diff" in combined_df.columns:
+                    combined_df = combined_df.drop(columns=["time_diff"])
+
+                # Ensure the DataFrame is sorted by time
+                combined_df = combined_df.sort_values("open_time").reset_index(
+                    drop=True
+                )
 
             except Exception as e:
-                logger.warning(f"Error during day boundary analysis: {e}")
+                logger.warning(f"Error during data analysis: {e}")
 
             # Filter by time range
             filtered_df = filter_dataframe_by_time(
@@ -818,43 +736,96 @@ class VisionDataClient(Generic[T]):
                 actual_start = filtered_df["open_time"].iloc[0]
                 actual_end = filtered_df["open_time"].iloc[-1]
                 record_count = len(filtered_df)
+
                 # Calculate expected count based on interval
                 interval_seconds = self._get_interval_seconds(self.interval)
-                expected_count = (
-                    int((actual_end - actual_start).total_seconds() / interval_seconds)
-                    + 1
-                )
-                coverage_percent = (record_count / expected_count) * 100
-                logger.debug(
-                    f"Data coverage: {record_count} records / {expected_count} expected ({coverage_percent:.1f}%)"
-                )
-                logger.debug(f"Time range: {actual_start} to {actual_end}")
+                total_seconds = (actual_end - actual_start).total_seconds()
+                expected_count = int(total_seconds / interval_seconds) + 1
+
+                # Calculate coverage percentage
+                if expected_count > 0:
+                    coverage_percent = (record_count / expected_count) * 100
+                    logger.debug(
+                        f"Data coverage: {record_count} records / {expected_count} expected ({coverage_percent:.1f}%)"
+                    )
+
+                logger.debug(f"Final time range: {actual_start} to {actual_end}")
+
+                # Analyze day boundaries in the filtered data
+                boundary_gaps = []
+                unique_days = filtered_df["open_time"].dt.date.unique()
+                for i in range(len(unique_days) - 1):
+                    curr_day = unique_days[i]
+                    next_day = unique_days[i + 1]
+
+                    # Get last record of current day
+                    curr_day_data = filtered_df[
+                        filtered_df["open_time"].dt.date == curr_day
+                    ]
+                    next_day_data = filtered_df[
+                        filtered_df["open_time"].dt.date == next_day
+                    ]
+
+                    if not curr_day_data.empty and not next_day_data.empty:
+                        last_of_day = curr_day_data.iloc[-1]["open_time"]
+                        first_of_next = next_day_data.iloc[0]["open_time"]
+                        time_diff = (first_of_next - last_of_day).total_seconds()
+
+                        # Check for midnight record at next day boundary
+                        midnight_time = datetime.combine(
+                            next_day, datetime.min.time(), tzinfo=timezone.utc
+                        )
+
+                        # Check if midnight record exists
+                        midnight_exists = any(
+                            abs((t - midnight_time).total_seconds()) < 1
+                            for t in filtered_df["open_time"]
+                        )
+
+                        # Only report as a gap if the midnight record is missing and time difference is large
+                        if time_diff > interval_seconds * 1.5 and not midnight_exists:
+                            logger.debug(
+                                f"Potential gap at day boundary: {curr_day} to {next_day}, "
+                                f"Last record at {last_of_day.strftime('%H:%M:%S')}, "
+                                f"First record at {first_of_next.strftime('%H:%M:%S')}, "
+                                f"Difference: {time_diff}s (expected {interval_seconds}s)"
+                            )
+                            boundary_gaps.append(
+                                {
+                                    "start_time": last_of_day,
+                                    "end_time": first_of_next,
+                                    "missing_time": midnight_time,
+                                    "expected_interval": interval_seconds,
+                                }
+                            )
+                        else:
+                            logger.debug(
+                                f"Day boundary transition from {curr_day} to {next_day} "
+                                f"(midnight record {'exists' if midnight_exists else 'missing'})"
+                            )
+
+                # Fill gaps at day boundaries if any were detected
+                if boundary_gaps:
+                    filled_df = self._fill_boundary_gaps_with_rest(
+                        filtered_df, boundary_gaps
+                    )
+                    if filled_df is not None:
+                        filtered_df = filled_df
+                        logger.info(
+                            f"Filled {len(boundary_gaps)} day boundary gaps with REST API data"
+                        )
+                    else:
+                        logger.warning(
+                            "Failed to fill day boundary gaps with REST API data"
+                        )
             else:
                 logger.warning(
                     f"No data found for {self.symbol} in filtered range {aligned_start} to {aligned_end}"
                 )
 
-            # Ensure the DataFrame is sorted by time
-            filtered_df = filtered_df.sort_values("open_time").reset_index(drop=True)
-
             logger.debug(
                 f"Downloaded {len(filtered_df)} records for {self.symbol} from {aligned_start} to {aligned_end}"
             )
-
-            # Drop temporary columns used for analysis
-            cols_to_drop = [
-                "time_diff",
-                "hour",
-                "minute",
-                "day",
-                "month",
-                "year",
-                "boundary_record",
-                "original_timestamp",
-            ]
-            for col in cols_to_drop:
-                if col in filtered_df.columns:
-                    filtered_df = filtered_df.drop(columns=[col])
 
             # Standardize column names
             filtered_df = standardize_column_names(filtered_df)
@@ -874,6 +845,101 @@ class VisionDataClient(Generic[T]):
         except Exception as e:
             logger.error(f"Error downloading data: {e}")
             return self._create_empty_dataframe()
+
+    def _fill_boundary_gaps_with_rest(
+        self, df: pd.DataFrame, boundary_gaps: List[Dict[str, Any]]
+    ) -> Optional[pd.DataFrame]:
+        """Fill day boundary gaps using REST API data.
+
+        This method fetches just the specific missing records at day boundaries using
+        the REST API, then merges them with the original data from Vision API.
+
+        Args:
+            df: DataFrame with Vision API data that has gaps
+            boundary_gaps: List of gap information dictionaries
+
+        Returns:
+            DataFrame with gaps filled, or None if filling failed
+        """
+        try:
+            from core.sync.rest_data_client import RestDataClient
+            from utils.market_constraints import Interval
+
+            # Create a REST client for fetching the missing data
+            rest_client = RestDataClient(
+                market_type=self.market_type,
+                symbol=self.symbol,
+                interval=self.interval_obj,
+            )
+
+            # Create a list to hold the gap data we'll fetch
+            gap_dfs = []
+
+            # Include the original data
+            if not df.empty:
+                gap_dfs.append(df)
+
+            # For each gap, fetch the specific missing data
+            for gap in boundary_gaps:
+                # Buffer the request times slightly to ensure we get the missing point
+                buffer_seconds = gap["expected_interval"] * 0.5
+
+                # Calculate precise start and end times for the REST request
+                # Fetch a bit before and after the actual gap to ensure we get the needed data
+                gap_start = gap["start_time"] - timedelta(seconds=buffer_seconds)
+                gap_end = gap["end_time"] + timedelta(seconds=buffer_seconds)
+
+                logger.debug(
+                    f"Fetching gap data from REST API: {gap_start} to {gap_end} "
+                    f"(to fill missing {gap['missing_time']})"
+                )
+
+                # Fetch the gap data using REST API
+                gap_data = rest_client.fetch(
+                    symbol=self.symbol,
+                    interval=self.interval_obj,
+                    start_time=gap_start,
+                    end_time=gap_end,
+                )
+
+                if not gap_data.empty:
+                    # Check if we got the missing midnight record
+                    midnight_time = gap["missing_time"]
+                    midnight_records = gap_data[
+                        (gap_data["open_time"] - midnight_time).abs()
+                        < timedelta(seconds=1)
+                    ]
+
+                    if not midnight_records.empty:
+                        logger.debug(
+                            f"Successfully fetched missing midnight record for {midnight_time.date()}"
+                        )
+                        gap_dfs.append(gap_data)
+                    else:
+                        logger.warning(
+                            f"REST API did not return the expected midnight record for {midnight_time.date()}"
+                        )
+
+            # If we have gap data, merge it with the original data
+            if len(gap_dfs) > 1:  # More than just the original df
+                # Concatenate all data
+                merged_df = pd.concat(gap_dfs, ignore_index=True)
+
+                # Remove duplicates and sort
+                merged_df = merged_df.drop_duplicates(subset=["open_time"])
+                merged_df = merged_df.sort_values("open_time").reset_index(drop=True)
+
+                return merged_df
+
+            # If we didn't add any gap data, return the original
+            return df
+
+        except Exception as e:
+            logger.error(f"Error filling boundary gaps with REST API: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return None
 
     def fetch(
         self,
@@ -919,14 +985,6 @@ class VisionDataClient(Generic[T]):
         except Exception as e:
             logger.error(f"Error fetching data: {e}")
             return self._create_empty_dataframe()
-
-    def close(self) -> None:
-        """Close the client and release resources."""
-        if hasattr(self, "_client") and self._client:
-            try:
-                self._client.close()
-            except Exception as e:
-                logger.warning(f"Error closing httpx client: {e}")
 
     @staticmethod
     def fetch_multiple(
@@ -978,16 +1036,15 @@ class VisionDataClient(Generic[T]):
         # Define worker function to download data for a single symbol
         def download_worker(symbol: str) -> Tuple[str, TimestampedDataFrame]:
             try:
-                client = VisionDataClient(
+                with VisionDataClient(
                     symbol=symbol, interval=interval, market_type=market_type
-                )
-                df = client.fetch(start_time, end_time)
-                client.close()
+                ) as client:
+                    df = client.fetch(start_time, end_time)
                 return symbol, df
             except Exception as e:
                 logger.error(f"Error fetching data for {symbol}: {e}")
                 # Return empty dataframe on error
-                return symbol, VisionDataClient._create_empty_dataframe(None)
+                return symbol, VisionDataClient._create_empty_dataframe()
 
         # Use ThreadPoolExecutor to parallelize downloads across symbols
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -1007,6 +1064,6 @@ class VisionDataClient(Generic[T]):
                 except Exception as e:
                     logger.error(f"Error processing result for {symbol}: {e}")
                     # Create empty dataframe for failed symbols
-                    results[symbol] = VisionDataClient._create_empty_dataframe(None)
+                    results[symbol] = VisionDataClient._create_empty_dataframe()
 
         return results
