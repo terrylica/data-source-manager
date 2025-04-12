@@ -253,7 +253,7 @@ class RateLimitTester:
         # Print final statistics
         self.print_final_stats()
 
-    def _handle_signal(self, signum, frame):
+    def _handle_signal(self, _signum, frame):
         """Handle termination signals."""
         self.console.print(
             "\n[bold red]Received termination signal. Shutting down...[/bold red]"

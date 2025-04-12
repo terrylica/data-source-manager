@@ -90,7 +90,7 @@ class BinanceFundingRateClient(DataClientInterface):
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
         """Context manager exit."""
         # Close the HTTP client if it has a close method
         if hasattr(self._client, "close") and callable(self._client.close):

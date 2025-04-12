@@ -1020,7 +1020,6 @@ class VisionDownloadManager:
             except Exception as e:
                 logger.error(f"[{debug_id}] Error cleaning up temp directory: {e}")
 
-        return None
 
     async def _download_file(self, url: str, local_path: Path) -> bool:
         """Download a file from URL to local path.
@@ -1088,7 +1087,9 @@ async def safely_close_client(client):
                 try:
                     # Always use delattr for C-pointer attributes to prevent type errors
                     delattr(client, "_curlm")
-                    logger.debug("[ProgressIndicator] Successfully deleted _curlm attribute")
+                    logger.debug(
+                        "[ProgressIndicator] Successfully deleted _curlm attribute"
+                    )
                 except Exception as e:
                     logger.debug(
                         f"[ProgressIndicator] Could not delete _curlm attribute: {e}"
@@ -1110,7 +1111,9 @@ async def safely_close_client(client):
             try:
                 # Always use delattr for C-pointer attributes to prevent type errors
                 delattr(client, "_timeout_handle")
-                logger.debug("[ProgressIndicator] Successfully deleted _timeout_handle attribute")
+                logger.debug(
+                    "[ProgressIndicator] Successfully deleted _timeout_handle attribute"
+                )
             except Exception as e:
                 logger.debug(
                     f"[ProgressIndicator] Could not delete _timeout_handle attribute: {e}"

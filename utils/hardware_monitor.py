@@ -44,11 +44,8 @@ class HardwareMonitor:
         self._bandwidth_requirement = 0.5  # MB per request
         self._binance_rate_limit = 1200  # Requests per minute
 
-    async def measure_network_speed(self, test_url: Optional[str] = None) -> float:
+    async def measure_network_speed(self) -> float:
         """Measure network speed to Binance API endpoints.
-
-        Args:
-            test_url: Optional URL to test instead of default endpoints
 
         Returns:
             Network speed in Mbps

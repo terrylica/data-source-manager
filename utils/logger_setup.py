@@ -80,7 +80,7 @@ class CustomLogger(logging.Logger):
     to find the actual application code that initiated the logging call.
     """
 
-    def findCaller(self, stack_info=False, stacklevel=1):
+    def findCaller(self, stack_info=False, _stacklevel=1):
         """
         Find the stack frame of the caller.
 
@@ -91,7 +91,7 @@ class CustomLogger(logging.Logger):
 
         Args:
             stack_info (bool): If True, collect stack trace information
-            stacklevel (int): How many frames to skip (unused, kept for compatibility)
+            _stacklevel (int): How many frames to skip (unused, kept for compatibility)
 
         Returns:
             tuple: (filename, line number, function name, stack info)
