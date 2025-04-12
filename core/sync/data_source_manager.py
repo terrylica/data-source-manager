@@ -23,6 +23,7 @@ from utils.config import (
     REST_CHUNK_SIZE,
     REST_MAX_CHUNKS,
     create_empty_dataframe,
+    CACHE_DATA_HOURS,
 )
 from core.sync.rest_data_client import RestDataClient
 from core.sync.vision_data_client import VisionDataClient
@@ -573,6 +574,9 @@ class DataSourceManager:
             )
 
             if df is not None and not df.empty:
+                # Add source information
+                df["_data_source"] = "CACHE"
+
                 cached_dfs.append(df)
                 # If we were tracking a missing range, close it
                 if last_missing_start is not None:
@@ -681,6 +685,9 @@ class DataSourceManager:
                 logger.warning(f"Vision API returned no data for {symbol}")
                 return create_empty_dataframe()
 
+            # Add source information
+            df["_data_source"] = "VISION"
+
             logger.info(f"Retrieved {len(df)} records from Vision API")
             return df
 
@@ -726,6 +733,9 @@ class DataSourceManager:
                 logger.warning(f"REST API returned no data for {symbol}")
                 return create_empty_dataframe()
 
+            # Add source information
+            df["_data_source"] = "REST"
+
             logger.info(f"Retrieved {len(df)} records from REST API")
             return df
 
@@ -754,11 +764,31 @@ class DataSourceManager:
         # Concatenate all DataFrames
         merged = pd.concat(dfs, ignore_index=True)
 
-        # Remove duplicates based on open_time
-        merged = merged.drop_duplicates(subset=["open_time"])
+        # For overlapping records (same open_time), prioritize data sources in order:
+        # CACHE > VISION > REST
+        # First sort by open_time and source priority
+        if "_data_source" in merged.columns:
+            # Create a priority order for data sources
+            def source_priority(source):
+                priorities = {"CACHE": 1, "VISION": 2, "REST": 3}
+                return priorities.get(source, 4)  # Default lowest priority for unknown
+
+            merged["_source_priority"] = merged["_data_source"].apply(source_priority)
+            # Sort by open_time first, then by source priority
+            merged = merged.sort_values(["open_time", "_source_priority"])
+            # Drop the temporary priority column
+            merged = merged.drop(columns=["_source_priority"])
+
+        # Remove duplicates based on open_time, keeping the first one (highest priority)
+        merged = merged.drop_duplicates(subset=["open_time"], keep="first")
 
         # Sort by open_time
         merged = merged.sort_values("open_time").reset_index(drop=True)
+
+        # Log data source statistics
+        if "_data_source" in merged.columns:
+            source_counts = merged["_data_source"].value_counts()
+            logger.info(f"Merged data source statistics: {source_counts.to_dict()}")
 
         return merged
 
@@ -769,6 +799,7 @@ class DataSourceManager:
         end_time: datetime,
         interval: Interval = Interval.MINUTE_1,
         chart_type: Optional[ChartType] = None,
+        include_source_info: bool = True,
     ) -> pd.DataFrame:
         """Get data for the specified time range, using the FCP strategy.
 
@@ -783,6 +814,7 @@ class DataSourceManager:
             end_time: End time for data retrieval
             interval: Time interval between data points
             chart_type: Override chart type for this query
+            include_source_info: Whether to include source information in the result
 
         Returns:
             DataFrame with requested data
@@ -826,6 +858,8 @@ class DataSourceManager:
             # If we have all data from cache, return it
             if not missing_ranges:
                 logger.info(f"Retrieved all data from cache: {len(cached_df)} records")
+                if not include_source_info and "_data_source" in cached_df.columns:
+                    cached_df = cached_df.drop(columns=["_data_source"])
                 return cached_df
 
             # Step 2: Get missing data from appropriate sources
@@ -871,6 +905,15 @@ class DataSourceManager:
                 f"Retrieved {len(result_df)} records for {symbol} in {elapsed_time:.2f} seconds"
             )
 
+            # Log source breakdown
+            if "_data_source" in result_df.columns:
+                source_counts = result_df["_data_source"].value_counts()
+                logger.info(f"Data source breakdown: {source_counts.to_dict()}")
+
+            # Remove source information if not requested
+            if not include_source_info and "_data_source" in result_df.columns:
+                result_df = result_df.drop(columns=["_data_source"])
+
             return result_df
 
         except Exception as e:
@@ -880,6 +923,80 @@ class DataSourceManager:
             # Restore original chart type
             if chart_type is not None:
                 self.chart_type = original_chart_type
+
+    def analyze_merged_data(
+        self,
+        df: pd.DataFrame,
+        cache_start: datetime,
+        vision_start: datetime,
+        rest_start: datetime,
+        rest_end: datetime,
+    ) -> Dict[str, int]:
+        """Analyze the merged data to determine the source of each record.
+
+        Args:
+            df: The merged DataFrame
+            cache_start: Start time for cache data
+            vision_start: Start time for Vision API data
+            rest_start: Start time for REST API data
+            rest_end: End time for REST API data
+
+        Returns:
+            Dict with count of records from each source
+        """
+        if df.empty:
+            return {"cache": 0, "vision": 0, "rest": 0, "gap": 0}
+
+        # If we have the _data_source column, use it directly
+        if "_data_source" in df.columns:
+            source_counts = df["_data_source"].value_counts().to_dict()
+            return {
+                "cache": source_counts.get("CACHE", 0),
+                "vision": source_counts.get("VISION", 0),
+                "rest": source_counts.get("REST", 0),
+                "gap": 0,  # No gap with direct source tracking
+            }
+
+        # Legacy fallback to timestamp-based classification
+        # (This should only be used if _data_source is not available)
+        # Calculate cache_end as the time before vision_start
+        cache_end = vision_start
+        vision_end = rest_start
+
+        # Convert to UTC timestamps for comparison
+        cache_ts = int(cache_start.timestamp() * 1000)
+        cache_end_ts = int(cache_end.timestamp() * 1000)
+        vision_ts = int(vision_start.timestamp() * 1000)
+        vision_end_ts = int(vision_end.timestamp() * 1000)
+        rest_ts = int(rest_start.timestamp() * 1000)
+        rest_end_ts = int(rest_end.timestamp() * 1000)
+
+        # Count records from each source
+        cache_count = len(
+            df[(df["open_time"] >= cache_ts) & (df["open_time"] < cache_end_ts)]
+        )
+        vision_count = len(
+            df[(df["open_time"] >= vision_ts) & (df["open_time"] < vision_end_ts)]
+        )
+        rest_count = len(
+            df[(df["open_time"] >= rest_ts) & (df["open_time"] < rest_end_ts)]
+        )
+
+        # Calculate gap filling (records outside the specified ranges)
+        total = len(df)
+        gap_count = total - (cache_count + vision_count + rest_count)
+
+        logger.warning(
+            "Using legacy timestamp-based source classification. "
+            "This is less accurate than using the _data_source column."
+        )
+
+        return {
+            "cache": cache_count,
+            "vision": vision_count,
+            "rest": rest_count,
+            "gap": gap_count,
+        }
 
     def __enter__(self):
         """Context manager entry."""
