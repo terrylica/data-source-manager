@@ -10,12 +10,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import pytz
-from pathlib import Path
 
 from utils.logger_setup import logger
-from rich import print
 from utils.market_constraints import Interval
-from utils.gap_detector import GapDetector, detect_gaps, analyze_day_boundary
+from utils.gap_detector import GapDetector, analyze_day_boundary
 
 
 def create_synthetic_data(

@@ -7,7 +7,6 @@ timestamp validation issues and day boundary transitions.
 """
 
 from datetime import datetime, timezone, timedelta
-import os
 import pandas as pd
 import argparse
 from pathlib import Path
@@ -29,14 +28,10 @@ except ImportError:
 from utils.logger_setup import logger
 from rich import print
 from utils.market_constraints import Interval, MarketType
-from utils.time_utils import (
-    align_time_boundaries,
-    get_interval_seconds,
-)
 from core.sync.vision_data_client import VisionDataClient
 from core.sync.rest_data_client import RestDataClient
-from core.sync.data_source_manager import DataSourceManager, DataSource
-from utils.gap_detector import detect_gaps, Gap, format_gaps_for_display
+from core.sync.data_source_manager import DataSourceManager
+from utils.gap_detector import detect_gaps, Gap
 
 # Ensure logs directory exists
 log_dir = Path("logs/gap_debugger")

@@ -15,7 +15,7 @@ import zipfile
 import json
 import subprocess
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from enum import Enum, auto
 
@@ -30,9 +30,6 @@ import boto3  # Add official boto3
 from core.sync.vision_data_client import VisionDataClient
 from core.sync.vision_constraints import (
     detect_timestamp_unit,
-    MICROSECOND_DIGITS,
-    MILLISECOND_DIGITS,
-    FileType,
 )
 from utils.time_utils import enforce_utc_timezone
 from utils.logger_setup import logger

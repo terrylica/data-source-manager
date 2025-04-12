@@ -7,10 +7,8 @@ This script compares the results of the new gap detector with our previous manua
 
 from pathlib import Path
 import pandas as pd
-from datetime import datetime
 
 from utils.logger_setup import logger
-from rich import print
 from utils.market_constraints import Interval
 from utils.gap_detector import GapDetector
 

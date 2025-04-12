@@ -13,8 +13,7 @@ import pytz
 from typing import List, Dict, Any
 
 from utils.logger_setup import logger
-from rich import print
-from utils.market_constraints import MarketType, Interval
+from utils.market_constraints import Interval
 
 # Configuration
 SYMBOL = "BTCUSDT"

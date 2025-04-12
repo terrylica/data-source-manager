@@ -14,7 +14,7 @@ import argparse
 import sys
 
 from utils.logger_setup import logger
-from utils.market_constraints import Interval, MarketType
+from utils.market_constraints import Interval
 from rich import print
 
 # Import the refined gap detector
@@ -22,8 +22,6 @@ from utils.gap_detector import (
     detect_gaps,
     format_gaps_for_display,
     analyze_file_for_gaps,
-    combine_daily_files,
-    Gap,
 )
 
 

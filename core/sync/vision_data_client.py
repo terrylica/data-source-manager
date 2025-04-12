@@ -17,7 +17,7 @@ directly with this client.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Sequence, TypeVar, Generic, Union, List, Dict, Any, Tuple
+from typing import Optional, Sequence, TypeVar, Generic, Union, List, Dict, Tuple
 import os
 import tempfile
 import zipfile
@@ -33,7 +33,6 @@ from utils.time_utils import (
     filter_dataframe_by_time,
 )
 from utils.config import (
-    standardize_column_names,
     KLINE_COLUMNS,
     MAXIMUM_CONCURRENT_DOWNLOADS,
 )
@@ -42,7 +41,6 @@ from core.sync.vision_constraints import (
     FileType,
     get_vision_url,
     detect_timestamp_unit,
-    MICROSECOND_DIGITS,
 )
 from utils.gap_detector import detect_gaps, Gap
 

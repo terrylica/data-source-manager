@@ -16,14 +16,12 @@ import pandas as pd
 import numpy as np
 import logging
 import httpx
-from typing import List, Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, Optional
 import io
 import pytz
-from rich import print
 
 from utils.logger_setup import logger
 from utils.market_constraints import MarketType, Interval
-from utils.time_utils import datetime_to_milliseconds, milliseconds_to_datetime
 
 # Configuration
 SYMBOL = "BTCUSDT"

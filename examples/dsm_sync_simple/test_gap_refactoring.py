@@ -7,13 +7,11 @@ This script tests the basic functionality of the gap_detector utility.
 
 from datetime import datetime, timezone, timedelta
 import pandas as pd
-from pathlib import Path
-import argparse
 
 from utils.logger_setup import logger
 from rich import print
 from utils.market_constraints import Interval
-from utils.gap_detector import detect_gaps, Gap, format_gaps_for_display
+from utils.gap_detector import detect_gaps, format_gaps_for_display
 
 
 def test_gap_detector_direct():
