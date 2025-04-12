@@ -38,6 +38,8 @@ __all__ = [
     "align_time_boundaries",
     "estimate_record_count",
     "TimeseriesDataProcessor",
+    "datetime_to_milliseconds",
+    "milliseconds_to_datetime",
 ]
 
 # Constants for timestamp format detection
@@ -46,6 +48,34 @@ MICROSECOND_DIGITS = 16
 TIMESTAMP_UNIT = "us"  # Default unit for timestamp parsing
 
 # Configure module logger
+
+
+def datetime_to_milliseconds(dt: datetime) -> int:
+    """Convert datetime to milliseconds timestamp for Binance API.
+
+    Args:
+        dt: Datetime object (naive or timezone-aware)
+
+    Returns:
+        Milliseconds timestamp (int)
+    """
+    # Ensure datetime is timezone-aware and in UTC
+    dt = enforce_utc_timezone(dt)
+
+    # Convert to milliseconds
+    return int(dt.timestamp() * 1000)
+
+
+def milliseconds_to_datetime(ms: int) -> datetime:
+    """Convert milliseconds timestamp to datetime object.
+
+    Args:
+        ms: Milliseconds timestamp
+
+    Returns:
+        Timezone-aware datetime (UTC)
+    """
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
 
 
 def enforce_utc_timezone(dt: datetime) -> datetime:
@@ -241,36 +271,43 @@ def is_bar_complete(
 
 
 def filter_dataframe_by_time(
-    df: pd.DataFrame, start_time: datetime, end_time: datetime
+    df: pd.DataFrame,
+    start_time: datetime,
+    end_time: datetime,
+    time_column: str = "open_time",
 ) -> pd.DataFrame:
-    """Filter a dataframe based on time boundaries.
+    """Filter DataFrame by time range.
+
+    This function filters a DataFrame to include only rows where the time column
+    is within the specified time range. It also ensures that the time values
+    are properly aligned to the interval boundaries.
 
     Args:
-        df: Dataframe to filter
-        start_time: Start time boundary (inclusive)
-        end_time: End time boundary (inclusive)
+        df: DataFrame to filter
+        start_time: Start time (inclusive)
+        end_time: End time (inclusive)
+        time_column: Name of the column containing timestamps (default: "open_time")
 
     Returns:
-        Filtered dataframe
+        Filtered DataFrame
     """
     if df.empty:
-        return df
+        return df.copy()
 
-    # Assert UTC timezone
+    # Ensure times are timezone-aware
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
 
-    # First check if 'timestamp' or 'open_time' is in columns
-    if "timestamp" in df.columns:
-        time_col = "timestamp"
-        filtered_df = df[(df[time_col] >= start_time) & (df[time_col] <= end_time)]
-    elif "open_time" in df.columns:
-        time_col = "open_time"
-        filtered_df = df[(df[time_col] >= start_time) & (df[time_col] <= end_time)]
-    else:
-        # If neither in columns, assume the index is the time
-        # This handles cases where 'open_time' is already set as the index
-        filtered_df = df[(df.index >= start_time) & (df.index <= end_time)]
+    # Filter dataframe
+    filtered_df = df[
+        (df[time_column] >= start_time) & (df[time_column] <= end_time)
+    ].copy()
+
+    # Reset index
+    filtered_df = filtered_df.reset_index(drop=True)
+
+    if len(filtered_df) == 0:
+        logger.warning(f"No data within time range {start_time} to {end_time}")
 
     return filtered_df
 

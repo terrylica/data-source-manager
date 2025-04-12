@@ -159,7 +159,7 @@ DEFAULT_HTTP_TIMEOUT_SECONDS: Final[float] = (
 
 # Chunk size constraints
 REST_CHUNK_SIZE: Final = 1000
-REST_MAX_CHUNKS: Final = 5
+REST_MAX_CHUNKS: Final = 1000  # Increased from 5 to 1000 to effectively remove limit
 MAXIMUM_CONCURRENT_DOWNLOADS: Final = 13
 
 # File formats

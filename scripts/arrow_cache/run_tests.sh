@@ -370,154 +370,500 @@ clean_cache_index_files() {
     fi
 }
 
-# Set up error logging before starting tests
-enable_error_logging
+# Function to run schema standardization tests
+run_schema_standardization_tests() {
+    # Schema standardization tests variables
+    SCHEMA_SCRIPT_DIR="${BASE_DIR}/examples/schema_standardization"
+    SCHEMA_OUTPUT_DIR="${SCHEMA_SCRIPT_DIR}/schema_test"
+    mkdir -p "$SCHEMA_OUTPUT_DIR"
+    
+    # Default: Run all schema tests
+    RUN_REST_TEST=true
+    RUN_SPOT_TEST=true
+    RUN_UM_TEST=true
+    RUN_SAMPLE_TEST=true
+    
+    # Parse specific schema test flags if provided
+    for flag in "$@"; do
+        case $flag in
+            --rest-only)
+                RUN_REST_TEST=true
+                RUN_SPOT_TEST=false
+                RUN_UM_TEST=false
+                RUN_SAMPLE_TEST=false
+                ;;
+            --spot-only)
+                RUN_REST_TEST=false
+                RUN_SPOT_TEST=true
+                RUN_UM_TEST=false
+                RUN_SAMPLE_TEST=false
+                ;;
+            --um-only)
+                RUN_REST_TEST=false
+                RUN_SPOT_TEST=false
+                RUN_UM_TEST=true
+                RUN_SAMPLE_TEST=false
+                ;;
+            --sample-only)
+                RUN_REST_TEST=false
+                RUN_SPOT_TEST=false
+                RUN_UM_TEST=false
+                RUN_SAMPLE_TEST=true
+                ;;
+            --no-rest)
+                RUN_REST_TEST=false
+                ;;
+            --no-spot)
+                RUN_SPOT_TEST=false
+                ;;
+            --no-um)
+                RUN_UM_TEST=false
+                ;;
+            --no-sample)
+                RUN_SAMPLE_TEST=false
+                ;;
+        esac
+    done
+    
+    print_header "SCHEMA STANDARDIZATION TESTS"
+    print_info "Script directory: $SCHEMA_SCRIPT_DIR"
+    print_info "Output directory: $SCHEMA_OUTPUT_DIR"
+    
+    # Navigate to project root for proper imports
+    cd "$BASE_DIR"
+    
+    # Test 1: Testing REST API
+    if $RUN_REST_TEST; then
+        print_header "1. Testing REST API"
+        python "$SCHEMA_SCRIPT_DIR/test_rest_api.py" --market-type SPOT --symbol BTCUSDT --interval 1m
+    else
+        print_info "Skipping REST API test"
+    fi
+    
+    # Test 2: Running SPOT market tests
+    if $RUN_SPOT_TEST; then
+        print_header "2. Running SPOT market tests"
+        python "$SCHEMA_SCRIPT_DIR/verify_standardizer.py" --market-type SPOT --symbol BTCUSDT --interval 1m --days 1 --output-dir "$SCHEMA_OUTPUT_DIR"
+    else
+        print_info "Skipping SPOT market test"
+    fi
+    
+    # Test 3: Running UM market tests
+    if $RUN_UM_TEST; then
+        print_header "3. Running UM market tests"
+        python "$SCHEMA_SCRIPT_DIR/verify_standardizer.py" --market-type UM --symbol BTCUSDT --interval 1m --days 1 --output-dir "$SCHEMA_OUTPUT_DIR"
+    else
+        print_info "Skipping UM market test"
+    fi
+    
+    # Test 4 & 5: Create sample file and run debug standardizer
+    if $RUN_SAMPLE_TEST; then
+        # Create sample output file from REST API and run debug standardizer on it
+        SAMPLE_FILE="$SCHEMA_OUTPUT_DIR/sample_rest_data.csv"
+        
+        # Navigate to project root to create sample file
+        cd "$BASE_DIR"
+        print_header "4. Creating sample file from REST API for debugging"
+        python - <<EOF
+from utils.logger_setup import logger
+from rich import print
+import pandas as pd
+from utils.market_constraints import MarketType, Interval
+from core.sync.rest_data_client import RestDataClient
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-# Clear all the test data before starting
-print_header "PREPARING TEST ENVIRONMENT"
-print_info "Clearing all cache data..."
-rm -rf "${BASE_DIR}/cache/${DATA_PROVIDER}/${CHART_TYPE}/${MARKET_TYPE}"
-rm -f "${BASE_DIR}/logs/cache_index.db"
-rm -f "${BASE_DIR}/logs/cache_index.json"  # Remove legacy file if it exists
-rm -f "${BASE_DIR}/logs/checksum_failures/registry.json"
-print_info "Cache cleared"
+# Create a REST client to get some data
+rest_client = RestDataClient(market_type=MarketType.SPOT)
+end_time = datetime.now(timezone.utc)
+start_time = end_time - timedelta(minutes=30)
 
-# Display options for tests to run
-print_header "AVAILABLE TESTS"
-print_info "1. Run Incremental Testing Suite"
-print_info "2. Run Basic Cache Building Test"
-print_info "3. Run Incremental Update Test"
-print_info "4. Run Force Update Test"
-print_info "5. Run Gap Detection Test"
-print_info "6. Run Auto Mode Test"
-print_info "7. Run Combined Features Test"
-print_info "8. Run Gap Detection Detailed Test"
-print_info "9. Run Checksum Handling Test"
-print_info "10. Run All Tests"
-print_info "11. Clean Cache Index Files"
-print_info "0. Exit"
+# Get some data
+df = rest_client.fetch(
+    symbol="BTCUSDT",
+    interval=Interval.MINUTE_1,
+    start_time=start_time,
+    end_time=end_time
+)
 
-# Get user input
-read -p "Enter test number(s) to run (space-separated, e.g., '1 3 5'): " -a TEST_CHOICES
+if df is not None and len(df) > 0:
+    output_file = Path("$SAMPLE_FILE")
+    logger.info(f"Saving sample data with {len(df)} rows to {output_file}")
+    df.to_csv(output_file, index=False)
+    print(f"Sample file created at {output_file}")
+else:
+    logger.error("Failed to get sample data from REST API")
+EOF
+        
+        # Run debug standardizer on sample file if it exists
+        if [ -f "$SAMPLE_FILE" ]; then
+            print_header "5. Running debug standardizer on sample data"
+            python "$SCHEMA_SCRIPT_DIR/debug_standardizer.py" --input "$SAMPLE_FILE" --market-type SPOT --symbol BTCUSDT --interval 1m --output "$SCHEMA_OUTPUT_DIR/sample_standardized.csv"
+        else
+            print_error "Failed to create sample file. Skipping debug standardizer test."
+        fi
+    else
+        print_info "Skipping sample file creation and debug standardizer test"
+    fi
+    
+    print_info "All schema standardization tests completed!"
+}
 
-# Process user input
-if [[ " ${TEST_CHOICES[@]} " =~ " 0 " ]]; then
-    print_info "Exiting without running tests"
-    exit 0
-fi
-
-if [[ " ${TEST_CHOICES[@]} " =~ " 10 " ]]; then
-    # Run all tests
-    TEST_CHOICES=(1 2 3 4 5 6 7 8 9 11)
-fi
-
-for choice in "${TEST_CHOICES[@]}"; do
-    case $choice in
-        1)
-            # Run Incremental Testing Suite (from test_incremental.sh)
-            run_incremental_test
-            ;;
-        2)
-            # Test 1: Very Small Footprint Basic Test
-            run_test_scenario "Basic Cache Building" "very-small" "BTCUSDT" "5m" ""
-            ;;
-        3)
-            # Test 2: Incremental Update (Very Small)
-            run_test_scenario "Incremental Update" "very-small" "BTCUSDT" "5m" "--incremental"
-            ;;
-        4)
-            # Test 3: Force Update (Very Small)
-            run_test_scenario "Force Update" "very-small" "BTCUSDT" "5m" "--force-update"
-            ;;
-        5)
-            # Test 4: Gap Detection (Small Size)
-            run_test_scenario "Gap Detection" "small" "BTCUSDT,ETHUSDT,BNBUSDT" "5m" "--detect-gaps"
-            ;;
-        6)
-            # Test 5: Auto Mode (Small Size)
-            run_test_scenario "Auto Mode" "small" "BTCUSDT,ETHUSDT,BNBUSDT" "5m" "--auto"
-            ;;
-        7)
-            # Test 6: Combined Features Test (Medium Size)
-            run_test_scenario "Combined Features" "medium" "BTCUSDT,ETHUSDT,BNBUSDT,XRPUSDT,ADAUSDT" "5m,1h" "--incremental --detect-gaps"
-            ;;
-        8)
-            # Create gap test (manually delete files and then detect gaps)
-            print_header "GAP DETECTION DETAILED TEST"
-            print_info "Step 1: Initial download (medium size)"
-            $SCRIPT_DIR/cache_builder.sh -m test -t medium --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
-
-            print_info "Step 2: Creating gaps by deleting some files..."
-            SYMBOL="BTCUSDT"
-            INTERVAL="5m"
-            CACHE_DIR="${BASE_DIR}/cache/${DATA_PROVIDER}/${CHART_TYPE}/${MARKET_TYPE}/${SYMBOL}/${INTERVAL}"
-            FILES=$(ls "$CACHE_DIR" | sort)
-            COUNT=$(echo "$FILES" | wc -l)
-
-            # Delete every other file to create gaps
-            i=0
-            for file in $FILES; do
-                if [ $((i % 2)) -eq 0 ]; then
-                    rm -f "${CACHE_DIR}/${file}"
-                    print_info "Deleted ${CACHE_DIR}/${file}"
-                fi
-                i=$((i+1))
-            done
-
-            print_info "Step 3: Running gap detection to fill missing files"
-            $SCRIPT_DIR/cache_builder.sh -m test -t medium --detect-gaps --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
-
-            print_info "Final result after gap filling:"
-            ls -la "$CACHE_DIR"
+# Function to run DataSourceManager FCP tests
+run_dsm_orchestration_tests() {
+    # These tests focus on the DataSourceManager failover composition priority (FCP)
+    # as described in focus_demo.mdc
+    
+    # Default test parameters
+    MARKET_TYPES=("spot" "um" "cm")
+    RUN_DEBUG_MODE=false
+    SPECIFIC_MARKET=""
+    
+    # Parse specific test flags if provided
+    for flag in "$@"; do
+        case $flag in
+            --debug)
+                RUN_DEBUG_MODE=true
+                ;;
+            --spot-only)
+                MARKET_TYPES=("spot")
+                ;;
+            --um-only)
+                MARKET_TYPES=("um")
+                ;;
+            --cm-only)
+                MARKET_TYPES=("cm")
+                ;;
+        esac
+    done
+    
+    print_header "DATA SOURCE MANAGER ORCHESTRATION TESTS"
+    print_info "Testing the DataSourceManager's Failover Composition Priority (FCP)"
+    print_info "This tests the orchestration between cache, VISION API, and REST API"
+    print_info "Using historical data from Dec 24, 2024 12:09:03 to Feb 25, 2025 23:56:56"
+    print_info "Note: Today is April 11, 2025, so these are past dates"
+    
+    # Create logs directory if it doesn't exist
+    LOGS_DIR="${BASE_DIR}/logs/historical_tests"
+    mkdir -p "$LOGS_DIR"
+    
+    # Navigate to project root for proper imports
+    cd "$BASE_DIR"
+    
+    # Set up debug mode flag if enabled
+    DEBUG_FLAG=""
+    if $RUN_DEBUG_MODE; then
+        DEBUG_FLAG="--debug"
+        print_info "Debug mode enabled - data will be fetched in smaller chunks"
+    fi
+    
+    for market in "${MARKET_TYPES[@]}"; do
+        print_header "Testing FCP orchestration for ${market} market"
+        
+        # Determine symbol based on market type
+        SYMBOL="BTCUSDT"
+        if [ "$market" == "cm" ]; then
+            SYMBOL="BTCUSD_PERP"
+        fi
+        
+        # Run the historical test
+        print_info "Running long-term historical data test for ${market}/${SYMBOL}"
+        DEMO_SCRIPT="${BASE_DIR}/examples/dsm_sync_simple/demo.sh"
+        
+        if [ -f "$DEMO_SCRIPT" ]; then
+            # First ensure we're running with cache enabled
+            print_info "Step 1: Running with cache enabled to build cache"
+            "$DEMO_SCRIPT" --historical-test "$market" "$SYMBOL" "1m" "binance"
             
-            read -p "Press Enter to continue with other tests..."
-            ;;
-        9)
-            # Test checksum features
-            print_header "CHECKSUM HANDLING TEST"
-            print_info "Step 1: Run with proceed-on-failure flag"
-            $SCRIPT_DIR/cache_builder.sh -m test -t very-small --proceed-on-failure --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
-
-            print_info "Step 2: Check checksum failures registry"
-            if [ -f "${BASE_DIR}/logs/checksum_failures/registry.json" ]; then
-                print_info "Checksum failures registry exists:"
-                cat "${BASE_DIR}/logs/checksum_failures/registry.json" | head -20
-            else
-                print_info "No checksum failures detected"
-            fi
-
-            print_info "Step 3: Run retry-failed-checksums if any failures exist"
-            if [ -f "${BASE_DIR}/logs/checksum_failures/registry.json" ] && [ -s "${BASE_DIR}/logs/checksum_failures/registry.json" ]; then
-                $SCRIPT_DIR/cache_builder.sh -m test -t very-small --retry-failed-checksums --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
-            else
-                print_info "Skipping retry as no failures were detected"
-            fi
+            # Then run with cache disabled to force API fetching
+            print_info "Step 2: Running with cache disabled to test direct API fetching"
+            "$DEMO_SCRIPT" --historical-test "$market" "$SYMBOL" "1m" "binance" --no-cache
             
-            read -p "Press Enter to continue with other tests..."
+            # Check log directory for results
+            CSV_FILE="${LOGS_DIR}/${market}_${SYMBOL}_1m_historical_test.csv"
+            if [ -f "$CSV_FILE" ]; then
+                COUNT=$(wc -l < "$CSV_FILE")
+                print_info "Test completed successfully - retrieved $(($COUNT - 1)) data points"
+            else
+                print_warning "No CSV output file generated at $CSV_FILE"
+            fi
+        else
+            print_error "Demo script not found at $DEMO_SCRIPT"
+            print_error "Did you run from the project root directory?"
+        fi
+        
+        # Add a pause between tests to prevent rate limiting
+        if [ "$market" != "${MARKET_TYPES[-1]}" ]; then
+            print_info "Pausing before next market test..."
+            sleep 5
+        fi
+    done
+    
+    print_header "DATA SOURCE MANAGER TESTS COMPLETED"
+    print_info "Test results saved to ${LOGS_DIR}"
+    print_info "To visualize and analyze the results, you can open the CSV files"
+    
+    # View results if available
+    RESULT_FILES=$(ls -la "$LOGS_DIR" 2>/dev/null)
+    if [ -n "$RESULT_FILES" ]; then
+        print_info "Result files:"
+        echo "$RESULT_FILES"
+    fi
+}
+
+# Main test script - process command line arguments
+SHOW_HELP=false
+RUN_CACHE_TESTS=true
+RUN_SCHEMA_TESTS=false
+RUN_DSM_TESTS=false
+SCHEMA_TEST_ARGS=()
+DSM_TEST_ARGS=()
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help|-h)
+            SHOW_HELP=true
+            shift
             ;;
-        11)
-            # Clean Cache Index Files
-            clean_cache_index_files
+        --schema-only)
+            RUN_CACHE_TESTS=false
+            RUN_SCHEMA_TESTS=true
+            RUN_DSM_TESTS=false
+            shift
+            ;;
+        --dsm-only|--fcp-only)
+            RUN_CACHE_TESTS=false
+            RUN_SCHEMA_TESTS=false
+            RUN_DSM_TESTS=true
+            shift
+            ;;
+        --all)
+            RUN_CACHE_TESTS=true
+            RUN_SCHEMA_TESTS=true
+            RUN_DSM_TESTS=true
+            shift
+            ;;
+        --debug|--spot-only|--um-only|--cm-only)
+            DSM_TEST_ARGS+=("$1")
+            shift
+            ;;
+        --rest-only|--no-rest|--no-spot|--no-um|--no-sample)
+            RUN_SCHEMA_TESTS=true
+            SCHEMA_TEST_ARGS+=("$1")
+            shift
             ;;
         *)
-            print_warning "Invalid test number: $choice"
+            print_error "Unknown option: $1"
+            SHOW_HELP=true
+            shift
             ;;
     esac
 done
 
-print_header "ALL TESTS COMPLETE"
-print_info "The tests demonstrated:"
-print_info "1. Basic cache building with various footprint sizes"
-print_info "2. Incremental updates (skipping existing files)"
-print_info "3. Force updates (re-downloading files)"
-print_info "4. Gap detection and filling"
-print_info "5. Auto mode functionality"
-print_info "6. Combined features test"
-print_info "7. Checksum handling"
-print_info "8. Proper use of market parameters: ${DATA_PROVIDER}/${CHART_TYPE}/${MARKET_TYPE}"
+# Display help if requested
+if $SHOW_HELP; then
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  --help, -h           Display this help message"
+    echo "  --schema-only        Run only schema standardization tests"
+    echo "  --dsm-only, --fcp-only  Run only DataSourceManager FCP tests"
+    echo "  --cache-only         Run only cache tests (default)"
+    echo "  --all                Run all tests (cache, schema, dsm)"
+    echo ""
+    echo "Schema standardization test options:"
+    echo "  --rest-only          Run only the REST API schema test"
+    echo "  --spot-only          Run only the SPOT market schema test"
+    echo "  --um-only            Run only the UM market schema test"
+    echo "  --sample-only        Run only the sample debugging schema test"
+    echo "  --no-rest            Skip the REST API schema test"
+    echo "  --no-spot            Skip the SPOT market schema test"
+    echo "  --no-um              Skip the UM market schema test"
+    echo "  --no-sample          Skip the sample debugging schema test"
+    echo ""
+    echo "DataSourceManager test options:"
+    echo "  --debug              Run in debug mode (fetch data in smaller chunks)"
+    echo "  --spot-only          Run only SPOT market tests"
+    echo "  --um-only            Run only UM market tests"
+    echo "  --cm-only            Run only CM market tests"
+    exit 0
+fi
 
-# Display the error log summary
+# Run the selected tests
+print_header "RUNNING TEST SUITE"
+
+# Run DataSourceManager FCP tests if requested
+if $RUN_DSM_TESTS; then
+    run_dsm_orchestration_tests "${DSM_TEST_ARGS[@]}"
+fi
+
+# Run schema standardization tests if requested
+if $RUN_SCHEMA_TESTS; then
+    run_schema_standardization_tests "${SCHEMA_TEST_ARGS[@]}"
+fi
+
+# Run cache tests if requested
+if $RUN_CACHE_TESTS; then
+    # Set up error logging before starting tests
+    enable_error_logging
+
+    # Clear all the test data before starting
+    print_header "PREPARING TEST ENVIRONMENT"
+    print_info "Clearing all cache data..."
+    rm -rf "${BASE_DIR}/cache/${DATA_PROVIDER}/${CHART_TYPE}/${MARKET_TYPE}"
+    rm -f "${BASE_DIR}/logs/cache_index.db"
+    rm -f "${BASE_DIR}/logs/cache_index.json"  # Remove legacy file if it exists
+    rm -f "${BASE_DIR}/logs/checksum_failures/registry.json"
+    print_info "Cache cleared"
+
+    # Display options for tests to run
+    print_header "AVAILABLE TESTS"
+    print_info "1. Run Incremental Testing Suite"
+    print_info "2. Run Basic Cache Building Test"
+    print_info "3. Run Incremental Update Test"
+    print_info "4. Run Force Update Test"
+    print_info "5. Run Gap Detection Test"
+    print_info "6. Run Auto Mode Test"
+    print_info "7. Run Combined Features Test"
+    print_info "8. Run Gap Detection Detailed Test"
+    print_info "9. Run Checksum Handling Test"
+    print_info "10. Run All Cache Tests"
+    print_info "11. Clean Cache Index Files"
+    print_info "12. Run DataSourceManager FCP Historical Tests"
+    print_info "0. Exit"
+
+    # Get user input
+    read -p "Enter test number(s) to run (space-separated, e.g., '1 3 5'): " -a TEST_CHOICES
+
+    # Process user input
+    if [[ " ${TEST_CHOICES[@]} " =~ " 0 " ]]; then
+        print_info "Exiting without running tests"
+        exit 0
+    fi
+
+    if [[ " ${TEST_CHOICES[@]} " =~ " 10 " ]]; then
+        # Run all cache tests
+        TEST_CHOICES=(1 2 3 4 5 6 7 8 9 11)
+    fi
+
+    for choice in "${TEST_CHOICES[@]}"; do
+        case $choice in
+            1)
+                # Run Incremental Testing Suite (from test_incremental.sh)
+                run_incremental_test
+                ;;
+            2)
+                # Test 1: Very Small Footprint Basic Test
+                run_test_scenario "Basic Cache Building" "very-small" "BTCUSDT" "5m" ""
+                ;;
+            3)
+                # Test 2: Incremental Update (Very Small)
+                run_test_scenario "Incremental Update" "very-small" "BTCUSDT" "5m" "--incremental"
+                ;;
+            4)
+                # Test 3: Force Update (Very Small)
+                run_test_scenario "Force Update" "very-small" "BTCUSDT" "5m" "--force-update"
+                ;;
+            5)
+                # Test 4: Gap Detection (Small Size)
+                run_test_scenario "Gap Detection" "small" "BTCUSDT,ETHUSDT,BNBUSDT" "5m" "--detect-gaps"
+                ;;
+            6)
+                # Test 5: Auto Mode (Small Size)
+                run_test_scenario "Auto Mode" "small" "BTCUSDT,ETHUSDT,BNBUSDT" "5m" "--auto"
+                ;;
+            7)
+                # Test 6: Combined Features Test (Medium Size)
+                run_test_scenario "Combined Features" "medium" "BTCUSDT,ETHUSDT,BNBUSDT,XRPUSDT,ADAUSDT" "5m,1h" "--incremental --detect-gaps"
+                ;;
+            8)
+                # Create gap test (manually delete files and then detect gaps)
+                print_header "GAP DETECTION DETAILED TEST"
+                print_info "Step 1: Initial download (medium size)"
+                $SCRIPT_DIR/cache_builder.sh -m test -t medium --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
+
+                print_info "Step 2: Creating gaps by deleting some files..."
+                SYMBOL="BTCUSDT"
+                INTERVAL="5m"
+                CACHE_DIR="${BASE_DIR}/cache/${DATA_PROVIDER}/${CHART_TYPE}/${MARKET_TYPE}/${SYMBOL}/${INTERVAL}"
+                FILES=$(ls "$CACHE_DIR" | sort)
+                COUNT=$(echo "$FILES" | wc -l)
+
+                # Delete every other file to create gaps
+                i=0
+                for file in $FILES; do
+                    if [ $((i % 2)) -eq 0 ]; then
+                        rm -f "${CACHE_DIR}/${file}"
+                        print_info "Deleted ${CACHE_DIR}/${file}"
+                    fi
+                    i=$((i+1))
+                done
+
+                print_info "Step 3: Running gap detection to fill missing files"
+                $SCRIPT_DIR/cache_builder.sh -m test -t medium --detect-gaps --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
+
+                print_info "Final result after gap filling:"
+                ls -la "$CACHE_DIR"
+                
+                read -p "Press Enter to continue with other tests..."
+                ;;
+            9)
+                # Test checksum features
+                print_header "CHECKSUM HANDLING TEST"
+                print_info "Step 1: Run with proceed-on-failure flag"
+                $SCRIPT_DIR/cache_builder.sh -m test -t very-small --proceed-on-failure --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
+
+                print_info "Step 2: Check checksum failures registry"
+                if [ -f "${BASE_DIR}/logs/checksum_failures/registry.json" ]; then
+                    print_info "Checksum failures registry exists:"
+                    cat "${BASE_DIR}/logs/checksum_failures/registry.json" | head -20
+                else
+                    print_info "No checksum failures detected"
+                fi
+
+                print_info "Step 3: Run retry-failed-checksums if any failures exist"
+                if [ -f "${BASE_DIR}/logs/checksum_failures/registry.json" ] && [ -s "${BASE_DIR}/logs/checksum_failures/registry.json" ]; then
+                    $SCRIPT_DIR/cache_builder.sh -m test -t very-small --retry-failed-checksums --error-log $ERROR_LOG_FILE --start-date $START_DATE --end-date $END_DATE --market-type $MARKET_TYPE --data-provider $DATA_PROVIDER --chart-type $CHART_TYPE
+                else
+                    print_info "Skipping retry as no failures were detected"
+                fi
+                
+                read -p "Press Enter to continue with other tests..."
+                ;;
+            11)
+                # Clean Cache Index Files
+                clean_cache_index_files
+                ;;
+            12)
+                # Run DataSourceManager FCP Historical Tests
+                run_dsm_orchestration_tests
+                ;;
+            *)
+                print_warning "Invalid test number: $choice"
+                ;;
+        esac
+    done
+
+    print_header "ALL TESTS COMPLETE"
+    print_info "The tests demonstrated:"
+    print_info "1. Basic cache building with various footprint sizes"
+    print_info "2. Incremental updates (skipping existing files)"
+    print_info "3. Force updates (re-downloading files)"
+    print_info "4. Gap detection and filling"
+    print_info "5. Auto mode functionality"
+    print_info "6. Combined features test"
+    print_info "7. Checksum handling"
+    print_info "8. Proper use of market parameters: ${DATA_PROVIDER}/${CHART_TYPE}/${MARKET_TYPE}"
+    if [[ " ${TEST_CHOICES[@]} " =~ " 12 " ]]; then
+        print_info "9. DataSourceManager FCP orchestration with historical data"
+    fi
+
+    # Display the error log summary
+    display_error_log
+
+    print_header "TEST RUN FINISHED"
+    print_info "Error log file: $ERROR_LOG_FILE"
+fi
+
+print_header "TESTS COMPLETED"
 display_error_log
-
-print_header "TEST RUN FINISHED"
-print_info "Error log file: $ERROR_LOG_FILE"
