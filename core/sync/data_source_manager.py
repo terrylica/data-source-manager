@@ -11,6 +11,7 @@ import time
 
 from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
+from utils.market_utils import get_market_type_str
 from utils.time_utils import (
     filter_dataframe_by_time,
     align_time_boundaries,
@@ -491,16 +492,7 @@ class DataSourceManager:
         Returns:
             String representation of market type
         """
-        if self.market_type == MarketType.SPOT:
-            return "spot"
-        elif self.market_type == MarketType.FUTURES_USDT:
-            return "futures_usdt"
-        elif self.market_type == MarketType.FUTURES_COIN:
-            return "futures_coin"
-        elif self.market_type == MarketType.FUTURES:
-            return "futures_usdt"  # Default to USDT for legacy type
-        else:
-            raise ValueError(f"Unsupported market type: {self.market_type}")
+        return get_market_type_str(self.market_type)
 
     def _should_use_vision_api(self, start_time: datetime, end_time: datetime) -> bool:
         """Determine if Vision API should be used based on time range.

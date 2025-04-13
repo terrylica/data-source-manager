@@ -21,6 +21,7 @@ import logging
 from utils.logger_setup import logger
 from rich import print
 from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
+from utils.market_utils import get_market_type_str
 from core.sync.data_source_manager import DataSourceManager, DataSource
 from core.sync.cache_manager import UnifiedCacheManager
 from utils.config import VISION_DATA_DELAY_HOURS
@@ -79,11 +80,7 @@ def get_data_sync(
         cache_dir = Path("./cache")
         # Create an instance of UnifiedCacheManager to get the cache path
         cache_manager = UnifiedCacheManager(cache_dir=cache_dir)
-        market_type_str = market_type.name.lower()
-        if market_type == MarketType.FUTURES_USDT:
-            market_type_str = "futures_usdt"
-        elif market_type == MarketType.FUTURES_COIN:
-            market_type_str = "futures_coin"
+        market_type_str = get_market_type_str(market_type)
 
         cache_key = cache_manager.get_cache_key(
             symbol=symbol,
@@ -198,11 +195,7 @@ def get_historical_data_test(
         cache_dir = Path("./cache")
         # Create an instance of UnifiedCacheManager to get the cache path
         cache_manager = UnifiedCacheManager(cache_dir=cache_dir)
-        market_type_str = market_type.name.lower()
-        if market_type == MarketType.FUTURES_USDT:
-            market_type_str = "futures_usdt"
-        elif market_type == MarketType.FUTURES_COIN:
-            market_type_str = "futures_coin"
+        market_type_str = get_market_type_str(market_type)
 
         # Display expected cache paths for a few sample dates throughout the range
         sample_dates = [
@@ -358,7 +351,13 @@ def get_historical_data_test(
     # Check for gaps
     # Ensure we reset the index if it's open_time to avoid ambiguity
     if df.index.name == "open_time":
-        df = df.reset_index()
+        # Use drop=True to avoid trying to add the index as a column when the column already exists
+        df = df.reset_index(drop=True)
+    elif hasattr(df, "index") and not df.index.equals(
+        pd.RangeIndex.from_range(range(len(df)))
+    ):
+        # If we have any other custom index, reset it safely
+        df = df.reset_index(drop=False)
 
     df_sorted = df.sort_values("open_time")
     time_diffs = df_sorted["open_time"].diff().dropna().dt.total_seconds()
@@ -463,11 +462,7 @@ def clear_cache(
     cache_manager = UnifiedCacheManager(cache_dir=CACHE_DIR, create_dirs=True)
 
     # Build market type string
-    market_type_str = market_type.name.lower()
-    if market_type == MarketType.FUTURES_USDT:
-        market_type_str = "futures_usdt"
-    elif market_type == MarketType.FUTURES_COIN:
-        market_type_str = "futures_coin"
+    market_type_str = get_market_type_str(market_type)
 
     # Clear cache for the specific dates we're testing
     now = datetime.now(timezone.utc)
@@ -562,11 +557,7 @@ def setup_test_scenario(
 
             # Verify data is in the cache by checking for cache file
             cache_manager = UnifiedCacheManager(cache_dir=CACHE_DIR)
-            market_type_str = market_type.name.lower()
-            if market_type == MarketType.FUTURES_USDT:
-                market_type_str = "futures_usdt"
-            elif market_type == MarketType.FUTURES_COIN:
-                market_type_str = "futures_coin"
+            market_type_str = get_market_type_str(market_type)
 
             # Check if cache was created
             cache_key = cache_manager.get_cache_key(

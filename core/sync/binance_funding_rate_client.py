@@ -17,6 +17,7 @@ from utils.config import (
 )
 from core.sync.data_client_interface import DataClientInterface
 from core.sync.cache_manager import UnifiedCacheManager
+from utils.market_utils import get_market_type_str
 
 
 class BinanceFundingRateClient(DataClientInterface):
@@ -283,12 +284,7 @@ class BinanceFundingRateClient(DataClientInterface):
         Returns:
             Market type string
         """
-        if self._market_type == MarketType.FUTURES_USDT:
-            return "futures_usdt"
-        elif self._market_type == MarketType.FUTURES_COIN:
-            return "futures_coin"
-        else:
-            return "futures_usdt"  # Default to USDT if unknown
+        return get_market_type_str(self._market_type)
 
     def _fetch_funding_rate(
         self,

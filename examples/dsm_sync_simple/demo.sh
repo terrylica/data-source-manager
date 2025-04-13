@@ -92,46 +92,47 @@ run_merge_demo() {
   eval $cmd
 }
 
-# Function to run the long-term historical data test
-run_historical_test() {
-  local market_type=$1
-  local symbol=${2:-"BTCUSDT"}
-  local interval=${3:-"1m"}
-  local provider=${4:-"binance"}
-  local use_cache=${5:-"--use-cache"}
-  local debug_mode=${6:-""}
-  local retries=${7:-3}
-  local chart_type=${8:-"klines"}
-  
-  echo -e "\n${CYAN}===============================================${NC}"
-  echo -e "${CYAN}Running Long-Term Historical Data Test${NC}"
-  echo -e "${CYAN}Market: $market_type | Symbol: $symbol | Interval: $interval | Chart Type: $chart_type${NC}" 
-  echo -e "${CYAN}Provider: $provider | Retries: $retries${NC}"
-  echo -e "${CYAN}Test uses data from Dec 24, 2024 12:09:03 to Feb 25, 2025 23:56:56${NC}"
-  echo -e "${CYAN}(Today is April 11, 2025, so these dates are historical)${NC}"
-  if [[ "$use_cache" == "--use-cache" ]]; then
-    echo -e "${CYAN}Cache: enabled${NC}"
-  else
-    echo -e "${CYAN}Cache: disabled${NC}"
-  fi
-  if [[ "$debug_mode" == "--debug" ]]; then
-    echo -e "${CYAN}Debug mode: enabled (fetching in chunks)${NC}"
-  fi
-  echo -e "${CYAN}===============================================${NC}"
-  
-  # Build command with appropriate flags
-  cmd="python examples/dsm_sync_simple/demo.py --market \"$market_type\" --symbol \"$symbol\" --interval \"$interval\" --provider \"$provider\" --retries \"$retries\" --historical-test --show-cache --chart-type \"$chart_type\""
-  
-  if [[ "$use_cache" == "--use-cache" ]]; then
-    cmd="$cmd --use-cache"
-  fi
-  
-  if [[ "$debug_mode" == "--debug" ]]; then
-    cmd="$cmd --debug"
-  fi
-  
-  # Run the command
-  eval $cmd
+# Function to run historical data test
+function run_historical_test() {
+    echo -e "${YELLOW}Running historical data test using DataSourceManager...${NC}"
+    
+    # Default to spot market if not specified
+    MARKET=${1:-spot}
+    SYMBOL=${2:-BTCUSDT}
+    INTERVAL=${3:-1m}
+    PROVIDER=${4:-binance}  # Changed from USE_CACHE to PROVIDER
+    USE_CACHE=${5:-false}    # Changed from CHART_TYPE to USE_CACHE
+    DEBUG_MODE=${6:-false}  # Changed from DEBUG to DEBUG_MODE
+    RETRIES=${7:-3}         # New parameter
+    CHART_TYPE=${8:-klines} # Moved CHART_TYPE to position 8
+    
+    echo -e "${BLUE}DEBUG: MARKET=$MARKET, SYMBOL=$SYMBOL, INTERVAL=$INTERVAL, PROVIDER=$PROVIDER${NC}"
+    echo -e "${BLUE}DEBUG: USE_CACHE=$USE_CACHE, DEBUG_MODE=$DEBUG_MODE, RETRIES=$RETRIES, CHART_TYPE=$CHART_TYPE${NC}"
+    
+    # Construct the Python command
+    CMD="python examples/dsm_sync_simple/demo.py"
+    CMD+=" --market=$MARKET"
+    CMD+=" --symbol=$SYMBOL"
+    CMD+=" --interval=$INTERVAL"
+    CMD+=" --provider=$PROVIDER"
+    CMD+=" --retries=$RETRIES"
+    CMD+=" --chart-type=$CHART_TYPE"
+    CMD+=" --historical-test"
+    
+    # Add optional flags
+    if [ "$USE_CACHE" = "true" ]; then
+        CMD+=" --use-cache"
+    fi
+    
+    if [ "$DEBUG_MODE" = "true" ]; then
+        CMD+=" --debug"
+    fi
+    
+    # Execute the command
+    echo -e "${BLUE}Executing: $CMD${NC}"
+    set -x  # Enable command tracing
+    eval $CMD
+    set +x  # Disable command tracing
 }
 
 # Function to get data synchronously
@@ -155,45 +156,6 @@ function get_data_sync() {
     CMD+=" --interval=$INTERVAL"
     CMD+=" --days=$DAYS"
     CMD+=" --chart-type=$CHART_TYPE"
-    
-    # Add optional flags
-    if [ "$USE_CACHE" = "true" ]; then
-        CMD+=" --use-cache"
-    fi
-    
-    if [ "$DEBUG" = "true" ]; then
-        CMD+=" --debug"
-    fi
-    
-    if [ "$ENFORCE_SOURCE" != "AUTO" ]; then
-        CMD+=" --enforce-source=$ENFORCE_SOURCE"
-    fi
-    
-    # Execute the command
-    echo -e "${BLUE}Executing: $CMD${NC}"
-    eval $CMD
-}
-
-# Function to run historical data test
-function run_historical_test() {
-    echo -e "${YELLOW}Running historical data test using DataSourceManager...${NC}"
-    
-    # Default to spot market if not specified
-    MARKET=${1:-spot}
-    SYMBOL=${2:-BTCUSDT}
-    INTERVAL=${3:-1m}
-    USE_CACHE=${4:-true}
-    CHART_TYPE=${5:-klines}
-    DEBUG=${6:-false}
-    ENFORCE_SOURCE=${7:-AUTO}
-    
-    # Construct the Python command
-    CMD="python examples/dsm_sync_simple/demo.py"
-    CMD+=" --market=$MARKET"
-    CMD+=" --symbol=$SYMBOL"
-    CMD+=" --interval=$INTERVAL"
-    CMD+=" --chart-type=$CHART_TYPE"
-    CMD+=" --historical-test"
     
     # Add optional flags
     if [ "$USE_CACHE" = "true" ]; then
@@ -292,28 +254,37 @@ if [[ $1 == "--demo-cache" ]]; then
   fi
 elif [[ $1 == "--historical-test" ]]; then
   # Run long-term historical data test
+  echo -e "${BLUE}DEBUG: Historical test mode detected${NC}"
+  echo -e "${BLUE}DEBUG: All arguments: $@${NC}"
+  echo -e "${BLUE}DEBUG: Number of arguments: $#${NC}"
+  
   if [ $# -ge 2 ]; then
     market_type=$2
     symbol=${3:-"BTCUSDT"}
     interval=${4:-"1m"}
     provider=${5:-"binance"}
     
+    echo -e "${BLUE}DEBUG: market_type=$market_type, symbol=$symbol, interval=$interval, provider=$provider${NC}"
+    
     # Check for options
-    use_cache="--use-cache"  # Default to using cache
-    debug_mode=""            # Default to no debug mode
+    use_cache="true"  # Default to using cache
+    debug_mode="false"            # Default to no debug mode
     retries=3                # Default retry count
     chart_type="klines"      # Default chart type
     
     # Parse remaining arguments if provided
     shift 5
+    echo -e "${BLUE}DEBUG: Remaining args after shift: $@${NC}"
+    
     while [[ $# -gt 0 ]]; do
+      echo -e "${BLUE}DEBUG: Processing arg: $1${NC}"
       case "$1" in
         --no-cache)
-          use_cache=""
+          use_cache="false"
           shift
           ;;
         --debug)
-          debug_mode="--debug"
+          debug_mode="true"
           shift
           ;;
         --retries)
@@ -335,6 +306,11 @@ elif [[ $1 == "--historical-test" ]]; then
     echo -e "${GREEN}# Long-Term Historical Data Test Mode #${NC}"
     echo -e "${GREEN}################################################${NC}"
     echo -e "Running historical test for $market_type market with $symbol\n"
+    
+    echo -e "${BLUE}DEBUG: About to call run_historical_test with:${NC}"
+    echo -e "${BLUE}DEBUG: market_type=$market_type, symbol=$symbol, interval=$interval${NC}"
+    echo -e "${BLUE}DEBUG: provider=$provider, use_cache=$use_cache, debug_mode=$debug_mode${NC}"
+    echo -e "${BLUE}DEBUG: retries=$retries, chart_type=$chart_type${NC}"
     
     run_historical_test "$market_type" "$symbol" "$interval" "$provider" "$use_cache" "$debug_mode" "$retries" "$chart_type"
     exit 0
