@@ -19,7 +19,7 @@ From [`docs/api/binance_vision_klines.md`](../api/binance_vision_klines.md):
 > ### Spot Market (2020-2024)
 >
 > For spot market data from 2020 to 2024, the files do not include column headers.
-
+>
 > ### Futures Markets (UM and CM)
 >
 > #### USDT-Margined Futures Data Format
