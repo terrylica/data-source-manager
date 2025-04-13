@@ -31,18 +31,17 @@ from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType
 from utils.time_utils import (
     filter_dataframe_by_time,
+    detect_timestamp_unit,
 )
 from utils.config import (
     KLINE_COLUMNS,
     MAXIMUM_CONCURRENT_DOWNLOADS,
-)
-from core.sync.vision_constraints import (
-    TimestampedDataFrame,
     FileType,
-    get_vision_url,
-    detect_timestamp_unit,
 )
+from utils.dataframe_types import TimestampedDataFrame
+from core.sync.vision_constraints import get_vision_url
 from utils.gap_detector import detect_gaps, Gap
+from utils.dataframe_utils import ensure_open_time_as_column
 
 # Define the type variable for VisionDataClient
 T = TypeVar("T")
@@ -247,7 +246,7 @@ class VisionDataClient(Generic[T]):
                 first_ts = df.iloc[0, 0]  # First timestamp in first column
 
                 try:
-                    # Detect timestamp unit using the standardized function
+                    # Detect timestamp unit using the standardized function from utils.time_utils
                     timestamp_unit = detect_timestamp_unit(first_ts)
 
                     # Log the first and last timestamps for debugging
@@ -287,14 +286,16 @@ class VisionDataClient(Generic[T]):
 
         return df
 
-    def _download_file(self, date: datetime) -> Optional[pd.DataFrame]:
+    def _download_file(
+        self, date: datetime
+    ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
         """Download and process data file for a specific date.
 
         Args:
             date: Date to download
 
         Returns:
-            DataFrame with data or None if download failed
+            Tuple of (DataFrame or None, warning message or None)
         """
         try:
             # First check if the date is safe to process with pandas
@@ -302,7 +303,7 @@ class VisionDataClient(Generic[T]):
                 logger.error(
                     f"Skipping date {date.date()} due to potential timestamp overflow"
                 )
-                return None
+                return None, None
 
             # Generate URL for the data - ensure we use interval string value
             interval_str = self.interval
@@ -347,16 +348,15 @@ class VisionDataClient(Generic[T]):
 
                     # For 404 (Not Found) status, check if it's within 2 days of now
                     if response.status_code == 404 and days_difference <= 2:
-                        # We expect recent data might not be available yet, so just show a warning
-                        logger.warning(
-                            f"Recent data not yet available from Vision API: {date.date()} (HTTP 404)"
-                        )
+                        # Return a warning message instead of logging it immediately
+                        warning_msg = f"Recent data not yet available from Vision API: {date.date()} (HTTP 404)"
+                        return None, warning_msg
                     else:
                         # For data that should be available or other error codes, log as error
                         logger.error(
                             f"Failed to download data: HTTP {response.status_code}"
                         )
-                    return None
+                    return None, None
 
                 # Get response content
                 content = response.content
@@ -370,12 +370,10 @@ class VisionDataClient(Generic[T]):
                 days_difference = (now.date() - date.date()).days
 
                 if days_difference <= 2:
-                    logger.warning(
-                        f"Error downloading recent data for {date.date()}: {e}"
-                    )
+                    return None, f"Error downloading recent data for {date.date()}: {e}"
                 else:
                     logger.error(f"Error downloading data for {date.date()}: {e}")
-                return None
+                return None, None
 
             # Create a temporary file to store the zip
             with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
@@ -389,7 +387,7 @@ class VisionDataClient(Generic[T]):
                     file_list = zip_ref.namelist()
                     if not file_list:
                         logger.error("Zip file is empty")
-                        return None
+                        return None, None
 
                     csv_file = file_list[0]
                     logger.debug(f"Found CSV file in zip: {csv_file}")
@@ -420,16 +418,15 @@ class VisionDataClient(Generic[T]):
                             # Process timestamp columns
                             df = self._process_timestamp_columns(df)
 
-                            return df
+                            return df, None
                         else:
-                            logger.warning(f"Empty dataframe for {date.date()}")
-                            return None
+                            return None, f"Empty dataframe for {date.date()}"
             except Exception as e:
                 logger.error(
                     f"Error processing zip file {temp_file_path}: {str(e)}",
                     exc_info=True,
                 )
-                return None
+                return None, None
             finally:
                 # Clean up temp file
                 if os.path.exists(temp_file_path):
@@ -437,7 +434,7 @@ class VisionDataClient(Generic[T]):
 
         except Exception as e:
             logger.error(f"Unexpected error processing {date.date()}: {str(e)}")
-            return None
+            return None, None
 
     def _download_data(
         self,
@@ -474,6 +471,7 @@ class VisionDataClient(Generic[T]):
         # Use ThreadPoolExecutor to download files in parallel
         max_workers = min(MAXIMUM_CONCURRENT_DOWNLOADS, len(date_range))
         downloaded_dfs = []
+        warning_messages = []  # Collect warning messages
 
         # For very short intervals like 1s, avoid too many concurrent downloads
         if self.interval == "1s" and max_workers > 10:
@@ -504,7 +502,9 @@ class VisionDataClient(Generic[T]):
                 for future in as_completed(future_to_date):
                     date = future_to_date[future]
                     try:
-                        df = future.result()
+                        df, warning = future.result()
+                        if warning:
+                            warning_messages.append(warning)
                         if df is not None and not df.empty:
                             # Ensure each dataframe is properly sorted by open_time before adding it
                             if (
@@ -518,9 +518,36 @@ class VisionDataClient(Generic[T]):
         except Exception as e:
             logger.error(f"Error in ThreadPoolExecutor: {e}")
 
-        # If no data was downloaded, return an empty dataframe
+        # If no data was downloaded, log a consolidated warning and return empty dataframe
         if not downloaded_dfs:
-            logger.warning("No data downloaded from Binance Vision API")
+            # Check if we have specific warnings about missing dates
+            if warning_messages:
+                # Group warnings about 404 (missing data)
+                missing_dates = [
+                    msg.split(": ")[1].split(" ")[0]
+                    for msg in warning_messages
+                    if "404" in msg
+                ]
+                if missing_dates:
+                    # Log a consolidated warning instead of individual ones
+                    dates_str = ", ".join(missing_dates)
+                    logger.warning(
+                        f"No data downloaded from Binance Vision API - dates not available: {dates_str}. "
+                        f"This may happen for recent data or less common markets (e.g., CM futures). "
+                        f"The system will attempt to fetch from REST API instead."
+                    )
+                else:
+                    # Log a generic warning for other issues
+                    logger.warning(
+                        "No data downloaded from Binance Vision API - this may happen for recent data or less common markets (e.g., CM futures). "
+                        "The system will attempt to fetch from REST API instead."
+                    )
+            else:
+                # No specific warnings
+                logger.warning(
+                    "No data downloaded from Binance Vision API - this may happen for recent data or less common markets (e.g., CM futures). "
+                    "The system will attempt to fetch from REST API instead."
+                )
             return self._create_empty_dataframe()
 
         logger.info(f"Downloaded {len(downloaded_dfs)} daily files")
@@ -752,7 +779,7 @@ class VisionDataClient(Generic[T]):
         self,
         start_time: datetime,
         end_time: datetime,
-    ) -> TimestampedDataFrame:
+    ) -> pd.DataFrame:
         """Fetch data for a specific time range.
 
         Args:
@@ -760,7 +787,7 @@ class VisionDataClient(Generic[T]):
             end_time: End time for data
 
         Returns:
-            TimestampedDataFrame with data
+            DataFrame with data (standard pandas DataFrame, not TimestampedDataFrame)
         """
         try:
             # Enforce consistent timezone for time boundaries
@@ -782,7 +809,28 @@ class VisionDataClient(Generic[T]):
             # Download data
             try:
                 logger.debug(f"Calling _download_data from {start_time} to {end_time}")
-                return self._download_data(start_time, end_time)
+                timestamped_df = self._download_data(start_time, end_time)
+
+                # Use the centralized utility to ensure open_time is properly handled
+                # Convert to standard pandas DataFrame first
+                if hasattr(timestamped_df, "to_pandas"):
+                    df = timestamped_df.to_pandas()
+                    logger.debug(
+                        f"Converted TimestampedDataFrame to DataFrame using to_pandas()"
+                    )
+                else:
+                    df = pd.DataFrame(timestamped_df)
+                    logger.debug(
+                        f"Converted TimestampedDataFrame using pd.DataFrame constructor"
+                    )
+
+                # Ensure open_time is properly handled
+                df = ensure_open_time_as_column(df)
+
+                logger.debug(f"Final DataFrame columns: {list(df.columns)}")
+                logger.debug(f"Final DataFrame has {len(df)} rows")
+
+                return df
             except Exception as e:
                 logger.error(f"Error in _download_data: {e}")
                 import traceback

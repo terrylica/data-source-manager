@@ -9,6 +9,7 @@ import os
 from datetime import timedelta, timezone
 from typing import Dict, Final, Any, List
 import pandas as pd
+from enum import Enum, auto
 
 # Time-related constants
 DEFAULT_TIMEZONE: Final = timezone.utc
@@ -162,6 +163,17 @@ REST_CHUNK_SIZE: Final = 1000
 REST_MAX_CHUNKS: Final = 1000  # Increased from 5 to 1000 to effectively remove limit
 MAXIMUM_CONCURRENT_DOWNLOADS: Final = 50  # Increased from 13 to 50 based on benchmarks
 
+
+# File management enums and constants
+class FileType(Enum):
+    """Types of files managed by Vision client."""
+
+    DATA = auto()
+    CHECKSUM = auto()
+    CACHE = auto()
+    METADATA = auto()
+
+
 # File formats
 FILE_EXTENSIONS: Final[Dict[str, str]] = {
     "DATA": ".zip",
@@ -169,6 +181,10 @@ FILE_EXTENSIONS: Final[Dict[str, str]] = {
     "CACHE": ".arrow",
     "METADATA": ".json",
 }
+
+# File constraint values
+MIN_VALID_FILE_SIZE: Final[int] = 1024  # 1KB minimum for valid data files
+METADATA_UPDATE_INTERVAL: Final[timedelta] = timedelta(minutes=5)
 
 # Error classification
 ERROR_TYPES: Final[Dict[str, str]] = {

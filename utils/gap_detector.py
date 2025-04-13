@@ -87,14 +87,14 @@ def detect_gaps(
         span_hours = time_span.total_seconds() / 3600
 
         if span_hours < min_hours_span:
-            error_msg = (
-                f"CRITICAL ERROR: Input data spans only {span_hours:.2f} hours. "
-                f"Gap detection requires at least {min_hours_span} hours of continuous data. "
-                f"Please combine daily files before running gap detection."
+            warning_msg = (
+                f"WARNING: Input data spans only {span_hours:.2f} hours. "
+                f"Gap detection normally requires at least {min_hours_span} hours of continuous data. "
+                f"This may produce misleading gap analysis results."
             )
-            logger.critical(error_msg)
-            print(f"[bold red]{error_msg}[/bold red]")
-            sys.exit(1)
+            logger.warning(warning_msg)
+            print(f"[bold yellow]{warning_msg}[/bold yellow]")
+            # Continue with analysis instead of exiting
 
     # Ensure DataFrame is sorted by time
     df_sorted = df.sort_values(time_column).reset_index(drop=True)

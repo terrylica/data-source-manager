@@ -24,6 +24,12 @@ from utils.config import (
     REST_MAX_CHUNKS,
     create_empty_dataframe,
 )
+from utils.dataframe_utils import (
+    ensure_open_time_as_column,
+    ensure_open_time_as_index,
+    standardize_dataframe,
+    merge_dataframes,
+)
 from core.sync.rest_data_client import RestDataClient
 from core.sync.vision_data_client import VisionDataClient
 from core.sync.cache_manager import UnifiedCacheManager
@@ -608,38 +614,88 @@ class DataSourceManager:
             symbol: Symbol the data is for
             interval: Time interval of the data
         """
-        if not self.use_cache or self.cache_manager is None or df.empty:
+        print(
+            f"**** SAVING TO CACHE: {symbol} {interval.value} with {len(df)} records, use_cache={self.use_cache}"
+        )
+
+        if not self.use_cache or self.cache_manager is None:
+            logger.debug(
+                "Caching disabled or cache manager is None - skipping cache save"
+            )
             return
 
-        # Ensure data is sorted by open_time before caching to prevent unsorted cache entries
-        if "open_time" in df.columns and not df["open_time"].is_monotonic_increasing:
-            logger.debug(f"Sorting data by open_time before caching for {symbol}")
-            df = df.sort_values("open_time").reset_index(drop=True)
+        if df.empty:
+            logger.warning(f"Empty DataFrame for {symbol} - skipping cache save")
+            return
 
-        # Get market type string for cache key
-        market_type_str = self._get_market_type_str()
+        # Enhanced debug info about incoming data
+        logger.debug(f"_save_to_cache called for {symbol} with {len(df)} records")
+        logger.debug(f"DataFrame columns: {list(df.columns)}")
+        logger.debug(f"DataFrame dtypes: {df.dtypes}")
 
-        # Group data by date
-        df["date"] = df["open_time"].dt.date
-        for date, group in df.groupby("date"):
-            # Remove the date column
-            group = group.drop(columns=["date"])
+        try:
+            # Ensure data is sorted by open_time before caching to prevent unsorted cache entries
+            if (
+                "open_time" in df.columns
+                and not df["open_time"].is_monotonic_increasing
+            ):
+                logger.debug(f"Sorting data by open_time before caching for {symbol}")
+                df = df.sort_values("open_time").reset_index(drop=True)
 
-            # Convert date to datetime at midnight
-            cache_date = datetime.combine(date, datetime.min.time()).replace(
-                tzinfo=timezone.utc
-            )
+            # Get market type string for cache key
+            market_type_str = self._get_market_type_str()
 
-            # Save to cache
-            self.cache_manager.save_to_cache(
-                df=group,
-                symbol=symbol,
-                interval=interval.value,
-                date=cache_date,
-                provider=self.provider.name,
-                chart_type=self.chart_type.name,
-                market_type=market_type_str,
-            )
+            # Group data by date
+            if "open_time" not in df.columns:
+                logger.error(f"DataFrame missing open_time column: {list(df.columns)}")
+                return
+
+            logger.debug(f"Creating date column from open_time for grouping")
+            df["date"] = df["open_time"].dt.date
+
+            logger.debug(f"Grouping {len(df)} records by date")
+            date_groups = df.groupby("date")
+            logger.debug(f"Found {len(date_groups)} date groups")
+
+            for date, group in date_groups:
+                logger.debug(
+                    f"Processing group for date {date} with {len(group)} records"
+                )
+                # Remove the date column
+                group = group.drop(columns=["date"])
+
+                # Convert date to datetime at midnight
+                cache_date = datetime.combine(date, datetime.min.time()).replace(
+                    tzinfo=timezone.utc
+                )
+
+                logger.debug(
+                    f"Saving {len(group)} records for {symbol} on {cache_date.date()} to cache"
+                )
+                # Save to cache
+                success = self.cache_manager.save_to_cache(
+                    df=group,
+                    symbol=symbol,
+                    interval=interval.value,
+                    date=cache_date,
+                    provider=self.provider.name,
+                    chart_type=self.chart_type.name,
+                    market_type=market_type_str,
+                )
+
+                if success:
+                    logger.debug(
+                        f"Successfully saved cache data for {symbol} on {cache_date.date()}"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to save cache data for {symbol} on {cache_date.date()}"
+                    )
+        except Exception as e:
+            logger.error(f"Error in _save_to_cache: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
 
     def _fetch_from_vision(
         self, symbol: str, start_time: datetime, end_time: datetime, interval: Interval
@@ -674,18 +730,63 @@ class DataSourceManager:
                 end_time=end_time,
             )
 
+            # Add detailed debugging to understand DataFrame structure
+            logger.debug(f"Vision API returned DataFrame with shape: {df.shape}")
+            logger.debug(f"Vision API DataFrame columns: {list(df.columns)}")
+            logger.debug(f"Vision API DataFrame index name: {df.index.name}")
+            logger.debug(f"Vision API DataFrame index type: {type(df.index)}")
+
             if df.empty:
-                logger.warning(f"Vision API returned no data for {symbol}")
+                # At this point, the Vision client should have already logged a specific warning
+                # about why it couldn't download data, so we'll just log this as an info
+                # to avoid duplicating warnings
+                logger.info(
+                    f"Vision API returned no data for {symbol} - falling back to REST API"
+                )
                 return create_empty_dataframe()
+
+            # Ensure open_time exists in DataFrame (either as index or column)
+            if df.index.name == "open_time" and "open_time" not in df.columns:
+                # If open_time is in the index but not as a column, create the column
+                logger.debug("Converting open_time from index to column")
+                df = df.reset_index()
+            elif df.index.name != "open_time" and "open_time" not in df.columns:
+                # Neither index nor column has open_time, check for other timestamp columns
+                for col in df.columns:
+                    if "time" in col.lower() and pd.api.types.is_datetime64_any_dtype(
+                        df[col]
+                    ):
+                        logger.debug(f"Using {col} as open_time")
+                        df["open_time"] = df[col]
+                        break
+                else:
+                    # If no suitable column found, try to use the index if it's datetime
+                    if isinstance(df.index, pd.DatetimeIndex):
+                        logger.debug("Using DatetimeIndex as open_time")
+                        df["open_time"] = df.index
+                    else:
+                        logger.error(
+                            "No suitable open_time found in Vision API response"
+                        )
+                        return create_empty_dataframe()
 
             # Add source information
             df["_data_source"] = "VISION"
 
             logger.info(f"Retrieved {len(df)} records from Vision API")
+
+            # Debug the finalized DataFrame before returning
+            logger.debug(f"Final Vision API DataFrame columns: {list(df.columns)}")
+            if "open_time" in df.columns:
+                logger.debug(f"open_time column type: {df['open_time'].dtype}")
+
             return df
 
         except Exception as e:
             logger.error(f"Error fetching data from Vision API: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return create_empty_dataframe()
 
     def _fetch_from_rest(
@@ -745,79 +846,9 @@ class DataSourceManager:
         Returns:
             Merged DataFrame
         """
-        # Filter out empty DataFrames
-        dfs = [df for df in dfs if not df.empty]
-
-        if not dfs:
-            return create_empty_dataframe()
-
-        if len(dfs) == 1:
-            return self._standardize_columns(dfs[0])
-
-        # Normalize all dataframes to have 'open_time' as a column, not an index
-        # This prevents the 'open_time is both an index level and a column label' error
-        normalized_dfs = []
-        for df in dfs:
-            # First, handle the case where open_time is both an index and column
-            if (
-                hasattr(df, "index")
-                and hasattr(df.index, "name")
-                and df.index.name == "open_time"
-                and "open_time" in df.columns
-            ):
-                # Create a new DataFrame with reset index to avoid ambiguity
-                df_copy = pd.DataFrame(df.reset_index())
-                df_copy.drop(columns=["open_time"], errors="ignore", inplace=True)
-                normalized_dfs.append(df_copy)
-                logger.debug("Normalized DataFrame with ambiguous open_time")
-                continue
-
-            # Handle case where open_time is only the index
-            if (
-                hasattr(df, "index")
-                and hasattr(df.index, "name")
-                and df.index.name == "open_time"
-                and "open_time" not in df.columns
-            ):
-                df_copy = df.reset_index()
-                normalized_dfs.append(df_copy)
-                logger.debug("Reset index for DataFrame with open_time as index")
-                continue
-
-            # If open_time is already a column and not an index, use as is
-            normalized_dfs.append(df)
-
-        # Concatenate all normalized DataFrames
-        merged = pd.concat(normalized_dfs, ignore_index=True)
-
-        # For overlapping records (same open_time), prioritize data sources in order:
-        # CACHE > VISION > REST
-        # First sort by open_time and source priority
-        if "_data_source" in merged.columns:
-            # Create a priority order for data sources
-            def source_priority(source):
-                priorities = {"CACHE": 1, "VISION": 2, "REST": 3}
-                return priorities.get(source, 4)  # Default lowest priority for unknown
-
-            merged["_source_priority"] = merged["_data_source"].apply(source_priority)
-            # Sort by open_time first, then by source priority
-            merged = merged.sort_values(["open_time", "_source_priority"])
-            # Drop the temporary priority column
-            merged = merged.drop(columns=["_source_priority"])
-
-        # Remove duplicates based on open_time, keeping the first one (highest priority)
-        merged = merged.drop_duplicates(subset=["open_time"], keep="first")
-
-        # Sort by open_time
-        merged = merged.sort_values("open_time").reset_index(drop=True)
-
-        # Log data source statistics
-        if "_data_source" in merged.columns:
-            source_counts = merged["_data_source"].value_counts()
-            logger.info(f"Merged data source statistics: {source_counts.to_dict()}")
-
-        # Standardize columns before returning
-        return self._standardize_columns(merged)
+        # Use the centralized merge_dataframes function from dataframe_utils
+        # This handles all the special cases and ensures consistent behavior
+        return merge_dataframes(dfs)
 
     def get_data(
         self,
@@ -829,153 +860,237 @@ class DataSourceManager:
         include_source_info: bool = True,
         enforce_source: DataSource = DataSource.AUTO,
     ) -> pd.DataFrame:
-        """Get data for the specified time range, using the FCP strategy.
+        """Get data from the most appropriate source with caching.
 
-        This method follows the Failover Composition Priority (FCP) strategy:
-        1. Check cache first
-        2. For missing data, try Vision API
-        3. If Vision API fails, fall back to REST API
+        This is the main entry point for getting data. It will:
+        1. Check if data is in cache and use it if available
+        2. Otherwise, get data from Vision API for older data if applicable
+        3. If Vision API doesn't have the data, fall back to REST API
+        4. Merge data from multiple sources if needed
 
         Args:
             symbol: Symbol to retrieve data for
             start_time: Start time for data retrieval
             end_time: End time for data retrieval
             interval: Time interval between data points
-            chart_type: Override chart type for this query
-            include_source_info: Whether to include source information in the result
+            chart_type: Type of chart data to retrieve (defaults to self.chart_type)
+            include_source_info: Include _data_source column in output
             enforce_source: Force specific data source (AUTO, REST, VISION)
 
         Returns:
-            DataFrame with requested data
+            DataFrame with the requested data
         """
-        # Use override chart type if provided
-        original_chart_type = self.chart_type
-        if chart_type is not None:
-            self.chart_type = chart_type
+        logger.debug(
+            f"**** DEBUG INFO: get_data called with use_cache={self.use_cache} for symbol={symbol}, interval={interval.value}"
+        )
+
+        # Use the class chart_type if none is specified
+        if chart_type is None:
+            chart_type = self.chart_type
+
+        # Validate input
+        if not isinstance(symbol, str) or not symbol:
+            raise ValueError(f"Invalid symbol: {symbol}")
+
+        if not isinstance(start_time, datetime) or not isinstance(end_time, datetime):
+            raise ValueError("start_time and end_time must be datetime objects")
+
+        if not start_time.tzinfo or not end_time.tzinfo:
+            raise ValueError("start_time and end_time must be timezone-aware")
+
+        if start_time >= end_time:
+            raise ValueError(
+                f"start_time ({start_time}) must be earlier than end_time ({end_time})"
+            )
+
+        if not isinstance(interval, Interval):
+            raise ValueError(f"interval must be an Interval enum, got {interval}")
+
+        if not isinstance(chart_type, ChartType):
+            raise ValueError(f"chart_type must be a ChartType enum, got {chart_type}")
+
+        if not isinstance(enforce_source, DataSource):
+            raise ValueError(
+                f"enforce_source must be a DataSource enum, got {enforce_source}"
+            )
+
+        # Normalize symbol to upper case
+        symbol = symbol.upper()
+
+        # Log key parameters
+        logger.info(
+            f"Retrieving {interval.value} data for {symbol} from {start_time} to {end_time}"
+        )
 
         try:
-            # Validate inputs
-            if not isinstance(symbol, str) or not symbol:
-                raise ValueError(f"Invalid symbol: {symbol}")
+            # First, check cache if enabled
+            dfs = []
+            missing_ranges = []
+            rest_fallback_ranges = []
 
-            if not isinstance(start_time, datetime) or not isinstance(
-                end_time, datetime
-            ):
-                raise ValueError("Start time and end time must be datetime objects")
-
-            if start_time >= end_time:
-                raise ValueError(
-                    f"Start time {start_time} must be before end time {end_time}"
+            # Use cache if enabled
+            if self.use_cache:
+                # Get data from cache and identify missing ranges
+                cache_df, missing_ranges = self._get_from_cache(
+                    symbol, start_time, end_time, interval
                 )
+                # Add cache data to list if not empty
+                if not cache_df.empty:
+                    # Add source info if requested
+                    if include_source_info and "_data_source" not in cache_df.columns:
+                        cache_df["_data_source"] = "CACHE"
+                    dfs.append(cache_df)
+            else:
+                # If cache is disabled, treat entire range as missing
+                missing_ranges = [(start_time, end_time)]
 
-            if start_time.tzinfo is None or end_time.tzinfo is None:
-                raise ValueError("Start time and end time must be timezone-aware")
-
-            # Standardize symbol
-            symbol = symbol.upper()
-
-            logger.info(
-                f"Retrieving {interval.value} data for {symbol} from {start_time} to {end_time}"
-            )
-
-            # Step 1: Try to get data from cache
-            start_time_retrieval = time.time()
-            cached_df, missing_ranges = self._get_from_cache(
-                symbol, start_time, end_time, interval
-            )
-
-            # If we have all data from cache, return it
-            if not missing_ranges:
-                logger.info(f"Retrieved all data from cache: {len(cached_df)} records")
-                # Standardize columns before handling source info
-                cached_df = self._standardize_columns(cached_df)
-                if not include_source_info and "_data_source" in cached_df.columns:
-                    cached_df = cached_df.drop(columns=["_data_source"])
-                return cached_df
-
-            # Step 2: Get missing data from appropriate sources
-            all_dfs = [cached_df] if not cached_df.empty else []
-
-            for missing_start, missing_end in missing_ranges:
+            # If there are missing ranges, fetch from other sources
+            if missing_ranges:
                 logger.info(
-                    f"Fetching missing data from {missing_start} to {missing_end}"
+                    f"Fetching missing data from {missing_ranges[0][0]} to {missing_ranges[-1][1]}"
                 )
 
-                # Handle forced source if specified
-                if enforce_source != DataSource.AUTO:
-                    df = create_empty_dataframe()
-
-                    if enforce_source == DataSource.VISION:
-                        logger.info("Using enforced source: VISION API")
-                        df = self._fetch_from_vision(
-                            symbol, missing_start, missing_end, interval
+                # Determine which source to use based on enforce_source
+                if enforce_source == DataSource.REST:
+                    # Skip Vision API, use REST directly
+                    for miss_start, miss_end in missing_ranges:
+                        rest_fallback_ranges.append((miss_start, miss_end))
+                elif enforce_source == DataSource.VISION:
+                    # Use only Vision API (no REST fallback)
+                    vision_df = pd.DataFrame()
+                    for miss_start, miss_end in missing_ranges:
+                        range_df = self._fetch_from_vision(
+                            symbol, miss_start, miss_end, interval
                         )
-                    elif enforce_source == DataSource.REST:
-                        logger.info("Using enforced source: REST API")
-                        df = self._fetch_from_rest(
-                            symbol, missing_start, missing_end, interval
+                        # Add source info if requested
+                        if (
+                            include_source_info
+                            and "_data_source" not in range_df.columns
+                        ):
+                            range_df["_data_source"] = "VISION"
+                        vision_df = pd.concat([vision_df, range_df], ignore_index=True)
+
+                    if not vision_df.empty:
+                        dfs.append(vision_df)
+                else:
+                    # AUTO mode - try Vision first, fall back to REST
+                    for miss_start, miss_end in missing_ranges:
+                        # Check if we should try Vision API
+                        if self._should_use_vision_api(miss_start, miss_end):
+                            logger.info("Attempting to use Vision API")
+                            range_df = self._fetch_from_vision(
+                                symbol, miss_start, miss_end, interval
+                            )
+                            # If Vision API returned data, add it
+                            if not range_df.empty:
+                                # Add source info if requested
+                                if (
+                                    include_source_info
+                                    and "_data_source" not in range_df.columns
+                                ):
+                                    range_df["_data_source"] = "VISION"
+                                dfs.append(range_df)
+
+                                # If Vision data was retrieved successfully and caching is enabled, save it
+                                if self.use_cache:
+                                    logger.debug(
+                                        f"Auto-saving Vision data to cache for {symbol}"
+                                    )
+                                    self._save_to_cache(range_df, symbol, interval)
+                            else:
+                                # If Vision failed, add to REST fallback ranges
+                                rest_fallback_ranges.append((miss_start, miss_end))
+                        else:
+                            # If we shouldn't use Vision (e.g., too recent), use REST
+                            rest_fallback_ranges.append((miss_start, miss_end))
+
+                # Use REST API for any remaining ranges
+                if rest_fallback_ranges:
+                    for rest_start, rest_end in rest_fallback_ranges:
+                        logger.info(
+                            f"Falling back to REST API for {rest_start} to {rest_end}"
                         )
+                        rest_df = self._fetch_from_rest(
+                            symbol, rest_start, rest_end, interval
+                        )
+                        # Add source info if requested
+                        if (
+                            include_source_info
+                            and "_data_source" not in rest_df.columns
+                        ):
+                            rest_df["_data_source"] = "REST"
+                        dfs.append(rest_df)
 
-                    if not df.empty:
-                        all_dfs.append(df)
-
-                        # Cache the data we just fetched
-                        if self.use_cache:
-                            self._save_to_cache(df, symbol, interval)
-                    continue
-
-                # For automatic source selection, follow FCP strategy:
-                # Try Vision API first for all missing ranges
-                df = create_empty_dataframe()
-
-                # Always attempt to use Vision API first
-                logger.info("Attempting to use Vision API")
-                df = self._fetch_from_vision(
-                    symbol, missing_start, missing_end, interval
-                )
-
-                # If Vision API failed or returned no data, fall back to REST API
-                if df.empty:
-                    logger.info("Falling back to REST API")
-                    df = self._fetch_from_rest(
-                        symbol, missing_start, missing_end, interval
-                    )
-
-                # Add to list of DataFrames if we got data
-                if not df.empty:
-                    all_dfs.append(df)
-
-                    # Cache the data we just fetched
-                    if self.use_cache:
-                        self._save_to_cache(df, symbol, interval)
+                        # If REST data was retrieved successfully and caching is enabled, save it
+                        if not rest_df.empty and self.use_cache:
+                            logger.debug(f"Auto-saving REST data to cache for {symbol}")
+                            self._save_to_cache(rest_df, symbol, interval)
 
             # Merge all DataFrames
-            result_df = self._merge_dataframes(all_dfs)
+            if not dfs:
+                logger.warning("No data available from any source")
+                return create_empty_dataframe(chart_type)
 
-            # Log retrieval stats
-            elapsed_time = time.time() - start_time_retrieval
-            logger.info(
-                f"Retrieved {len(result_df)} records for {symbol} in {elapsed_time:.2f} seconds"
-            )
+            # Check if we need to merge or just return the single DataFrame
+            if len(dfs) == 1:
+                result_df = dfs[0]
+            else:
+                try:
+                    # Log info about each DataFrame before merging
+                    for i, df in enumerate(dfs):
+                        logger.debug(f"DataFrame {i} shape: {df.shape}")
+                        logger.debug(f"DataFrame {i} columns: {list(df.columns)}")
+                        if "open_time" in df.columns:
+                            logger.debug(
+                                f"DataFrame {i} open_time type: {df['open_time'].dtype}"
+                            )
+                        elif hasattr(df.index, "name") and df.index.name == "open_time":
+                            logger.debug(f"DataFrame {i} has open_time as index")
 
-            # Log source breakdown
-            if "_data_source" in result_df.columns:
-                source_counts = result_df["_data_source"].value_counts()
-                logger.info(f"Data source breakdown: {source_counts.to_dict()}")
+                    result_df = self._merge_dataframes(dfs)
+                except Exception as merge_error:
+                    logger.error(f"Error merging DataFrames: {merge_error}")
+                    # If merging fails, try to return the largest DataFrame
+                    largest_df = max(dfs, key=len)
+                    logger.warning(
+                        f"Returning largest DataFrame with {len(largest_df)} rows instead"
+                    )
+                    result_df = largest_df
 
-            # Remove source information if not requested
+            # Skip source info column if not requested
             if not include_source_info and "_data_source" in result_df.columns:
                 result_df = result_df.drop(columns=["_data_source"])
 
+            logger.info(f"Successfully retrieved {len(result_df)} records for {symbol}")
             return result_df
 
         except Exception as e:
+            # Improved error handling with better diagnostics
             logger.error(f"Error retrieving data: {e}")
-            return create_empty_dataframe()
-        finally:
-            # Restore original chart type
-            if chart_type is not None:
-                self.chart_type = original_chart_type
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+
+            # Special handling for open_time related errors
+            if "'open_time'" in str(e):
+                logger.error(
+                    "This appears to be an issue with the open_time column in the DataFrame"
+                )
+                logger.error("Please check the data sources and conversion process")
+
+                # Additional diagnostic information for debugging
+                if "dfs" in locals() and dfs:
+                    logger.error(f"Number of DataFrames: {len(dfs)}")
+                    for i, df in enumerate(dfs):
+                        logger.error(f"DataFrame {i} columns: {list(df.columns)}")
+                        logger.error(f"DataFrame {i} index name: {df.index.name}")
+                        if not df.empty:
+                            logger.error(
+                                f"DataFrame {i} first row: {df.iloc[0].to_dict()}"
+                            )
+
+            # Return empty DataFrame on error
+            return create_empty_dataframe(chart_type)
 
     def analyze_merged_data(
         self,
@@ -1092,59 +1207,6 @@ class DataSourceManager:
         Returns:
             Standardized DataFrame with consistent columns
         """
-        if df.empty:
-            return df
-
-        # First, handle potential ambiguity of open_time
-        # If open_time exists as both index and column, resolve the ambiguity
-        if (
-            hasattr(df, "index")
-            and hasattr(df.index, "name")
-            and df.index.name == "open_time"
-            and "open_time" in df.columns
-        ):
-            logger.warning(
-                "Detected open_time as both index and column - resolving ambiguity"
-            )
-            # Reset index and use only the column version
-            df = df.reset_index(drop=True)
-
-        # If open_time exists only as index, convert it to a column
-        elif (
-            hasattr(df, "index")
-            and hasattr(df.index, "name")
-            and df.index.name == "open_time"
-            and "open_time" not in df.columns
-        ):
-            logger.debug("Converting open_time from index to column for consistency")
-            df = df.reset_index()
-
-        # Define standard columns in their expected order
-        standard_columns = [
-            "open_time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "close_time",
-            "quote_asset_volume",
-            "count",
-            "taker_buy_volume",
-            "taker_buy_quote_volume",
-        ]
-
-        # Add _data_source if present
-        if "_data_source" in df.columns:
-            standard_columns.append("_data_source")
-
-        # Create a new DataFrame with only the standard columns that exist
-        result_columns = [col for col in standard_columns if col in df.columns]
-
-        # If any standard columns are missing, log a warning
-        missing_columns = [col for col in standard_columns if col not in df.columns]
-        if missing_columns:
-            logger.warning(f"Missing standard columns in output: {missing_columns}")
-
-        # Return DataFrame with standardized columns
-        return df[result_columns]
+        # Use the centralized standardize_dataframe function from dataframe_utils
+        # This function handles all the special cases we've had to fix
+        return standardize_dataframe(df)

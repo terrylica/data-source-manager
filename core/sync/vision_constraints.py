@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""Vision constraints and utilities for the Binance Vision API.
+
+This module provides constraints and utility functions specific to the Binance
+Vision API, leveraging centralized definitions from the utils modules for common
+functionality to maintain DRY principles.
+"""
 
 from typing import TypeVar, NewType, Final, NamedTuple, Literal, Dict
 from datetime import datetime, timedelta
@@ -15,19 +21,28 @@ from utils.validation import DataValidation, DataFrameValidator
 from utils.cache_validator import (
     CacheKeyManager,
 )
-from utils.time_utils import enforce_utc_timezone
-from utils.validation import DataValidation
+from utils.time_utils import (
+    enforce_utc_timezone,
+    TimestampUnit,
+    MILLISECOND_DIGITS,
+    MICROSECOND_DIGITS,
+    detect_timestamp_unit,
+    validate_timestamp_unit,
+)
 from utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_TIMEZONE,
     ERROR_TYPES,
     CONSOLIDATION_DELAY,
-)  # Import ERROR_TYPES from central config
+    FileType,
+    MIN_VALID_FILE_SIZE,
+    MAX_CACHE_AGE,
+    METADATA_UPDATE_INTERVAL,
+)
 
 # Type definitions for semantic clarity and safety
 TimeseriesIndex = NewType("TimeseriesIndex", pd.DatetimeIndex)
 CachePath = NewType("CachePath", Path)
-TimestampUnit = Literal["ms", "us"]  # Supported timestamp units
 
 # Define cache schema for Arrow files
 CACHE_SCHEMA: Final[Dict[str, pa.DataType]] = {
@@ -45,16 +60,7 @@ CACHE_SCHEMA: Final[Dict[str, pa.DataType]] = {
 }
 
 # Constraint constants
-FILES_PER_DAY: Final[int] = 2
-
-# Timestamp format detection thresholds
-MILLISECOND_DIGITS: Final[int] = 13
-MICROSECOND_DIGITS: Final[int] = 16
-
-# Data availability constraints
-# CONSOLIDATION_DELAY = timedelta(
-#     hours=48
-# )  # Time Binance needs to consolidate daily data - increased from 12h to 48h for safety margin
+FILES_PER_DAY: int = 2
 
 # Type variable for DataFrame with enforced index
 T = TypeVar("T")
@@ -269,114 +275,6 @@ def validate_data_availability(start_time: datetime, end_time: datetime) -> None
             f"Requested data includes recent time ({end_time}) that may not be fully consolidated. "
             f"Data is typically available with a {CONSOLIDATION_DELAY} delay."
         )
-
-
-class TimestampedDataFrame(pd.DataFrame):
-    """DataFrame with enforced UTC timestamp index.
-
-    This class enforces:
-    1. Index must be DatetimeIndex
-    2. Index must be timezone-aware and in UTC
-    3. Index must be named 'open_time'
-    4. Index must be monotonically increasing
-    5. No duplicate indices allowed
-    """
-
-    def __init__(self, *args, **kwargs):
-        """Initialize with DataFrame validation."""
-        # Check if open_time exists as both index and column in the input DataFrame
-        if args and isinstance(args[0], pd.DataFrame):
-            df = args[0]
-            if (
-                hasattr(df, "index")
-                and hasattr(df.index, "name")
-                and df.index.name == CANONICAL_INDEX_NAME
-                and CANONICAL_INDEX_NAME in df.columns
-            ):
-                # Create a new DataFrame without the ambiguous structure
-                # Keep only the column version of open_time and set it as index later
-                df = pd.DataFrame(df.reset_index())
-                # Update args with the corrected DataFrame
-                args = (df,) + args[1:]
-                logger.debug("Resolved ambiguous open_time in index and columns")
-
-        super().__init__(*args, **kwargs)
-        self._validate_and_normalize_index()
-
-    def _validate_and_normalize_index(self):
-        """Validate and normalize the index to meet requirements."""
-        # First check for ambiguous index/column situation
-        if (
-            CANONICAL_INDEX_NAME in self.columns
-            and hasattr(self.index, "name")
-            and self.index.name == CANONICAL_INDEX_NAME
-        ):
-            # Reset the index to resolve the ambiguity
-            self.reset_index(inplace=True)
-            logger.debug("Resolved ambiguous index by resetting index")
-
-        # Convert index to DatetimeIndex if it's not already
-        if not isinstance(self.index, pd.DatetimeIndex):
-            try:
-                # If open_time is in columns, set it as index
-                if CANONICAL_INDEX_NAME in self.columns:
-                    self.set_index(CANONICAL_INDEX_NAME, inplace=True)
-                    logger.debug(f"Set {CANONICAL_INDEX_NAME} column as index")
-                else:
-                    # Try to convert the existing index to datetime
-                    self.index = pd.to_datetime(self.index, utc=True)
-            except Exception as e:
-                raise ValueError(f"Failed to convert index to DatetimeIndex: {e}")
-
-        # Ensure index is timezone-aware and in UTC
-        if self.index.tz is None:
-            self.index = self.index.tz_localize(DEFAULT_TIMEZONE)
-        elif self.index.tz != DEFAULT_TIMEZONE:
-            self.index = self.index.tz_convert(DEFAULT_TIMEZONE)
-
-        # Ensure index is named correctly
-        if self.index.name != CANONICAL_INDEX_NAME:
-            self.index.name = CANONICAL_INDEX_NAME
-
-        # Use the DataFrameValidator for index validation
-        # This avoids duplicating validation logic
-        try:
-            DataFrameValidator.validate_dataframe(self)
-        except ValueError as e:
-            # If there are duplicates or non-monotonic indices, handle them
-            if self.index.has_duplicates:
-                # Instead of just raising an error, we'll fix it
-                logger.warning("Found duplicate indices, keeping first occurrence")
-                # Create a new index without duplicates
-                self.reset_index(inplace=True)
-                self.drop_duplicates(
-                    subset=[CANONICAL_INDEX_NAME], keep="first", inplace=True
-                )
-                self.set_index(CANONICAL_INDEX_NAME, inplace=True)
-
-            if not self.index.is_monotonic_increasing:
-                logger.warning("Index not monotonically increasing, sorting")
-                self.sort_index(inplace=True)
-
-            # After fixing, validate again to ensure it's correct
-            DataFrameValidator.validate_dataframe(self)
-
-    def __setitem__(self, key, value):
-        """Override to prevent modification of index."""
-        if key == CANONICAL_INDEX_NAME:
-            raise ValueError(
-                f"Cannot modify {CANONICAL_INDEX_NAME} directly - it is reserved for index"
-            )
-        super().__setitem__(key, value)
-
-
-def validate_cache_path(path: Path) -> CachePath:
-    """Validate and convert a Path to a CachePath."""
-    if not isinstance(path, Path):
-        raise TypeError(f"Expected Path object, got {type(path)}")
-    if not path.suffix == ".arrow":
-        raise ValueError("Cache path must have .arrow extension")
-    return CachePath(path)
 
 
 def validate_time_boundaries(

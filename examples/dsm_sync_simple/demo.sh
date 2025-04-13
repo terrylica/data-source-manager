@@ -29,6 +29,53 @@ YELLOW='\033[1;33m'
 RED='\033[1;31m'
 NC='\033[0m' # No Color
 
+# Show help function
+show_help() {
+  echo -e "${GREEN}################################################${NC}"
+  echo -e "${GREEN}# Pure Synchronous Binance Data Retrieval Demo #${NC}"
+  echo -e "${GREEN}################################################${NC}"
+  echo -e "This script demonstrates synchronous data retrieval for Bitcoin data across different market types.\n"
+  
+  echo -e "${CYAN}USAGE:${NC}"
+  echo -e "  ./examples/dsm_sync_simple/demo.sh [OPTIONS] [PARAMETERS]${NC}"
+  echo -e "  ./examples/dsm_sync_simple/demo.sh [MARKET] [DAYS] [PROVIDER] [CACHE_FLAG] [RETRIES] [CHART_TYPE]${NC}\n"
+  
+  echo -e "${CYAN}OPTIONS:${NC}"
+  echo -e "  -h, --help             Show this help message and exit"
+  echo -e "  --demo-cache           Demonstrate cache behavior by running twice"
+  echo -e "  --historical-test      Run historical test (Dec 2024-Feb 2025)"
+  echo -e "  --demo-merge           Run data source merging demo\n"
+  
+  echo -e "${CYAN}STANDARD PARAMETERS:${NC}"
+  echo -e "  MARKET                 Market type: spot, um, or cm"
+  echo -e "  DAYS                   Number of days of data to retrieve"
+  echo -e "  PROVIDER               Data provider (default: binance)"
+  echo -e "  CACHE_FLAG             Use --use-cache to enable caching"
+  echo -e "  RETRIES                Number of retry attempts (default: 3)"
+  echo -e "  CHART_TYPE             Type of chart data: klines or fundingRate (default: klines)\n"
+  
+  echo -e "${CYAN}SPECIAL PARAMETERS FOR --demo-merge:${NC}"
+  echo -e "  MARKET                 Market type: spot, um, or cm"
+  echo -e "  SYMBOL                 Trading symbol (default: BTCUSDT)"
+  echo -e "  INTERVAL               Time interval: 1m, 5m, etc. (default: 1m)"
+  echo -e "  CHART_TYPE             Type of chart data (default: klines)\n"
+  
+  echo -e "${CYAN}EXAMPLES:${NC}"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh${NC}                            # Run default demo for all markets"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 7${NC}                     # For 7 days of SPOT data"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh um 3${NC}                       # For 3 days of UM futures data"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh cm 5 binance${NC}               # For 5 days of CM futures data with explicit provider"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache${NC} # Enable caching for the request"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache 5${NC} # With 5 retry attempts"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache 3 klines${NC} # Specify chart type"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-cache spot 1${NC}        # Demonstrate cache behavior"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --historical-test spot${NC}     # Run historical test"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --historical-test spot BTCUSDT 1m binance --chart-type fundingRate${NC}"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot${NC}          # Run data source merging demo with default symbol"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot BTCUSDT 1m klines${NC} # Custom merge demo for a specific symbol"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot ETHUSDT 5m klines${NC} # Custom merge demo for ETH with 5m interval"
+}
+
 # Define function to run demo
 run_market_demo() {
   local market_type=$1
@@ -76,7 +123,7 @@ run_market_demo() {
 # Function to run the merge demo
 run_merge_demo() {
   local market_type=$1
-  local symbol=$2
+  local symbol=${2:-"BTCUSDT"}
   local interval=${3:-"1m"}
   local chart_type=${4:-"klines"}
   
@@ -230,7 +277,11 @@ function demo_cache_performance() {
 }
 
 # Parse arguments based on first parameter
-if [[ $1 == "--demo-cache" ]]; then
+if [[ $1 == "-h" || $1 == "--help" ]]; then
+  # Show help
+  show_help
+  exit 0
+elif [[ $1 == "--demo-cache" ]]; then
   # Run cache demonstration for a specific market
   if [ $# -ge 3 ] && [ $# -le 6 ]; then
     market_type=$2
@@ -328,12 +379,20 @@ elif [[ $1 == "--historical-test" ]]; then
   fi
 elif [[ $1 == "--demo-merge" ]]; then
   # Run data source merging demo
-  if [ $# -ge 1 ] && [ $# -le 4 ]; then
+  if [ $# -ge 1 ] && [ $# -le 5 ]; then
     # Run with user-specified parameters
-    market_type=$2
+    market_type=${2:-"spot"}
     symbol=${3:-"BTCUSDT"}
     interval=${4:-"1m"}
     chart_type=${5:-"klines"}
+    
+    # Validate that symbol is not a number - common mistake when users try to use the days parameter
+    if [[ $symbol =~ ^[0-9]+$ ]]; then
+      echo -e "${RED}Error: '$symbol' looks like a number, not a valid symbol.${NC}"
+      echo -e "${RED}For --demo-merge, the parameters are <market> [symbol] [interval] [chart-type]${NC}"
+      echo -e "${YELLOW}Try: $0 --demo-merge $market_type BTCUSDT 1m klines${NC}"
+      exit 1
+    fi
     
     echo -e "${GREEN}################################################${NC}"
     echo -e "${GREEN}# Data Source Merging Demonstration #${NC}"
@@ -382,17 +441,7 @@ run_market_demo "um" 1 "binance" "" "" 3 "klines"
 run_market_demo "cm" 1 "binance" "" "" 3 "klines"
 
 echo -e "\n${GREEN}All demos completed successfully!${NC}"
-echo -e "To run for a specific market with custom parameters:"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 7${NC}                       # For 7 days of SPOT data"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh um 3${NC}                         # For 3 days of UM futures data"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh cm 5 binance${NC}                 # For 5 days of CM futures data with explicit provider"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache${NC}   # Enable caching for the request"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache 5${NC} # With 5 retry attempts"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache 3 klines${NC} # Specify chart type (klines, fundingRate)"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-cache spot 1${NC}          # Demonstrate cache behavior by running twice"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --historical-test spot${NC}       # Run historical test (Dec 2024-Feb 2025)"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --historical-test spot BTCUSDT 1m binance --chart-type fundingRate${NC} # Run historical test with funding rate data"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot${NC}            # Run data source merging demo"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot ETHUSDT 5m klines${NC} # Run merge demo with custom parameters"
+echo -e "To see all available options and examples, run:"
+echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --help${NC}"
 
 exit 0

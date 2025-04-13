@@ -6,13 +6,14 @@ This module centralizes all time-related functionality, providing a single sourc
 2. Interval calculations and manipulations
 3. Time boundary alignment for API requests
 4. Time window validation
+5. Timestamp unit detection and formatting (for Binance Vision API compatibility)
 
 The module combines functionality previously scattered across time_alignment.py and
 api_boundary_validator.py to ensure consistent behavior throughout the application.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple, List, Union
+from typing import Optional, Tuple, List, Union, Literal
 import re
 
 import pandas as pd
@@ -40,6 +41,8 @@ __all__ = [
     "TimeseriesDataProcessor",
     "datetime_to_milliseconds",
     "milliseconds_to_datetime",
+    "detect_timestamp_unit",
+    "validate_timestamp_unit",
 ]
 
 # Constants for timestamp format detection
@@ -47,7 +50,56 @@ MILLISECOND_DIGITS = 13
 MICROSECOND_DIGITS = 16
 TIMESTAMP_UNIT = "us"  # Default unit for timestamp parsing
 
+# Timestamp unit type
+TimestampUnit = Literal["ms", "us"]  # Supported timestamp units
+
 # Configure module logger
+
+
+def detect_timestamp_unit(sample_ts: Union[int, str]) -> TimestampUnit:
+    """Detect timestamp unit based on number of digits.
+
+    Args:
+        sample_ts: Sample timestamp value
+
+    Returns:
+        "us" for microseconds (16 digits)
+        "ms" for milliseconds (13 digits)
+
+    Raises:
+        ValueError: If timestamp format is not recognized
+
+    Note:
+        This is a core architectural feature to handle Binance Vision's
+        evolution of timestamp formats:
+        - Pre-2025: Millisecond timestamps (13 digits)
+        - 2025 onwards: Microsecond timestamps (16 digits)
+    """
+    digits = len(str(int(sample_ts)))
+
+    if digits == MICROSECOND_DIGITS:
+        return "us"
+    elif digits == MILLISECOND_DIGITS:
+        return "ms"
+    else:
+        raise ValueError(
+            f"Unrecognized timestamp format with {digits} digits. "
+            f"Expected {MILLISECOND_DIGITS} for milliseconds or "
+            f"{MICROSECOND_DIGITS} for microseconds."
+        )
+
+
+def validate_timestamp_unit(unit: TimestampUnit) -> None:
+    """Validate that the timestamp unit is supported.
+
+    Args:
+        unit: Timestamp unit to validate
+
+    Raises:
+        ValueError: If unit is not supported
+    """
+    if unit not in ("ms", "us"):
+        raise ValueError(f"Unsupported timestamp unit: {unit}. Must be 'ms' or 'us'.")
 
 
 def datetime_to_milliseconds(dt: datetime) -> int:
@@ -451,18 +503,8 @@ class TimeseriesDataProcessor:
         Raises:
             ValueError: If timestamp format is not recognized
         """
-        digits = len(str(int(sample_ts)))
-
-        if digits == MICROSECOND_DIGITS:
-            return "us"
-        elif digits == MILLISECOND_DIGITS:
-            return "ms"
-        else:
-            raise ValueError(
-                f"Unrecognized timestamp format with {digits} digits. "
-                f"Expected {MILLISECOND_DIGITS} for milliseconds or "
-                f"{MICROSECOND_DIGITS} for microseconds."
-            )
+        # Use the global function for consistency
+        return detect_timestamp_unit(sample_ts)
 
     @classmethod
     def process_kline_data(

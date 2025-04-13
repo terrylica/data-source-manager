@@ -1,0 +1,444 @@
+#!/usr/bin/env python
+"""
+DataFrame utilities for consistent handling of pandas DataFrames.
+
+This module centralizes common DataFrame operations to ensure consistent behavior
+across the codebase, particularly for:
+1. Handling open_time as both column and index
+2. Standardizing DataFrame formats
+3. Converting between different DataFrame representations
+4. Ensuring proper index configuration
+"""
+
+from datetime import datetime, timezone
+from typing import Optional, List, Dict, Any, Union
+
+import pandas as pd
+
+from utils.logger_setup import logger
+from utils.config import (
+    CANONICAL_INDEX_NAME,
+    OUTPUT_DTYPES,
+    FUNDING_RATE_DTYPES,
+    DEFAULT_TIMEZONE,
+    DEFAULT_COLUMN_ORDER,
+)
+
+
+def ensure_open_time_as_column(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ensure that open_time exists as a column in the DataFrame.
+
+    This handles the common cases:
+    1. DataFrame has open_time as an index but not as a column
+    2. DataFrame has both open_time as index and column (resolves ambiguity)
+    3. DataFrame is missing open_time completely (attempts recovery)
+
+    Args:
+        df: Input DataFrame to process
+
+    Returns:
+        DataFrame with open_time guaranteed to be present as a column
+    """
+    if df.empty:
+        logger.debug("Empty DataFrame passed to ensure_open_time_as_column")
+        return df
+
+    # Log initial state
+    logger.debug(f"DataFrame columns: {list(df.columns)}")
+    logger.debug(f"DataFrame index name: {df.index.name}")
+    logger.debug(f"DataFrame index type: {type(df.index)}")
+
+    # Case 1: open_time exists as both index and column
+    if (
+        hasattr(df, "index")
+        and hasattr(df.index, "name")
+        and df.index.name == CANONICAL_INDEX_NAME
+        and CANONICAL_INDEX_NAME in df.columns
+    ):
+        logger.debug("Resolving ambiguity: open_time exists as both index and column")
+        df = df.reset_index(drop=True)  # Keep only the column version
+
+    # Case 2: open_time exists only as index
+    elif (
+        hasattr(df, "index")
+        and hasattr(df.index, "name")
+        and df.index.name == CANONICAL_INDEX_NAME
+        and CANONICAL_INDEX_NAME not in df.columns
+    ):
+        logger.debug("Converting open_time from index to column")
+        df = df.reset_index()  # Convert index to column
+
+    # Case 3: open_time missing completely
+    elif CANONICAL_INDEX_NAME not in df.columns:
+        logger.warning(
+            "open_time missing as both column and index - attempting recovery"
+        )
+
+        # Try to find any time-related columns that could serve as open_time
+        for col in df.columns:
+            if "time" in col.lower() and pd.api.types.is_datetime64_any_dtype(df[col]):
+                logger.debug(f"Using {col} as open_time")
+                df[CANONICAL_INDEX_NAME] = df[col]
+                break
+        else:
+            # If the index is a DatetimeIndex, use it
+            if isinstance(df.index, pd.DatetimeIndex):
+                logger.debug("Using DatetimeIndex as open_time")
+                df[CANONICAL_INDEX_NAME] = df.index
+            else:
+                logger.error("Cannot find suitable column to use as open_time")
+                # Create a placeholder column to prevent errors
+                # This is a last resort and should be handled by the caller
+                df[CANONICAL_INDEX_NAME] = pd.Series(dtype="datetime64[ns, UTC]")
+
+    # Ensure the column is datetime type with UTC timezone
+    if CANONICAL_INDEX_NAME in df.columns:
+        # Handle non-datetime columns
+        if not pd.api.types.is_datetime64_any_dtype(df[CANONICAL_INDEX_NAME]):
+            try:
+                logger.debug(f"Converting {CANONICAL_INDEX_NAME} to datetime")
+                df[CANONICAL_INDEX_NAME] = pd.to_datetime(
+                    df[CANONICAL_INDEX_NAME], utc=True
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error converting {CANONICAL_INDEX_NAME} to datetime: {e}"
+                )
+
+        # Ensure timezone is UTC
+        if hasattr(df[CANONICAL_INDEX_NAME], "dt") and hasattr(
+            df[CANONICAL_INDEX_NAME].dt, "tz"
+        ):
+            if df[CANONICAL_INDEX_NAME].dt.tz is None:
+                logger.debug(f"Localizing {CANONICAL_INDEX_NAME} to UTC")
+                df[CANONICAL_INDEX_NAME] = df[CANONICAL_INDEX_NAME].dt.tz_localize(
+                    timezone.utc
+                )
+            elif df[CANONICAL_INDEX_NAME].dt.tz != timezone.utc:
+                logger.debug(f"Converting {CANONICAL_INDEX_NAME} timezone to UTC")
+                df[CANONICAL_INDEX_NAME] = df[CANONICAL_INDEX_NAME].dt.tz_convert(
+                    timezone.utc
+                )
+
+    logger.debug(f"Final DataFrame columns: {list(df.columns)}")
+    return df
+
+
+def ensure_open_time_as_index(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ensure that open_time exists as the DataFrame index.
+
+    This handles the common cases:
+    1. DataFrame has open_time as a column but not as the index
+    2. DataFrame has both open_time as index and column (resolves ambiguity)
+    3. DataFrame is missing open_time completely (attempts recovery)
+
+    Args:
+        df: Input DataFrame to process
+
+    Returns:
+        DataFrame with open_time as the index
+    """
+    if df.empty:
+        logger.debug("Empty DataFrame passed to ensure_open_time_as_index")
+        # Create empty DatetimeIndex with proper name and timezone
+        df.index = pd.DatetimeIndex([], name=CANONICAL_INDEX_NAME, tz=timezone.utc)
+        return df
+
+    # Log initial state
+    logger.debug(f"DataFrame columns: {list(df.columns)}")
+    logger.debug(f"DataFrame index name: {df.index.name}")
+    logger.debug(f"DataFrame index type: {type(df.index)}")
+
+    # Case 1: open_time exists as both index and column
+    if (
+        hasattr(df, "index")
+        and hasattr(df.index, "name")
+        and df.index.name == CANONICAL_INDEX_NAME
+        and CANONICAL_INDEX_NAME in df.columns
+    ):
+        logger.debug("Resolving ambiguity: open_time exists as both index and column")
+        # Use column version as the definitive one
+        df = df.reset_index(drop=True)
+        df = df.set_index(CANONICAL_INDEX_NAME)
+
+    # Case 2: open_time exists only as column
+    elif CANONICAL_INDEX_NAME in df.columns:
+        logger.debug("Setting open_time column as index")
+        df = df.set_index(CANONICAL_INDEX_NAME)
+
+    # Case 3: index is already correct
+    elif (
+        hasattr(df, "index")
+        and hasattr(df.index, "name")
+        and df.index.name == CANONICAL_INDEX_NAME
+    ):
+        logger.debug("open_time index already set correctly")
+        pass
+
+    # Case 4: index is unnamed or has a different name
+    else:
+        logger.warning("No suitable open_time found - attempting recovery")
+
+        # If the index is a DatetimeIndex but has the wrong name
+        if isinstance(df.index, pd.DatetimeIndex):
+            logger.debug("Renaming existing DatetimeIndex to open_time")
+            df.index.name = CANONICAL_INDEX_NAME
+        else:
+            # Try to find any time-related columns
+            time_col = None
+            for col in df.columns:
+                if "time" in col.lower() and pd.api.types.is_datetime64_any_dtype(
+                    df[col]
+                ):
+                    time_col = col
+                    break
+
+            if time_col:
+                logger.debug(f"Using {time_col} as open_time index")
+                df = df.set_index(time_col)
+                df.index.name = CANONICAL_INDEX_NAME
+            else:
+                logger.error("Cannot find suitable column to use as open_time index")
+                # Create a placeholder index to prevent errors
+                df.index = pd.DatetimeIndex(
+                    pd.date_range(
+                        start=datetime.now(timezone.utc), periods=len(df), freq="s"
+                    ),
+                    name=CANONICAL_INDEX_NAME,
+                )
+
+    # Ensure the index is a DatetimeIndex with UTC timezone
+    if not isinstance(df.index, pd.DatetimeIndex):
+        try:
+            logger.debug("Converting index to DatetimeIndex")
+            df.index = pd.to_datetime(df.index, utc=True)
+            df.index.name = CANONICAL_INDEX_NAME
+        except Exception as e:
+            logger.error(f"Error converting index to DatetimeIndex: {e}")
+    else:
+        # Ensure timezone is UTC
+        if df.index.tz is None:
+            logger.debug("Localizing index to UTC")
+            df.index = df.index.tz_localize(timezone.utc)
+        elif df.index.tz != timezone.utc:
+            logger.debug(f"Converting index timezone from {df.index.tz} to UTC")
+            df.index = df.index.tz_convert(timezone.utc)
+
+        # Ensure index name is correct
+        if df.index.name != CANONICAL_INDEX_NAME:
+            logger.debug(
+                f"Changing index name from {df.index.name} to {CANONICAL_INDEX_NAME}"
+            )
+            df.index.name = CANONICAL_INDEX_NAME
+
+    # Ensure index is sorted
+    if not df.index.is_monotonic_increasing:
+        logger.debug("Sorting DataFrame by index")
+        df = df.sort_index()
+
+    # Remove duplicates from index
+    if df.index.has_duplicates:
+        logger.warning("Removing duplicate indices")
+        df = df[~df.index.duplicated(keep="first")]
+
+    logger.debug(f"Final index name: {df.index.name}")
+    logger.debug(f"Final index timezone: {df.index.tz}")
+    return df
+
+
+def standardize_dataframe(
+    df: pd.DataFrame, keep_as_column: bool = True
+) -> pd.DataFrame:
+    """
+    Standardize a DataFrame for consistent use throughout the system.
+
+    This is a comprehensive function that ensures:
+    1. open_time is properly handled (as index, column, or both)
+    2. All columns have the correct data types
+    3. The DataFrame is properly sorted
+    4. No duplicate indices exist
+
+    Args:
+        df: Input DataFrame to standardize
+        keep_as_column: Whether to keep open_time as a column (in addition to index)
+                       Set to True for REST API and Vision API compatibility
+                       Set to False for compact storage (cache files)
+
+    Returns:
+        Standardized DataFrame
+    """
+    if df.empty:
+        logger.debug("Empty DataFrame passed to standardize_dataframe")
+        return df
+
+    # Ensure open_time is available as a column (needed for most operations)
+    df = ensure_open_time_as_column(df)
+
+    # Set index to open_time for proper sorting and lookup
+    df = ensure_open_time_as_index(df)
+
+    # If requested, keep open_time as a column too
+    if keep_as_column and CANONICAL_INDEX_NAME not in df.columns:
+        logger.debug("Adding open_time as column from index")
+        df = df.reset_index()
+
+    # Use centralized DEFAULT_COLUMN_ORDER from config.py instead of duplicating
+    standard_columns = DEFAULT_COLUMN_ORDER.copy()
+
+    # Add open_time to front of column list if we're keeping it as a column
+    if keep_as_column:
+        standard_columns = [CANONICAL_INDEX_NAME] + standard_columns
+
+    # Add data source info if present
+    if "_data_source" in df.columns:
+        standard_columns.append("_data_source")
+
+    # Create a new DataFrame with only the standard columns that exist
+    result_columns = [col for col in standard_columns if col in df.columns]
+
+    # If any standard columns are missing, log a warning
+    missing_columns = [col for col in standard_columns if col not in df.columns]
+    if missing_columns:
+        logger.warning(f"Missing standard columns in output: {missing_columns}")
+
+    # Return DataFrame with standardized columns
+    return df[result_columns]
+
+
+def merge_dataframes(
+    dfs: List[pd.DataFrame], priority_sources: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Merge multiple DataFrames into one, handling overlaps by data source priority.
+
+    Args:
+        dfs: List of DataFrames to merge
+        priority_sources: List of data source names in descending priority order
+                         (highest priority first)
+                         Default: ["CACHE", "VISION", "REST"]
+
+    Returns:
+        Merged DataFrame
+    """
+    if not dfs:
+        logger.warning("No DataFrames provided to merge")
+        return pd.DataFrame()
+
+    # Use default priority if not specified
+    if priority_sources is None:
+        priority_sources = ["CACHE", "VISION", "REST"]
+
+    # Filter out empty DataFrames
+    dfs = [df for df in dfs if not df.empty]
+
+    if not dfs:
+        logger.warning("All provided DataFrames were empty")
+        return pd.DataFrame()
+
+    if len(dfs) == 1:
+        logger.debug("Only one non-empty DataFrame provided, no merging needed")
+        return standardize_dataframe(dfs[0])
+
+    # Ensure each DataFrame has open_time as a column
+    normalized_dfs = [ensure_open_time_as_column(df) for df in dfs]
+
+    # Concatenate all DataFrames
+    merged = pd.concat(normalized_dfs, ignore_index=True)
+
+    # If _data_source column exists, use it for prioritization
+    if "_data_source" in merged.columns:
+        # Create a priority order for data sources
+        source_priorities = {source: i for i, source in enumerate(priority_sources)}
+        default_priority = len(priority_sources)  # Lowest priority for unknown sources
+
+        # Add a priority column for sorting
+        merged["_source_priority"] = merged["_data_source"].apply(
+            lambda source: source_priorities.get(source, default_priority)
+        )
+
+        # Sort by open_time first, then by source priority
+        merged = merged.sort_values(["open_time", "_source_priority"])
+
+        # Drop the temporary priority column
+        merged = merged.drop(columns=["_source_priority"])
+    else:
+        # If no source information, just sort by open_time
+        merged = merged.sort_values("open_time")
+
+    # Remove duplicates based on open_time, keeping the first one (highest priority)
+    merged = merged.drop_duplicates(subset=["open_time"], keep="first")
+
+    # Sort one final time and reset index
+    merged = merged.sort_values("open_time").reset_index(drop=True)
+
+    # Log data source statistics if available
+    if "_data_source" in merged.columns:
+        source_counts = merged["_data_source"].value_counts()
+        logger.info(f"Merged data source statistics: {source_counts.to_dict()}")
+
+    # Standardize the final DataFrame
+    return standardize_dataframe(merged)
+
+
+def convert_to_standardized_formats(
+    df: pd.DataFrame, output_format: str = "default", chart_type: str = "klines"
+) -> pd.DataFrame:
+    """
+    Convert a DataFrame to a standardized format based on the specified output format.
+
+    Args:
+        df: Input DataFrame to convert
+        output_format: Output format (default, column_only, index_only)
+        chart_type: Chart type (klines, funding_rate)
+
+    Returns:
+        Converted DataFrame
+    """
+    if df.empty:
+        logger.debug("Empty DataFrame passed to convert_to_standardized_formats")
+        return df
+
+    # Select appropriate dtype mapping based on chart type
+    if chart_type.lower() == "funding_rate":
+        dtypes = FUNDING_RATE_DTYPES
+    else:
+        dtypes = OUTPUT_DTYPES
+
+    # Ensure correct data types
+    for col, dtype in dtypes.items():
+        if col in df.columns:
+            try:
+                df[col] = df[col].astype(dtype)
+            except Exception as e:
+                logger.warning(f"Failed to convert {col} to {dtype}: {e}")
+
+    # Perform the conversion based on the requested format
+    if output_format == "column_only":
+        # Ensure open_time is a column but not an index
+        if (
+            df.index.name == CANONICAL_INDEX_NAME
+            and CANONICAL_INDEX_NAME not in df.columns
+        ):
+            df = df.reset_index()
+        elif (
+            df.index.name == CANONICAL_INDEX_NAME and CANONICAL_INDEX_NAME in df.columns
+        ):
+            df = df.reset_index(drop=True)  # Drop the index version to avoid ambiguity
+
+    elif output_format == "index_only":
+        # Ensure open_time is the index but not a column
+        df = ensure_open_time_as_index(df)
+        if CANONICAL_INDEX_NAME in df.columns:
+            df = df.drop(columns=[CANONICAL_INDEX_NAME])
+
+    else:  # default - keep both
+        # Ensure open_time is both an index and a column
+        df = ensure_open_time_as_index(df)
+        if CANONICAL_INDEX_NAME not in df.columns:
+            # Add it as a column too
+            df = df.reset_index()
+            df = df.set_index(CANONICAL_INDEX_NAME)
+
+    return df

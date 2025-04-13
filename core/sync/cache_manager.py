@@ -7,6 +7,8 @@ from typing import Dict, Optional, Any
 import pandas as pd
 import os
 import time
+import pyarrow as pa
+import pyarrow.ipc
 
 from utils.logger_setup import logger
 
@@ -207,12 +209,12 @@ class UnifiedCacheManager:
         if len(parts) < 6:
             logger.warning(f"Invalid cache key format: {cache_key}")
             # Fallback path
-            return self.cache_dir / f"{cache_key}.parquet"
+            return self.cache_dir / f"{cache_key}.arrow"
 
         provider, chart_type, market_type, symbol, interval, date_str = parts[0:6]
 
         # Create a directory structure based on components for better organization
-        # provider/chart_type/market_type/symbol/interval/date_str.parquet
+        # provider/chart_type/market_type/symbol/interval/date_str.arrow
         cache_path = (
             self.cache_dir
             / provider
@@ -220,7 +222,7 @@ class UnifiedCacheManager:
             / market_type
             / symbol
             / interval
-            / f"{date_str}.parquet"
+            / f"{date_str}.arrow"
         )
 
         # Ensure directory exists
@@ -248,7 +250,7 @@ class UnifiedCacheManager:
             market_type: Market type
 
         Returns:
-            DataFrame with the cached data, or None if not found or invalid
+            DataFrame from cache, or None if not found
         """
         # Generate cache key
         cache_key = self.get_cache_key(
@@ -258,54 +260,54 @@ class UnifiedCacheManager:
         # Get the file path
         cache_path = self._get_cache_path(cache_key)
 
-        # Check if the file exists
-        if not cache_path.exists():
-            logger.debug(f"Cache miss for {cache_key}")
-            return None
-
         try:
-            # Load metadata for this cache entry if available
-            metadata = self.metadata.get(cache_key, {})
-
-            # Check if this cache entry is marked as invalid
-            if metadata.get("is_invalid", False):
-                reason = metadata.get("invalid_reason", "unknown reason")
-                logger.debug(f"Skipping invalid cache entry {cache_key}: {reason}")
+            # Check if the file exists
+            if not cache_path.exists():
+                logger.debug(f"Cache not found: {cache_path}")
                 return None
 
-            # Try to read the parquet file
-            df = pd.read_parquet(cache_path)
+            # Check file size, skip if too small to be valid
+            try:
+                file_size = os.path.getsize(cache_path)
+                if file_size < 100:  # Extremely small file size suggests corruption
+                    logger.warning(
+                        f"Cache file is too small ({file_size} bytes): {cache_path}"
+                    )
+                    return None
+            except Exception as size_err:
+                logger.warning(f"Error checking cache file size: {size_err}")
+                return None
+
+            # Try to read the arrow file
+            try:
+                with pa.memory_map(str(cache_path), "r") as source:
+                    table = pa.ipc.open_file(source).read_all()
+                df = table.to_pandas()
+            except (pa.ArrowInvalid, pa.ArrowIOError) as e:
+                logger.warning(f"Error reading Arrow file: {e}")
+                return None
 
             # Validate that the DataFrame has data
             if df.empty:
-                logger.debug(f"Empty DataFrame in cache for {cache_key}")
-                self._mark_cache_invalid(cache_key, "Empty DataFrame")
+                logger.warning(f"Cache file is empty: {cache_path}")
                 return None
 
-            # Basic validation checks
-            if "open_time" in df.columns and chart_type == "KLINES":
-                # Check if the data is properly sorted
-                if not df["open_time"].is_monotonic_increasing:
-                    logger.warning(f"Cache entry {cache_key} has unsorted timestamps")
-                    # Sort the DataFrame for the user
-                    df = df.sort_values("open_time").reset_index(drop=True)
+            # Update metadata with last access time if it exists
+            if cache_key in self.metadata:
+                self.metadata[cache_key]["last_accessed"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
+                # Save metadata periodically, not on every read to avoid overhead
+                # Let's say update every 10th read or after significant time passed
+                if "access_count" not in self.metadata[cache_key]:
+                    self.metadata[cache_key]["access_count"] = 1
+                    self._save_metadata()
+                else:
+                    self.metadata[cache_key]["access_count"] += 1
+                    if self.metadata[cache_key]["access_count"] % 10 == 0:
+                        self._save_metadata()
 
-            elif "funding_time" in df.columns and chart_type == "FUNDING_RATE":
-                # Check funding rate data for appropriate columns
-                required_columns = ["symbol", "funding_time", "funding_rate"]
-                missing_columns = [
-                    col for col in required_columns if col not in df.columns
-                ]
-                if missing_columns:
-                    logger.warning(
-                        f"Cache entry {cache_key} missing columns: {missing_columns}"
-                    )
-                    self._mark_cache_invalid(
-                        cache_key, f"Missing columns: {missing_columns}"
-                    )
-                    return None
-
-            logger.debug(f"Loaded {len(df)} rows from cache for {cache_key}")
+            logger.debug(f"Successfully loaded {len(df)} rows from cache: {cache_path}")
             return df
 
         except Exception as e:
@@ -394,8 +396,13 @@ class UnifiedCacheManager:
                 f"Preparing to save {len(df)} rows (~{size_estimate / 1024 / 1024:.2f} MB) to {cache_path}"
             )
 
-            # Write the DataFrame to parquet
-            df.to_parquet(cache_path, index=False)
+            # Convert to pyarrow table
+            table = pa.Table.from_pandas(df)
+
+            # Write to file using Arrow IPC format (not Parquet)
+            with pa.OSFile(str(cache_path), "wb") as sink:
+                with pa.ipc.new_file(sink, table.schema) as writer:
+                    writer.write_table(table)
 
             # Update metadata
             metadata_entry["file_size_bytes"] = os.path.getsize(cache_path)

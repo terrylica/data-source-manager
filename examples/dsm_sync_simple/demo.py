@@ -16,7 +16,6 @@ from pathlib import Path
 import time
 import os
 import argparse
-import logging
 
 from utils.logger_setup import logger
 from rich import print
@@ -25,6 +24,7 @@ from utils.market_utils import get_market_type_str
 from core.sync.data_source_manager import DataSourceManager, DataSource
 from core.sync.cache_manager import UnifiedCacheManager
 from utils.config import VISION_DATA_DELAY_HOURS
+
 
 # We'll use this cache dir for all demos
 CACHE_DIR = Path("./cache")
@@ -328,25 +328,8 @@ def get_historical_data_test(
     print(f"Average retrieval rate: {len(df) / elapsed_time:.2f} records/second")
 
     # Count potential gaps in the data
-    expected_intervals = {
-        Interval.MINUTE_1: 60,
-        Interval.MINUTE_3: 180,
-        Interval.MINUTE_5: 300,
-        Interval.MINUTE_15: 900,
-        Interval.MINUTE_30: 1800,
-        Interval.HOUR_1: 3600,
-        Interval.HOUR_2: 7200,
-        Interval.HOUR_4: 14400,
-        Interval.HOUR_6: 21600,
-        Interval.HOUR_8: 28800,
-        Interval.HOUR_12: 43200,
-        Interval.DAY_1: 86400,
-        Interval.DAY_3: 259200,
-        Interval.WEEK_1: 604800,
-        Interval.MONTH_1: 2592000,
-    }.get(
-        interval, 60
-    )  # Default to 60 seconds for unknown intervals
+    # Use the built-in to_seconds() method of the Interval enum
+    expected_intervals = interval.to_seconds()  # Get interval duration in seconds
 
     # Check for gaps
     # Ensure we reset the index if it's open_time to avoid ambiguity
@@ -559,6 +542,16 @@ def setup_test_scenario(
             cache_manager = UnifiedCacheManager(cache_dir=CACHE_DIR)
             market_type_str = get_market_type_str(market_type)
 
+            # Print debug info
+            print(f"[yellow]Verifying cache creation...[/yellow]")
+            print(f"Cache directory: {CACHE_DIR}")
+            print(f"Market type string: {market_type_str}")
+            print(f"Symbol: {symbol}, Interval: {interval.value}")
+            print(f"Date: {cache_start.date()}")
+            print(
+                f"Provider: {DataProvider.BINANCE.name}, Chart type: {chart_type.name}"
+            )
+
             # Check if cache was created
             cache_key = cache_manager.get_cache_key(
                 symbol=symbol,
@@ -568,14 +561,38 @@ def setup_test_scenario(
                 chart_type=chart_type.name,
                 market_type=market_type_str,
             )
+            print(f"Generated cache key: {cache_key}")
+
             cache_path = cache_manager._get_cache_path(cache_key)
+            print(f"Cache path: {cache_path}")
+
+            # Check if the directory exists
+            if os.path.exists(cache_path.parent):
+                print(f"[green]Directory exists: {cache_path.parent}[/green]")
+                print(f"Directory contents:")
+                for f in os.listdir(cache_path.parent):
+                    print(f"  - {f}")
+            else:
+                print(f"[red]Directory does not exist: {cache_path.parent}[/red]")
 
             if os.path.exists(cache_path):
                 print(f"[bold green]Cache file created: {cache_path}[/bold green]")
+                print(f"File size: {os.path.getsize(cache_path)} bytes")
             else:
                 print(
                     f"[bold red]WARNING: Cache file was not created at {cache_path}[/bold red]"
                 )
+                # Check for mismatches in format (.arrow vs .parquet)
+                alternative_path = str(cache_path).replace(".arrow", ".parquet")
+                if os.path.exists(alternative_path):
+                    print(
+                        f"[yellow]Found alternative file format: {alternative_path}[/yellow]"
+                    )
+                alternative_path = str(cache_path).replace(".parquet", ".arrow")
+                if os.path.exists(alternative_path):
+                    print(
+                        f"[yellow]Found alternative file format: {alternative_path}[/yellow]"
+                    )
         else:
             print(f"[bold red]WARNING: Failed to pre-cache data for range 1[/bold red]")
 
@@ -732,7 +749,7 @@ def analyze_merged_data(
 def main():
     """Run the demo."""
     # Set info logging level for less verbose logs
-    logger.setLevel(logging.INFO)
+    logger.setLevel("DEBUG")
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -780,24 +797,7 @@ def main():
         "--interval",
         type=str,
         default="1m",
-        choices=[
-            "1s",
-            "1m",
-            "3m",
-            "5m",
-            "15m",
-            "30m",
-            "1h",
-            "2h",
-            "4h",
-            "6h",
-            "8h",
-            "12h",
-            "1d",
-            "3d",
-            "1w",
-            "1M",
-        ],
+        choices=[interval.value for interval in Interval],
         help="Time interval between data points",
     )
 
