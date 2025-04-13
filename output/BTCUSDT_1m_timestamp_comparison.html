@@ -1,0 +1,173 @@
+
+    <html>
+    <head>
+        <title>Vision API Timestamp Comparison</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #0066cc; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+            th { background-color: #f2f2f2; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .mismatch { background-color: #ffcccc; }
+            .summary { margin-top: 20px; padding: 10px; background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <h1>Vision API Timestamp Comparison</h1>
+        <p><strong>Symbol:</strong> BTCUSDT | <strong>Interval:</strong> 1m | <strong>Date:</strong> 2025-03-15</p>
+        
+        <h2>Timestamp Comparison</h2>
+        <table>
+            <tr>
+                <th>Minute</th>
+                <th>Raw Timestamp</th>
+                <th>Processed Timestamp</th>
+                <th>Discrepancy</th>
+            </tr>
+    
+            <tr class="mismatch">
+                <td>00</td>
+                <td>2025-03-15 00:00:00</td>
+                <td>2025-03-15 00:01:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>01</td>
+                <td>2025-03-15 00:01:00</td>
+                <td>2025-03-15 00:02:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>02</td>
+                <td>2025-03-15 00:02:00</td>
+                <td>2025-03-15 00:03:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>03</td>
+                <td>2025-03-15 00:03:00</td>
+                <td>2025-03-15 00:04:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>04</td>
+                <td>2025-03-15 00:04:00</td>
+                <td>2025-03-15 00:05:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>05</td>
+                <td>2025-03-15 00:05:00</td>
+                <td>2025-03-15 00:06:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>06</td>
+                <td>2025-03-15 00:06:00</td>
+                <td>2025-03-15 00:07:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>07</td>
+                <td>2025-03-15 00:07:00</td>
+                <td>2025-03-15 00:08:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>08</td>
+                <td>2025-03-15 00:08:00</td>
+                <td>2025-03-15 00:09:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>09</td>
+                <td>2025-03-15 00:09:00</td>
+                <td>2025-03-15 00:10:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>10</td>
+                <td>2025-03-15 00:10:00</td>
+                <td>2025-03-15 00:11:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>11</td>
+                <td>2025-03-15 00:11:00</td>
+                <td>2025-03-15 00:12:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>12</td>
+                <td>2025-03-15 00:12:00</td>
+                <td>2025-03-15 00:13:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>13</td>
+                <td>2025-03-15 00:13:00</td>
+                <td>2025-03-15 00:14:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>14</td>
+                <td>2025-03-15 00:14:00</td>
+                <td>2025-03-15 00:15:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>15</td>
+                <td>2025-03-15 00:15:00</td>
+                <td>2025-03-15 00:16:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>16</td>
+                <td>2025-03-15 00:16:00</td>
+                <td>2025-03-15 00:17:59</td>
+                <td>120.00 seconds</td>
+            </tr>
+        
+            <tr class="mismatch">
+                <td>17</td>
+                <td>2025-03-15 00:17:00</td>
+                <td>N/A</td>
+                <td>N/A</td>
+            </tr>
+        
+        </table>
+        
+        <div class="summary">
+            <h3>Summary</h3>
+            <p>Raw data entries: 18</p>
+            <p>Processed data entries: 17</p>
+            
+            <h3>Observations</h3>
+            <ul>
+                <li>The VisionDataClient interprets timestamps as the end of each minute period, 
+                    while the raw data marks timestamps at the beginning of the period.</li>
+                <li>This creates a "one-minute shift" in the data when comparing raw Vision API data 
+                    with processed data.</li>
+                <li>The first candle of the requested period is typically missing in the processed output.</li>
+            </ul>
+        </div>
+    </body>
+    </html>
+    

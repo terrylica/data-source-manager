@@ -15,6 +15,7 @@ from utils.market_utils import get_market_type_str
 from utils.time_utils import (
     filter_dataframe_by_time,
     align_time_boundaries,
+    standardize_timestamp_precision,
 )
 from utils.config import (
     OUTPUT_DTYPES,
@@ -23,6 +24,8 @@ from utils.config import (
     REST_CHUNK_SIZE,
     REST_MAX_CHUNKS,
     create_empty_dataframe,
+    CANONICAL_INDEX_NAME,
+    REST_IS_STANDARD,
 )
 from utils.dataframe_utils import (
     ensure_open_time_as_column,
@@ -719,34 +722,29 @@ class DataSourceManager:
             f"Fetching data from Vision API for {symbol} from {start_time} to {end_time}"
         )
 
-        # Initialize Vision client if not already done
-        if self.vision_client is None:
-            logger.debug("Creating new Vision API client")
-            self.vision_client = VisionDataClient(
-                symbol=symbol,
-                interval=interval.value,
-                market_type=self.market_type,
-            )
-        else:
-            logger.debug(
-                f"Reusing existing Vision API client configured for {self.vision_client.symbol}"
-            )
-            # Check if symbol and interval match, recreate client if needed
-            if (
-                self.vision_client.symbol != symbol
-                or self.vision_client.interval != interval.value
-            ):
-                logger.debug(
-                    f"Recreating Vision API client for {symbol} {interval.value}"
-                )
-                self.vision_client.close()
+        try:
+            # Create Vision client if not already created
+            if self.vision_client is None:
+                logger.debug("Creating new Vision API client")
                 self.vision_client = VisionDataClient(
                     symbol=symbol,
                     interval=interval.value,
                     market_type=self.market_type,
                 )
+            elif self.vision_client.symbol != symbol:
+                # If client exists but for a different symbol, reconfigure it
+                logger.debug("Reconfiguring Vision API client for new symbol")
+                # Close existing client if needed
+                if hasattr(self.vision_client, "close"):
+                    self.vision_client.close()
+                # Create new client
+                self.vision_client = VisionDataClient(
+                    symbol=symbol,
+                    interval=interval.value,
+                    market_type=self.market_type,
+                )
+            # Otherwise, reuse the existing client
 
-        try:
             # Fetch data from Vision API
             df = self.vision_client.fetch(
                 symbol=symbol,
@@ -771,29 +769,7 @@ class DataSourceManager:
                 return create_empty_dataframe()
 
             # Ensure open_time exists in DataFrame (either as index or column)
-            if df.index.name == "open_time" and "open_time" not in df.columns:
-                # If open_time is in the index but not as a column, create the column
-                logger.debug("Converting open_time from index to column")
-                df = df.reset_index()
-            elif df.index.name != "open_time" and "open_time" not in df.columns:
-                # Neither index nor column has open_time, check for other timestamp columns
-                for col in df.columns:
-                    if "time" in col.lower() and pd.api.types.is_datetime64_any_dtype(
-                        df[col]
-                    ):
-                        logger.debug(f"Using {col} as open_time")
-                        df["open_time"] = df[col]
-                        break
-                else:
-                    # If no suitable column found, try to use the index if it's datetime
-                    if isinstance(df.index, pd.DatetimeIndex):
-                        logger.debug("Using DatetimeIndex as open_time")
-                        df["open_time"] = df.index
-                    else:
-                        logger.error(
-                            "No suitable open_time found in Vision API response"
-                        )
-                        return create_empty_dataframe()
+            df = ensure_open_time_as_column(df)
 
             # Add source information
             df["_data_source"] = "VISION"
@@ -809,6 +785,9 @@ class DataSourceManager:
             logger.debug(f"Final Vision API DataFrame columns: {list(df.columns)}")
             if "open_time" in df.columns:
                 logger.debug(f"open_time column type: {df['open_time'].dtype}")
+
+            # Apply standardization which handles timestamp normalization
+            df = self._standardize_columns(df)
 
             return df
 
@@ -870,15 +849,90 @@ class DataSourceManager:
     def _merge_dataframes(self, dfs: List[pd.DataFrame]) -> pd.DataFrame:
         """Merge multiple DataFrames into one, handling overlaps.
 
+        This method ensures:
+        1. Each DataFrame has the same timestamp precision before merging
+        2. Timestamps are standardized according to the REST API format
+        3. Columns are consistently named and typed
+        4. Duplicates are properly handled
+
         Args:
             dfs: List of DataFrames to merge
 
         Returns:
             Merged DataFrame
         """
-        # Use the centralized merge_dataframes function from dataframe_utils
-        # This handles all the special cases and ensures consistent behavior
-        return merge_dataframes(dfs)
+        if not dfs:
+            logger.warning("Empty list of DataFrames to merge")
+            return create_empty_dataframe()
+
+        if len(dfs) == 1:
+            logger.debug("Only one DataFrame to merge, returning as is")
+            return dfs[0]
+
+        # Log information about DataFrames to be merged
+        logger.debug(f"Merging {len(dfs)} DataFrames")
+        for i, df in enumerate(dfs):
+            logger.debug(
+                f"DataFrame {i}: {len(df)} rows, source: {df.get('_data_source', 'unknown')[0] if not df.empty and '_data_source' in df.columns else 'unknown'}"
+            )
+
+            # Debug timestamp precision
+            if not df.empty and isinstance(df.index, pd.DatetimeIndex):
+                sample_ts = df.index[0].value
+                precision = (
+                    "microsecond" if len(str(abs(sample_ts))) > 13 else "millisecond"
+                )
+                logger.debug(f"DataFrame {i} has {precision} precision")
+
+            # Ensure each DataFrame is properly formatted
+            dfs[i] = self._standardize_columns(df)
+
+            # Ensure open_time is set as index for proper merging
+            if "open_time" in df.columns and df.index.name != CANONICAL_INDEX_NAME:
+                dfs[i] = ensure_open_time_as_index(df)
+
+            # Debug timestamp information
+            if not dfs[i].empty:
+                logger.debug(f"DataFrame {i} index type: {type(dfs[i].index)}")
+                if isinstance(dfs[i].index, pd.DatetimeIndex):
+                    logger.debug(f"DataFrame {i} index name: {dfs[i].index.name}")
+                    logger.debug(f"DataFrame {i} index timezone: {dfs[i].index.tz}")
+
+                    # Debug first few timestamps
+                    if len(dfs[i]) > 0:
+                        logger.debug(
+                            f"DataFrame {i} first index timestamp: {dfs[i].index[0]}"
+                        )
+                        if "open_time" in dfs[i].columns:
+                            logger.debug(
+                                f"DataFrame {i} open_time type: {dfs[i]['open_time'].dtype}"
+                            )
+
+        # Now merge the DataFrames
+        # First, concatenate all DataFrames
+        logger.debug(f"Concatenating {len(dfs)} DataFrames")
+        merged = pd.concat(dfs)
+
+        # Ensure the index is sorted
+        if not merged.index.is_monotonic_increasing:
+            logger.debug("Sorting merged DataFrame by index")
+            merged = merged.sort_index()
+
+        # Remove duplicates, keeping the last occurrence (which is usually from the more reliable source)
+        if merged.index.has_duplicates:
+            duplicates_count = merged.index.duplicated().sum()
+            logger.debug(
+                f"Removing {duplicates_count} duplicate rows (keeping last occurrence)"
+            )
+            merged = merged[~merged.index.duplicated(keep="last")]
+
+        # Final standardization to ensure consistency
+        merged = self._standardize_columns(merged)
+
+        logger.debug(
+            f"Successfully merged {len(dfs)} DataFrames into one with {len(merged)} rows"
+        )
+        return merged
 
     def get_data(
         self,
@@ -1230,17 +1284,131 @@ class DataSourceManager:
         logger.debug("Closed all data clients")
 
     def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Standardize DataFrame columns to ensure consistent output.
+        """Standardize column names and data types to ensure consistency.
 
-        This ensures that all DataFrames returned by DataSourceManager have the
-        same column structure regardless of data source.
+        This method ensures:
+        1. Standardized column names (mapping variant names to canonical names)
+        2. Consistent data types for all columns
+        3. Timestamp precision standardization (to milliseconds, matching REST API)
+        4. Proper handling of all timestamp-related columns
 
         Args:
             df: DataFrame to standardize
 
         Returns:
-            Standardized DataFrame with consistent columns
+            Standardized DataFrame following REST API format
         """
-        # Use the centralized standardize_dataframe function from dataframe_utils
-        # This function handles all the special cases we've had to fix
-        return standardize_dataframe(df)
+        if df.empty:
+            return df
+
+        # Standardize column names
+        column_map = {
+            # Common name variations
+            "open_time_ms": "open_time",
+            "openTime": "open_time",
+            "close_time_ms": "close_time",
+            "closeTime": "close_time",
+            # Volume variants
+            "volume_base": "volume",
+            "baseVolume": "volume",
+            "volume_quote": "quote_asset_volume",
+            "quoteVolume": "quote_asset_volume",
+            # Other variants
+            "trades": "count",
+            "numberOfTrades": "count",
+        }
+
+        # Apply column mapping
+        for old_name, new_name in column_map.items():
+            if old_name in df.columns and new_name not in df.columns:
+                df.rename(columns={old_name: new_name}, inplace=True)
+
+        # First apply the centralized standardize_dataframe function
+        # This function ensures proper column structure and data types
+        df = standardize_dataframe(df)
+
+        # Then standardize timestamp precision to align with REST API format
+        # This ensures Vision API data (which may use microsecond precision in 2025+)
+        # is converted to millisecond precision to match REST API format
+        if REST_IS_STANDARD:
+            logger.debug("Standardizing timestamp precision to match REST API format")
+            df = standardize_timestamp_precision(df)
+
+        return df
+
+    def _load_from_cache(
+        self, symbol: str, start_time: datetime, end_time: datetime, interval: Interval
+    ) -> pd.DataFrame:
+        """Load data from cache.
+
+        Args:
+            symbol: Symbol to retrieve data for
+            start_time: Start time for data retrieval
+            end_time: End time for data retrieval
+            interval: Time interval between data points
+
+        Returns:
+            DataFrame with data from cache
+        """
+        logger.info(
+            f"Loading data from cache for {symbol} from {start_time} to {end_time}"
+        )
+
+        # Create a cache manager if not already created
+        if self.cache_manager is None:
+            self.cache_manager = UnifiedCacheManager()
+
+        # Convert interval to string value
+        interval_str = interval.value
+
+        # Get market type string
+        market_type_str = self._get_market_type_str()
+
+        # Determine date range to load
+        start_date = start_time.date()
+        end_date = end_time.date()
+        date_range = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_range.append(current_date)
+            current_date = (
+                datetime.combine(current_date, datetime.min.time(), timezone.utc)
+                + timedelta(days=1)
+            ).date()
+
+        # Load data for each date in range
+        all_dfs = []
+        for date in date_range:
+            # Convert date to datetime at midnight UTC
+            date_dt = datetime.combine(date, datetime.min.time(), timezone.utc)
+
+            # Try to load from cache
+            df = self.cache_manager.load_from_cache(
+                symbol=symbol,
+                interval=interval_str,
+                date=date_dt,
+                provider=self.provider.name,
+                chart_type=self.chart_type.name,
+                market_type=market_type_str,
+            )
+            if df is not None and not df.empty:
+                # Apply standardization to ensure consistent format including timestamp normalization
+                df = self._standardize_columns(df)
+
+                # Add source information
+                df["_data_source"] = "CACHE"
+                all_dfs.append(df)
+
+        # If no data was loaded from cache, return empty DataFrame
+        if not all_dfs:
+            logger.info(f"No cache data found for {symbol}")
+            return create_empty_dataframe()
+
+        # Concatenate all loaded DataFrames
+        combined_df = pd.concat(all_dfs)
+
+        # Filter data to requested time range
+        filtered_df = filter_dataframe_by_time(combined_df, start_time, end_time)
+
+        logger.info(f"Successfully loaded {len(filtered_df)} records from cache")
+        return filtered_df

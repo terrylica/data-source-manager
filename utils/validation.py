@@ -817,6 +817,14 @@ class DataValidation:
 class DataFrameValidator:
     """Validation and standardization for DataFrames."""
 
+    def __init__(self, df: pd.DataFrame = None):
+        """Initialize with a DataFrame to validate.
+
+        Args:
+            df: DataFrame to validate
+        """
+        self.df = df
+
     @staticmethod
     def validate_dataframe(df: pd.DataFrame) -> None:
         """Validate DataFrame structure and integrity.
@@ -885,6 +893,105 @@ class DataFrameValidator:
 
         logger.debug("DataFrame validation completed successfully")
         logger.debug("==== END OF DATAFRAME VALIDATION FUNCTION ====")
+
+    def validate_klines_data(self) -> Tuple[bool, Optional[str]]:
+        """Validate that a DataFrame contains valid klines market data.
+
+        This method ensures:
+        1. The DataFrame has the expected structure for klines data
+        2. Timestamps are standardized to millisecond precision (matching REST API)
+        3. Required columns are present with correct data types
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if self.df is None:
+            return False, "No DataFrame provided for validation"
+
+        if self.df.empty:
+            logger.debug("Empty DataFrame passed validation")
+            return True, None
+
+        try:
+            # Basic structure validation
+            self.validate_dataframe(self.df)
+
+            # Check timestamp precision - convert to millisecond precision if needed
+            # This ensures alignment with REST API format (which is our standard)
+            if TIMESTAMP_PRECISION == "ms" and hasattr(self.df.index, "astype"):
+                # If timestamps have microsecond precision (from Vision API 2025+ data)
+                # we need to truncate to millisecond precision
+                sample_ts = self.df.index[0].value
+                if len(str(abs(sample_ts))) > 13:  # More than millisecond precision
+                    logger.debug(
+                        "Converting timestamps from microsecond to millisecond precision"
+                    )
+
+                    # For datetime index - round to milliseconds
+                    if isinstance(self.df.index, pd.DatetimeIndex):
+                        # Round to millisecond precision
+                        rounded_index = pd.DatetimeIndex(
+                            [
+                                pd.Timestamp(
+                                    ts.timestamp() * 1000, unit="ms", tz=timezone.utc
+                                )
+                                for ts in self.df.index
+                            ],
+                            name=self.df.index.name,
+                        )
+                        self.df.index = rounded_index
+
+                    # Also handle open_time and close_time columns if present
+                    if (
+                        "open_time" in self.df.columns
+                        and pd.api.types.is_datetime64_dtype(self.df["open_time"])
+                    ):
+                        self.df["open_time"] = pd.to_datetime(
+                            (self.df["open_time"].astype(int) // 1000000) * 1000,
+                            unit="ms",
+                            utc=True,
+                        )
+
+                    if (
+                        "close_time" in self.df.columns
+                        and pd.api.types.is_datetime64_dtype(self.df["close_time"])
+                    ):
+                        self.df["close_time"] = pd.to_datetime(
+                            (self.df["close_time"].astype(int) // 1000000) * 1000,
+                            unit="ms",
+                            utc=True,
+                        )
+
+            # Verify required numeric columns have proper data types
+            for col, dtype in OUTPUT_DTYPES.items():
+                if (
+                    col in self.df.columns
+                    and not pd.api.types.is_numeric_dtype(self.df[col])
+                    and "time" not in col
+                ):
+                    logger.warning(
+                        f"Column {col} has non-numeric dtype: {self.df[col].dtype}"
+                    )
+                    try:
+                        self.df[col] = self.df[col].astype(dtype)
+                    except Exception as e:
+                        return (
+                            False,
+                            f"Failed to convert column {col} to {dtype}: {str(e)}",
+                        )
+
+            # Check for NaN values in critical columns
+            critical_columns = ["open", "high", "low", "close"]
+            for col in critical_columns:
+                if col in self.df.columns and self.df[col].isna().any():
+                    return False, f"Found NaN values in critical column: {col}"
+
+            # All validation passed
+            return True, None
+
+        except Exception as e:
+            logger.error(f"Error validating klines data: {str(e)}")
+            return False, str(e)
 
     @staticmethod
     def format_dataframe(

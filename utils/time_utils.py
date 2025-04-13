@@ -22,6 +22,7 @@ import numpy as np
 from utils.market_constraints import Interval as MarketInterval
 from utils.deprecation_rules import TimeUnit
 from utils.logger_setup import logger
+from utils.config import TIMESTAMP_PRECISION, CANONICAL_INDEX_NAME, CANONICAL_CLOSE_TIME
 
 # Re-export the get_interval_micros function at the module level for direct import
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "milliseconds_to_datetime",
     "detect_timestamp_unit",
     "validate_timestamp_unit",
+    "standardize_timestamp_precision",
 ]
 
 # Constants for timestamp format detection
@@ -87,6 +89,113 @@ def detect_timestamp_unit(sample_ts: Union[int, str]) -> TimestampUnit:
             f"Expected {MILLISECOND_DIGITS} for milliseconds or "
             f"{MICROSECOND_DIGITS} for microseconds."
         )
+
+
+def standardize_timestamp_precision(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardize timestamp precision to match the system standard (REST API format).
+
+    This function ensures all timestamps in a DataFrame conform to the standard precision
+    defined in utils/config.py (now set to milliseconds to match REST API format).
+
+    It handles:
+    1. DatetimeIndex standardization
+    2. Timestamp-type columns (open_time, close_time)
+    3. Conversion between microsecond and millisecond precision
+
+    Args:
+        df: DataFrame with timestamp columns or DatetimeIndex
+
+    Returns:
+        DataFrame with standardized timestamp precision
+
+    Note:
+        - The current system standard is millisecond precision as used by the REST API
+        - Vision API data from 2025+ uses microsecond precision that needs to be standardized
+        - This function is crucial for ensuring that data from different sources is comparable
+    """
+    if df.empty:
+        logger.debug("Empty DataFrame in standardize_timestamp_precision")
+        return df
+
+    # Make a copy to avoid modifying the original
+    result_df = df.copy()
+
+    # Process DatetimeIndex if present
+    if isinstance(result_df.index, pd.DatetimeIndex):
+        logger.debug(
+            f"Processing DatetimeIndex in standardize_timestamp_precision, target precision: {TIMESTAMP_PRECISION}"
+        )
+
+        # Get a sample timestamp to determine current precision
+        sample_ts = result_df.index[0].value
+        current_precision = "us" if len(str(abs(sample_ts))) > 13 else "ms"
+
+        # Only convert if current precision doesn't match target
+        if current_precision != TIMESTAMP_PRECISION:
+            logger.debug(
+                f"Converting index from {current_precision} to {TIMESTAMP_PRECISION} precision"
+            )
+
+            if current_precision == "us" and TIMESTAMP_PRECISION == "ms":
+                # Convert from microseconds to milliseconds (truncate)
+                # Create new DatetimeIndex with millisecond precision
+                new_index = pd.DatetimeIndex(
+                    [
+                        pd.Timestamp(ts.timestamp() * 1000, unit="ms", tz=timezone.utc)
+                        for ts in result_df.index
+                    ],
+                    name=result_df.index.name,
+                )
+                result_df.index = new_index
+
+            elif current_precision == "ms" and TIMESTAMP_PRECISION == "us":
+                # Convert from milliseconds to microseconds (add zeros)
+                # Create new DatetimeIndex with microsecond precision
+                new_index = pd.DatetimeIndex(
+                    [
+                        pd.Timestamp(
+                            int(ts.timestamp() * 1000000), unit="us", tz=timezone.utc
+                        )
+                        for ts in result_df.index
+                    ],
+                    name=result_df.index.name,
+                )
+                result_df.index = new_index
+
+    # Process timestamp columns
+    time_columns = [CANONICAL_INDEX_NAME, CANONICAL_CLOSE_TIME]
+    for col in time_columns:
+        if col in result_df.columns and pd.api.types.is_datetime64_dtype(
+            result_df[col]
+        ):
+            logger.debug(f"Processing timestamp column {col}")
+
+            # Get a sample to determine current precision
+            if len(result_df) > 0:
+                sample_ts = result_df[col].iloc[0].value
+                current_precision = "us" if len(str(abs(sample_ts))) > 13 else "ms"
+
+                # Only convert if current precision doesn't match target
+                if current_precision != TIMESTAMP_PRECISION:
+                    logger.debug(
+                        f"Converting column {col} from {current_precision} to {TIMESTAMP_PRECISION} precision"
+                    )
+
+                    if current_precision == "us" and TIMESTAMP_PRECISION == "ms":
+                        # Convert from microseconds to milliseconds (truncate)
+                        result_df[col] = pd.to_datetime(
+                            (result_df[col].astype(np.int64) // 1000000) * 1000,
+                            unit="ms",
+                            utc=True,
+                        )
+
+                    elif current_precision == "ms" and TIMESTAMP_PRECISION == "us":
+                        # Convert from milliseconds to microseconds (add zeros)
+                        result_df[col] = pd.to_datetime(
+                            result_df[col].astype(np.int64) * 1000, unit="us", utc=True
+                        )
+
+    return result_df
 
 
 def validate_timestamp_unit(unit: TimestampUnit) -> None:

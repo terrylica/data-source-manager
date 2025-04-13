@@ -14,7 +14,14 @@ from enum import Enum, auto
 # Time-related constants
 DEFAULT_TIMEZONE: Final = timezone.utc
 CANONICAL_INDEX_NAME: Final = "open_time"
-TIMESTAMP_PRECISION: Final = "us"  # Microsecond precision
+TIMESTAMP_PRECISION: Final = (
+    "ms"  # Millisecond precision to align with REST API standard
+)
+
+# REST API standardization
+# We standardize to millisecond precision as this is what the REST API consistently uses
+# All data from Vision API and cache will be converted to this precision for consistency
+REST_IS_STANDARD: Final = True  # REST API format is the standard for all data sources
 
 # API-specific constraints
 VISION_DATA_DELAY_HOURS: Final = 48
@@ -148,8 +155,10 @@ FUNDING_RATE_COLUMN_ORDER: Final[List[str]] = [
 ]
 
 # Timestamp configuration
-TIMESTAMP_UNIT: Final[str] = "us"  # Microseconds for timestamps
-CLOSE_TIME_ADJUSTMENT: Final[int] = 999  # Microseconds to add to close_time
+TIMESTAMP_UNIT: Final[str] = (
+    "ms"  # Milliseconds for timestamps - aligns with REST API standard
+)
+CLOSE_TIME_ADJUSTMENT: Final[int] = 999  # Milliseconds to add to close_time
 
 # HTTP Client configuration
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
