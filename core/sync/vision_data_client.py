@@ -50,7 +50,13 @@ T = TypeVar("T")
 
 
 class VisionDataClient(DataClientInterface, Generic[T]):
-    """Vision Data Client for direct access to Binance historical data."""
+    """Vision Data Client for direct access to Binance historical data.
+
+    Important note on timestamp semantics:
+    - open_time represents the BEGINNING of the candle period (standard in financial data)
+    - close_time represents the END of the candle period
+    - This implementation preserves this semantic meaning across all interval types
+    """
 
     def __init__(
         self,
@@ -99,20 +105,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         self.market_type_str = market_type_str
 
         # Parse interval string to Interval object
-        try:
-            # Try to find the interval enum by value
-            self.interval_obj = next((i for i in Interval if i.value == interval), None)
-            if self.interval_obj is None:
-                # Try by enum name (upper case with _ instead of number)
-                try:
-                    self.interval_obj = Interval[interval.upper()]
-                except KeyError:
-                    raise ValueError(f"Invalid interval: {interval}")
-        except Exception as e:
-            logger.warning(
-                f"Could not parse interval {interval}, using SECOND_1 as default: {e}"
-            )
-            self.interval_obj = Interval.SECOND_1
+        self.interval_obj = self._parse_interval(interval)
 
         # Create httpx client instead of requests Session
         self._client = httpx.Client(
@@ -222,6 +215,40 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         validator = DataFrameValidator(df)
         return validator.validate_klines_data()
 
+    def _parse_interval(self, interval_str: str) -> Interval:
+        """Parse and validate interval string against market_constraints.Interval.
+
+        Args:
+            interval_str: Interval string (e.g., "1m", "1h")
+
+        Returns:
+            Parsed Interval enum
+
+        Raises:
+            ValueError: If interval is invalid or not supported
+        """
+        try:
+            # Try to find the interval enum by value
+            interval_obj = next((i for i in Interval if i.value == interval_str), None)
+            if interval_obj is None:
+                # Try by enum name (upper case with _ instead of number)
+                try:
+                    interval_obj = Interval[interval_str.upper()]
+                except KeyError:
+                    raise ValueError(f"Invalid interval: {interval_str}")
+
+            # Check if this interval is supported for this market type
+            # Could implement is_interval_supported() function if needed
+            logger.debug(
+                f"Using interval {interval_obj.name} ({interval_obj.value}) for {self.market_type_str}"
+            )
+
+            return interval_obj
+        except Exception as e:
+            logger.error(f"Error parsing interval {interval_str}: {e}")
+            # Default to 1s as a failsafe
+            return Interval.SECOND_1
+
     def _get_interval_seconds(self, interval: str) -> int:
         """Get interval duration in seconds from interval string.
 
@@ -292,6 +319,10 @@ class VisionDataClient(DataClientInterface, Generic[T]):
     def _process_timestamp_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process timestamp columns in the dataframe, handling various formats.
 
+        This method preserves the exact timestamps from the raw data without any shifting:
+        - open_time represents the BEGINNING of a candle period
+        - close_time represents the END of the candle period
+
         Args:
             df: DataFrame with timestamp columns to process
 
@@ -304,43 +335,125 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         try:
             # Check timestamp format if dataframe has rows
             if len(df) > 0:
+                # Debug: Log first few raw rows to track data through the pipeline
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Input data to _process_timestamp_columns has {len(df)} rows"
+                )
+                for i in range(min(3, len(df))):
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] Raw row {i}: open_time={df.iloc[i, 0]}, close={df.iloc[i, 4]}"
+                    )
+
                 first_ts = df.iloc[0, 0]  # First timestamp in first column
+                last_ts = df.iloc[-1, 0] if len(df) > 1 else first_ts
+
+                logger.debug(f"First raw timestamp detected: {first_ts}")
+                logger.debug(f"Last raw timestamp detected: {last_ts}")
 
                 try:
                     # Detect timestamp unit using the standardized function from utils.time_utils
                     timestamp_unit = detect_timestamp_unit(first_ts)
 
-                    # Log the first and last timestamps for debugging
+                    # Log timestamp details for debugging
                     logger.debug(f"First timestamp: {first_ts} ({timestamp_unit})")
                     if len(df) > 1:
                         last_ts = df.iloc[-1, 0]
                         logger.debug(f"Last timestamp: {last_ts} ({timestamp_unit})")
 
-                    # Convert timestamps to datetime using the detected unit
+                    # Convert timestamps to datetime, preserving their semantic meaning:
+                    # - open_time (1st column) is the BEGINNING of the candle period
+                    # - close_time (7th column) is the END of the candle period
                     if "open_time" in df.columns:
                         df["open_time"] = pd.to_datetime(
                             df["open_time"], unit=timestamp_unit, utc=True
                         )
+                        logger.debug(
+                            f"Converted open_time: first value = {df['open_time'].iloc[0]} (BEGINNING of candle)"
+                        )
+                        # Debug: Log first few converted timestamps to track processing
+                        for i in range(min(3, len(df))):
+                            logger.debug(
+                                f"[TIMESTAMP TRACE] Converted row {i}: open_time={df['open_time'].iloc[i]}, close={df.iloc[i, 4]}"
+                            )
+
                     if "close_time" in df.columns:
                         df["close_time"] = pd.to_datetime(
                             df["close_time"], unit=timestamp_unit, utc=True
                         )
+                        logger.debug(
+                            f"Converted close_time: first value = {df['close_time'].iloc[0]} (END of candle)"
+                        )
 
-                    logger.debug(
-                        f"Converted timestamps to datetime using {timestamp_unit} unit"
-                    )
+                    # Verify timestamp semantics are preserved (for debugging)
+                    if (
+                        "open_time" in df.columns
+                        and "close_time" in df.columns
+                        and len(df) > 0
+                    ):
+                        first_open = df["open_time"].iloc[0]
+                        first_close = df["close_time"].iloc[0]
+                        time_diff = (first_close - first_open).total_seconds()
+
+                        # Calculate expected difference based on interval
+                        # For 1s interval, close should be 0.999 seconds after open
+                        # For 1m interval, close should be 59.999 seconds after open, etc.
+                        expected_diff = (
+                            self._get_interval_seconds(self._interval_str) - 0.001
+                        )
+
+                        logger.debug(
+                            f"Time difference between first open_time and close_time: {time_diff:.3f}s "
+                            f"(expected ~{expected_diff:.3f}s for {self._interval_str} interval)"
+                        )
+
+                        # Verify the time difference is within expected range
+                        # Allow for a small tolerance to account for precision differences
+                        tolerance = 0.1  # 100ms tolerance
+                        if abs(time_diff - expected_diff) > tolerance:
+                            logger.warning(
+                                f"Unexpected time difference between open_time and close_time: "
+                                f"{time_diff:.3f}s vs expected {expected_diff:.3f}s for {self._interval_str} interval. "
+                                f"This could indicate a timestamp interpretation issue."
+                            )
+                        else:
+                            logger.debug(
+                                f"Time difference between open_time and close_time is as expected "
+                                f"({time_diff:.3f}s) for {self._interval_str} interval."
+                            )
+
+                        logger.debug(
+                            f"Timestamps converted preserving their semantic meaning: "
+                            f"open_time=BEGINNING of candle, close_time=END of candle"
+                        )
 
                 except ValueError as e:
                     logger.warning(f"Error detecting timestamp unit: {e}")
                     # Fall back to default handling with microseconds as unit
+                    logger.warning("Falling back to microseconds as the timestamp unit")
                     if "open_time" in df.columns:
                         df["open_time"] = pd.to_datetime(
                             df["open_time"], unit="us", utc=True
+                        )
+                        logger.debug(
+                            f"Converted open_time using fallback method: first value = {df['open_time'].iloc[0]} (BEGINNING of candle)"
                         )
                     if "close_time" in df.columns:
                         df["close_time"] = pd.to_datetime(
                             df["close_time"], unit="us", utc=True
                         )
+                        logger.debug(
+                            f"Converted close_time using fallback method: first value = {df['close_time'].iloc[0]} (END of candle)"
+                        )
+
+            # Debug: Log output from timestamp processing
+            logger.debug(
+                f"[TIMESTAMP TRACE] After _process_timestamp_columns: {len(df)} rows"
+            )
+            if len(df) > 0 and "open_time" in df.columns:
+                for i in range(min(3, len(df))):
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] Processed row {i}: open_time={df['open_time'].iloc[i]}, close={df.iloc[i, 4]}"
+                    )
 
         except Exception as e:
             logger.error(f"Error processing timestamp columns: {e}")
@@ -350,128 +463,118 @@ class VisionDataClient(DataClientInterface, Generic[T]):
     def _download_file(
         self, date: datetime
     ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
-        """Download and process data file for a specific date.
+        """Download a data file for a specific date.
 
         Args:
-            date: Date to download
+            date: Date to download data for
 
         Returns:
-            Tuple of (DataFrame or None, warning message or None)
+            Tuple of (DataFrame, warning message). DataFrame is None if download failed.
         """
+        logger.debug(
+            f"Downloading data for {date.date()} for {self._symbol} {self._interval_str}"
+        )
+
+        temp_file_path = None
+
         try:
-            # First check if the date is safe to process with pandas
-            if not self._validate_timestamp_safety(date):
-                logger.error(
-                    f"Skipping date {date.date()} due to potential timestamp overflow"
-                )
-                return None, None
-
-            # Generate URL for the data - ensure we use interval string value
-            interval_str = self._interval_str
-
-            # Debug for interval
-            logger.debug(
-                f"Self.interval is {self._interval_str} of type {type(self._interval_str)}"
-            )
-            logger.debug(
-                f"Self.interval_obj is {self.interval_obj} of type {type(self.interval_obj)}"
-            )
-
-            # Check if interval is an enum object with a value attribute
-            if hasattr(self.interval_obj, "value"):
-                interval_str = self.interval_obj.value
-                logger.debug(f"Using interval string value: {interval_str}")
-            else:
-                logger.debug(
-                    f"interval_obj does not have 'value' attribute, using {interval_str}"
-                )
-
+            # Create the file URL
+            base_interval = (
+                "1m" if self._interval_str == "1s" else self._interval_str
+            )  # 1s data stored with filename as 1m
             url = get_vision_url(
                 symbol=self._symbol,
-                interval=interval_str,  # Use string value
+                interval=base_interval,
                 date=date,
-                file_type=FileType.DATA,  # Explicitly pass proper FileType.DATA enum
+                file_type=FileType.DATA,
                 market_type=self.market_type_str,
             )
 
-            logger.debug(f"Downloading data from {url}")
-
-            # Download the file using httpx client
-            try:
-                # Make request using httpx
-                response = self._client.get(url)
-
-                # Check response status
-                if response.status_code != 200:
-                    # Calculate days difference between date and now
-                    now = datetime.now(timezone.utc)
-                    days_difference = (now.date() - date.date()).days
-
-                    # For 404 (Not Found) status, check if it's within 2 days of now
-                    if response.status_code == 404 and days_difference <= 2:
-                        # Return a warning message instead of logging it immediately
-                        warning_msg = f"Recent data not yet available from Vision API: {date.date()} (HTTP 404)"
-                        return None, warning_msg
-                    else:
-                        # For data that should be available or other error codes, log as error
-                        logger.error(
-                            f"Failed to download data: HTTP {response.status_code}"
-                        )
-                    return None, None
-
-                # Get response content
-                content = response.content
-                logger.debug(
-                    f"Successfully downloaded {url} - size: {len(content)} bytes"
-                )
-
-            except httpx.RequestError as e:
-                # Calculate days difference between date and now for request errors too
-                now = datetime.now(timezone.utc)
-                days_difference = (now.date() - date.date()).days
-
-                if days_difference <= 2:
-                    return None, f"Error downloading recent data for {date.date()}: {e}"
-                else:
-                    logger.error(f"Error downloading data for {date.date()}: {e}")
-                return None, None
-
-            # Create a temporary file to store the zip
+            # Create a temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
-                temp_file.write(content)
                 temp_file_path = temp_file.name
 
+            # Download the file
+            response = self._client.get(url)
+            if response.status_code == 404:
+                return None, f"404: Data not available for {date.date()}"
+
+            if response.status_code != 200:
+                return None, f"HTTP error {response.status_code} for {date.date()}"
+
+            # Save to the temporary file
+            with open(temp_file_path, "wb") as f:
+                f.write(response.content)
+
+            # Process the zip file
             try:
-                # Extract the zip file
                 with zipfile.ZipFile(temp_file_path, "r") as zip_ref:
-                    # Get the CSV file name (should be the only file in the zip)
-                    file_list = zip_ref.namelist()
-                    if not file_list:
-                        logger.error("Zip file is empty")
-                        return None, None
+                    # Find the CSV file in the zip
+                    csv_files = [f for f in zip_ref.namelist() if f.endswith(".csv")]
+                    if not csv_files:
+                        return None, f"No CSV file found in zip for {date.date()}"
 
-                    csv_file = file_list[0]
-                    logger.debug(f"Found CSV file in zip: {csv_file}")
+                    csv_file = csv_files[0]  # Take the first CSV file
 
-                    # Extract to a temporary directory
+                    # Extract and process the CSV file
                     with tempfile.TemporaryDirectory() as temp_dir:
                         zip_ref.extract(csv_file, temp_dir)
                         csv_path = os.path.join(temp_dir, csv_file)
 
                         # Read the CSV file
-                        df = pd.read_csv(csv_path)
+                        # DEBUG: Log the first few lines of the raw CSV to check content
+                        with open(csv_path, "r") as f:
+                            first_lines = [next(f) for _ in range(3)]
+                            logger.debug(f"[CSV TRACE] First few lines of raw CSV:")
+                            for i, line in enumerate(first_lines):
+                                logger.debug(f"[CSV TRACE] Line {i}: {line.strip()}")
+
+                            # Check if the first line contains headers (e.g., 'high' keyword)
+                            has_header = any(
+                                "high" in line.lower() for line in first_lines[:1]
+                            )
+                            logger.debug(f"[CSV TRACE] Headers detected: {has_header}")
+
+                            # Reopen the file to read from the beginning
+                            f.seek(0)
+
+                        # Read CSV with or without header based on detection
+                        if has_header:
+                            logger.info(
+                                f"Headers detected in CSV, reading with header=0"
+                            )
+                            df = pd.read_csv(csv_path, header=0)
+                            # Map column names to standard names if needed
+                            if "open_time" not in df.columns and len(df.columns) == len(
+                                KLINE_COLUMNS
+                            ):
+                                df.columns = KLINE_COLUMNS
+                        else:
+                            # No headers detected, use the standard column names
+                            logger.info(
+                                f"No headers detected in CSV, reading with header=None"
+                            )
+                            df = pd.read_csv(csv_path, header=None, names=KLINE_COLUMNS)
+
+                        # DEBUG: Check if first row contains 00:00:00 timestamp
+                        if not df.empty:
+                            first_ts = df.iloc[0, 0]  # First column is open_time
+                            first_ts_dt = datetime.fromtimestamp(
+                                (
+                                    first_ts / 1000000
+                                    if len(str(int(first_ts))) >= 16
+                                    else first_ts / 1000
+                                ),
+                                tz=timezone.utc,
+                            )
+                            logger.debug(
+                                f"[CSV TRACE] First timestamp in loaded CSV: {first_ts} ({first_ts_dt})"
+                            )
+
                         logger.debug(f"Read {len(df)} rows from CSV")
 
                         # Process the data
                         if not df.empty:
-                            # If number of columns match, use the standard names
-                            if len(df.columns) == len(KLINE_COLUMNS):
-                                df.columns = KLINE_COLUMNS
-                            else:
-                                logger.warning(
-                                    f"Column count mismatch: expected {len(KLINE_COLUMNS)}, got {len(df.columns)}"
-                                )
-
                             # Store original timestamp info for later analysis if not already present
                             if "original_timestamp" not in df.columns:
                                 df["original_timestamp"] = df.iloc[:, 0].astype(str)
@@ -487,15 +590,14 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                     f"Error processing zip file {temp_file_path}: {str(e)}",
                     exc_info=True,
                 )
-                return None, None
-            finally:
-                # Clean up temp file
-                if os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-
+                return None, f"Error processing zip file: {str(e)}"
         except Exception as e:
             logger.error(f"Unexpected error processing {date.date()}: {str(e)}")
-            return None, None
+            return None, f"Unexpected error: {str(e)}"
+        finally:
+            # Clean up temp file
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
 
     def _download_data(
         self,
@@ -512,9 +614,19 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
         Returns:
             TimestampedDataFrame with downloaded data
+
+        Note:
+            Timestamps in the returned data preserve their semantic meaning:
+            - open_time represents the BEGINNING of each candle period
+            - close_time represents the END of each candle period
         """
         logger.info(
             f"Downloading data for {self._symbol} {self._interval_str} from {start_time.isoformat()} to {end_time.isoformat()}"
+        )
+
+        # Debug: Log exact timestamps for requested range
+        logger.debug(
+            f"[TIMESTAMP TRACE] Requested time range: start={start_time.isoformat()} end={end_time.isoformat()}"
         )
 
         # Convert start and end times to date objects for file-based lookups
@@ -594,19 +706,19 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                     dates_str = ", ".join(missing_dates)
                     logger.warning(
                         f"No data downloaded from Binance Vision API - dates not available: {dates_str}. "
-                        f"This may happen for recent data or less common markets (e.g., CM futures). "
+                        f"This may happen for recent data or less common markets. "
                         f"The system will attempt to fetch from REST API instead."
                     )
                 else:
                     # Log a generic warning for other issues
                     logger.warning(
-                        "No data downloaded from Binance Vision API - this may happen for recent data or less common markets (e.g., CM futures). "
+                        "No data downloaded from Binance Vision API - this may happen for recent data or less common markets. "
                         "The system will attempt to fetch from REST API instead."
                     )
             else:
                 # No specific warnings
                 logger.warning(
-                    "No data downloaded from Binance Vision API - this may happen for recent data or less common markets (e.g., CM futures). "
+                    "No data downloaded from Binance Vision API - this may happen for recent data or less common markets. "
                     "The system will attempt to fetch from REST API instead."
                 )
             return self.create_empty_dataframe()
@@ -615,6 +727,19 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
         # Concatenate all dataframes
         concatenated_df = pd.concat(downloaded_dfs, ignore_index=True)
+
+        # Debug: Log the first few rows after concatenation
+        if not concatenated_df.empty:
+            logger.debug(
+                f"[TIMESTAMP TRACE] After concatenation: {len(concatenated_df)} rows total"
+            )
+            for i in range(min(3, len(concatenated_df))):
+                if "open_time" in concatenated_df.columns:
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] Concatenated row {i}: open_time={concatenated_df['open_time'].iloc[i]}, close={concatenated_df.iloc[i, concatenated_df.columns.get_loc('close')]}"
+                    )
+        else:
+            logger.debug("[TIMESTAMP TRACE] Concatenated DataFrame is empty")
 
         # If the dataframe is empty, return early
         if concatenated_df.empty:
@@ -634,10 +759,138 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 drop=True
             )
 
-        # Filter by the exact time range requested
+        # Debug: Log data before filtering
+        logger.debug(
+            f"[TIMESTAMP TRACE] Before time filtering: {len(concatenated_df)} rows"
+        )
+        if not concatenated_df.empty:
+            min_time = concatenated_df["open_time"].min()
+            max_time = concatenated_df["open_time"].max()
+            logger.debug(
+                f"[TIMESTAMP TRACE] Time range in data before filtering: {min_time} to {max_time}"
+            )
+            logger.debug(
+                f"[TIMESTAMP TRACE] Time range requested: {start_time} to {end_time}"
+            )
+
+            # Log first few rows before filtering
+            for i in range(min(3, len(concatenated_df))):
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Before filtering row {i}: open_time={concatenated_df['open_time'].iloc[i]}, close={concatenated_df.iloc[i, concatenated_df.columns.get_loc('close')]}"
+                )
+
+            # Check specifically for the exact start time
+            exact_match_rows = concatenated_df[
+                concatenated_df["open_time"] == start_time
+            ]
+            if not exact_match_rows.empty:
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Found {len(exact_match_rows)} rows exactly matching start_time={start_time}"
+                )
+            else:
+                closest_time_idx = (
+                    (concatenated_df["open_time"] - start_time).abs().idxmin()
+                )
+                closest_time = concatenated_df.iloc[closest_time_idx]["open_time"]
+                logger.debug(
+                    f"[TIMESTAMP TRACE] No exact match for start_time. Closest time is {closest_time}"
+                )
+
+                # Check for rows at the expected interval boundaries
+                boundary_rows = concatenated_df[
+                    (concatenated_df["open_time"].dt.minute == 0)
+                    & (concatenated_df["open_time"].dt.second == 0)
+                ]
+                if not boundary_rows.empty:
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] Found {len(boundary_rows)} rows at exact interval boundaries (minute=0, second=0)"
+                    )
+                    for j in range(min(3, len(boundary_rows))):
+                        logger.debug(
+                            f"[TIMESTAMP TRACE] Boundary row {j}: {boundary_rows.iloc[j]['open_time']}"
+                        )
+
+        # Filter by the exact time range requested - make sure we include start_time exactly
+        # This is critical for proper alignment with interval boundaries
+        logger.debug(
+            f"Filtering dataframe with time range: {start_time} (inclusive) to {end_time} (inclusive)"
+        )
+
+        # Debug: Check inclusion criteria before filtering
+        if not concatenated_df.empty:
+            would_include_first = concatenated_df["open_time"].min() >= start_time
+            would_include_last = concatenated_df["open_time"].max() <= end_time
+            logger.debug(
+                f"[TIMESTAMP TRACE] Would include first timestamp: {would_include_first}"
+            )
+            logger.debug(
+                f"[TIMESTAMP TRACE] Would include last timestamp: {would_include_last}"
+            )
+
+            # Check for timestamps exactly at boundaries
+            start_boundary_match = (concatenated_df["open_time"] == start_time).any()
+            end_boundary_match = (concatenated_df["open_time"] == end_time).any()
+            logger.debug(
+                f"[TIMESTAMP TRACE] Exact match at start_time: {start_boundary_match}"
+            )
+            logger.debug(
+                f"[TIMESTAMP TRACE] Exact match at end_time: {end_boundary_match}"
+            )
+
+        # Perform the filtering
         filtered_df = filter_dataframe_by_time(
             concatenated_df, start_time, end_time, time_column="open_time"
         )
+
+        # Debug: Check what happened during filtering
+        if not filtered_df.empty:
+            logger.debug(
+                f"[TIMESTAMP TRACE] After time filtering: {len(filtered_df)} rows"
+            )
+            min_filtered = filtered_df["open_time"].min()
+            max_filtered = filtered_df["open_time"].max()
+            logger.debug(
+                f"[TIMESTAMP TRACE] Filtered time range: {min_filtered} to {max_filtered}"
+            )
+
+            # Check if we lost the first candle
+            if min_filtered > start_time:
+                time_diff = (min_filtered - start_time).total_seconds()
+                logger.debug(
+                    f"[TIMESTAMP TRACE] First candle starts {time_diff} seconds after requested start_time"
+                )
+                logger.debug(
+                    f"[TIMESTAMP TRACE] This suggests the first candle may have been dropped during filtering"
+                )
+
+            # Log first few rows after filtering
+            for i in range(min(3, len(filtered_df))):
+                logger.debug(
+                    f"[TIMESTAMP TRACE] After filtering row {i}: open_time={filtered_df['open_time'].iloc[i]}, close={filtered_df.iloc[i, filtered_df.columns.get_loc('close')]}"
+                )
+        else:
+            logger.debug(
+                "[TIMESTAMP TRACE] Filtered DataFrame is empty - all rows were excluded"
+            )
+
+            # Log filtering criteria again for clarity
+            logger.debug(
+                f"[TIMESTAMP TRACE] Filtering criteria used: {start_time} <= open_time <= {end_time}"
+            )
+
+        # Log filtering results for debugging
+        if not filtered_df.empty:
+            logger.debug(f"Filtered dataframe contains {len(filtered_df)} rows")
+            logger.debug(
+                f"First timestamp after filtering: {filtered_df['open_time'].min()}"
+            )
+            logger.debug(
+                f"Last timestamp after filtering: {filtered_df['open_time'].max()}"
+            )
+        else:
+            logger.warning(
+                "Filtered dataframe is empty - no data within requested time range"
+            )
 
         # Use gap_detector to find gaps
         # Convert the interval string to Interval enum for proper gap detection
@@ -659,79 +912,156 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         # Detect gaps in the data using the standardized gap_detector
         # Only enforce min span requirement if we're querying a longer timeframe
         time_span_days = (end_time - start_time).total_seconds() / 86400
-        enforce_min_span = time_span_days >= 1.0
+        min_span_required = time_span_days > 1  # Only for multi-day spans
 
-        gaps, gap_stats = detect_gaps(
-            filtered_df,
-            interval_obj,
-            time_column="open_time",
-            gap_threshold=0.3,  # 30% threshold
-            day_boundary_threshold=1.5,  # Higher threshold for day boundaries
-            enforce_min_span=enforce_min_span,  # Only enforce for longer timeframes
-        )
-
-        # Log gap statistics if any gaps were found
-        if gaps:
-            boundary_gaps = [gap for gap in gaps if gap.crosses_day_boundary]
-            regular_gaps = [gap for gap in gaps if not gap.crosses_day_boundary]
-
-            logger.info(f"Gap detection results: {gap_stats['total_gaps']} gaps found")
-            logger.info(f"- Day boundary gaps: {len(boundary_gaps)}")
-            logger.info(f"- Regular gaps: {len(regular_gaps)}")
-
-            # Log details of each day boundary gap
-            for i, gap in enumerate(boundary_gaps):
-                logger.debug(
-                    f"Day boundary gap {i+1}: {gap.start_time} → {gap.end_time}, "
-                    f"duration: {gap.duration}, missing points: {gap.missing_points}"
-                )
-
-            # Fill gaps at day boundaries if any were detected
-            if boundary_gaps:
-                filled_df = self._fill_boundary_gaps_with_rest(
-                    filtered_df, boundary_gaps
-                )
-                if filled_df is not None:
-                    filtered_df = filled_df
-                    logger.info(
-                        f"Filled {len(boundary_gaps)} day boundary gaps with REST API data"
+        if filtered_df.empty:
+            gaps = []
+            logger.debug("Skipping gap detection for empty dataframe")
+        else:
+            try:
+                if "open_time" in filtered_df.columns:
+                    # Temporarily set index to open_time for gap detection
+                    df_with_index = filtered_df.set_index("open_time")
+                    gaps, stats = detect_gaps(
+                        df_with_index,
+                        interval_obj,
+                        enforce_min_span=min_span_required,
                     )
                 else:
-                    logger.warning(
-                        "Failed to fill day boundary gaps with REST API data"
+                    gaps, stats = detect_gaps(
+                        filtered_df,
+                        interval_obj,
+                        enforce_min_span=min_span_required,
                     )
 
-        # Convert to TimestampedDataFrame format
-        try:
-            # The main issue is when creating the TimestampedDataFrame:
-            # If we have both open_time column and set open_time_us as index with name open_time,
-            # we'd get the ambiguity error.
+                # Log the gaps and stats
+                if gaps:
+                    logger.debug(f"Detected {len(gaps)} gaps in Vision data")
+                    logger.debug(f"Gap stats: {stats}")
+                    for gap in gaps:
+                        logger.debug(
+                            f"Gap: {gap.start_time} to {gap.end_time} ({gap.duration.total_seconds()}s)"
+                        )
+                else:
+                    logger.debug("No gaps detected in Vision data")
 
-            # First make sure we don't have open_time column if we're going to use it as index name
-            if "open_time_us" not in filtered_df.columns:
-                # Create a microsecond precision timestamp column to use as index
-                filtered_df["open_time_us"] = (
-                    filtered_df["open_time"].astype(int).mul(1000000)
+            except Exception as e:
+                logger.error(f"Error detecting gaps: {e}")
+                gaps = []
+
+        # Check for day boundary gaps (gaps at midnight)
+        boundary_gaps = [
+            gap
+            for gap in gaps
+            if (
+                gap.start_time.hour == 0
+                and gap.start_time.minute == 0
+                and gap.start_time.second == 0
+            )
+            or (
+                gap.end_time.hour == 0
+                and gap.end_time.minute == 0
+                and gap.end_time.second == 0
+            )
+        ]
+
+        # Try to fill day boundary gaps using REST API
+        if boundary_gaps:
+            logger.debug(
+                f"Detected {len(boundary_gaps)} day boundary gaps. Attempting to fill with REST API data."
+            )
+            filled_df = self._fill_boundary_gaps_with_rest(filtered_df, boundary_gaps)
+            if filled_df is not None:
+                filtered_df = filled_df
+                logger.debug(
+                    f"Successfully filled boundary gaps. New row count: {len(filtered_df)}"
                 )
 
-            # Create a copy without the open_time column before setting the index
-            # to avoid the ambiguity of having open_time as both column and index name
-            if "open_time" in filtered_df.columns:
-                df_for_index = filtered_df.drop(columns=["open_time"])
+        # Store original timestamp for reference
+        if (
+            "open_time" in filtered_df.columns
+            and "original_timestamp" not in filtered_df.columns
+        ):
+            filtered_df["original_timestamp"] = filtered_df["open_time"]
+            logger.debug("Preserved original open_time timestamp for reference")
 
-                # Set the index with open_time_us column
-                df_for_index = df_for_index.set_index("open_time_us")
+        # Log timestamp semantics for debugging
+        logger.debug(
+            "Creating TimestampedDataFrame with timestamps representing the START of each candle period"
+        )
 
-                # The TimestampedDataFrame class will handle naming the index as 'open_time'
-                return TimestampedDataFrame(df_for_index)
-            else:
-                # If there's no open_time column, just set the index normally
-                filtered_df = filtered_df.set_index("open_time_us")
-                return TimestampedDataFrame(filtered_df)
+        # First check if we should be using open_time_us as index
+        if (
+            "open_time_us" not in filtered_df.columns
+            and "open_time" in filtered_df.columns
+        ):
+            logger.debug(
+                f"[TIMESTAMP TRACE] Creating TimestampedDataFrame using open_time as index"
+            )
+            if not filtered_df.empty:
+                for i in range(min(3, len(filtered_df))):
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] Before index creation row {i}: open_time={filtered_df['open_time'].iloc[i]}, close={filtered_df.iloc[i, filtered_df.columns.get_loc('close')]}"
+                    )
 
-        except Exception as e:
-            logger.error(f"Error creating TimestampedDataFrame: {e}")
-            return self.create_empty_dataframe()
+            # Create a copy to maintain the original dataframe
+            df_for_index = filtered_df.copy()
+
+            # IMPORTANT: When setting open_time as index, we're preserving the semantic meaning
+            # that open_time represents the BEGINNING of the candle period for all interval types
+            df_for_index = df_for_index.set_index("open_time")
+
+            # Log the first and last timestamps for debugging
+            if not df_for_index.empty:
+                logger.debug(
+                    f"First index timestamp: {df_for_index.index[0]} (represents BEGINNING of candle)"
+                )
+                logger.debug(
+                    f"Last index timestamp: {df_for_index.index[-1]} (represents BEGINNING of candle)"
+                )
+
+                # Debug: Log after setting index
+                for i in range(min(3, len(df_for_index))):
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] After index creation row {i}: index={df_for_index.index[i]}, close={df_for_index.iloc[i]['close']}"
+                    )
+
+            # Create TimestampedDataFrame preserving exact timestamps and their semantic meaning
+            timestamped_df = TimestampedDataFrame(df_for_index)
+
+            # Debug: Final check on TimestampedDataFrame
+            if not timestamped_df.empty:
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Final TimestampedDataFrame has {len(timestamped_df)} rows"
+                )
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Final index (first): {timestamped_df.index[0]}"
+                )
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Final index (last): {timestamped_df.index[-1]}"
+                )
+
+            return timestamped_df
+        elif "open_time_us" in filtered_df.columns:
+            # If open_time_us exists, use it as index
+            df_for_index = filtered_df.copy()
+
+            if "open_time" in df_for_index.columns:
+                # Avoid ambiguity by removing open_time column before setting index
+                df_for_index = df_for_index.drop(columns=["open_time"])
+
+            # Set open_time_us as index
+            df_for_index = df_for_index.set_index("open_time_us")
+            logger.debug(
+                f"Set index to open_time_us with first value {df_for_index.index[0] if not df_for_index.empty else 'N/A'}"
+            )
+
+            return TimestampedDataFrame(df_for_index)
+        else:
+            # If neither column exists, just return the filtered dataframe
+            # TimestampedDataFrame initialization will handle validation
+            logger.debug("No timestamp column found for index, returning as is")
+            return TimestampedDataFrame(filtered_df)
 
     def _fill_boundary_gaps_with_rest(
         self, df: pd.DataFrame, boundary_gaps: List[Gap]
@@ -865,6 +1195,10 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         Note:
             This client is optimized for historical data. For recent data (< 2 days old),
             use the RestDataClient as Vision API typically has a 24-48 hour delay.
+
+            Timestamps in the returned data preserve their semantic meaning:
+            - open_time represents the BEGINNING of each candle period
+            - close_time represents the END of each candle period
         """
         # Validate parameters
         if not isinstance(symbol, str) or not symbol:

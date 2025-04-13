@@ -440,8 +440,10 @@ def filter_dataframe_by_time(
     """Filter DataFrame by time range.
 
     This function filters a DataFrame to include only rows where the time column
-    is within the specified time range. It also ensures that the time values
-    are properly aligned to the interval boundaries.
+    is within the specified time range. It preserves the exact timestamps from
+    the raw data without any shifting, maintaining the semantic meaning:
+    - open_time represents the BEGINNING of each candle period
+    - close_time represents the END of each candle period
 
     Args:
         df: DataFrame to filter
@@ -450,7 +452,7 @@ def filter_dataframe_by_time(
         time_column: Name of the column containing timestamps (default: "open_time")
 
     Returns:
-        Filtered DataFrame
+        Filtered DataFrame with preserved timestamp semantics
     """
     if df.empty:
         return df.copy()
@@ -459,16 +461,213 @@ def filter_dataframe_by_time(
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
 
-    # Filter dataframe
-    filtered_df = df[
-        (df[time_column] >= start_time) & (df[time_column] <= end_time)
-    ].copy()
+    logger.debug(f"Filtering DataFrame by time: {start_time} to {end_time}")
+    logger.debug(f"Before filtering: {len(df)} rows")
 
-    # Reset index
-    filtered_df = filtered_df.reset_index(drop=True)
+    # Debug: Trace timestamps at boundaries
+    logger.debug(
+        f"[TIMESTAMP TRACE] filter_dataframe_by_time called with range: {start_time} to {end_time}"
+    )
+    if len(df) > 0:
+        if time_column in df.columns:
+            min_ts = df[time_column].min()
+            max_ts = df[time_column].max()
+            logger.debug(
+                f"[TIMESTAMP TRACE] Input DataFrame time range: {min_ts} to {max_ts}"
+            )
+
+            # Check for timestamps exactly at the boundaries
+            exact_start_match = (df[time_column] == start_time).any()
+            exact_end_match = (df[time_column] == end_time).any()
+            logger.debug(
+                f"[TIMESTAMP TRACE] Exact match at start_time: {exact_start_match}"
+            )
+            logger.debug(
+                f"[TIMESTAMP TRACE] Exact match at end_time: {exact_end_match}"
+            )
+
+            # Log first few rows
+            for i in range(min(3, len(df))):
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Before filtering row {i}: {time_column}={df[time_column].iloc[i]}"
+                )
+        elif df.index.name == time_column and isinstance(df.index, pd.DatetimeIndex):
+            min_ts = df.index.min()
+            max_ts = df.index.max()
+            logger.debug(
+                f"[TIMESTAMP TRACE] Input DataFrame index range: {min_ts} to {max_ts}"
+            )
+
+    # Check if the time column exists
+    if time_column not in df.columns:
+        if df.index.name == time_column and isinstance(df.index, pd.DatetimeIndex):
+            # Reset index to make the time column available for filtering
+            df_with_column = df.reset_index()
+
+            # IMPORTANT: Use >= for start_time and <= for end_time to ensure
+            # exact interval boundaries are included correctly
+            logger.debug(
+                f"[TIMESTAMP TRACE] Filtering on index reset as column, using criteria: {time_column} >= {start_time} AND {time_column} <= {end_time}"
+            )
+
+            # Debug: Check how many rows would match each condition separately
+            if not df_with_column.empty:
+                start_condition = df_with_column[time_column] >= start_time
+                end_condition = df_with_column[time_column] <= end_time
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Rows meeting start condition ({time_column} >= {start_time}): {start_condition.sum()}"
+                )
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Rows meeting end condition ({time_column} <= {end_time}): {end_condition.sum()}"
+                )
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Rows meeting both conditions: {(start_condition & end_condition).sum()}"
+                )
+
+                # Check specifically for exact boundary matches
+                exact_start = df_with_column[df_with_column[time_column] == start_time]
+                exact_end = df_with_column[df_with_column[time_column] == end_time]
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Rows exactly matching start_time: {len(exact_start)}"
+                )
+                logger.debug(
+                    f"[TIMESTAMP TRACE] Rows exactly matching end_time: {len(exact_end)}"
+                )
+
+            filtered_df = df_with_column[
+                (df_with_column[time_column] >= start_time)
+                & (df_with_column[time_column] <= end_time)
+            ].copy()
+
+            # Set index back
+            if not filtered_df.empty:
+                filtered_df = filtered_df.set_index(time_column)
+        else:
+            logger.warning(f"Time column '{time_column}' not found in DataFrame")
+            return df.copy()
+    else:
+        # Filter dataframe using the time column, preserving exact timestamps
+        # IMPORTANT: Use >= for start_time and <= for end_time to include timestamps
+        # exactly at the interval boundaries
+        logger.debug(
+            f"[TIMESTAMP TRACE] Filtering on column, using criteria: {time_column} >= {start_time} AND {time_column} <= {end_time}"
+        )
+
+        # Debug: Check how many rows would match each condition separately
+        if not df.empty:
+            start_condition = df[time_column] >= start_time
+            end_condition = df[time_column] <= end_time
+            logger.debug(
+                f"[TIMESTAMP TRACE] Rows meeting start condition ({time_column} >= {start_time}): {start_condition.sum()}"
+            )
+            logger.debug(
+                f"[TIMESTAMP TRACE] Rows meeting end condition ({time_column} <= {end_time}): {end_condition.sum()}"
+            )
+            logger.debug(
+                f"[TIMESTAMP TRACE] Rows meeting both conditions: {(start_condition & end_condition).sum()}"
+            )
+
+            # Check specifically for exact boundary matches
+            exact_start = df[df[time_column] == start_time]
+            exact_end = df[df[time_column] == end_time]
+            logger.debug(
+                f"[TIMESTAMP TRACE] Rows exactly matching start_time: {len(exact_start)}"
+            )
+            logger.debug(
+                f"[TIMESTAMP TRACE] Rows exactly matching end_time: {len(exact_end)}"
+            )
+
+            # If no rows match exact start time, find nearest
+            if len(exact_start) == 0:
+                earliest_after_start = df[df[time_column] > start_time]
+                if not earliest_after_start.empty:
+                    earliest_time = earliest_after_start[time_column].min()
+                    time_diff = (earliest_time - start_time).total_seconds()
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] No exact start_time match. Earliest timestamp after start_time is {earliest_time}, which is {time_diff} seconds later"
+                    )
+
+        filtered_df = df[
+            (df[time_column] >= start_time) & (df[time_column] <= end_time)
+        ].copy()
+
+    # Reset index if it's not already the time column
+    if filtered_df.index.name != time_column:
+        filtered_df = filtered_df.reset_index(drop=True)
 
     if len(filtered_df) == 0:
         logger.warning(f"No data within time range {start_time} to {end_time}")
+    else:
+        logger.debug(f"After filtering: {len(filtered_df)} rows")
+        if len(filtered_df) > 0:
+            # Log the min and max timestamps in the filtered data
+            if time_column in filtered_df.columns:
+                min_ts = filtered_df[time_column].min()
+                max_ts = filtered_df[time_column].max()
+                logger.debug(
+                    f"First timestamp: {min_ts} (represents BEGINNING of candle)"
+                )
+                logger.debug(
+                    f"Last timestamp: {max_ts} (represents BEGINNING of candle)"
+                )
+
+                # Check if the first expected timestamp is present
+                if min_ts > start_time:
+                    time_diff = (min_ts - start_time).total_seconds()
+                    logger.debug(
+                        f"First timestamp ({min_ts}) is later than requested start time ({start_time}), diff: {time_diff} seconds"
+                    )
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] First candle is missing from result! This may indicate a timestamp interpretation issue."
+                    )
+
+                # Check if the last expected timestamp is present
+                if max_ts < end_time:
+                    logger.debug(
+                        f"Last timestamp ({max_ts}) is earlier than requested end time ({end_time})"
+                    )
+            elif isinstance(filtered_df.index, pd.DatetimeIndex):
+                min_ts = filtered_df.index.min()
+                max_ts = filtered_df.index.max()
+                logger.debug(
+                    f"First timestamp: {min_ts} (represents BEGINNING of candle)"
+                )
+                logger.debug(
+                    f"Last timestamp: {max_ts} (represents BEGINNING of candle)"
+                )
+
+            # Debug: Log first few rows after filtering
+            logger.debug("[TIMESTAMP TRACE] After filtering results:")
+            if time_column in filtered_df.columns:
+                for i in range(min(3, len(filtered_df))):
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] Filtered row {i}: {time_column}={filtered_df[time_column].iloc[i]}"
+                    )
+            elif (
+                isinstance(filtered_df.index, pd.DatetimeIndex)
+                and filtered_df.index.name == time_column
+            ):
+                for i in range(min(3, len(filtered_df))):
+                    logger.debug(
+                        f"[TIMESTAMP TRACE] Filtered row {i}: {time_column}={filtered_df.index[i]}"
+                    )
+
+    # Debug: Final check on timestamp interpretation
+    logger.debug(
+        f"[TIMESTAMP TRACE] filter_dataframe_by_time completed. Input rows: {len(df)}, Output rows: {len(filtered_df)}"
+    )
+    if len(filtered_df) > 0 and len(df) > 0:
+        # Check if rows at exact boundaries were handled correctly
+        if time_column in df.columns and time_column in filtered_df.columns:
+            start_match_in_input = (df[time_column] == start_time).any()
+            start_match_in_output = (filtered_df[time_column] == start_time).any()
+            logger.debug(
+                f"[TIMESTAMP TRACE] Start time exact match in input: {start_match_in_input}, in output: {start_match_in_output}"
+            )
+            if start_match_in_input and not start_match_in_output:
+                logger.warning(
+                    f"[TIMESTAMP TRACE] Critical issue: Row with exact start_time existed in input but not in output!"
+                )
 
     return filtered_df
 
@@ -486,6 +685,11 @@ def align_time_boundaries(
     - endTime: Rounds DOWN to the previous interval boundary if not exactly on a boundary
     - Both boundaries are treated as INCLUSIVE after alignment
     - Microsecond/millisecond precision is ignored and rounded to interval boundaries
+
+    This implementation preserves the semantic meaning of timestamps:
+    - The aligned start_time represents the BEGINNING of the first candle in the range
+    - The aligned end_time represents the BEGINNING of the last candle in the range
+      (the actual end of the data range is end_time + interval_duration - 1 microsecond)
 
     This implementation is mathematically precise and works for all interval types:
     1s, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M.
@@ -531,8 +735,21 @@ def align_time_boundaries(
         aligned_end_microseconds / 1_000_000, tz=timezone.utc
     )
 
+    # Log with explicit semantic meaning of timestamps
     logger.debug(
-        f"Aligned boundaries: {start_time} -> {aligned_start}, {end_time} -> {aligned_end} (interval: {interval.value})"
+        f"Aligned boundaries: {start_time} → {aligned_start} (BEGINNING of first candle), "
+        f"{end_time} → {aligned_end} (BEGINNING of last candle) "
+        f"(interval: {interval.value})"
+    )
+
+    # Calculate and log the actual data range
+    actual_end_time = datetime.fromtimestamp(
+        (aligned_end_microseconds + interval_microseconds - 1) / 1_000_000,
+        tz=timezone.utc,
+    )
+    logger.debug(
+        f"Complete data range after alignment: {aligned_start} to {actual_end_time} "
+        f"(from BEGINNING of first candle to END of last candle)"
     )
 
     return aligned_start, aligned_end
@@ -626,6 +843,7 @@ class TimeseriesDataProcessor:
         - Properly handles timezone awareness
         - Normalizes numeric columns
         - Removes duplicates and ensures chronological ordering
+        - Preserves exact timestamps from raw data without any shifting
 
         Args:
             raw_data: List of kline data from an API
@@ -681,11 +899,7 @@ class TimeseriesDataProcessor:
                 # Convert to datetime with the appropriate unit
                 df[col] = pd.to_datetime(df[col], unit=timestamp_unit, utc=True)
 
-                # For close_time, add adjustment to match API behavior
-                if col == "close_time":
-                    # Close time should be 1 microsecond before the next interval
-                    df[col] = df[col] + pd.Timedelta(microseconds=-1)
-
+                # Log the exact timestamp values
                 if len(raw_data) > 0:
                     logger.debug(f"Converted {col}: {df[col].iloc[0]}")
                     logger.debug(f"{col} microseconds: {df[col].iloc[0].microsecond}")
@@ -729,13 +943,39 @@ class TimeseriesDataProcessor:
             # Set the index to open_time for consistent behavior
             df = df.set_index("open_time")
 
-            # Ensure close_time exists (calculate it if not provided)
-            if "close_time" not in df.columns:
-                logger.debug("Calculating close_time from index values")
-                # Use 1 second by default for missing close times
-                df["close_time"] = (
-                    df.index + pd.Timedelta(seconds=1) - pd.Timedelta(microseconds=1)
-                )
+            # If close_time doesn't exist in the raw data, we need to calculate it
+            # but we should clearly log that we are doing this modification
+            if "close_time" not in df.columns and "close_time" not in columns:
+                logger.debug("close_time not in raw data, calculating it from interval")
+                # Generate close_time based on the interval detected from consecutive timestamps
+                if len(df) > 1:
+                    # Estimate interval from first two timestamps
+                    first_two_indices = df.index[:2]
+                    estimated_interval = (
+                        first_two_indices[1] - first_two_indices[0]
+                    ).total_seconds()
+                    logger.debug(
+                        f"Estimated interval from timestamps: {estimated_interval} seconds"
+                    )
+                    # Calculate close_time based on this interval
+                    df["close_time"] = (
+                        df.index
+                        + pd.Timedelta(seconds=estimated_interval)
+                        - pd.Timedelta(microseconds=1)
+                    )
+                    logger.debug(
+                        f"Generated close_time using estimated interval: first value = {df['close_time'].iloc[0]}"
+                    )
+                else:
+                    # Default fallback to 1 second if we only have one timestamp
+                    logger.debug(
+                        "Only one timestamp, using default 1-second interval for close_time"
+                    )
+                    df["close_time"] = (
+                        df.index
+                        + pd.Timedelta(seconds=1)
+                        - pd.Timedelta(microseconds=1)
+                    )
 
         logger.debug(f"Final DataFrame shape: {df.shape}")
         return df

@@ -20,13 +20,18 @@ class TimestampedDataFrame(pd.DataFrame):
     This class enforces:
     1. Index must be DatetimeIndex
     2. Index must be timezone-aware and in UTC
-    3. Index must be named 'open_time'
+    3. Index must be named 'open_time' (representing the BEGINNING of each candle period)
     4. Index must be monotonically increasing
     5. No duplicate indices allowed
     """
 
     def __init__(self, *args, **kwargs):
-        """Initialize with DataFrame validation."""
+        """Initialize with DataFrame validation.
+
+        Preserves the semantic meaning of timestamps:
+        - open_time represents the BEGINNING of each candle period
+        - close_time represents the END of each candle period
+        """
         # Check if open_time exists as both index and column in the input DataFrame
         if args and isinstance(args[0], pd.DataFrame):
             df = args[0]
@@ -58,13 +63,17 @@ class TimestampedDataFrame(pd.DataFrame):
         if "open_time" not in self.columns:
             if hasattr(self.index, "name") and self.index.name == "open_time":
                 logger.debug("Ensuring open_time exists as column (copied from index)")
+                # Set from index while preserving semantic meaning (BEGINNING of candle)
                 self["open_time"] = self.index
                 logger.debug(
-                    f"Added open_time column, dtype: {self['open_time'].dtype}"
+                    f"Added open_time column, dtype: {self['open_time'].dtype} (represents BEGINNING of candle)"
                 )
 
     def _validate_and_normalize_index(self):
-        """Validate and normalize the index to meet requirements."""
+        """Validate and normalize the index to meet requirements.
+
+        Preserves the semantic meaning of open_time as the BEGINNING of each candle period.
+        """
         # Import here to avoid circular imports
         from utils.dataframe_utils import ensure_open_time_as_index
 
@@ -86,8 +95,25 @@ class TimestampedDataFrame(pd.DataFrame):
 
             # Log final state
             logger.debug(
-                f"TimestampedDataFrame index properly validated: {len(self)} rows"
+                f"TimestampedDataFrame index properly validated: {len(self)} rows, "
+                f"index represents BEGINNING of each candle period"
             )
+
+            # Verify semantic meaning of timestamps
+            if len(self) > 0 and "close_time" in self.columns:
+                first_open = (
+                    self.index[0] if isinstance(self.index, pd.DatetimeIndex) else None
+                )
+                first_close = (
+                    self["close_time"].iloc[0] if "close_time" in self.columns else None
+                )
+
+                if first_open is not None and first_close is not None:
+                    time_diff = (first_close - first_open).total_seconds()
+                    logger.debug(
+                        f"Time difference between first open_time and close_time: {time_diff:.3f}s"
+                        f" (open_time=BEGINNING of candle, close_time=END of candle)"
+                    )
         except Exception as e:
             logger.error(f"Error normalizing index: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
@@ -119,5 +145,8 @@ class TimestampedDataFrame(pd.DataFrame):
         if key == CANONICAL_INDEX_NAME:
             logger.warning(
                 f"Setting {CANONICAL_INDEX_NAME} directly - this may cause issues. Use index operations instead."
+            )
+            logger.debug(
+                f"Remember: {CANONICAL_INDEX_NAME} represents the BEGINNING of each candle period"
             )
         super().__setitem__(key, value)

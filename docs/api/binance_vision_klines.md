@@ -268,3 +268,84 @@ These kline intervals can be used with the Data Source Manager to fetch and cach
 ## Verification
 
 All intervals listed in this document were verified as available by testing API endpoint responses on the date of document creation.
+
+## Timestamp Boundaries and Behavior
+
+Based on direct testing with the Binance Vision API, we've observed the following timestamp behavior across different intervals:
+
+### Raw Data Timestamp Structure
+
+For each interval type, the raw data files follow these timestamp patterns:
+
+1. **All intervals start at interval boundaries**: The first data point in each file corresponds to the first interval boundary of the day.
+
+   - For 1s intervals: First timestamp is exactly 00:00:00
+   - For 1m intervals: First timestamp is exactly 00:00:00
+   - For 3m intervals: First timestamp is exactly 00:00:00
+   - For 5m intervals: First timestamp is exactly 00:00:00
+   - For 15m intervals: First timestamp is exactly 00:00:00
+   - For 1h intervals: First timestamp is exactly 00:00:00
+
+2. **Timestamp semantic meaning**:
+
+   - `open_time` (first column): Represents the **beginning** of the candle period
+   - `close_time` (7th column): Represents the **end** of the candle period
+
+3. **Timestamp precision**:
+   - 2023 and earlier: Millisecond precision (13 digits, e.g., `1678838400000`)
+   - 2025 and later: Microsecond precision (16 digits, e.g., `1741996800000000`)
+
+### Timestamp Alignment
+
+When processing these timestamps, it's important to preserve their semantic meaning:
+
+```text
+First candle for 1m interval (2023):
+open_time: 1678838400000 (2023-03-15 00:00:00+00:00) - Beginning of candle
+close_time: 1678838459999 (2023-03-15 00:00:59.999+00:00) - End of candle
+```
+
+```text
+First candle for 1m interval (2025):
+open_time: 1741996800000000 (2025-03-15 00:00:00+00:00) - Beginning of candle
+close_time: 1741996859999999 (2025-03-15 00:00:59.999999+00:00) - End of candle
+```
+
+When implementing applications that use this data, ensure that:
+
+1. Timestamps are interpreted as the **beginning** of the candle period
+2. Proper handling accounts for different precision between pre-2025 and 2025+ data
+3. When filtering by time ranges, the temporal semantics of the timestamps are preserved
+
+### Timestamp Conversion Considerations
+
+When converting timestamps to datetime objects:
+
+```python
+# For millisecond precision (2023 and earlier)
+from datetime import datetime, timezone
+millisecond_ts = 1678838400000  # From 2023 data
+dt = datetime.fromtimestamp(millisecond_ts / 1000, tz=timezone.utc)
+# Result: 2023-03-15 00:00:00+00:00
+
+# For microsecond precision (2025 and later)
+microsecond_ts = 1741996800000000  # From 2025 data
+dt = datetime.fromtimestamp(microsecond_ts / 1000000, tz=timezone.utc)
+# Result: 2025-03-15 00:00:00+00:00
+```
+
+## Interval Boundary Behavior
+
+For applications that need to fetch and merge data across time boundaries, understanding how the Binance Vision API structures these boundaries is crucial:
+
+1. **Daily files contain all intervals that start within that day**:
+
+   - A 1m candle starting at 23:59:00 on March 15 will be in the March 15 file, even though it ends at 00:00:00 on March 16
+   - A 1h candle starting at 23:00:00 on March 15 will be in the March 15 file, even though it ends at 00:00:00 on March 16
+
+2. **First interval behavior**:
+   - For 1s intervals: The file contains data starting from 00:00:00
+   - For 1m intervals: The file contains data starting from 00:00:00
+   - For larger intervals: The file contains data starting from 00:00:00
+
+When implementing data processing systems, these boundary behaviors should be carefully considered to avoid missing or duplicating data when working across day boundaries.
