@@ -135,8 +135,27 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
     # Add extended columns based on existing data
     df = standardize_column_names(df)
 
-    # Perform any REST API-specific post-processing here if needed
+    # Ensure we consistently return a DataFrame with open_time as a column, never as an index
+    # This prevents downstream ambiguity
+    if (
+        hasattr(df, "index")
+        and hasattr(df.index, "name")
+        and df.index.name == "open_time"
+    ):
+        logger.debug("Resetting index to ensure open_time is a column, not an index")
+        df = df.reset_index()
 
+    # Ensure there's only one open_time (column takes precedence over index)
+    if (
+        hasattr(df, "index")
+        and hasattr(df.index, "name")
+        and df.index.name == "open_time"
+        and "open_time" in df.columns
+    ):
+        logger.debug("Resolving ambiguous open_time by keeping only the column version")
+        df = df.reset_index(drop=True)
+
+    # Perform any REST API-specific post-processing here if needed
     return df
 
 

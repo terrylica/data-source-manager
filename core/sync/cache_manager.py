@@ -342,6 +342,15 @@ class UnifiedCacheManager:
             logger.warning("Cannot cache empty DataFrame")
             return False
 
+        # Ensure data is sorted by open_time before caching for KLINES chart type
+        # This is the final safety check to prevent unsorted cache entries
+        if "open_time" in df.columns and chart_type.upper() == "KLINES":
+            if not df["open_time"].is_monotonic_increasing:
+                logger.debug(
+                    f"UnifiedCacheManager: Sorting data by open_time before caching for {symbol}"
+                )
+                df = df.sort_values("open_time").reset_index(drop=True)
+
         # Generate cache key
         cache_key = self.get_cache_key(
             symbol, interval, date, provider, chart_type, market_type

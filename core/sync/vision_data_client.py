@@ -506,6 +506,12 @@ class VisionDataClient(Generic[T]):
                     try:
                         df = future.result()
                         if df is not None and not df.empty:
+                            # Ensure each dataframe is properly sorted by open_time before adding it
+                            if (
+                                "open_time" in df.columns
+                                and not df["open_time"].is_monotonic_increasing
+                            ):
+                                df = df.sort_values("open_time").reset_index(drop=True)
                             downloaded_dfs.append(df)
                     except Exception as exc:
                         logger.error(f"Error downloading data for {date}: {exc}")
@@ -535,9 +541,10 @@ class VisionDataClient(Generic[T]):
             return self._create_empty_dataframe()
 
         # Sort the dataframe by timestamp
-        concatenated_df = concatenated_df.sort_values("open_time").reset_index(
-            drop=True
-        )
+        if not concatenated_df["open_time"].is_monotonic_increasing:
+            concatenated_df = concatenated_df.sort_values("open_time").reset_index(
+                drop=True
+            )
 
         # Filter by the exact time range requested
         filtered_df = filter_dataframe_by_time(
@@ -606,16 +613,32 @@ class VisionDataClient(Generic[T]):
 
         # Convert to TimestampedDataFrame format
         try:
-            # Create a new column for microsecond precision timestamp to use as index
+            # The main issue is when creating the TimestampedDataFrame:
+            # If we have both open_time column and set open_time_us as index with name open_time,
+            # we'd get the ambiguity error.
+
+            # First make sure we don't have open_time column if we're going to use it as index name
             if "open_time_us" not in filtered_df.columns:
+                # Create a microsecond precision timestamp column to use as index
                 filtered_df["open_time_us"] = (
                     filtered_df["open_time"].astype(int).mul(1000000)
                 )
 
-            # Set the index
-            filtered_df = filtered_df.set_index("open_time_us")
+            # Create a copy without the open_time column before setting the index
+            # to avoid the ambiguity of having open_time as both column and index name
+            if "open_time" in filtered_df.columns:
+                df_for_index = filtered_df.drop(columns=["open_time"])
 
-            return TimestampedDataFrame(filtered_df)
+                # Set the index with open_time_us column
+                df_for_index = df_for_index.set_index("open_time_us")
+
+                # The TimestampedDataFrame class will handle naming the index as 'open_time'
+                return TimestampedDataFrame(df_for_index)
+            else:
+                # If there's no open_time column, just set the index normally
+                filtered_df = filtered_df.set_index("open_time_us")
+                return TimestampedDataFrame(filtered_df)
+
         except Exception as e:
             logger.error(f"Error creating TimestampedDataFrame: {e}")
             return self._create_empty_dataframe()

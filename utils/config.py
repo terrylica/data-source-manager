@@ -225,6 +225,7 @@ def create_empty_dataframe(chart_type=None) -> pd.DataFrame:
         An empty DataFrame with correct column types and index
     """
     from utils.market_constraints import ChartType
+    from utils.logger_setup import logger
 
     # Determine chart type
     if isinstance(chart_type, str):
@@ -253,9 +254,19 @@ def create_empty_dataframe(chart_type=None) -> pd.DataFrame:
     for col, dtype in dtypes_to_use.items():
         df[col] = df[col].astype(dtype)
 
-    # Set index
-    df.index = pd.DatetimeIndex([], name=CANONICAL_INDEX_NAME)
+    # IMPORTANT: To avoid the ambiguity of having 'open_time' as both column and index,
+    # we create a consistent structure where open_time is ONLY a column, and we use
+    # a different internal name for the index (open_time_us)
+    logger.debug("Creating empty DataFrame with consistent open_time structure")
+
+    # Create a proper timestamp index but don't call it 'open_time'
+    # to avoid conflict with the 'open_time' column
+    df.index = pd.DatetimeIndex([], name="open_time_us")
     df.index = df.index.tz_localize(DEFAULT_TIMEZONE)
+
+    # Ensure open_time exists as a column and not just as index name
+    if "open_time" not in df.columns:
+        df["open_time"] = pd.Series(dtype="datetime64[ns, UTC]")
 
     return df
 

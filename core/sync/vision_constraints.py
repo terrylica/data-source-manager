@@ -284,16 +284,47 @@ class TimestampedDataFrame(pd.DataFrame):
 
     def __init__(self, *args, **kwargs):
         """Initialize with DataFrame validation."""
+        # Check if open_time exists as both index and column in the input DataFrame
+        if args and isinstance(args[0], pd.DataFrame):
+            df = args[0]
+            if (
+                hasattr(df, "index")
+                and hasattr(df.index, "name")
+                and df.index.name == CANONICAL_INDEX_NAME
+                and CANONICAL_INDEX_NAME in df.columns
+            ):
+                # Create a new DataFrame without the ambiguous structure
+                # Keep only the column version of open_time and set it as index later
+                df = pd.DataFrame(df.reset_index())
+                # Update args with the corrected DataFrame
+                args = (df,) + args[1:]
+                logger.debug("Resolved ambiguous open_time in index and columns")
+
         super().__init__(*args, **kwargs)
         self._validate_and_normalize_index()
 
     def _validate_and_normalize_index(self):
         """Validate and normalize the index to meet requirements."""
+        # First check for ambiguous index/column situation
+        if (
+            CANONICAL_INDEX_NAME in self.columns
+            and hasattr(self.index, "name")
+            and self.index.name == CANONICAL_INDEX_NAME
+        ):
+            # Reset the index to resolve the ambiguity
+            self.reset_index(inplace=True)
+            logger.debug("Resolved ambiguous index by resetting index")
+
         # Convert index to DatetimeIndex if it's not already
         if not isinstance(self.index, pd.DatetimeIndex):
             try:
-                # Try to convert the index to datetime
-                self.index = pd.to_datetime(self.index, utc=True)
+                # If open_time is in columns, set it as index
+                if CANONICAL_INDEX_NAME in self.columns:
+                    self.set_index(CANONICAL_INDEX_NAME, inplace=True)
+                    logger.debug(f"Set {CANONICAL_INDEX_NAME} column as index")
+                else:
+                    # Try to convert the existing index to datetime
+                    self.index = pd.to_datetime(self.index, utc=True)
             except Exception as e:
                 raise ValueError(f"Failed to convert index to DatetimeIndex: {e}")
 

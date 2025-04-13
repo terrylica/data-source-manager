@@ -611,6 +611,11 @@ class DataSourceManager:
         if not self.use_cache or self.cache_manager is None or df.empty:
             return
 
+        # Ensure data is sorted by open_time before caching to prevent unsorted cache entries
+        if "open_time" in df.columns and not df["open_time"].is_monotonic_increasing:
+            logger.debug(f"Sorting data by open_time before caching for {symbol}")
+            df = df.sort_values("open_time").reset_index(drop=True)
+
         # Get market type string for cache key
         market_type_str = self._get_market_type_str()
 
@@ -749,8 +754,41 @@ class DataSourceManager:
         if len(dfs) == 1:
             return self._standardize_columns(dfs[0])
 
-        # Concatenate all DataFrames
-        merged = pd.concat(dfs, ignore_index=True)
+        # Normalize all dataframes to have 'open_time' as a column, not an index
+        # This prevents the 'open_time is both an index level and a column label' error
+        normalized_dfs = []
+        for df in dfs:
+            # First, handle the case where open_time is both an index and column
+            if (
+                hasattr(df, "index")
+                and hasattr(df.index, "name")
+                and df.index.name == "open_time"
+                and "open_time" in df.columns
+            ):
+                # Create a new DataFrame with reset index to avoid ambiguity
+                df_copy = pd.DataFrame(df.reset_index())
+                df_copy.drop(columns=["open_time"], errors="ignore", inplace=True)
+                normalized_dfs.append(df_copy)
+                logger.debug("Normalized DataFrame with ambiguous open_time")
+                continue
+
+            # Handle case where open_time is only the index
+            if (
+                hasattr(df, "index")
+                and hasattr(df.index, "name")
+                and df.index.name == "open_time"
+                and "open_time" not in df.columns
+            ):
+                df_copy = df.reset_index()
+                normalized_dfs.append(df_copy)
+                logger.debug("Reset index for DataFrame with open_time as index")
+                continue
+
+            # If open_time is already a column and not an index, use as is
+            normalized_dfs.append(df)
+
+        # Concatenate all normalized DataFrames
+        merged = pd.concat(normalized_dfs, ignore_index=True)
 
         # For overlapping records (same open_time), prioritize data sources in order:
         # CACHE > VISION > REST
@@ -1056,6 +1094,30 @@ class DataSourceManager:
         """
         if df.empty:
             return df
+
+        # First, handle potential ambiguity of open_time
+        # If open_time exists as both index and column, resolve the ambiguity
+        if (
+            hasattr(df, "index")
+            and hasattr(df.index, "name")
+            and df.index.name == "open_time"
+            and "open_time" in df.columns
+        ):
+            logger.warning(
+                "Detected open_time as both index and column - resolving ambiguity"
+            )
+            # Reset index and use only the column version
+            df = df.reset_index(drop=True)
+
+        # If open_time exists only as index, convert it to a column
+        elif (
+            hasattr(df, "index")
+            and hasattr(df.index, "name")
+            and df.index.name == "open_time"
+            and "open_time" not in df.columns
+        ):
+            logger.debug("Converting open_time from index to column for consistency")
+            df = df.reset_index()
 
         # Define standard columns in their expected order
         standard_columns = [
