@@ -744,7 +744,7 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description="Demonstrate DataSourceManager API for Binance data retrieval"
+        description="Demonstrate DataSourceManager with Failover Composition Priority (FCP) for Binance data retrieval"
     )
 
     # Market type selection (explicitly list all options from MarketType enum)
@@ -800,12 +800,12 @@ def main():
         help="Trading symbol (e.g., BTCUSDT for spot/UM, BTCUSD_PERP for CM)",
     )
 
-    # Time range options
+    # Time range options (for legacy mode)
     parser.add_argument(
         "--days",
         type=int,
         default=1,
-        help="Number of days to fetch (used for regular mode)",
+        help="Number of days to fetch (used for legacy mode only)",
     )
 
     # Cache options
@@ -833,7 +833,7 @@ def main():
         help="Number of retry attempts for API requests",
     )
 
-    # Demo options
+    # Special test modes
     parser.add_argument(
         "--historical-test",
         action="store_true",
@@ -844,12 +844,6 @@ def main():
         "--debug",
         action="store_true",
         help="Enable debug mode with additional output and chunked data retrieval",
-    )
-
-    parser.add_argument(
-        "--demo-merge",
-        action="store_true",
-        help="Demonstrate data source merging from cache, VISION API, and REST API",
     )
 
     # Add enforce_source parameter to the argument parser
@@ -886,33 +880,6 @@ def main():
     else:
         enforce_source = DataSource.AUTO
 
-    # Run data source merging demo if requested
-    if args.demo_merge:
-        print(f"\n[bold green]Running Data Source Merging Demo[/bold green]")
-        df = demonstrate_data_source_merging(
-            market_type=market_type,
-            symbol=args.symbol,
-            interval=interval_enum,
-            provider=provider,
-            chart_type=chart_type,
-            max_retries=args.retries,
-            enforce_source=enforce_source,
-        )
-
-        # Save data to CSV if retrieved successfully
-        if df is not None and not df.empty:
-            output_dir = Path("./logs/merge_tests")
-            output_dir.mkdir(parents=True, exist_ok=True)
-
-            # Create a filename with relevant info
-            filename = f"{market_type.name.lower()}_{args.symbol}_{args.interval}_{chart_type.name.lower()}_merge_test.csv"
-            output_path = output_dir / filename
-
-            df.to_csv(output_path, index=False)
-            print(f"[bold green]Saved {len(df)} records to {output_path}[/bold green]")
-
-        return
-
     # Run historical data test if requested
     if args.historical_test:
         df = get_historical_data_test(
@@ -942,32 +909,6 @@ def main():
 
         return
 
-    # Define time range for regular mode
-    end_time = datetime.now(timezone.utc)
-    start_time = end_time - timedelta(days=args.days)
-
-    # Adjust symbol for CM (Coin-Margined Futures) market
-    symbol = args.symbol
-    if market_type == MarketType.FUTURES_COIN and symbol == "BTCUSDT":
-        symbol = "BTCUSD_PERP"
-        print(f"[yellow]Adjusted symbol for CM market: {symbol}[/yellow]")
-
-    # Print configuration
-    print(f"[bold cyan]Fetching {args.days} days of data[/bold cyan]")
-    print(f"Market Type: {market_type.name}")
-    print(f"Symbol: {symbol}")
-    print(f"Chart Type: {chart_type.name}")
-    print(f"Data Provider: {provider.name}")
-    print(f"Interval: {interval_enum.value}")
-    print(f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}")
-    print(f"Caching: {'Enabled' if args.use_cache else 'Disabled'}")
-    print(f"Retries: {args.retries}")
-
-    if args.enforce_source != "AUTO":
-        print(
-            f"[bold yellow]Enforcing data source: {args.enforce_source}[/bold yellow]"
-        )
-
     # Demonstrate cache effect if requested
     if args.demo_cache:
         # First run - should fetch from the source
@@ -975,9 +916,9 @@ def main():
         first_start = time.time()
         df_first = get_data_sync(
             market_type=market_type,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
+            symbol=args.symbol,
+            start_time=datetime.now(timezone.utc) - timedelta(days=args.days),
+            end_time=datetime.now(timezone.utc),
             interval=interval_enum,
             provider=provider,
             chart_type=chart_type,
@@ -993,9 +934,9 @@ def main():
         second_start = time.time()
         df_second = get_data_sync(
             market_type=market_type,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
+            symbol=args.symbol,
+            start_time=datetime.now(timezone.utc) - timedelta(days=args.days),
+            end_time=datetime.now(timezone.utc),
             interval=interval_enum,
             provider=provider,
             chart_type=chart_type,
@@ -1025,37 +966,31 @@ def main():
                 "[bold green]Both dataframes are identical - cache is working perfectly![/bold green]"
             )
 
-    else:
-        # Regular single run
-        df = get_data_sync(
-            market_type=market_type,
-            symbol=symbol,
-            start_time=start_time,
-            end_time=end_time,
-            interval=interval_enum,
-            provider=provider,
-            chart_type=chart_type,
-            use_cache=args.use_cache,
-            show_cache_path=args.show_cache,
-            max_retries=args.retries,
-            enforce_source=enforce_source,
-        )
+        return
 
-        # Display results
-        if df is not None and not df.empty:
-            print("\n[bold green]Data Retrieved Successfully![/bold green]")
+    # Default behavior: run data source merge demo
+    print(f"[bold green]Running Data Source Merging Demo with FCP[/bold green]")
+    df = demonstrate_data_source_merging(
+        market_type=market_type,
+        symbol=args.symbol,
+        interval=interval_enum,
+        provider=provider,
+        chart_type=chart_type,
+        max_retries=args.retries,
+        enforce_source=enforce_source,
+    )
 
-            # Print source breakdown if available
-            if "_data_source" in df.columns:
-                source_counts = df["_data_source"].value_counts()
-                print(f"\n[bold cyan]Data Source Breakdown:[/bold cyan]")
-                for source, count in source_counts.items():
-                    print(f"{source}: {count} records ({count/len(df)*100:.1f}%)")
+    # Save data to CSV if retrieved successfully
+    if df is not None and not df.empty:
+        output_dir = Path("./logs/merge_tests")
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-            print(f"\nData sample ({min(5, len(df))} records of {len(df)} total):")
-            print(df.head())
-        else:
-            print("\n[bold red]No data retrieved![/bold red]")
+        # Create a filename with relevant info
+        filename = f"{market_type.name.lower()}_{args.symbol}_{args.interval}_{chart_type.name.lower()}_merge_test.csv"
+        output_path = output_dir / filename
+
+        df.to_csv(output_path, index=False)
+        print(f"[bold green]Saved {len(df)} records to {output_path}[/bold green]")
 
 
 if __name__ == "__main__":

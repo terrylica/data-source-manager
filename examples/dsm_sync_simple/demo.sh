@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script to demonstrate synchronous data retrieval using DataSourceManager
-# for Bitcoin data across different market types (SPOT, UM, CM)
+# with Failover Composition Priority (FCP) for data source merging
 
 # Navigate to project root
 if [[ -d "core" && -d "utils" && -d "examples" ]]; then
@@ -32,108 +32,53 @@ NC='\033[0m' # No Color
 # Show help function
 show_help() {
   echo -e "${GREEN}################################################${NC}"
-  echo -e "${GREEN}# Pure Synchronous Binance Data Retrieval Demo #${NC}"
+  echo -e "${GREEN}# Binance Data Retrieval Demo with FCP Merging #${NC}"
   echo -e "${GREEN}################################################${NC}"
-  echo -e "This script demonstrates synchronous data retrieval for Bitcoin data across different market types.\n"
+  echo -e "This script demonstrates data source merging across Cache, VISION API, and REST API using the Failover Composition Priority (FCP).\n"
   
   echo -e "${CYAN}USAGE:${NC}"
   echo -e "  ./examples/dsm_sync_simple/demo.sh [OPTIONS] [PARAMETERS]${NC}"
-  echo -e "  ./examples/dsm_sync_simple/demo.sh [MARKET] [DAYS] [PROVIDER] [CACHE_FLAG] [RETRIES] [CHART_TYPE]${NC}\n"
+  echo -e "  ./examples/dsm_sync_simple/demo.sh [MARKET] [SYMBOL] [INTERVAL] [CHART_TYPE]${NC}\n"
   
   echo -e "${CYAN}OPTIONS:${NC}"
   echo -e "  -h, --help             Show this help message and exit"
-  echo -e "  --demo-cache           Demonstrate cache behavior by running twice"
-  echo -e "  --historical-test      Run historical test (Dec 2024-Feb 2025)"
-  echo -e "  --demo-merge           Run data source merging demo\n"
+  echo -e "  --cache-demo           Demonstrate cache behavior by running the data retrieval twice"
+  echo -e "  --historical-test      Run historical test with specific dates (Dec 2024-Feb 2025)${NC}\n"
   
-  echo -e "${CYAN}STANDARD PARAMETERS:${NC}"
-  echo -e "  MARKET                 Market type: spot, um, or cm"
-  echo -e "  DAYS                   Number of days of data to retrieve"
-  echo -e "  PROVIDER               Data provider (default: binance)"
-  echo -e "  CACHE_FLAG             Use --use-cache to enable caching"
-  echo -e "  RETRIES                Number of retry attempts (default: 3)"
-  echo -e "  CHART_TYPE             Type of chart data: klines or fundingRate (default: klines)\n"
-  
-  echo -e "${CYAN}SPECIAL PARAMETERS FOR --demo-merge:${NC}"
-  echo -e "  MARKET                 Market type: spot, um, or cm"
+  echo -e "${CYAN}PARAMETERS:${NC}"
+  echo -e "  MARKET                 Market type: spot, um, or cm (default: spot)"
   echo -e "  SYMBOL                 Trading symbol (default: BTCUSDT)"
   echo -e "  INTERVAL               Time interval: 1m, 5m, etc. (default: 1m)"
-  echo -e "  CHART_TYPE             Type of chart data (default: klines)\n"
+  echo -e "  CHART_TYPE             Type of chart data: klines or fundingRate (default: klines)${NC}\n"
   
   echo -e "${CYAN}EXAMPLES:${NC}"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh${NC}                            # Run default demo for all markets"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 7${NC}                     # For 7 days of SPOT data"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh um 3${NC}                       # For 3 days of UM futures data"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh cm 5 binance${NC}               # For 5 days of CM futures data with explicit provider"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache${NC} # Enable caching for the request"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache 5${NC} # With 5 retry attempts"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot 1 binance --use-cache 3 klines${NC} # Specify chart type"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-cache spot 1${NC}        # Demonstrate cache behavior"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --historical-test spot${NC}     # Run historical test"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --historical-test spot BTCUSDT 1m binance --chart-type fundingRate${NC}"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot${NC}          # Run data source merging demo with default symbol"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot BTCUSDT 1m klines${NC} # Custom merge demo for a specific symbol"
-  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --demo-merge spot ETHUSDT 5m klines${NC} # Custom merge demo for ETH with 5m interval"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh${NC}                            # Run default FCP merge demo for BTCUSDT in SPOT market"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh spot ETHUSDT 5m klines${NC}     # Run merge demo for ETH with 5m interval"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh um BTCUSDT 1m klines${NC}       # Run merge demo for BTC in UM futures market"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh cm BTCUSD_PERP 1m klines${NC}   # Run merge demo for BTC in CM futures market"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --cache-demo spot BTCUSDT${NC}  # Demonstrate cache performance"
+  echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --historical-test spot${NC}     # Run historical test in SPOT market"
 }
 
-# Define function to run demo
-run_market_demo() {
-  local market_type=$1
-  local days=$2
-  local provider=${3:-"binance"}
-  local cache_flag=$4
-  local cache_demo_flag=$5
-  local retries=${6:-3}
-  local chart_type=${7:-"klines"}
-  
-  echo -e "\n${CYAN}===============================================${NC}"
-  echo -e "${CYAN}Running Bitcoin data demo for $market_type market${NC}"
-  echo -e "${CYAN}Provider: $provider${NC}"
-  echo -e "${CYAN}Chart Type: $chart_type${NC}"
-  if [[ "$cache_flag" == "--use-cache" ]]; then
-    echo -e "${CYAN}Cache: enabled${NC}"
-  fi
-  if [[ "$cache_demo_flag" == "--demo-cache" ]]; then
-    echo -e "${CYAN}Cache Demo: enabled (will run twice to show cache effect)${NC}"
-  fi
-  echo -e "${CYAN}Retry attempts: $retries${NC}"
-  echo -e "${CYAN}===============================================${NC}"
-  
-  # Build command with appropriate flags
-  cmd="python examples/dsm_sync_simple/demo.py --market \"$market_type\" --days \"$days\" --provider \"$provider\" --retries \"$retries\" --chart-type \"$chart_type\""
-  
-  if [[ "$cache_flag" == "--use-cache" ]]; then
-    cmd="$cmd --use-cache"
-  fi
-  
-  if [[ "$cache_demo_flag" == "--demo-cache" ]]; then
-    cmd="$cmd --demo-cache"
-  fi
-  
-  # Run the command
-  eval $cmd
-  
-  # Add a pause between runs
-  if [ "$market_type" != "cm" ]; then
-    echo -e "\n${YELLOW}Pausing before next demo...${NC}"
-    sleep 2
-  fi
-}
-
-# Function to run the merge demo
-run_merge_demo() {
-  local market_type=$1
+# Function to demonstrate data source merging (now the default)
+function run_merge_demo() {
+  local market_type=${1:-"spot"}
   local symbol=${2:-"BTCUSDT"}
   local interval=${3:-"1m"}
   local chart_type=${4:-"klines"}
+  local enforce_source=${5:-"AUTO"}
   
   echo -e "\n${CYAN}=================================================${NC}"
-  echo -e "${CYAN}Running Data Source Merge Demo${NC}"
+  echo -e "${CYAN}Running Data Source Merge Demo with FCP${NC}"
   echo -e "${CYAN}Market: $market_type | Symbol: $symbol | Interval: $interval | Chart Type: $chart_type${NC}"
   echo -e "${CYAN}=================================================${NC}"
   
-  # Build command with appropriate flags
-  cmd="python examples/dsm_sync_simple/demo.py --market \"$market_type\" --symbol \"$symbol\" --interval \"$interval\" --chart-type \"$chart_type\" --demo-merge"
+  # Build command
+  cmd="python examples/dsm_sync_simple/demo.py --market \"$market_type\" --symbol \"$symbol\" --interval \"$interval\" --chart-type \"$chart_type\""
+  
+  if [ "$enforce_source" != "AUTO" ]; then
+    cmd="$cmd --enforce-source=$enforce_source"
+  fi
   
   # Run the command
   eval $cmd
@@ -141,307 +86,103 @@ run_merge_demo() {
 
 # Function to run historical data test
 function run_historical_test() {
-    echo -e "${YELLOW}Running historical data test using DataSourceManager...${NC}"
-    
-    # Default to spot market if not specified
-    MARKET=${1:-spot}
-    SYMBOL=${2:-BTCUSDT}
-    INTERVAL=${3:-1m}
-    PROVIDER=${4:-binance}  # Changed from USE_CACHE to PROVIDER
-    USE_CACHE=${5:-false}    # Changed from CHART_TYPE to USE_CACHE
-    DEBUG_MODE=${6:-false}  # Changed from DEBUG to DEBUG_MODE
-    RETRIES=${7:-3}         # New parameter
-    CHART_TYPE=${8:-klines} # Moved CHART_TYPE to position 8
-    
-    echo -e "${BLUE}DEBUG: MARKET=$MARKET, SYMBOL=$SYMBOL, INTERVAL=$INTERVAL, PROVIDER=$PROVIDER${NC}"
-    echo -e "${BLUE}DEBUG: USE_CACHE=$USE_CACHE, DEBUG_MODE=$DEBUG_MODE, RETRIES=$RETRIES, CHART_TYPE=$CHART_TYPE${NC}"
-    
-    # Construct the Python command
-    CMD="python examples/dsm_sync_simple/demo.py"
-    CMD+=" --market=$MARKET"
-    CMD+=" --symbol=$SYMBOL"
-    CMD+=" --interval=$INTERVAL"
-    CMD+=" --provider=$PROVIDER"
-    CMD+=" --retries=$RETRIES"
-    CMD+=" --chart-type=$CHART_TYPE"
-    CMD+=" --historical-test"
-    
-    # Add optional flags
-    if [ "$USE_CACHE" = "true" ]; then
-        CMD+=" --use-cache"
-    fi
-    
-    if [ "$DEBUG_MODE" = "true" ]; then
-        CMD+=" --debug"
-    fi
-    
-    # Execute the command
-    echo -e "${BLUE}Executing: $CMD${NC}"
-    set -x  # Enable command tracing
-    eval $CMD
-    set +x  # Disable command tracing
-}
-
-# Function to get data synchronously
-function get_data_sync() {
-    echo -e "${YELLOW}Running data retrieval synchronously using DataSourceManager...${NC}"
-    
-    # Default to spot market if not specified
-    MARKET=${1:-spot}
-    SYMBOL=${2:-BTCUSDT}
-    INTERVAL=${3:-1m}
-    DAYS=${4:-1}
-    USE_CACHE=${5:-false}
-    CHART_TYPE=${6:-klines}
-    DEBUG=${7:-false}
-    ENFORCE_SOURCE=${8:-AUTO}
-    
-    # Construct the Python command
-    CMD="python examples/dsm_sync_simple/demo.py"
-    CMD+=" --market=$MARKET"
-    CMD+=" --symbol=$SYMBOL"
-    CMD+=" --interval=$INTERVAL"
-    CMD+=" --days=$DAYS"
-    CMD+=" --chart-type=$CHART_TYPE"
-    
-    # Add optional flags
-    if [ "$USE_CACHE" = "true" ]; then
-        CMD+=" --use-cache"
-    fi
-    
-    if [ "$DEBUG" = "true" ]; then
-        CMD+=" --debug"
-    fi
-    
-    if [ "$ENFORCE_SOURCE" != "AUTO" ]; then
-        CMD+=" --enforce-source=$ENFORCE_SOURCE"
-    fi
-    
-    # Execute the command
-    echo -e "${BLUE}Executing: $CMD${NC}"
-    eval $CMD
-}
-
-# Function to demonstrate data source merging
-function demo_data_source_merging() {
-    echo -e "${YELLOW}Demonstrating data source merging with DataSourceManager...${NC}"
-    
-    # Default to spot market if not specified
-    MARKET=${1:-spot}
-    SYMBOL=${2:-BTCUSDT}
-    INTERVAL=${3:-1m}
-    CHART_TYPE=${4:-klines}
-    ENFORCE_SOURCE=${5:-AUTO}
-    
-    # Construct the Python command
-    CMD="python examples/dsm_sync_simple/demo.py"
-    CMD+=" --market=$MARKET"
-    CMD+=" --symbol=$SYMBOL"
-    CMD+=" --interval=$INTERVAL"
-    CMD+=" --chart-type=$CHART_TYPE"
-    CMD+=" --demo-merge"
-    
-    if [ "$ENFORCE_SOURCE" != "AUTO" ]; then
-        CMD+=" --enforce-source=$ENFORCE_SOURCE"
-    fi
-    
-    # Execute the command
-    echo -e "${BLUE}Executing: $CMD${NC}"
-    eval $CMD
+  local market_type=${1:-"spot"}
+  local symbol=${2:-"BTCUSDT"}
+  local interval=${3:-"1m"}
+  local provider=${4:-"binance"}
+  local use_cache="true"
+  local debug_mode=${5:-"false"}
+  local retries=${6:-3}
+  local chart_type=${7:-"klines"}
+  
+  echo -e "${GREEN}################################################${NC}"
+  echo -e "${GREEN}# Long-Term Historical Data Test Mode #${NC}"
+  echo -e "${GREEN}################################################${NC}"
+  echo -e "Running historical test for $market_type market with $symbol\n"
+  
+  # Construct the Python command
+  cmd="python examples/dsm_sync_simple/demo.py"
+  cmd+=" --market=$market_type"
+  cmd+=" --symbol=$symbol"
+  cmd+=" --interval=$interval"
+  cmd+=" --provider=$provider"
+  cmd+=" --retries=$retries"
+  cmd+=" --chart-type=$chart_type"
+  cmd+=" --historical-test"
+  
+  # Add optional flags
+  if [ "$use_cache" = "true" ]; then
+    cmd+=" --use-cache"
+  fi
+  
+  if [ "$debug_mode" = "true" ]; then
+    cmd+=" --debug"
+  fi
+  
+  # Execute the command
+  echo -e "${BLUE}Executing: $cmd${NC}"
+  eval $cmd
 }
 
 # Function to demonstrate cache performance
 function demo_cache_performance() {
-    echo -e "${YELLOW}Demonstrating cache performance with DataSourceManager...${NC}"
-    
-    # Default to spot market if not specified
-    MARKET=${1:-spot}
-    SYMBOL=${2:-BTCUSDT}
-    INTERVAL=${3:-1m}
-    DAYS=${4:-1}
-    CHART_TYPE=${5:-klines}
-    
-    # Construct the Python command
-    CMD="python examples/dsm_sync_simple/demo.py"
-    CMD+=" --market=$MARKET"
-    CMD+=" --symbol=$SYMBOL"
-    CMD+=" --interval=$INTERVAL"
-    CMD+=" --days=$DAYS"
-    CMD+=" --chart-type=$CHART_TYPE"
-    CMD+=" --demo-cache"
-    CMD+=" --show-cache"
-    
-    # Execute the command
-    echo -e "${BLUE}Executing: $CMD${NC}"
-    eval $CMD
+  local market_type=${1:-"spot"}
+  local symbol=${2:-"BTCUSDT"}
+  local interval=${3:-"1m"}
+  local chart_type=${4:-"klines"}
+  
+  echo -e "${GREEN}################################################${NC}"
+  echo -e "${GREEN}# Cache Performance Demonstration #${NC}"
+  echo -e "${GREEN}################################################${NC}"
+  echo -e "Demonstrating cache behavior for $market_type market with $symbol\n"
+  
+  # Construct the Python command
+  cmd="python examples/dsm_sync_simple/demo.py"
+  cmd+=" --market=$market_type"
+  cmd+=" --symbol=$symbol"
+  cmd+=" --interval=$interval"
+  cmd+=" --chart-type=$chart_type"
+  cmd+=" --demo-cache"
+  cmd+=" --show-cache"
+  
+  # Execute the command
+  echo -e "${BLUE}Executing: $cmd${NC}"
+  eval $cmd
 }
 
-# Parse arguments based on first parameter
+# Parse arguments
 if [[ $1 == "-h" || $1 == "--help" ]]; then
   # Show help
   show_help
   exit 0
-elif [[ $1 == "--demo-cache" ]]; then
-  # Run cache demonstration for a specific market
-  if [ $# -ge 3 ] && [ $# -le 6 ]; then
-    market_type=$2
-    days=$3
-    provider=${4:-"binance"}
-    retries=${5:-3}
-    chart_type=${6:-"klines"}
-    
-    echo -e "${GREEN}################################################${NC}"
-    echo -e "${GREEN}# Pure Synchronous Cache Demonstration Mode #${NC}"
-    echo -e "${GREEN}################################################${NC}"
-    echo -e "Demonstrating cache behavior for $market_type market\n"
-    
-    run_market_demo "$market_type" "$days" "$provider" "--use-cache" "--demo-cache" "$retries" "$chart_type"
-    exit 0
-  else
-    echo -e "${RED}Error: Invalid number of arguments for cache demo mode${NC}"
-    echo -e "Usage: $0 --demo-cache <market> <days> [provider] [retries] [chart-type]"
-    echo -e "Example: $0 --demo-cache spot 1 binance 3 klines"
-    exit 1
-  fi
+elif [[ $1 == "--cache-demo" ]]; then
+  # Run cache performance demo
+  shift
+  market_type=${1:-"spot"}
+  symbol=${2:-"BTCUSDT"}
+  interval=${3:-"1m"}
+  chart_type=${4:-"klines"}
+  
+  demo_cache_performance "$market_type" "$symbol" "$interval" "$chart_type"
+  exit 0
 elif [[ $1 == "--historical-test" ]]; then
-  # Run long-term historical data test
-  echo -e "${BLUE}DEBUG: Historical test mode detected${NC}"
-  echo -e "${BLUE}DEBUG: All arguments: $@${NC}"
-  echo -e "${BLUE}DEBUG: Number of arguments: $#${NC}"
+  # Run historical data test
+  shift
+  market_type=${1:-"spot"}
+  symbol=${2:-"BTCUSDT"}
+  interval=${3:-"1m"}
+  provider=${4:-"binance"}
+  debug_mode=${5:-"false"}
   
-  if [ $# -ge 2 ]; then
-    market_type=$2
-    symbol=${3:-"BTCUSDT"}
-    interval=${4:-"1m"}
-    provider=${5:-"binance"}
-    
-    echo -e "${BLUE}DEBUG: market_type=$market_type, symbol=$symbol, interval=$interval, provider=$provider${NC}"
-    
-    # Check for options
-    use_cache="true"  # Default to using cache
-    debug_mode="false"            # Default to no debug mode
-    retries=3                # Default retry count
-    chart_type="klines"      # Default chart type
-    
-    # Parse remaining arguments if provided
-    shift 5
-    echo -e "${BLUE}DEBUG: Remaining args after shift: $@${NC}"
-    
-    while [[ $# -gt 0 ]]; do
-      echo -e "${BLUE}DEBUG: Processing arg: $1${NC}"
-      case "$1" in
-        --no-cache)
-          use_cache="false"
-          shift
-          ;;
-        --debug)
-          debug_mode="true"
-          shift
-          ;;
-        --retries)
-          retries="$2"
-          shift 2
-          ;;
-        --chart-type)
-          chart_type="$2"
-          shift 2
-          ;;
-        *)
-          echo -e "${RED}Error: Unknown option $1${NC}"
-          exit 1
-          ;;
-      esac
-    done
-    
-    echo -e "${GREEN}################################################${NC}"
-    echo -e "${GREEN}# Long-Term Historical Data Test Mode #${NC}"
-    echo -e "${GREEN}################################################${NC}"
-    echo -e "Running historical test for $market_type market with $symbol\n"
-    
-    echo -e "${BLUE}DEBUG: About to call run_historical_test with:${NC}"
-    echo -e "${BLUE}DEBUG: market_type=$market_type, symbol=$symbol, interval=$interval${NC}"
-    echo -e "${BLUE}DEBUG: provider=$provider, use_cache=$use_cache, debug_mode=$debug_mode${NC}"
-    echo -e "${BLUE}DEBUG: retries=$retries, chart_type=$chart_type${NC}"
-    
-    run_historical_test "$market_type" "$symbol" "$interval" "$provider" "$use_cache" "$debug_mode" "$retries" "$chart_type"
-    exit 0
-  else
-    echo -e "${RED}Error: Invalid number of arguments for historical test mode${NC}"
-    echo -e "Usage: $0 --historical-test <market> [symbol] [interval] [provider] [options]"
-    echo -e "Options:"
-    echo -e "  --no-cache          Disable cache usage"
-    echo -e "  --debug             Enable debug mode (fetches data in chunks)"
-    echo -e "  --retries <num>     Set number of retry attempts (default: 3)"
-    echo -e "  --chart-type <type> Set chart type (klines, fundingRate) (default: klines)"
-    echo -e ""
-    echo -e "Example: $0 --historical-test spot BTCUSDT 1m binance --debug --chart-type fundingRate"
-    exit 1
-  fi
-elif [[ $1 == "--demo-merge" ]]; then
-  # Run data source merging demo
-  if [ $# -ge 1 ] && [ $# -le 5 ]; then
-    # Run with user-specified parameters
-    market_type=${2:-"spot"}
-    symbol=${3:-"BTCUSDT"}
-    interval=${4:-"1m"}
-    chart_type=${5:-"klines"}
-    
-    # Validate that symbol is not a number - common mistake when users try to use the days parameter
-    if [[ $symbol =~ ^[0-9]+$ ]]; then
-      echo -e "${RED}Error: '$symbol' looks like a number, not a valid symbol.${NC}"
-      echo -e "${RED}For --demo-merge, the parameters are <market> [symbol] [interval] [chart-type]${NC}"
-      echo -e "${YELLOW}Try: $0 --demo-merge $market_type BTCUSDT 1m klines${NC}"
-      exit 1
-    fi
-    
-    echo -e "${GREEN}################################################${NC}"
-    echo -e "${GREEN}# Data Source Merging Demonstration #${NC}"
-    echo -e "${GREEN}################################################${NC}"
-    echo -e "This demo shows how data from multiple sources is seamlessly merged:"
-    echo -e "1. Cache (local Arrow files)"
-    echo -e "2. Vision API (historical data)"
-    echo -e "3. REST API (recent data)"
-    echo -e ""
-    
-    run_merge_demo "$market_type" "$symbol" "$interval" "$chart_type"
-    exit 0
-  else
-    echo -e "${RED}Error: Invalid number of arguments for merge demo mode${NC}"
-    echo -e "Usage: $0 --demo-merge <market> [symbol] [interval] [chart-type]"
-    echo -e "Example: $0 --demo-merge spot BTCUSDT 1m klines"
-    exit 1
-  fi
-# Check if all parameters were provided for standard run
-elif [ $# -ge 2 ] && [ $# -le 6 ]; then
-  # Run for a single market type with specified parameters
-  market_type=$1
-  days=$2
-  provider=${3:-"binance"}
-  if [[ "$4" == "--use-cache" ]]; then
-    cache_flag="--use-cache"
-  else
-    cache_flag=""
-  fi
-  retries=${5:-3}
-  chart_type=${6:-"klines"}
+  run_historical_test "$market_type" "$symbol" "$interval" "$provider" "$debug_mode"
+  exit 0
+else
+  # Run the default merge demo with provided or default parameters
+  market_type=${1:-"spot"}
+  symbol=${2:-"BTCUSDT"}
+  interval=${3:-"1m"}
+  chart_type=${4:-"klines"}
   
-  run_market_demo "$market_type" "$days" "$provider" "$cache_flag" "" "$retries" "$chart_type"
+  run_merge_demo "$market_type" "$symbol" "$interval" "$chart_type"
   exit 0
 fi
-
-# Default: run for all market types with 1 day of data
-echo -e "${GREEN}################################################${NC}"
-echo -e "${GREEN}# Pure Synchronous Binance Data Retrieval Demo #${NC}"
-echo -e "${GREEN}################################################${NC}"
-echo -e "Retrieving Bitcoin data for SPOT, UM, and CM markets\n"
-
-# Run demo for all market types
-run_market_demo "spot" 1 "binance" "" "" 3 "klines"
-run_market_demo "um" 1 "binance" "" "" 3 "klines"
-run_market_demo "cm" 1 "binance" "" "" 3 "klines"
-
-echo -e "\n${GREEN}All demos completed successfully!${NC}"
-echo -e "To see all available options and examples, run:"
-echo -e "  ${YELLOW}./examples/dsm_sync_simple/demo.sh --help${NC}"
-
-exit 0
