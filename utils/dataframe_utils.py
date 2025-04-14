@@ -442,3 +442,28 @@ def convert_to_standardized_formats(
             df = df.set_index(CANONICAL_INDEX_NAME)
 
     return df
+
+
+def format_dataframe_for_display(df):
+    """Format DataFrame for display with better readability.
+
+    Args:
+        df: DataFrame to format
+
+    Returns:
+        Formatted DataFrame
+    """
+    # Make a copy to avoid modifying the original
+    display_df = df.copy()
+
+    # Format timestamp columns for better readability
+    datetime_cols = display_df.select_dtypes(include=["datetime64"]).columns
+    for col in datetime_cols:
+        display_df[col] = display_df[col].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    # Format float columns to reduce decimal places
+    float_cols = display_df.select_dtypes(include=["float"]).columns
+    for col in float_cols:
+        display_df[col] = display_df[col].round(4)
+
+    return display_df
