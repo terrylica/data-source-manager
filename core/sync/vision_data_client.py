@@ -837,46 +837,10 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 f"[TIMESTAMP TRACE] Exact match at end_time: {end_boundary_match}"
             )
 
-        # Perform the filtering
+        # Filter data to requested time range
         filtered_df = filter_dataframe_by_time(
-            concatenated_df, start_time, end_time, time_column="open_time"
+            concatenated_df, start_time, end_time, "open_time"
         )
-
-        # Debug: Check what happened during filtering
-        if not filtered_df.empty:
-            logger.debug(
-                f"[TIMESTAMP TRACE] After time filtering: {len(filtered_df)} rows"
-            )
-            min_filtered = filtered_df["open_time"].min()
-            max_filtered = filtered_df["open_time"].max()
-            logger.debug(
-                f"[TIMESTAMP TRACE] Filtered time range: {min_filtered} to {max_filtered}"
-            )
-
-            # Check if we lost the first candle
-            if min_filtered > start_time:
-                time_diff = (min_filtered - start_time).total_seconds()
-                logger.debug(
-                    f"[TIMESTAMP TRACE] First candle starts {time_diff} seconds after requested start_time"
-                )
-                logger.debug(
-                    f"[TIMESTAMP TRACE] This suggests the first candle may have been dropped during filtering"
-                )
-
-            # Log first few rows after filtering
-            for i in range(min(3, len(filtered_df))):
-                logger.debug(
-                    f"[TIMESTAMP TRACE] After filtering row {i}: open_time={filtered_df['open_time'].iloc[i]}, close={filtered_df.iloc[i, filtered_df.columns.get_loc('close')]}"
-                )
-        else:
-            logger.debug(
-                "[TIMESTAMP TRACE] Filtered DataFrame is empty - all rows were excluded"
-            )
-
-            # Log filtering criteria again for clarity
-            logger.debug(
-                f"[TIMESTAMP TRACE] Filtering criteria used: {start_time} <= open_time <= {end_time}"
-            )
 
         # Log filtering results for debugging
         if not filtered_df.empty:
@@ -887,6 +851,12 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             logger.debug(
                 f"Last timestamp after filtering: {filtered_df['open_time'].max()}"
             )
+
+            # Debug DataFrame structure
+            logger.debug(f"DataFrame columns: {list(filtered_df.columns)}")
+            logger.debug(f"DataFrame dtypes: {filtered_df.dtypes}")
+            logger.debug(f"DataFrame index name: {filtered_df.index.name}")
+            logger.debug(f"DataFrame index type: {type(filtered_df.index)}")
         else:
             logger.warning(
                 "Filtered dataframe is empty - no data within requested time range"
@@ -912,27 +882,51 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         # Detect gaps in the data using the standardized gap_detector
         # Only enforce min span requirement if we're querying a longer timeframe
         time_span_days = (end_time - start_time).total_seconds() / 86400
-        min_span_required = time_span_days > 1  # Only for multi-day spans
+        min_span_required = time_span_days > 1
 
         if filtered_df.empty:
             gaps = []
             logger.debug("Skipping gap detection for empty dataframe")
         else:
             try:
-                if "open_time" in filtered_df.columns:
-                    # Temporarily set index to open_time for gap detection
-                    df_with_index = filtered_df.set_index("open_time")
+                # Create a copy to ensure we don't modify the original
+                df_for_gap_detection = filtered_df.copy()
+
+                # Ensure open_time is present and is a datetime type
+                if "open_time" not in df_for_gap_detection.columns and isinstance(
+                    df_for_gap_detection.index, pd.DatetimeIndex
+                ):
+                    logger.debug("Adding open_time column from index for gap detection")
+                    df_for_gap_detection["open_time"] = df_for_gap_detection.index
+                elif (
+                    "open_time" in df_for_gap_detection.columns
+                    and not pd.api.types.is_datetime64_any_dtype(
+                        df_for_gap_detection["open_time"]
+                    )
+                ):
+                    logger.debug(
+                        f"Converting open_time to datetime - current type: {df_for_gap_detection['open_time'].dtype}"
+                    )
+                    try:
+                        df_for_gap_detection["open_time"] = pd.to_datetime(
+                            df_for_gap_detection["open_time"], unit="ms", utc=True
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to convert open_time to datetime: {e}")
+
+                # Check if we have a valid time column now
+                if "open_time" in df_for_gap_detection.columns:
+                    logger.debug("Using open_time column for gap detection")
                     gaps, stats = detect_gaps(
-                        df_with_index,
+                        df_for_gap_detection,
                         interval_obj,
+                        time_column="open_time",
                         enforce_min_span=min_span_required,
                     )
                 else:
-                    gaps, stats = detect_gaps(
-                        filtered_df,
-                        interval_obj,
-                        enforce_min_span=min_span_required,
-                    )
+                    logger.warning("No open_time column available for gap detection")
+                    gaps = []
+                    stats = {"total_gaps": 0}
 
                 # Log the gaps and stats
                 if gaps:
@@ -947,23 +941,31 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
             except Exception as e:
                 logger.error(f"Error detecting gaps: {e}")
+                import traceback
+
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 gaps = []
 
         # Check for day boundary gaps (gaps at midnight)
-        boundary_gaps = [
-            gap
-            for gap in gaps
-            if (
-                gap.start_time.hour == 0
-                and gap.start_time.minute == 0
-                and gap.start_time.second == 0
-            )
-            or (
-                gap.end_time.hour == 0
-                and gap.end_time.minute == 0
-                and gap.end_time.second == 0
-            )
-        ]
+        boundary_gaps = []
+        try:
+            boundary_gaps = [
+                gap
+                for gap in gaps
+                if (
+                    gap.start_time.hour == 0
+                    and gap.start_time.minute == 0
+                    and gap.start_time.second == 0
+                )
+                or (
+                    gap.end_time.hour == 0
+                    and gap.end_time.minute == 0
+                    and gap.end_time.second == 0
+                )
+            ]
+        except Exception as e:
+            logger.error(f"Error checking for boundary gaps: {e}")
+            boundary_gaps = []
 
         # Try to fill day boundary gaps using REST API
         if boundary_gaps:

@@ -3,7 +3,7 @@ description:
 globs: 
 alwaysApply: true
 ---
-Focus is on iteratively testing and debugging `examples/dsm_sync_simple/demo.sh`, which invokes `examples/dsm_sync_simple/demo.py`, and subsequently calls `core/sync/data_source_manager.py`. This demo operates solely in **synchronous** mode (async intentionally excluded for simplicity) and targets the minimal viable setup for retrieving **1-minute Bitcoin data** for SPOT, UM, or CM markets.
+Focus is on iteratively testing and debugging `examples/dsm_sync_simple/demo.py`, and subsequently calls `core/sync/data_source_manager.py`. This demo operates solely in **synchronous** mode (async intentionally excluded for simplicity) and targets the minimal viable setup for retrieving **1-minute Bitcoin data** for SPOT, UM, or CM markets.
 
 The file `core/sync/data_source_manager.py` acts as the orchestrator. Its responsibilities include:
 

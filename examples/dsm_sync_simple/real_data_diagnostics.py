@@ -516,7 +516,18 @@ def main():
         default=0.3,
         help="Gap threshold (default: 0.3 = 30%%)",
     )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="DEBUG",
+        help="Set the logging level (default: DEBUG)",
+    )
     args = parser.parse_args()
+
+    # Set the logging level based on the command line argument
+    logger.setLevel(args.log_level)
+    print(f"[bold cyan]Log level set to: {args.log_level}[/bold cyan]")
 
     # Fetch real market data
     df = fetch_real_market_data(

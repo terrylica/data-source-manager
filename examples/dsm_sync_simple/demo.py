@@ -31,12 +31,15 @@ from core.sync.data_source_manager import DataSourceManager, DataSource
 from core.sync.cache_manager import UnifiedCacheManager
 from utils.config import VISION_DATA_DELAY_HOURS
 import demo_stats
-from utils.gap_detector import detect_gaps, Gap, format_gaps_for_display
+from utils.gap_detector import detect_gaps
 
 console = Console()
 
 # We'll use this cache dir for all demos
 CACHE_DIR = Path("./cache")
+
+# Log timestamp at script initialization
+logger.info(f"Script started at: {datetime.now(timezone.utc).isoformat()}")
 
 
 def check_dependencies():
@@ -92,70 +95,56 @@ def show_help():
     """Display detailed help information."""
     console.print(
         Panel(
-            "[bold green]Binance Data Retrieval Demo with FCP Merging[/bold green]",
+            "[bold green]Binance Real Data Diagnostics Tool[/bold green]",
             expand=False,
             border_style="green",
         )
     )
 
     print(
-        "This script demonstrates data source merging across Cache, VISION API, and REST API using the Failover Composition Priority (FCP).\n"
+        "This script performs diagnostics on real market data retrieved directly from Binance APIs using DataSourceManager.\n"
     )
 
     print("[bold cyan]USAGE:[/bold cyan]")
     print("  python examples/dsm_sync_simple/demo.py [OPTIONS]")
     print(
-        "  python examples/dsm_sync_simple/demo.py market symbol interval chart_type\n"
+        "  python examples/dsm_sync_simple/demo.py --market spot --symbol BTCUSDT --interval 1m --days 5\n"
     )
 
     print("[bold cyan]OPTIONS:[/bold cyan]")
     print("  -h, --help             Show this help message and exit")
+    print("  --market               Market type: spot, um, or cm (default: spot)")
+    print("  --symbol               Trading symbol (default: BTCUSDT)")
+    print("  --interval             Time interval: 1m, 5m, etc. (default: 1m)")
+    print("  --days                 Number of days to fetch (default: 3)")
+    print("  --no-cache             Disable caching (cache is enabled by default)")
+    print("  --clear-cache          Clear cache before fetching")
     print(
-        "  --cache-demo           Demonstrate cache behavior by running the data retrieval twice"
+        "  --gap-threshold        Gap threshold as percentage above expected interval (default: 0.3 = 30%)"
     )
     print(
-        "  --historical-test      Run historical test with specific dates (Dec 2024-Feb 2025)"
-    )
-    print(
-        "  --detailed-stats       Show detailed statistics after the run and save to JSON file"
-    )
-    print(
-        "  --gap-report           Generate a detailed gap report identifying missing data points"
+        "  --log-level            Set logging verbosity: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: DEBUG)"
     )
     print("\n")
 
-    print("[bold cyan]PARAMETERS:[/bold cyan]")
-    print("  market                 Market type: spot, um, or cm (default: spot)")
-    print("  symbol                 Trading symbol (default: BTCUSDT)")
-    print("  interval               Time interval: 1m, 5m, etc. (default: 1m)")
-    print(
-        "  chart_type             Type of chart data: klines or fundingRate (default: klines)\n"
-    )
-
     print("[bold cyan]EXAMPLES:[/bold cyan]")
     print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py[/yellow]                            # Run default FCP merge demo for BTCUSDT in SPOT market"
+        "  [yellow]python examples/dsm_sync_simple/demo.py[/yellow]                            # Run with default settings"
     )
     print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py spot ETHUSDT 5m klines[/yellow]     # Run merge demo for ETH with 5m interval"
+        "  [yellow]python examples/dsm_sync_simple/demo.py --market spot --symbol ETHUSDT[/yellow]   # Run diagnostics for ETH in SPOT market"
     )
     print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py um BTCUSDT 1m klines[/yellow]       # Run merge demo for BTC in UM futures market"
+        "  [yellow]python examples/dsm_sync_simple/demo.py --interval 5m --days 7[/yellow]            # Analyze 5-minute data for last 7 days"
     )
     print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py cm BTCUSD_PERP 1m klines[/yellow]   # Run merge demo for BTC in CM futures market"
+        "  [yellow]python examples/dsm_sync_simple/demo.py --no-cache --clear-cache[/yellow]         # Run without cache and clear existing cache"
     )
     print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py --cache-demo spot BTCUSDT[/yellow]  # Demonstrate cache performance"
+        "  [yellow]python examples/dsm_sync_simple/demo.py --gap-threshold 0.5[/yellow]              # Use higher threshold (50%) for gap detection"
     )
     print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py --historical-test spot[/yellow]     # Run historical test in SPOT market"
-    )
-    print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py --detailed-stats spot[/yellow]      # Run with detailed statistics"
-    )
-    print(
-        "  [yellow]python examples/dsm_sync_simple/demo.py --gap-report spot[/yellow]          # Generate a gap analysis report"
+        "  [yellow]python examples/dsm_sync_simple/demo.py --log-level INFO[/yellow]                 # Set less verbose logging with INFO level"
     )
 
 
@@ -1228,9 +1217,6 @@ def main():
     if not verify_project_root():
         sys.exit(1)
 
-    # Set info logging level for less verbose logs
-    logger.setLevel("DEBUG")
-
     # Parse command line arguments
     parser = argparse.ArgumentParser(
         description="Demonstrate DataSourceManager with Failover Composition Priority (FCP) for Binance data retrieval",
@@ -1367,6 +1353,15 @@ def main():
         help="Gap threshold as a fraction above expected interval (default: 0.3 = 30%%)",
     )
 
+    # Add log level parameter
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="DEBUG",
+        help="Set the logging level (default: DEBUG)",
+    )
+
     # Add positional arguments list (optional)
     parser.add_argument(
         "positional",
@@ -1409,6 +1404,11 @@ def main():
         interval_str = positional_args[2]
     if len(positional_args) >= 4:
         chart_type_str = positional_args[3]
+
+    # Set the logging level based on the command line argument
+    logger.setLevel(args.log_level)
+    print(f"[bold cyan]Log level set to: {args.log_level}[/bold cyan]")
+    print(f"Current time when Script Started: {datetime.now(timezone.utc).isoformat()}")
 
     # Convert special mode parameters
     if args.cache_demo and len(positional_args) >= 1:

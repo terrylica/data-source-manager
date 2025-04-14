@@ -1,14 +1,77 @@
+#!/usr/bin/env python3
+"""
+Advanced Logging System for Binance Data Services
+
+This module provides a sophisticated logging system that extends Python's standard
+logging facilities with additional features:
+
+Key Features:
+- Automatic module name detection in log messages
+- Proper source file/line tracking for accurate debugging
+- Method chaining support for cleaner code
+- Rich-powered logging for improved readability in terminals
+- Dedicated timeout and error logging subsystems
+- Smart print functionality that respects log levels
+
+The central component is the `logger` object which serves as a drop-in replacement
+for the standard logging module with enhanced capabilities.
+
+Basic Usage Examples:
+    # Import the logger
+    from utils.logger_setup import logger
+
+    # Basic logging with auto-detected module name
+    logger.debug("Debug message")
+    logger.info("Info message")
+    logger.warning("Warning message")
+    logger.error("Error message")
+    logger.critical("Critical message")
+
+    # Chainable logging API
+    logger.info("First message").debug("Second message")
+
+    # Rich formatting (if available)
+    logger.info("Status: [bold green]SUCCESS[/bold green]")
+
+Advanced Usage:
+    # Configure log level
+    logger.setLevel(logger.DEBUG)  # Or using string: "DEBUG"
+
+    # Enable/disable showing filenames in logs
+    logger.show_filename(True)
+
+    # Switch between rich and standard logging
+    logger.use_rich(True)
+
+    # Log timeouts to a dedicated file
+    log_timeout("database_query", 5.0, details={"query_id": "abc123"})
+
+    # Enable error logging to a separate file
+    enable_error_logging("/path/to/errors.log")
+
+    # Make print statements respect log levels
+    enable_smart_print()
+"""
+
 import logging, os
 import inspect
 from colorlog import ColoredFormatter
 import traceback
 from pathlib import Path
+import builtins
+import sys
+import time
+import functools
+from typing import Any, Dict, List, Optional, Union, Callable
 
 try:
     from rich.console import Console
     from rich.logging import RichHandler
+    from rich.traceback import install as install_rich_traceback
 
     RICH_AVAILABLE = True
+    # Install rich traceback handling
+    install_rich_traceback(show_locals=True)
 except ImportError:
     RICH_AVAILABLE = False
 
@@ -60,6 +123,9 @@ RICH_FORMAT = RICH_FORMAT_WITH_FILENAME if _show_filename else RICH_FORMAT_BASE
 # Rich console instance
 if RICH_AVAILABLE:
     console = Console()
+
+# Rich console instance for the module
+_console = None
 
 
 # Custom logger that properly tracks caller information
@@ -344,6 +410,11 @@ class LoggerProxy:
         if not _root_configured:
             _setup_root_logger(level=DEFAULT_LEVEL, use_rich=_use_rich)
 
+        # Don't enable smart print by default here, it will be done later
+
+        # Initialize console (lazy loading)
+        self._console = None
+
     def __getattr__(self, name):
         """
         Dynamic attribute resolution with runtime module detection.
@@ -615,6 +686,130 @@ class LoggerProxy:
         """
         return logging.Formatter(pattern)
 
+    def should_show_rich_output(self):
+        """
+        Determine if rich Progress and print should be displayed based on log level.
+
+        Returns:
+            bool: True if the current log level allows rich output (DEBUG, INFO, WARNING),
+                  False if the current log level is ERROR or CRITICAL.
+        """
+        # Get the root logger level
+        root_level = logging.getLogger().level
+
+        # Allow rich output for DEBUG, INFO, WARNING levels
+        # Suppress rich output for ERROR and CRITICAL levels
+        return root_level < logging.ERROR
+
+    def print(self, *args, **kwargs):
+        """
+        Print using rich.print only if the current log level allows rich output.
+
+        NOTE: This method is provided for backward compatibility. For new code,
+        prefer using logger.console.print() which provides better rich object
+        rendering and is always available regardless of log level.
+
+        This function behaves like rich.print but respects the log level settings:
+        - When log level is DEBUG, INFO, or WARNING: prints normally
+        - When log level is ERROR or CRITICAL: suppresses output
+
+        Args:
+            *args: Positional arguments to pass to rich.print
+            **kwargs: Keyword arguments to pass to rich.print
+        """
+        if self.should_show_rich_output():
+            # Import locally to avoid circular imports
+            from rich.console import Console
+
+            # Use console for better rendering of rich objects
+            console = Console()
+            for arg in args:
+                console.print(arg)
+
+    def progress(self, *args, **kwargs):
+        """
+        Create a rich.progress.Progress instance only if the current log level allows rich output.
+
+        This function returns a Progress object when the log level is DEBUG, INFO, or WARNING,
+        but returns a no-op context manager when the log level is ERROR or CRITICAL.
+
+        Args:
+            *args: Positional arguments to pass to rich.progress.Progress
+            **kwargs: Keyword arguments to pass to rich.progress.Progress
+
+        Returns:
+            Context manager: Either a Progress object or a no-op context manager
+        """
+        if self.should_show_rich_output():
+            # Import locally to avoid circular imports
+            from rich.progress import Progress
+
+            return Progress(*args, **kwargs)
+        else:
+            # Return a no-op context manager when output should be suppressed
+            class NoOpProgress:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc_val, exc_tb):
+                    pass
+
+                def add_task(self, *args, **kwargs):
+                    return 0
+
+                def update(self, *args, **kwargs):
+                    pass
+
+            return NoOpProgress()
+
+    def enable_smart_print(self, enabled=True):
+        """
+        Enable or disable the smart print feature that makes all print statements
+        respect log level settings.
+
+        When enabled, the built-in print function is monkey-patched to use logger.console.print,
+        making it respect the current log level (prints for DEBUG, INFO, WARNING; suppresses for ERROR, CRITICAL)
+        while providing the best rich object rendering available.
+
+        Args:
+            enabled (bool): Whether to enable (True) or disable (False) smart print
+
+        Returns:
+            LoggerProxy: Self reference for method chaining
+        """
+        if enabled:
+            # Store original print function if not already stored
+            if not hasattr(builtins, "_original_print"):
+                builtins._original_print = builtins.print
+
+            # Replace built-in print with a function that uses logger.console.print
+            def smart_print(*args, **kwargs):
+                if self.should_show_rich_output():
+                    # Use our shared console for consistent rendering
+                    # This leverages the console property to ensure we use a single instance
+                    self.console.print(*args, **kwargs)
+
+            # Replace the built-in print
+            builtins.print = smart_print
+
+            # Use debug level message to not appear in higher log levels
+            self.debug("Smart print enabled - print statements now respect log level")
+
+            # Always show this message regardless of level
+            if logging.getLogger().level >= logging.ERROR:
+                # For ERROR and CRITICAL, use the original print function to show a message
+                if hasattr(builtins, "_original_print"):
+                    builtins._original_print(
+                        "Smart print enabled - print output will be suppressed at current log level"
+                    )
+        else:
+            # Restore original print if we have it stored
+            if hasattr(builtins, "_original_print"):
+                builtins.print = builtins._original_print
+                self.debug("Smart print disabled - print statements restored to normal")
+
+        return self
+
     # Constants to expose logging levels without importing logging
     DEBUG = logging.DEBUG
     INFO = logging.INFO
@@ -622,11 +817,46 @@ class LoggerProxy:
     ERROR = logging.ERROR
     CRITICAL = logging.CRITICAL
 
+    @property
+    def console(self):
+        """
+        Get a rich.console.Console instance for direct rendering of rich objects.
+
+        This property provides access to a shared Console instance that can be used
+        for rendering rich objects directly, regardless of log level.
+
+        Examples:
+            # Print a rich table directly
+            table = Table(title="Data")
+            table.add_column("Name")
+            table.add_row("Example")
+            logger.console.print(table)
+
+            # Print formatted text
+            logger.console.print("[bold red]Important message[/bold red]")
+
+        Returns:
+            rich.console.Console: A Console instance for direct rendering
+        """
+        global _console
+
+        # Lazy initialize console
+        if _console is None:
+            # Import locally to avoid circular imports
+            from rich.console import Console
+
+            _console = Console()
+
+        return _console
+
 
 # Create the auto-detecting logger proxy for conventional syntax
 logger = LoggerProxy()
 
-# Hide the get_logger function from imports
+# Enable smart print by default to support rich object rendering
+logger.enable_smart_print(True)
+
+# Add these to __all__ to make them available when importing
 __all__ = [
     "logger",
     "show_filename",
@@ -636,6 +866,7 @@ __all__ = [
     "enable_error_logging",
     "set_error_log_file",
     "get_error_log_file",
+    "enable_smart_print",
 ]
 
 # Test logger if run directly
@@ -951,4 +1182,25 @@ def set_error_log_file(path):
         _error_logger_configured = False
         _error_logger = None
 
+    return True
+
+
+# Add to the global scope
+def enable_smart_print(enabled=True):
+    """
+    Enable or disable the smart print feature that makes all print statements
+    respect log level settings.
+
+    When enabled, the built-in print function is monkey-patched to use rich print,
+    making it respect the current log level (prints for DEBUG, INFO, WARNING; suppresses for ERROR, CRITICAL).
+
+    This is a global function that calls logger.enable_smart_print().
+
+    Args:
+        enabled (bool): Whether to enable (True) or disable (False) smart print
+
+    Returns:
+        bool: True if successful
+    """
+    logger.enable_smart_print(enabled)
     return True
