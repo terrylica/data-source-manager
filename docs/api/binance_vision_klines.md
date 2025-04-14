@@ -81,11 +81,25 @@ https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-12
 https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT-1h-2023-12-01.zip
 ```
 
+And the corresponding checksum files:
+
+```url
+https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-12-01.zip.CHECKSUM
+https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT-1h-2023-12-01.zip.CHECKSUM
+```
+
 ### USDT-Margined Futures Example URLs
 
 ```url
 https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-12-01.zip
 https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/1h/BTCUSDT-1h-2023-12-01.zip
+```
+
+And the corresponding checksum files:
+
+```url
+https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-12-01.zip.CHECKSUM
+https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/1h/BTCUSDT-1h-2023-12-01.zip.CHECKSUM
 ```
 
 ### Coin-Margined Futures Example URLs
@@ -94,6 +108,36 @@ https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/1h/BTCUSDT-1h-2
 https://data.binance.vision/data/futures/cm/daily/klines/BTCUSD_PERP/1m/BTCUSD_PERP-1m-2023-12-01.zip
 https://data.binance.vision/data/futures/cm/daily/klines/BTCUSD_PERP/1h/BTCUSD_PERP-1h-2023-12-01.zip
 ```
+
+And the corresponding checksum files:
+
+```url
+https://data.binance.vision/data/futures/cm/daily/klines/BTCUSD_PERP/1m/BTCUSD_PERP-1m-2023-12-01.zip.CHECKSUM
+https://data.binance.vision/data/futures/cm/daily/klines/BTCUSD_PERP/1h/BTCUSD_PERP-1h-2023-12-01.zip.CHECKSUM
+```
+
+## Checksum Format and Verification
+
+Each data file is accompanied by a corresponding SHA-256 checksum file (with a `.zip.CHECKSUM` extension). The format of the checksum file is:
+
+```tree
+<sha256_hash>  <filename>
+```
+
+For example:
+
+```tree
+d0a6fd261d2bf9c6c61b113714724e682760b025c449b19c90a1c4f00ede3e9c  BTCUSDT-1m-2025-04-13.zip
+```
+
+To verify the integrity of a downloaded data file:
+
+1. Download both the data file (`.zip`) and its corresponding checksum file (`.zip.CHECKSUM`)
+2. Calculate the SHA-256 hash of the downloaded data file
+3. Compare it with the hash in the checksum file
+4. If they match, the file integrity is verified
+
+This verification ensures that the data has not been corrupted during download or transmission.
 
 ## Data Format
 
