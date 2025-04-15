@@ -26,8 +26,8 @@ import typer
 from typing_extensions import Annotated
 import pendulum
 
-# Import the logger for logging and rich formatting
-from utils.logger_setup import logger
+# Import the logger or logging and rich formatting
+from utils.logger_setup import logger, configure_session_logging
 from rich import print
 
 # Set initial log level (will be overridden by command line args)
@@ -306,7 +306,7 @@ def fetch_data_with_fcp(
         return pd.DataFrame()
 
 
-def display_results(df, symbol, market_type, interval, chart_type):
+def display_results(df, symbol, market_type, interval, chart_type, log_timestamp=None):
     """Display the results of the FCP data retrieval."""
     if df is None or df.empty:
         print("[bold red]No data to display[/bold red]")
@@ -360,9 +360,46 @@ def display_results(df, symbol, market_type, interval, chart_type):
     csv_dir.mkdir(parents=True, exist_ok=True)
     csv_path = csv_dir / f"{market_str}_{symbol}_{interval}_{timestamp}.csv"
 
+    # If log_timestamp is provided, use it for log paths
+    if log_timestamp:
+        main_log_path = f"logs/fcp_demo_logs/fcp_demo_{log_timestamp}.log"
+        error_log_path = f"logs/error_logs/fcp_demo_errors_{log_timestamp}.log"
+
     try:
         df.to_csv(csv_path)
         print(f"\n[bold green]Data saved to: {csv_path}[/bold green]")
+
+        # Display log file paths
+        log_file_path = Path(f"logs/fcp_demo_logs/fcp_demo_{timestamp}.log")
+        error_log_file_path = Path(f"logs/error_logs/fcp_demo_errors_{timestamp}.log")
+
+        print("\n[bold cyan]Log Files:[/bold cyan]")
+
+        # Check detailed logs
+        if log_file_path.exists():
+            log_size = log_file_path.stat().st_size
+            print(f"[green]Detailed logs: {log_file_path} ({log_size:,} bytes)[/green]")
+        else:
+            print(f"[yellow]Detailed logs: {log_file_path} (file not found)[/yellow]")
+
+        # Check error logs
+        if error_log_file_path.exists():
+            error_size = error_log_file_path.stat().st_size
+            if error_size > 0:
+                print(
+                    f"[yellow]Error logs: {error_log_file_path} ({error_size:,} bytes - contains errors)[/yellow]"
+                )
+            else:
+                print(
+                    f"[green]Error logs: {error_log_file_path} (empty - no errors)[/green]"
+                )
+        else:
+            print(
+                f"[yellow]Error logs: {error_log_file_path} (file not found)[/yellow]"
+            )
+
+        print("\n[dim]To view logs: cat logs/fcp_demo_logs/fcp_demo_*.log[/dim]")
+
         return csv_path
     except Exception as e:
         print(f"[bold red]Error saving data to CSV: {e}[/bold red]")
@@ -756,6 +793,22 @@ def main(
 
     It displays real-time source information about where each data point comes from.
     """
+    # Convert shorthand log levels to full names
+    level = log_level.value
+    if level == "D":
+        level = "DEBUG"
+    elif level == "I":
+        level = "INFO"
+    elif level == "W":
+        level = "WARNING"
+    elif level == "E":
+        level = "ERROR"
+    elif level == "C":
+        level = "CRITICAL"
+
+    # Set up session logging (delegated to logger_setup.py)
+    main_log, error_log, log_timestamp = configure_session_logging("fcp_demo", level)
+
     logger.info(f"Current time: {pendulum.now().isoformat()}")
 
     try:
@@ -772,25 +825,20 @@ def main(
             )
         )
 
+        # Print logging information
+        print(
+            Panel(
+                f"[bold cyan]Logging Configuration:[/bold cyan]\n"
+                f"Detailed logs: [green]{main_log}[/green]\n"
+                f"Error logs: [yellow]{error_log}[/yellow]",
+                title="Logging Info",
+                border_style="blue",
+            )
+        )
+
         # Verify project root
         if not verify_project_root():
             sys.exit(1)
-
-        # Convert shorthand log levels to full names
-        level = log_level.value
-        if level == "D":
-            level = "DEBUG"
-        elif level == "I":
-            level = "INFO"
-        elif level == "W":
-            level = "WARNING"
-        elif level == "E":
-            level = "ERROR"
-        elif level == "C":
-            level = "CRITICAL"
-
-        logger.setLevel(level)
-        print(f"[bold cyan]Log level set to:[/bold cyan] {level}")
 
         # Show command line arguments
         print(f"[bold cyan]Command line arguments:[/bold cyan]")
@@ -920,6 +968,7 @@ def main(
                 market_type.name.lower(),
                 interval_enum.value,
                 chart_type_enum.name.lower(),
+                log_timestamp,
             )
 
             # Add note about log level and rich output
