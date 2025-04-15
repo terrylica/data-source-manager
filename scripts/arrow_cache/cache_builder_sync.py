@@ -730,22 +730,27 @@ def download_data_with_checksum(
                 ):
                     # Read expected checksum
                     with open(checksum_file, "r") as f:
-                        checksum_content = f.read().strip()
-                        # Format is typically: "<checksum>  <filename>"
-                        # We need to extract just the checksum part
-                        expected_checksum = checksum_content.split()[0]
+                        content = f.read().strip()
+                        # Split on whitespace and take first part (the checksum)
+                        expected = content.split()[0]
+                        content_length = len(content)
+                        preview_length = min(40, content_length)
+                        logger.debug(
+                            f"Raw checksum file content: '{content[:preview_length]}' (+ {content_length - preview_length} more chars, {content_length} total)"
+                        )
+                        logger.debug(f"Expected checksum: '{expected}'")
 
                     # Calculate actual checksum on the ZIP file
                     actual_checksum = calculate_sha256(data_file)
 
                     # Verify checksum
-                    checksum_verified = actual_checksum == expected_checksum
+                    checksum_verified = actual_checksum == expected
 
                     if not checksum_verified:
                         logger.warning(
                             f"Checksum verification failed for {symbol} {interval_str} {date_str}"
                         )
-                        logger.warning(f"Expected: {expected_checksum}")
+                        logger.warning(f"Expected: {expected}")
                         logger.warning(f"Actual:   {actual_checksum}")
 
                         # Record the failure
@@ -754,7 +759,7 @@ def download_data_with_checksum(
                             symbol,
                             interval_str,
                             date,
-                            expected_checksum,
+                            expected,
                             actual_checksum,
                             action,
                         )
@@ -1034,7 +1039,11 @@ def verify_checksum(data_file, checksum_file, symbol, interval_str, date):
             content = f.read().strip()
             # Split on whitespace and take first part (the checksum)
             expected = content.split()[0]
-            logger.debug(f"Raw checksum file content: '{content}'")
+            content_length = len(content)
+            preview_length = min(40, content_length)
+            logger.debug(
+                f"Raw checksum file content: '{content[:preview_length]}' (+ {content_length - preview_length} more chars, {content_length} total)"
+            )
             logger.debug(f"Expected checksum: '{expected}'")
 
         # Calculate checksum of the zip file directly

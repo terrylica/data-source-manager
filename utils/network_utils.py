@@ -820,7 +820,7 @@ class VisionDownloadManager:
         temp_dir = Path(tempfile.mkdtemp(dir="./tmp"))
 
         # Get URLs for Vision API
-        from core.vision_constraints import get_vision_url, FileType
+        from core.sync.vision_constraints import get_vision_url, FileType
 
         data_url = get_vision_url(
             self.symbol, self.interval, date, FileType.DATA, self.market_type
@@ -892,7 +892,11 @@ class VisionDownloadManager:
                     content = f.read().strip()
                     # Split on whitespace and take first part (the checksum)
                     expected = content.split()[0]
-                    logger.debug(f"Raw checksum file content: '{content}'")
+                    content_length = len(content)
+                    preview_length = min(40, content_length)
+                    logger.debug(
+                        f"Raw checksum file content: '{content[:preview_length]}' (+ {content_length - preview_length} more chars, {content_length} total)"
+                    )
                     logger.debug(f"Expected checksum: '{expected}'")
 
                 # Calculate checksum of the zip file directly
@@ -1019,7 +1023,6 @@ class VisionDownloadManager:
                 shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception as e:
                 logger.error(f"[{debug_id}] Error cleaning up temp directory: {e}")
-
 
     async def _download_file(self, url: str, local_path: Path) -> bool:
         """Download a file from URL to local path.

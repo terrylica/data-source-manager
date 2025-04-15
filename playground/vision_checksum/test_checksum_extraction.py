@@ -237,13 +237,18 @@ def test_real_checksum_extraction(
         if verbose:
             with open(checksum_path, "rb") as f:
                 content = f.read()
-                rprint(f"\n[bold]Raw checksum file content (first 200 bytes):[/bold]")
-                rprint(f"{content[:200]}")
+                content_length = len(content)
+                preview_length = min(40, content_length)
+                rprint(f"\n[bold]Raw checksum file content preview:[/bold]")
+                rprint(
+                    f"{content[:preview_length]} (+ {content_length - preview_length} more bytes, {content_length} total)"
+                )
 
                 try:
                     decoded = content.decode("utf-8", errors="replace")
-                    rprint(f"\n[bold]Decoded content:[/bold]")
-                    rprint(f"{decoded}")
+                    decoded_preview = decoded[:60] if len(decoded) > 60 else decoded
+                    rprint(f"\n[bold]Decoded content preview:[/bold]")
+                    rprint(f"{decoded_preview}" + ("..." if len(decoded) > 60 else ""))
                 except:
                     pass
 

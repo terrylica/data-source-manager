@@ -105,7 +105,11 @@ def validate_file_checksum(file_path: Path, checksum_url: str) -> Tuple[bool, st
             # Try direct parsing from URL content
             with open(temp_path, "rb") as f:
                 content = f.read().decode("utf-8", errors="replace")
-                console.print(f"[yellow]Raw checksum file content: {content}")
+                content_length = len(content)
+                preview_length = min(40, content_length)
+                console.print(
+                    f"[yellow]Raw checksum file content: {content[:preview_length]} (+ {content_length - preview_length} more chars, {content_length} total)"
+                )
                 # Look for a SHA-256 hash pattern
                 matches = re.findall(r"([a-fA-F0-9]{64})", content)
                 if matches:
@@ -150,16 +154,23 @@ def show_checksums_for_symbol(
         try:
             with open(checksum_path, "rb") as f:
                 content = f.read()
+                content_length = len(content)
+                preview_length = min(40, content_length)
+                console.print(f"\n[bold]Raw checksum file content preview:[/bold]")
                 console.print(
-                    f"\n[bold]Raw checksum file content (first 200 bytes):[/bold]"
+                    f"{content[:preview_length]} (+ {content_length - preview_length} more bytes, {content_length} total)"
                 )
-                console.print(content[:200])
 
                 # Try to decode as text
-                console.print("\n[bold]Decoded content:[/bold]")
+                console.print("\n[bold]Decoded content preview:[/bold]")
                 try:
                     text_content = content.decode("utf-8", errors="replace")
-                    console.print(text_content)
+                    text_preview = (
+                        text_content[:60] if len(text_content) > 60 else text_content
+                    )
+                    console.print(
+                        f"{text_preview}" + ("..." if len(text_content) > 60 else "")
+                    )
                 except Exception as e:
                     console.print(f"[red]Error decoding content: {e}")
         except Exception as e:
