@@ -7,7 +7,6 @@ missing segments and fetches them from REST API to complete the dataset.
 
 from datetime import datetime, timezone, timedelta
 import pandas as pd
-from pathlib import Path
 import time
 import sys
 

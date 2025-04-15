@@ -9,18 +9,17 @@ This script demonstrates the timestamp interpretation issue by comparing:
 The script converts both timestamp formats to human-readable format for clear comparison.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
 import zipfile
 import httpx
 import pandas as pd
-import subprocess
 import os
 
 from utils.logger_setup import logger
 from rich import print
-from utils.market_constraints import MarketType, Interval
+from utils.market_constraints import MarketType
 from core.sync.vision_data_client import VisionDataClient
 
 

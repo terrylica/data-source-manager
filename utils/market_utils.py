@@ -1,5 +1,4 @@
 from utils.market_constraints import MarketType
-from utils.logger_setup import logger
 from rich import print
 
 

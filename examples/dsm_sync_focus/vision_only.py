@@ -7,7 +7,7 @@ This example demonstrates direct use of the VisionDataClient without going throu
 the DataSourceManager layer and identifies the timestamp interpretation issue.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -17,7 +17,7 @@ from utils.logger_setup import logger
 from rich import print
 from rich.table import Table
 from rich.console import Console
-from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
+from utils.market_constraints import MarketType, Interval
 from core.sync.vision_data_client import VisionDataClient
 
 

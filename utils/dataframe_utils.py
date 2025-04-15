@@ -11,7 +11,7 @@ across the codebase, particularly for:
 """
 
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List
 
 import pandas as pd
 
@@ -20,7 +20,6 @@ from utils.config import (
     CANONICAL_INDEX_NAME,
     OUTPUT_DTYPES,
     FUNDING_RATE_DTYPES,
-    DEFAULT_TIMEZONE,
     DEFAULT_COLUMN_ORDER,
 )
 
@@ -175,7 +174,6 @@ def ensure_open_time_as_index(df: pd.DataFrame) -> pd.DataFrame:
         and df.index.name == CANONICAL_INDEX_NAME
     ):
         logger.debug("open_time index already set correctly")
-        pass
 
     # Case 4: index is unnamed or has a different name
     else:

@@ -8,8 +8,7 @@ the Binance Vision API, including boundary gap filling and related operations.
 
 import pandas as pd
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from utils.logger_setup import logger
 from utils.gap_detector import Gap

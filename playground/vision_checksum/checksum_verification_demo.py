@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 import tempfile
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Tuple, Any
 
 import httpx
 from rich.console import Console

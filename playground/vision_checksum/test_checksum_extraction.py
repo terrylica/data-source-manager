@@ -31,8 +31,7 @@ from rich.panel import Panel
 from rich import print as rprint
 
 from utils.logger_setup import logger
-from utils.vision_checksum import extract_checksum_from_file, verify_file_checksum
-from utils.validation import DataValidation
+from utils.vision_checksum import extract_checksum_from_file
 
 
 def setup_argparse() -> argparse.ArgumentParser:

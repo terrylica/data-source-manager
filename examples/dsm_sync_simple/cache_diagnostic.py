@@ -9,8 +9,7 @@ the day boundaries and data transitions between cache files.
 import os
 import sys
 import pandas as pd
-import numpy as np
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from pathlib import Path
 import json
 
@@ -19,14 +18,10 @@ sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 
-from utils.logger_setup import logger
 from rich import print
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from core.sync.cache_manager import UnifiedCacheManager
-from utils.market_constraints import MarketType, Interval
-from utils.market_utils import get_market_type_str
 
 console = Console()
 

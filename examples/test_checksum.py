@@ -10,7 +10,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Any
 
 from rich.console import Console
 from rich.table import Table

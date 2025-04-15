@@ -5,9 +5,6 @@ This script enforces the use of REST API and verifies that the resulting data ha
 """
 
 from datetime import datetime, timezone, timedelta
-import pandas as pd
-from pathlib import Path
-import time
 import sys
 
 from utils.logger_setup import logger

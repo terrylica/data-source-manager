@@ -6,15 +6,13 @@ timestamps from the Binance Vision API, preserving the semantic meaning of
 open_time as the START of each candle period.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import pandas as pd
-from rich import print
 from rich.table import Table
 from rich.console import Console
 from rich.panel import Panel
 
-from utils.logger_setup import logger
-from utils.market_constraints import Interval, MarketType
+from utils.market_constraints import MarketType
 from utils.config import KLINE_COLUMNS
 from core.sync.vision_data_client import VisionDataClient
 

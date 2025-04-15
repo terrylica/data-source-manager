@@ -7,11 +7,8 @@ data integrity issues in DataFrames containing market data.
 """
 
 import pandas as pd
-from datetime import datetime, timedelta
-import logging
 
 from utils.logger_setup import logger
-from utils.market_constraints import Interval
 
 
 def analyze_data_integrity(df, start_time, end_time, interval):

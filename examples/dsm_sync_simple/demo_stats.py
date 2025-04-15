@@ -4,11 +4,11 @@ Statistics and visualization helper module for DataSourceManager demo.
 Provides detailed analysis of data sources and time ranges using terminal-based tools.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import pandas as pd
 from pathlib import Path
 import json
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, Tuple, Any
 import numpy as np
 
 from utils.logger_setup import logger
@@ -17,7 +17,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
-from rich.progress import Progress, BarColumn, TextColumn
 
 console = Console()
 

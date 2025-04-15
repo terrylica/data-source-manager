@@ -8,9 +8,8 @@ and behaviors for consistent data handling.
 
 import pandas as pd
 import traceback
-from typing import Optional
 
-from utils.config import CANONICAL_INDEX_NAME, DEFAULT_TIMEZONE
+from utils.config import CANONICAL_INDEX_NAME
 from utils.logger_setup import logger
 
 

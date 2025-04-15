@@ -13,7 +13,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import tempfile
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 
 import httpx
 from rich.console import Console

@@ -54,7 +54,6 @@ from utils.validation import DataFrameValidator
 from utils.vision_timestamp import (
     process_timestamp_columns,
     parse_interval,
-    validate_timestamp_safety,
 )
 from utils.vision_file_utils import fill_boundary_gaps_with_rest, find_day_boundary_gaps
 
@@ -598,7 +597,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                     # Verify checksum if available
                     try:
                         from utils.vision_checksum import calculate_sha256_direct
-                        from utils.validation import DataValidation
                         import time
 
                         # Small delay to ensure filesystem sync

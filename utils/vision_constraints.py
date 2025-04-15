@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from typing import NewType, NamedTuple
-from datetime import timedelta
 import pandas as pd
 from pathlib import Path
 

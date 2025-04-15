@@ -7,7 +7,6 @@ from enum import Enum, auto
 import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass
-import time
 
 from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
@@ -24,14 +23,11 @@ from utils.config import (
     REST_CHUNK_SIZE,
     REST_MAX_CHUNKS,
     create_empty_dataframe,
-    CANONICAL_INDEX_NAME,
     REST_IS_STANDARD,
 )
 from utils.dataframe_utils import (
     ensure_open_time_as_column,
-    ensure_open_time_as_index,
     standardize_dataframe,
-    merge_dataframes,
 )
 from core.sync.rest_data_client import RestDataClient
 from core.sync.vision_data_client import VisionDataClient

@@ -1,7 +1,7 @@
 """Unified cache manager for market data."""
 
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional, Any
 import pandas as pd

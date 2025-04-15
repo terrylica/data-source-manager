@@ -9,7 +9,7 @@ from the Binance Vision API using SHA-256 checksums.
 import hashlib
 import re
 from pathlib import Path
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict
 
 from utils.logger_setup import logger
 from rich import print as rprint

@@ -37,10 +37,6 @@ logger.setLevel("DEBUG")
 from rich.panel import Panel
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.console import Console
-from rich.text import Text
-from rich.markdown import Markdown
-from rich import box
 
 from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
 from core.sync.data_source_manager import DataSourceManager, DataSource

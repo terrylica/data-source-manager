@@ -6,7 +6,7 @@ Vision API, leveraging centralized definitions from the utils modules for common
 functionality to maintain DRY principles.
 """
 
-from typing import TypeVar, NewType, Final, NamedTuple, Literal, Dict
+from typing import TypeVar, NewType, Final, NamedTuple, Dict
 from datetime import datetime, timedelta
 import pandas as pd
 from pathlib import Path

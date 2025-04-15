@@ -3,18 +3,15 @@
 import httpx
 import tempfile
 import os
-import sys
 import argparse
 import re
 import hashlib
 from pathlib import Path
 from typing import Optional, Tuple
-from rich import print
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
 
-from utils.logger_setup import logger
 from utils.vision_checksum import extract_checksum_from_file
 from utils.validation import DataValidation
 

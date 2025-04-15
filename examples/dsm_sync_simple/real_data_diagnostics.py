@@ -8,8 +8,6 @@ to retrieve and analyze actual market data without any synthetic test scenarios.
 
 import os
 import sys
-import pandas as pd
-import numpy as np
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import json
@@ -24,11 +22,9 @@ from utils.logger_setup import logger
 from rich import print
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from core.sync.data_source_manager import DataSourceManager
 from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
-from utils.market_utils import get_market_type_str
 from utils.gap_detector import detect_gaps
 
 console = Console()

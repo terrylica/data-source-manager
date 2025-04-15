@@ -12,11 +12,9 @@ This script uses utils/gap_detector.py as the single source of truth for gap det
 
 import argparse
 import json
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from rich import print
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -27,7 +25,6 @@ from utils.market_constraints import Interval
 from utils.gap_detector import (
     detect_gaps,
     format_gaps_for_display,
-    analyze_file_for_gaps,
 )
 
 console = Console()

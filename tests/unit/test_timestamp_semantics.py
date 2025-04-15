@@ -4,11 +4,9 @@
 from datetime import datetime, timezone, timedelta
 import unittest
 import pandas as pd
-import numpy as np
 
-from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType
-from utils.time_utils import detect_timestamp_unit, filter_dataframe_by_time
+from utils.time_utils import filter_dataframe_by_time
 from utils.config import KLINE_COLUMNS
 from core.sync.vision_data_client import VisionDataClient
 
