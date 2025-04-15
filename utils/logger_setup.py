@@ -78,7 +78,7 @@ DEFAULT_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 # Global state tracking
 _root_configured = False
 _module_loggers = {}
-_use_rich = os.environ.get("USE_RICH_LOGGING", "").lower() in ("true", "1", "yes")
+_use_rich = os.environ.get("USE_RICH_LOGGING", "true").lower() in ("true", "1", "yes")
 _show_filename = True  # Always show filename
 
 # Timeout logging
@@ -108,7 +108,7 @@ DEFAULT_LOG_COLORS = {
 FORMAT_BASE = "%(log_color)s%(levelname)-8s%(reset)s %(name)s: %(message)s"
 
 # Format with custom file/line information from our proxy
-CUSTOM_FORMAT_WITH_FILENAME = "%(log_color)s%(levelname)-8s%(reset)s %(name)s: %(message)s%(blue)s [%(cyan)s%(source_file)s:%(yellow)s%(source_line)s%(blue)s]%(reset)s"
+CUSTOM_FORMAT_WITH_FILENAME = "%(log_color)s%(levelname)-8s%(reset)s %(name)s: %(message)s%(blue)s [%(cyan)s%(source_file)s%(blue)s:%(yellow)s%(source_line)s%(blue)s]%(reset)s"
 
 # Current format
 FORMAT = CUSTOM_FORMAT_WITH_FILENAME
@@ -118,7 +118,7 @@ RICH_FORMAT = "%(message)s"
 
 # Rich console instance
 if RICH_AVAILABLE:
-    console = Console()
+    console = Console(highlight=False)  # Disable syntax highlighting to preserve markup
 
 # Rich console instance for the module
 _console = None
@@ -263,10 +263,11 @@ def _setup_root_logger(level=None, use_rich=None):
         handler = RichHandler(
             console=console,
             rich_tracebacks=True,
-            markup=True,
+            markup=True,  # Enable markup
             show_time=False,
             show_path=False,  # We'll handle file path display ourselves
             enable_link_path=True,
+            highlighter=None,  # Disable syntax highlighting to preserve rich markup
         )
 
         # For Rich, we'll directly modify the message in the LoggerProxy
@@ -394,7 +395,9 @@ class LoggerProxy:
                     args_list = list(args)
 
                     # Append to the first argument (the message) if it's a string
+                    # Be careful not to break existing rich markup
                     if isinstance(args_list[0], str):
+                        # Preserve rich markup by adding file info at the end without modifying existing markup
                         args_list[0] = f"{args_list[0]}{file_info}"
                         args = tuple(args_list)
 
@@ -794,13 +797,19 @@ class LoggerProxy:
             # Import locally to avoid circular imports
             from rich.console import Console
 
-            _console = Console()
+            _console = Console(
+                highlight=False
+            )  # Disable syntax highlighting to preserve markup
 
         return _console
 
 
 # Create the auto-detecting logger proxy for conventional syntax
 logger = LoggerProxy()
+
+# Enable rich logging by default for best experience
+if RICH_AVAILABLE:
+    use_rich_logging(True)
 
 # Enable smart print by default to support rich object rendering
 logger.enable_smart_print(True)
