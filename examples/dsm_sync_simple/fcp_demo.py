@@ -14,7 +14,6 @@ It shows real-time source information about where each data point comes from,
 and provides a summary of the data source breakdown.
 """
 
-import argparse
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 from pathlib import Path
@@ -22,13 +21,16 @@ import time
 import sys
 import os
 import shutil
+from typing import Optional
+from enum import Enum
+import typer
+from typing_extensions import Annotated
 
 # Import the logger for logging and rich formatting
 from utils.logger_setup import logger
+from rich import print
 
 # Set initial log level (will be overridden by command line args)
-
-
 logger.setLevel("DEBUG")
 
 # Rich components - import after enabling smart print
@@ -55,235 +57,47 @@ from utils_for_debug.dataframe_output import (
 # We'll use this cache dir for all demos
 CACHE_DIR = Path("./cache")
 
+# Create Typer app with custom rich formatting
+app = typer.Typer(
+    help="FCP Demo: Demonstrate the Failover Composition Priority mechanism",
+    rich_markup_mode="rich",
+)
 
-# Custom rich-formatted ArgumentParser
-class RichArgumentParser(argparse.ArgumentParser):
-    """ArgumentParser with rich-formatted help output."""
 
-    def _print_message(self, message, file=None):
-        """Override _print_message to use rich formatting."""
-        if message:
-            if file is None:
-                file = sys.stdout
+# Enum for market types to use with Typer
+class MarketTypeChoice(str, Enum):
+    SPOT = "spot"
+    UM = "um"
+    CM = "cm"
+    FUTURES_USDT = "futures_usdt"
+    FUTURES_COIN = "futures_coin"
 
-            # Skip formatting if it's an error message (usually goes to stderr)
-            if file == sys.stderr:
-                file.write(message)
-                return
 
-            # Convert standard argparse output to rich-formatted output
-            if message.startswith("usage:"):
-                self._print_rich_help()
-            else:
-                # For other messages, just print normally
-                file.write(message)
+# Enum for data sources to use with Typer
+class DataSourceChoice(str, Enum):
+    AUTO = "AUTO"
+    REST = "REST"
+    VISION = "VISION"
 
-    def _print_rich_help(self):
-        """Print help using rich formatting."""
-        console = Console()
 
-        # Program name and description panel
-        console.print(
-            Panel(
-                f"[bold green]{self.description}[/bold green]",
-                expand=False,
-                border_style="green",
-            )
-        )
+# Enum for chart types to use with Typer
+class ChartTypeChoice(str, Enum):
+    KLINES = "klines"
+    FUNDING_RATE = "fundingRate"
 
-        # Usage section
-        usage_text = Text()
-        usage_text.append("Usage: ", style="bold")
-        usage_text.append(f"{os.path.basename(sys.argv[0])} ")
-        usage_text.append("[OPTIONS]", style="yellow")
-        console.print(usage_text)
-        console.print()
 
-        # Create options table
-        options_table = Table(
-            title="[bold]Command Options[/bold]",
-            box=box.ROUNDED,
-            highlight=True,
-            title_justify="left",
-            expand=True,
-        )
-        options_table.add_column("Option", style="cyan", no_wrap=True)
-        options_table.add_column("Description", style="white")
-        options_table.add_column("Default", style="green")
-
-        # Add main options
-        options_table.add_row(
-            "--symbol SYMBOL", "Trading symbol (e.g., BTCUSDT)", "BTCUSDT"
-        )
-        options_table.add_row(
-            "--market {spot,um,cm,futures_usdt,futures_coin}",
-            "Market type: spot, um (USDT-M futures), cm (Coin-M futures)",
-            "spot",
-        )
-        options_table.add_row(
-            "--interval INTERVAL", "Time interval (e.g., 1m, 5m, 1h)", "1m"
-        )
-        options_table.add_row(
-            "--retries RETRIES", "Maximum number of retry attempts", "3"
-        )
-        options_table.add_row(
-            "--chart-type {klines,fundingRate}", "Type of chart data", "klines"
-        )
-        options_table.add_row(
-            "--log-level, -l {DEBUG,INFO,...}",
-            "Set the log level (see Log Level Options below)",
-            "INFO",
-        )
-        options_table.add_row("-h, --help", "Show this help message and exit", "")
-
-        console.print(options_table)
-        console.print()
-
-        # Time Range options
-        time_table = Table(
-            title="[bold]Time Range Options[/bold]",
-            box=box.ROUNDED,
-            highlight=True,
-            title_justify="left",
-            expand=True,
-        )
-        time_table.add_column("Option", style="cyan", no_wrap=True)
-        time_table.add_column("Description", style="white")
-        time_table.add_column("Default", style="green")
-
-        time_table.add_row(
-            "--start-time START_TIME",
-            "Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
-            "",
-        )
-        time_table.add_row(
-            "--end-time END_TIME",
-            "End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
-            "",
-        )
-        time_table.add_row(
-            "--days DAYS",
-            "Number of days to fetch (used if start-time and end-time not provided)",
-            "3",
-        )
-
-        console.print(time_table)
-        console.print()
-
-        # Cache options
-        cache_table = Table(
-            title="[bold]Cache Options[/bold]",
-            box=box.ROUNDED,
-            highlight=True,
-            title_justify="left",
-            expand=True,
-        )
-        cache_table.add_column("Option", style="cyan", no_wrap=True)
-        cache_table.add_column("Description", style="white")
-        cache_table.add_column("Default", style="green")
-
-        cache_table.add_row(
-            "--no-cache", "Disable caching (cache is enabled by default)", "False"
-        )
-        cache_table.add_row(
-            "--clear-cache", "-cc", "Clear the cache directory before running", "False"
-        )
-
-        console.print(cache_table)
-        console.print()
-
-        # Source options
-        source_table = Table(
-            title="[bold]Source Options[/bold]",
-            box=box.ROUNDED,
-            highlight=True,
-            title_justify="left",
-            expand=True,
-        )
-        source_table.add_column("Option", style="cyan", no_wrap=True)
-        source_table.add_column("Description", style="white")
-        source_table.add_column("Default", style="green")
-
-        source_table.add_row(
-            "--enforce-source {AUTO,REST,VISION}", "Force specific data source", "AUTO"
-        )
-
-        console.print(source_table)
-        console.print()
-
-        # Log Level options
-        level_table = Table(
-            title="[bold]Log Level Options[/bold]",
-            box=box.ROUNDED,
-            highlight=True,
-            title_justify="left",
-            expand=True,
-        )
-        level_table.add_column("Option", style="cyan", no_wrap=True)
-        level_table.add_column("Log Level", style="white")
-        level_table.add_column("Shorthand", style="green")
-
-        level_table.add_row("--log-level DEBUG, -l D", "Debug (most verbose)", "D")
-        level_table.add_row("--log-level INFO, -l I", "Information (default)", "I")
-        level_table.add_row("--log-level WARNING, -l W", "Warning", "W")
-        level_table.add_row("--log-level ERROR, -l E", "Error", "E")
-        level_table.add_row(
-            "--log-level CRITICAL, -l C", "Critical (least verbose)", "C"
-        )
-
-        console.print(level_table)
-        console.print()
-
-        # Examples section
-        if self.epilog:
-            # Create a better examples display with custom tables
-            console.print("\n[bold]Examples:[/bold]")
-
-            # Parse examples from epilog - this assumes specific format with ## headers and examples in code blocks
-            # We'll create a more structured display
-            import re
-
-            sections = re.split(r"##\s+([^\n]+)", self.epilog)[
-                1:
-            ]  # Split on ## headers, skip first empty element
-
-            # Process sections in pairs (title, content)
-            for i in range(0, len(sections), 2):
-                if i + 1 < len(sections):
-                    title = sections[i].strip()
-                    content = sections[i + 1].strip()
-
-                    # Extract example commands (between ``` ```)
-                    examples = re.findall(r"```\s*(.*?)\s*```", content, re.DOTALL)
-
-                    # Create section table
-                    console.print(f"\n[bold cyan]{title}[/bold cyan]")
-
-                    for example in examples:
-                        lines = example.strip().split("\n")
-                        description = ""
-                        command = ""
-
-                        # First line with # is description, rest is command
-                        for line in lines:
-                            if line.startswith("#"):
-                                description = line[1:].strip()
-                            elif line.strip() and not description:
-                                # If we found a non-empty line before description, it's not formatted correctly
-                                command = line.strip()
-                            elif line.strip():
-                                # Add to command
-                                if command:
-                                    command += f"\n{line.strip()}"
-                                else:
-                                    command = line.strip()
-
-                        # Display without a panel - just use colors and spacing
-                        console.print(f"[yellow]• {description}[/yellow]")
-                        console.print(
-                            f"[green]  {command.replace(chr(10), chr(10) + '  ')}[/green]"
-                        )
-                        console.print()
+# Enum for log levels to use with Typer
+class LogLevel(str, Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+    D = "D"
+    I = "I"
+    W = "W"
+    E = "E"
+    C = "C"
 
 
 def clear_cache_directory():
@@ -795,179 +609,102 @@ def test_fcp_pm_mechanism(
     )
 
 
-def parse_arguments():
-    """Parse command line arguments."""
-    # Create examples based on successfully tested commands with a simpler format
-    # that our custom parser can handle
-    examples = """
-## Basic Usage
-```
-# Basic usage with default parameters (BTCUSDT on spot market for the last 3 days)
-python examples/dsm_sync_simple/fcp_demo.py
-```
+@app.command()
+def main(
+    symbol: Annotated[
+        str, typer.Option("--symbol", help="Trading symbol (e.g., BTCUSDT)")
+    ] = "BTCUSDT",
+    market: Annotated[
+        MarketTypeChoice,
+        typer.Option(
+            "--market",
+            help="Market type: spot, um (USDT-M futures), cm (Coin-M futures)",
+        ),
+    ] = MarketTypeChoice.SPOT,
+    interval: Annotated[
+        str, typer.Option("--interval", help="Time interval (e.g., 1m, 5m, 1h)")
+    ] = "1m",
+    start_time: Annotated[
+        Optional[str],
+        typer.Option(
+            "--start-time",
+            help="Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
+        ),
+    ] = None,
+    end_time: Annotated[
+        Optional[str],
+        typer.Option(
+            "--end-time",
+            help="End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
+        ),
+    ] = None,
+    days: Annotated[
+        int,
+        typer.Option(
+            "--days",
+            help="Number of days to fetch (used if start-time and end-time not provided)",
+        ),
+    ] = 3,
+    no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--no-cache", help="Disable caching (cache is enabled by default)"
+        ),
+    ] = False,
+    clear_cache: Annotated[
+        bool,
+        typer.Option(
+            "--clear-cache", "-cc", help="Clear the cache directory before running"
+        ),
+    ] = False,
+    enforce_source: Annotated[
+        DataSourceChoice,
+        typer.Option(
+            "--enforce-source", help="Force specific data source (default: AUTO)"
+        ),
+    ] = DataSourceChoice.AUTO,
+    test_fcp_pm: Annotated[
+        bool,
+        typer.Option(
+            "--test-fcp-pm",
+            help="Run the special test for Failover Composition and Parcel Merge mechanism",
+        ),
+    ] = False,
+    retries: Annotated[
+        int, typer.Option("--retries", help="Maximum number of retry attempts")
+    ] = 3,
+    chart_type: Annotated[
+        ChartTypeChoice, typer.Option("--chart-type", help="Type of chart data")
+    ] = ChartTypeChoice.KLINES,
+    log_level: Annotated[
+        LogLevel,
+        typer.Option(
+            "--log-level",
+            "-l",
+            help="Set the log level (default: INFO). Shorthand options: D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL",
+        ),
+    ] = LogLevel.INFO,
+    prepare_cache: Annotated[
+        bool,
+        typer.Option(
+            "--prepare-cache",
+            help="Pre-populate cache with the first segment of data (for FCP-PM test)",
+        ),
+    ] = False,
+):
+    """
+    FCP Demo: Demonstrates the Failover Composition Priority (FCP) mechanism.
 
-## Market Types and Intervals
-```
-# Fetch Ethereum data with 15-minute intervals and detailed logging
-python examples/dsm_sync_simple/fcp_demo.py --symbol ETHUSDT --market spot --interval 15m --days 1 --log-level DEBUG
-```
+    This script shows how DataSourceManager automatically retrieves data from different sources:
 
-```
-# Use REST API as source for Bitcoin data from USDT-M futures with cache cleared
-python examples/dsm_sync_simple/fcp_demo.py --symbol BTCUSDT --market um --days 1 --enforce-source REST --clear-cache
-```
+    1. Cache (Local Arrow files)
+    2. VISION API
+    3. REST API
 
-## Date Range Specification
-```
-# Fetch hourly Bitcoin spot data for a specific date range
-python examples/dsm_sync_simple/fcp_demo.py --symbol BTCUSDT --market spot \\
-  --start-time "2025-04-13" --end-time "2025-04-14" --interval 1h
-```
-
-## Log Level Shorthand Options
-```
-# Using shorthand log level options for debugging
-python examples/dsm_sync_simple/fcp_demo.py -l D  # Same as --log-level DEBUG
-
-# Using warning log level with shorthand
-python examples/dsm_sync_simple/fcp_demo.py -l W  # Same as --log-level WARNING
-```
-
-## FCP-PM Mechanism Test
-```
-# Test the Failover Composition and Parcel Merge mechanism
-python examples/dsm_sync_simple/fcp_demo.py --test-fcp-pm --days 5 --interval 1h
-```
-"""
-
-    parser = RichArgumentParser(
-        description="FCP Demo: Demonstrate the Failover Composition Priority mechanism",
-        epilog=examples,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    # Required arguments
-    parser.add_argument(
-        "--symbol", type=str, default="BTCUSDT", help="Trading symbol (e.g., BTCUSDT)"
-    )
-
-    parser.add_argument(
-        "--market",
-        type=str,
-        default="spot",
-        choices=["spot", "um", "cm", "futures_usdt", "futures_coin"],
-        help="Market type: spot, um (USDT-M futures), cm (Coin-M futures)",
-    )
-
-    parser.add_argument(
-        "--interval", type=str, default="1m", help="Time interval (e.g., 1m, 5m, 1h)"
-    )
-
-    # Time range arguments
-    time_group = parser.add_argument_group("Time Range")
-    time_group.add_argument(
-        "--start-time",
-        type=str,
-        help="Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
-    )
-
-    time_group.add_argument(
-        "--end-time",
-        type=str,
-        help="End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
-    )
-
-    time_group.add_argument(
-        "--days",
-        type=int,
-        default=3,
-        help="Number of days to fetch (used if start-time and end-time not provided)",
-    )
-
-    # Cache options
-    cache_group = parser.add_argument_group("Cache Options")
-    cache_group.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Disable caching (cache is enabled by default)",
-    )
-
-    cache_group.add_argument(
-        "--clear-cache",
-        "-cc",
-        action="store_true",
-        help="Clear the cache directory before running",
-    )
-
-    # Source options
-    source_group = parser.add_argument_group("Source Options")
-    source_group.add_argument(
-        "--enforce-source",
-        type=str,
-        choices=["AUTO", "REST", "VISION"],
-        default="AUTO",
-        help="Force specific data source (default: AUTO)",
-    )
-
-    # FCP-PM Test option
-    parser.add_argument(
-        "--test-fcp-pm",
-        action="store_true",
-        help="Run the special test for Failover Composition and Parcel Merge mechanism",
-    )
-
-    # Other options
-    parser.add_argument(
-        "--retries", type=int, default=3, help="Maximum number of retry attempts"
-    )
-
-    parser.add_argument(
-        "--chart-type",
-        type=str,
-        choices=["klines", "fundingRate"],
-        default="klines",
-        help="Type of chart data",
-    )
-
-    # Add a log level option to demonstrate rich output control
-    parser.add_argument(
-        "--log-level",
-        "-l",
-        type=str,
-        choices=[
-            "DEBUG",
-            "INFO",
-            "WARNING",
-            "ERROR",
-            "CRITICAL",
-            "D",
-            "I",
-            "W",
-            "E",
-            "C",
-        ],
-        default="INFO",
-        help="Set the log level (default: INFO). Shorthand options: D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL",
-    )
-
-    # Add a new argument for prepare_cache
-    parser.add_argument(
-        "--prepare-cache",
-        action="store_true",
-        help="Pre-populate cache with the first segment of data (for FCP-PM test)",
-    )
-
-    # For --help flag, use our custom formatter
-    if "-h" in sys.argv or "--help" in sys.argv:
-        parser.print_help()
-        sys.exit(0)
-
-    return parser.parse_args()
-
-
-def main():
+    It displays real-time source information about where each data point comes from.
+    """
     logger.info(f"Current time: {datetime.now().isoformat()}")
-    """Run the FCP demo."""
+
     try:
         print(
             Panel(
@@ -986,120 +723,135 @@ def main():
         if not verify_project_root():
             sys.exit(1)
 
-        # Parse arguments
-        args = parse_arguments()
-        print(f"[bold cyan]Command line arguments:[/bold cyan] {args}")
+        # Convert shorthand log levels to full names
+        level = log_level.value
+        if level == "D":
+            level = "DEBUG"
+        elif level == "I":
+            level = "INFO"
+        elif level == "W":
+            level = "WARNING"
+        elif level == "E":
+            level = "ERROR"
+        elif level == "C":
+            level = "CRITICAL"
 
-        # Set the log level
-        # Convert shorthand to full names
-        log_level = args.log_level
-        if log_level == "D":
-            log_level = "DEBUG"
-        elif log_level == "I":
-            log_level = "INFO"
-        elif log_level == "W":
-            log_level = "WARNING"
-        elif log_level == "E":
-            log_level = "ERROR"
-        elif log_level == "C":
-            log_level = "CRITICAL"
+        logger.setLevel(level)
+        print(f"[bold cyan]Log level set to:[/bold cyan] {level}")
 
-        logger.setLevel(log_level)
-        print(f"[bold cyan]Log level set to:[/bold cyan] {log_level}")
+        # Show command line arguments
+        print(f"[bold cyan]Command line arguments:[/bold cyan]")
+        print(f"  Symbol: {symbol}")
+        print(f"  Market: {market.value}")
+        print(f"  Interval: {interval}")
+        print(f"  Days: {days}")
+        print(f"  Start time: {start_time}")
+        print(f"  End time: {end_time}")
+        print(f"  No cache: {no_cache}")
+        print(f"  Clear cache: {clear_cache}")
+        print(f"  Enforce source: {enforce_source.value}")
+        print(f"  Test FCP-PM: {test_fcp_pm}")
+        print(f"  Retries: {retries}")
+        print(f"  Chart type: {chart_type.value}")
+        print(f"  Prepare cache: {prepare_cache}")
 
         # Clear cache if requested
-        if args.clear_cache:
+        if clear_cache:
             clear_cache_directory()
 
         # Check if we should run the FCP-PM test
-        if hasattr(args, "test_fcp_pm") and args.test_fcp_pm:
+        if test_fcp_pm:
             # Run the FCP-PM mechanism test
             test_fcp_pm_mechanism(
-                symbol=args.symbol,
-                market_type=MarketType.from_string(args.market),
-                interval=Interval(args.interval),
-                chart_type=ChartType.from_string(args.chart_type),
-                start_date=args.start_time,
-                end_date=args.end_time,
-                days=args.days,
-                prepare_cache=args.prepare_cache,
+                symbol=symbol,
+                market_type=MarketType.from_string(market.value),
+                interval=Interval(interval),
+                chart_type=ChartType.from_string(chart_type.value),
+                start_date=start_time,
+                end_date=end_time,
+                days=days,
+                prepare_cache=prepare_cache,
             )
             return
 
         # Validate and process arguments
         try:
             # Convert market type string to enum
-            market_type = MarketType.from_string(args.market)
+            market_type = MarketType.from_string(market.value)
 
             # Convert interval string to enum
-            interval = Interval(args.interval)
+            interval_enum = Interval(interval)
 
             # Convert chart type string to enum
-            chart_type = ChartType.from_string(args.chart_type)
+            chart_type_enum = ChartType.from_string(chart_type.value)
 
             # Determine time range
-            if args.start_time and args.end_time:
+            if start_time and end_time:
                 # Use specified time range
-                start_time = parse_datetime(args.start_time)
-                end_time = parse_datetime(args.end_time)
+                start_datetime = parse_datetime(start_time)
+                end_datetime = parse_datetime(end_time)
             else:
                 # Use days parameter to calculate time range
-                end_time = datetime.now(timezone.utc)
-                start_time = end_time - timedelta(days=args.days)
+                end_datetime = datetime.now(timezone.utc)
+                start_datetime = end_datetime - timedelta(days=days)
 
             # Process caching option
-            use_cache = not args.no_cache
+            use_cache = not no_cache
 
             # Process enforce source option
-            if args.enforce_source == "AUTO":
-                enforce_source = DataSource.AUTO
-            elif args.enforce_source == "REST":
-                enforce_source = DataSource.REST
-                logger.debug(f"Enforcing REST API source: {enforce_source}")
-            elif args.enforce_source == "VISION":
-                enforce_source = DataSource.VISION
+            if enforce_source == DataSourceChoice.AUTO:
+                enforce_source_enum = DataSource.AUTO
+            elif enforce_source == DataSourceChoice.REST:
+                enforce_source_enum = DataSource.REST
+                logger.debug(f"Enforcing REST API source: {enforce_source_enum}")
+            elif enforce_source == DataSourceChoice.VISION:
+                enforce_source_enum = DataSource.VISION
             else:
-                enforce_source = DataSource.AUTO
+                enforce_source_enum = DataSource.AUTO
 
             # Adjust symbol for CM market if needed
-            symbol = args.symbol
+            symbol_adjusted = symbol
             if market_type == MarketType.FUTURES_COIN and symbol == "BTCUSDT":
-                symbol = "BTCUSD_PERP"
-                print(f"[yellow]Adjusted symbol for CM market: {symbol}[/yellow]")
+                symbol_adjusted = "BTCUSD_PERP"
+                print(
+                    f"[yellow]Adjusted symbol for CM market: {symbol_adjusted}[/yellow]"
+                )
 
             # Display configuration
             print(f"[bold cyan]Configuration:[/bold cyan]")
             print(f"Market type: {market_type.name}")
-            print(f"Symbol: {symbol}")
-            print(f"Interval: {interval.value}")
-            print(f"Chart type: {chart_type.name}")
-            print(f"Time range: {start_time.isoformat()} to {end_time.isoformat()}")
+            print(f"Symbol: {symbol_adjusted}")
+            print(f"Interval: {interval_enum.value}")
+            print(f"Chart type: {chart_type_enum.name}")
+            print(
+                f"Time range: {start_datetime.isoformat()} to {end_datetime.isoformat()}"
+            )
             print(f"Cache enabled: {use_cache}")
-            print(f"Enforce source: {args.enforce_source}")
-            print(f"Max retries: {args.retries}")
+            print(f"Enforce source: {enforce_source.value}")
+            print(f"Max retries: {retries}")
             print()
 
             # Fetch data using FCP
             df = fetch_data_with_fcp(
                 market_type=market_type,
-                symbol=symbol,
-                start_time=start_time,
-                end_time=end_time,
-                interval=interval,
+                symbol=symbol_adjusted,
+                start_time=start_datetime,
+                end_time=end_datetime,
+                interval=interval_enum,
                 provider=DataProvider.BINANCE,
-                chart_type=chart_type,
+                chart_type=chart_type_enum,
                 use_cache=use_cache,
-                enforce_source=enforce_source,
-                max_retries=args.retries,
+                enforce_source=enforce_source_enum,
+                max_retries=retries,
             )
 
             # Display results
             display_results(
                 df,
-                symbol,
+                symbol_adjusted,
                 market_type.name.lower(),
-                interval.value,
-                chart_type.name.lower(),
+                interval_enum.value,
+                chart_type_enum.name.lower(),
             )
 
             # Add note about log level and rich output
@@ -1137,4 +889,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    app()
