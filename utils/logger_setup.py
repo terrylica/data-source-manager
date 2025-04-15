@@ -7,7 +7,7 @@ logging facilities with additional features:
 
 Key Features:
 - Automatic module name detection in log messages
-- Proper source file/line tracking for accurate debugging
+- Source file and line tracking for accurate debugging
 - Method chaining support for cleaner code
 - Rich-powered logging for improved readability in terminals
 - Dedicated timeout and error logging subsystems
@@ -36,9 +36,6 @@ Basic Usage Examples:
 Advanced Usage:
     # Configure log level
     logger.setLevel(logger.DEBUG)  # Or using string: "DEBUG"
-
-    # Enable/disable showing filenames in logs
-    logger.show_filename(True)
 
     # Switch between rich and standard logging
     logger.use_rich(True)
@@ -82,7 +79,7 @@ DEFAULT_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 _root_configured = False
 _module_loggers = {}
 _use_rich = os.environ.get("USE_RICH_LOGGING", "").lower() in ("true", "1", "yes")
-_show_filename = os.environ.get("SHOW_LOG_FILENAME", "").lower() in ("true", "1", "yes")
+_show_filename = True  # Always show filename
 
 # Timeout logging
 _timeout_log_file = os.environ.get(
@@ -109,16 +106,15 @@ DEFAULT_LOG_COLORS = {
 # Format strings
 # Base format without filename
 FORMAT_BASE = "%(log_color)s%(levelname)-8s%(reset)s %(name)s: %(message)s"
-# Format with filename - moved to the right end of the line to match Rich style
-FORMAT_WITH_FILENAME = "%(log_color)s%(levelname)-8s%(reset)s %(name)s: %(message)s%(log_color)s %(filename)25s:%(lineno)-4d%(reset)s"
-# Current format based on show_filename setting
-FORMAT = FORMAT_WITH_FILENAME if _show_filename else FORMAT_BASE
 
-# Rich format (simpler as Rich handles the styling)
-RICH_FORMAT_BASE = "%(message)s"
-# Rich format for filename display - no square brackets since Rich will add its own formatting
-RICH_FORMAT_WITH_FILENAME = "%(message)s"  # Let Rich handle the file path display
-RICH_FORMAT = RICH_FORMAT_WITH_FILENAME if _show_filename else RICH_FORMAT_BASE
+# Format with custom file/line information from our proxy
+CUSTOM_FORMAT_WITH_FILENAME = "%(log_color)s%(levelname)-8s%(reset)s %(name)s: %(message)s%(blue)s [%(cyan)s%(source_file)s:%(yellow)s%(source_line)s%(blue)s]%(reset)s"
+
+# Current format
+FORMAT = CUSTOM_FORMAT_WITH_FILENAME
+
+# Rich format (Rich handles the styling)
+RICH_FORMAT = "%(message)s"
 
 # Rich console instance
 if RICH_AVAILABLE:
@@ -146,7 +142,7 @@ class CustomLogger(logging.Logger):
     to find the actual application code that initiated the logging call.
     """
 
-    def findCaller(self, stack_info=False, _stacklevel=1):
+    def findCaller(self, stack_info=False, stacklevel=1):
         """
         Find the stack frame of the caller.
 
@@ -157,71 +153,46 @@ class CustomLogger(logging.Logger):
 
         Args:
             stack_info (bool): If True, collect stack trace information
-            _stacklevel (int): How many frames to skip (unused, kept for compatibility)
+            stacklevel (int): How many frames to skip
 
         Returns:
             tuple: (filename, line number, function name, stack info)
         """
-        # Start from the frame of the caller of this method
-        frame = inspect.currentframe()
+        # Get current stack frames
+        try:
+            # Get the stack frames
+            frame_records = inspect.stack()
 
-        # Skip this frame
-        if frame:
-            frame = frame.f_back
+            # Skip frames based on stacklevel (default is 1 in logging)
+            # We need to skip more frames to account for the logger proxy and other infrastructure
+            adjusted_level = stacklevel + 4  # Skip extra frames for our infrastructure
 
-        # Initialize values
-        fn, lno, func, sinfo = "(unknown file)", 0, "(unknown function)", None
+            if len(frame_records) <= adjusted_level:
+                return "(unknown file)", 0, "(unknown function)", None
 
-        # Find frame that's not in the logging system
-        while frame:
-            module_name = frame.f_globals.get("__name__", "")
-            if not (module_name == "logging" or module_name == __name__):
-                # This is the original caller
-                fn = frame.f_code.co_filename
-                lno = frame.f_lineno
-                func = frame.f_code.co_name
-                if stack_info:
-                    sinfo = self._get_stack_info(frame)
-                break
-            frame = frame.f_back
+            # Get the relevant frame based on adjusted stacklevel
+            caller_frame = frame_records[adjusted_level]
 
-        return fn, lno, func, sinfo
+            # Extract file, line, and function information
+            fn = caller_frame.filename
+            lno = caller_frame.lineno
+            func = caller_frame.function
 
-    def _get_stack_info(self, frame):
-        """
-        Get formatted stack information for the given frame.
+            # Get stack info if requested
+            sinfo = None
+            if stack_info:
+                sinfo = "".join(
+                    traceback.format_stack(frame_records[adjusted_level][0])
+                )
 
-        Args:
-            frame: The stack frame to format
+            return fn, lno, func, sinfo
 
-        Returns:
-            str: Formatted stack trace information
-        """
-        stack = traceback.extract_stack(frame)
-        if stack:
-            return "".join(traceback.format_list(stack))
-        return None
+        except Exception:
+            return "(unknown file)", 0, "(unknown function)", None
 
 
 # Register our custom logger class
 logging.setLoggerClass(CustomLogger)
-
-
-# DEPRECATED: This function is intentionally disabled to enforce the use of 'logger' instead
-def get_logger(*args, **kwargs):
-    """
-    DEPRECATED: Do not use this function. Import and use 'logger' directly.
-
-    Example:
-        from utils.logger_setup import logger
-
-        # Then use directly:
-        logger.info("Your message")
-    """
-    raise DeprecationWarning(
-        "get_logger() is deprecated and has been disabled. "
-        "Please use 'from utils.logger_setup import logger' instead and access logging methods directly."
-    )
 
 
 def _get_module_logger(name=None, level=None, setup_root=False, use_rich=None):
@@ -266,39 +237,17 @@ def _get_module_logger(name=None, level=None, setup_root=False, use_rich=None):
     return logger_instance
 
 
-def _setup_root_logger(level=None, use_rich=None, show_filename=None):
+def _setup_root_logger(level=None, use_rich=None):
     """
     Configure the root logger with specified level and colorized output.
-
-    Establishes the hierarchy root configuration that affects all loggers.
-    Clears any existing handlers to prevent duplicate log entries and
-    applies consistent formatting across the logging system.
-
-    Parameters:
-        level (str, optional): Logging level threshold (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-                               If None, uses DEFAULT_LEVEL from environment or configuration.
-        use_rich (bool, optional): When True, uses Rich for logging formatting.
-                                  If None, uses the value from USE_RICH_LOGGING env var.
-        show_filename (bool, optional): When True, includes filename and line number in log output.
-                                       If None, uses the value from the global _show_filename.
-
-    Returns:
-        logging.Logger: Configured root logger instance.
     """
-    global _root_configured, _use_rich, _show_filename, FORMAT, RICH_FORMAT
+    global _root_configured, _use_rich, FORMAT
 
     # Determine whether to use rich
     if use_rich is None:
         use_rich = _use_rich
     else:
         _use_rich = use_rich
-
-    # Determine whether to show filename
-    if show_filename is not None:
-        _show_filename = show_filename
-        # Update format strings based on current setting
-        FORMAT = FORMAT_WITH_FILENAME if _show_filename else FORMAT_BASE
-        RICH_FORMAT = RICH_FORMAT_WITH_FILENAME if _show_filename else RICH_FORMAT_BASE
 
     root_logger = logging.getLogger()
     root_logger.handlers.clear()  # Clear existing handlers
@@ -310,22 +259,40 @@ def _setup_root_logger(level=None, use_rich=None, show_filename=None):
 
     # Set up handler based on preference and availability
     if use_rich and RICH_AVAILABLE:
-        # Use Rich handler
+        # Use Rich handler with explicit filename display
         handler = RichHandler(
             console=console,
             rich_tracebacks=True,
             markup=True,
             show_time=False,
-            show_path=_show_filename,  # Show path if filename display is enabled
-            enable_link_path=_show_filename,  # Enable clickable links when filenames are shown
+            show_path=False,  # We'll handle file path display ourselves
+            enable_link_path=True,
         )
-        formatter = logging.Formatter(RICH_FORMAT)
+
+        # For Rich, we'll directly modify the message in the LoggerProxy
+        formatter = logging.Formatter("%(message)s")
     else:
         # Use colorlog handler (fallback or default)
         handler = logging.StreamHandler()
         formatter = ColoredFormatter(
             FORMAT,
             log_colors=DEFAULT_LOG_COLORS,
+            secondary_log_colors={
+                "filename": {
+                    "DEBUG": "cyan",
+                    "INFO": "cyan",
+                    "WARNING": "cyan",
+                    "ERROR": "cyan",
+                    "CRITICAL": "cyan",
+                },
+                "lineno": {
+                    "DEBUG": "yellow",
+                    "INFO": "yellow",
+                    "WARNING": "yellow",
+                    "ERROR": "yellow",
+                    "CRITICAL": "yellow",
+                },
+            },
             style="%",
             reset=True,
         )
@@ -345,13 +312,9 @@ def use_rich_logging(enable=True, level=None):
     """
     Enable or disable Rich logging.
 
-    Configures the root logger to use Rich for enhanced console logging with
-    proper formatting for structured data, exceptions, and other rich content.
-
     Parameters:
         enable (bool): True to enable Rich logging, False to use standard colorlog.
         level (str, optional): Logging level to set when reconfiguring.
-                              If None, maintains current level.
 
     Returns:
         bool: True if Rich logging was enabled, False otherwise.
@@ -370,38 +333,10 @@ def use_rich_logging(enable=True, level=None):
     return enable
 
 
-def show_filename(enable=True, level=None):
-    """
-    Enable or disable showing filename and line number in log messages.
-
-    Configures the root logger to include source file information in log output.
-
-    Parameters:
-        enable (bool): True to show filename and line number, False to hide.
-        level (str, optional): Logging level to set when reconfiguring.
-                              If None, maintains current level.
-
-    Returns:
-        bool: Current show_filename setting
-    """
-    global _show_filename
-
-    _show_filename = enable
-    _setup_root_logger(level=level, show_filename=enable)
-    return enable
-
-
 # Create a proxy logger object that automatically detects the calling module
 class LoggerProxy:
     """
     Proxy implementation providing automatic module detection and method chaining.
-
-    Implements the Proxy design pattern to provide transparent access to module-specific
-    loggers without requiring explicit logger acquisition. Uses runtime introspection
-    to determine the calling module and delegates to the appropriate logger instance.
-
-    Additionally implements the Fluent Interface pattern through method chaining,
-    allowing sequential logging operations and configuration with a concise syntax.
     """
 
     def __init__(self):
@@ -410,24 +345,12 @@ class LoggerProxy:
         if not _root_configured:
             _setup_root_logger(level=DEFAULT_LEVEL, use_rich=_use_rich)
 
-        # Don't enable smart print by default here, it will be done later
-
         # Initialize console (lazy loading)
         self._console = None
 
     def __getattr__(self, name):
         """
         Dynamic attribute resolution with runtime module detection.
-
-        Intercepts standard logging method calls (debug, info, etc.) and
-        delegates them to the appropriate module-specific logger. Returns
-        a callable wrapper that preserves the proxy instance for method chaining.
-
-        Parameters:
-            name (str): Attribute name being accessed, typically a logging method.
-
-        Returns:
-            callable: Wrapper function for logging methods or direct attribute access.
         """
         # Handle standard logging methods
         if name in (
@@ -439,18 +362,51 @@ class LoggerProxy:
             "critical",
             "exception",
         ):
-            # Get caller's module (skip this frame)
+            # Get caller's module and source information
             frame = inspect.currentframe().f_back
             module = inspect.getmodule(frame)
             module_name = module.__name__ if module else "__main__"
 
+            # Get exact caller information
+            file_path = frame.f_code.co_filename
+            line_no = frame.f_lineno
+
             # Get the appropriate logger for the module
             logger_instance = _get_module_logger(module_name)
 
-            # Create a wrapper that calls the log method and returns self for chaining
+            # Create a wrapper with explicit source location handling
             def log_wrapper(*args, **kwargs):
+                # If extra is not provided, create it
+                if "extra" not in kwargs:
+                    kwargs["extra"] = {}
+
+                # Add specific file and line information to make it available to formatters
+                source_file = os.path.basename(file_path)
+                kwargs["extra"]["source_file"] = source_file
+                kwargs["extra"]["source_line"] = line_no
+
+                # For Rich logging, append file/line info directly to the message
+                if _use_rich and RICH_AVAILABLE and args:
+                    # Format for the appended file info - match the style of standard logger
+                    file_info = f" [blue][[cyan]{source_file}[/cyan]:[yellow]{line_no}[/yellow][blue]][/blue]"
+
+                    # Make sure args is mutable (convert from tuple to list)
+                    args_list = list(args)
+
+                    # Append to the first argument (the message) if it's a string
+                    if isinstance(args_list[0], str):
+                        args_list[0] = f"{args_list[0]}{file_info}"
+                        args = tuple(args_list)
+
+                # Don't use stacklevel as we're directly providing file/line info
+                if "stacklevel" in kwargs:
+                    del kwargs["stacklevel"]
+
+                # Call the actual log method
                 log_method = getattr(logger_instance, name)
                 log_method(*args, **kwargs)
+
+                # Return self for method chaining
                 return self
 
             return log_wrapper
@@ -459,28 +415,23 @@ class LoggerProxy:
         tmp_logger = _get_module_logger()
         return getattr(tmp_logger, name)
 
-    def setup_root(self, level=None, use_rich=None, show_filename=None):
+    def setup_root(self, level=None, use_rich=None):
         """
         Configure the root logger with specified options.
-
-        Provides a cleaner interface for setting up the root logger with various options.
 
         Parameters:
             level (str, optional): Logging level to set
             use_rich (bool, optional): Whether to use Rich logging
-            show_filename (bool, optional): Whether to show filenames in log output
 
         Returns:
             LoggerProxy: Self reference for method chaining
         """
-        _setup_root_logger(level=level, use_rich=use_rich, show_filename=show_filename)
+        _setup_root_logger(level=level, use_rich=use_rich)
         return self
 
     def setLevel(self, level, configure_root=True):
         """
         Set the logging level with method chaining support.
-
-        Simplifies setting the logging level while supporting method chaining.
 
         Parameters:
             level (str): Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -502,9 +453,6 @@ class LoggerProxy:
         # Set up root logger if requested (usually first setup)
         if configure_root:
             _setup_root_logger(level=level_str, use_rich=_use_rich)
-            # Use logging.getLogger directly to avoid circular reference
-            # root_logger = logging.getLogger("root")
-            # root_logger.debug(f"Logger root configured with level {level_str}")
 
         # Get corresponding module
         frame = inspect.currentframe()
@@ -530,20 +478,6 @@ class LoggerProxy:
             LoggerProxy: Self reference for method chaining support.
         """
         use_rich_logging(enable=enable, level=level)
-        return self
-
-    def show_filename(self, enable=True, level=None):
-        """
-        Enable or disable showing filename in log output with method chaining support.
-
-        Parameters:
-            enable (bool): True to show filename and line number, False to hide.
-            level (str, optional): Logging level to set when reconfiguring.
-
-        Returns:
-            LoggerProxy: Self reference for method chaining support.
-        """
-        show_filename(enable=enable, level=level)
         return self
 
     def log_timeout(self, operation, timeout_value, details=None):
@@ -786,7 +720,22 @@ class LoggerProxy:
             def smart_print(*args, **kwargs):
                 if self.should_show_rich_output():
                     # Use our shared console for consistent rendering
-                    # This leverages the console property to ensure we use a single instance
+                    # Extract file and end parameters as they're not supported by console.print
+                    file = kwargs.pop("file", None)
+                    end = kwargs.pop("end", None)
+
+                    # If output is being redirected to a file (like in exception handling),
+                    # use the original print function
+                    if (
+                        file is not None
+                        and file is not sys.stdout
+                        and file is not sys.stderr
+                    ):
+                        if hasattr(builtins, "_original_print"):
+                            builtins._original_print(*args, **kwargs)
+                        return
+
+                    # Otherwise use the console to print
                     self.console.print(*args, **kwargs)
 
             # Replace the built-in print
@@ -872,44 +821,28 @@ __all__ = [
 # Test logger if run directly
 if __name__ == "__main__":
     # Test the proxy logger with conventional syntax
-    print("\nTesting conventional logger.xxx() syntax:")
-    logger.debug("Debug using conventional syntax")
-    logger.info("Info using conventional syntax")
-    logger.warning("Warning using conventional syntax")
-    logger.error("Error using conventional syntax")
-    logger.critical("Critical using conventional syntax")
+    print("\nTesting logger with file/line detection:")
+    logger.debug("Debug message")
+    logger.info("Info message")
+    logger.warning("Warning message")
+    logger.error("Error message")
+    logger.critical("Critical message")
 
-    # Test the conventional setLevel method
-    print("\nTesting conventional logger.setLevel() method:")
+    # Test with different logging levels
+    print("\nTesting logger with different levels:")
     logger.setLevel("WARNING")
-    logger.debug("This debug message should NOT appear")
-    logger.info("This info message should NOT appear")
-    logger.warning("This warning message SHOULD appear")
+    logger.debug("Debug message (should not appear)")
+    logger.info("Info message (should not appear)")
+    logger.warning("Warning message (should appear)")
 
-    # Test filename display
-    print("\nTesting filename display:")
-    logger.show_filename(True)
-    logger.info("This message should show filename")
-    logger.show_filename(False)
-    logger.info("This message should NOT show filename")
+    # Reset to DEBUG
+    logger.setLevel("DEBUG")
 
     # Test rich logging if available
     if RICH_AVAILABLE:
         print("\nTesting Rich logging:")
         logger.use_rich(True)
-        logger.debug("Debug message with [bold blue]Rich[/bold blue] formatting")
-        logger.info("Info with Rich: [green]success[/green]")
-        logger.warning(
-            "Warning with data",
-            extra={"data": {"complex": True, "nested": {"value": 42}}},
-        )
-
-        # Test rich logging with filename
-        print("\nTesting Rich logging with filename:")
-        logger.show_filename(True)
-        logger.info("This message should show filename with Rich formatting")
-        logger.show_filename(False)
-        logger.info("This message should NOT show filename with Rich formatting")
+        logger.info("Info with [bold green]Rich formatting[/bold green]")
 
         try:
             1 / 0
@@ -922,25 +855,34 @@ if __name__ == "__main__":
     else:
         print("\nRich library not installed, skipping Rich logging tests")
 
-    # Test method chaining with all levels
-    print("\nTesting method chaining with all levels:")
-    logger.debug("Debug chain").info("Info chain").warning("Warning chain").error(
-        "Error chain"
-    ).critical("Critical chain")
+    # Test method chaining
+    print("\nTesting method chaining:")
+    logger.debug("First message").info("Second message").warning("Third message")
 
-    # Test method chaining with setLevel
-    print("\nTesting method chaining with setLevel:")
-    logger.setLevel("DEBUG").debug("This chained debug message SHOULD appear")
+    # Create and test a temporary file
+    test_file = "temp_logger_test.py"
+    with open(test_file, "w") as f:
+        f.write(
+            """#!/usr/bin/env python3
+from utils.logger_setup import logger
 
-    # Test method chaining with show_filename
-    print("\nTesting method chaining with show_filename:")
-    logger.show_filename(True).info("This message should show filename (chained)")
+def test_from_another_file():
+    logger.info("Log from another file")
+    
+if __name__ == "__main__":
+    test_from_another_file()
+"""
+        )
 
-    # Try to use the deprecated get_logger function - should raise an error
-    try:
-        get_logger()
-    except Exception as e:
-        print(f"\nSuccessfully disabled get_logger(): {e}")
+    # Make it executable
+    os.chmod(test_file, 0o755)
+
+    # Run the test file
+    print("\nTesting logging from another file:")
+    os.system(f"python {test_file}")
+
+    # Clean up
+    os.remove(test_file)
 
 
 def _configure_timeout_logger():
