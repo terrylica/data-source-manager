@@ -57,6 +57,7 @@ import traceback
 from pathlib import Path
 import builtins
 import sys
+import pendulum
 
 try:
     from rich.console import Console
@@ -1152,3 +1153,48 @@ def enable_smart_print(enabled=True):
     """
     logger.enable_smart_print(enabled)
     return True
+
+
+def configure_session_logging(session_name, log_level="DEBUG"):
+    """
+    Configure comprehensive session logging with timestamp-based files.
+
+    This function:
+    1. Creates necessary log directories
+    2. Generates timestamped log files
+    3. Sets up file handlers for regular logs and errors
+    4. Returns paths to log files for reference
+
+    Args:
+        session_name (str): Name of the session (used in log filenames)
+        log_level (str): Logging level to use
+
+    Returns:
+        tuple: (main_log_path, error_log_path, timestamp) for reference
+    """
+    # Generate timestamp for consistent filenames
+    timestamp = pendulum.now("UTC").format("YYYYMMDD_HHmmss")
+
+    # Create log directories
+    main_log_dir = Path(f"logs/{session_name}_logs")
+    error_log_dir = Path("logs/error_logs")
+
+    main_log_dir.mkdir(parents=True, exist_ok=True)
+    error_log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Define log paths
+    main_log_path = main_log_dir / f"{session_name}_{timestamp}.log"
+    error_log_path = error_log_dir / f"{session_name}_errors_{timestamp}.log"
+
+    # Configure logging
+    logger.setLevel(log_level)
+    logger.add_file_handler(str(main_log_path), level=log_level, mode="w")
+    logger.enable_error_logging(str(error_log_path))
+
+    # Log initialization
+    logger.info(f"Session logging initialized for {session_name}")
+    logger.debug(f"Log level: {log_level}")
+    logger.debug(f"Main log: {main_log_path}")
+    logger.debug(f"Error log: {error_log_path}")
+
+    return str(main_log_path), str(error_log_path), timestamp
