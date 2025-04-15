@@ -57,6 +57,8 @@ CACHE_DIR = Path("./cache")
 app = typer.Typer(
     help="FCP Demo: Demonstrate the Failover Composition Priority mechanism",
     rich_markup_mode="rich",
+    add_completion=False,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 
@@ -385,7 +387,7 @@ def test_fcp_pm_mechanism(
 
     print(
         Panel(
-            f"[bold green]Testing Failover Composition and Parcel Merge (FCP-PM) Mechanism[/bold green]\n"
+            "[bold green]Testing Failover Composition and Parcel Merge (FCP-PM) Mechanism[/bold green]\n"
             f"Symbol: {symbol}\n"
             f"Market: {market_type.name}\n"
             f"Interval: {interval.value}\n"
@@ -608,22 +610,24 @@ def test_fcp_pm_mechanism(
 @app.command()
 def main(
     symbol: Annotated[
-        str, typer.Option("--symbol", help="Trading symbol (e.g., BTCUSDT)")
+        str, typer.Option("--symbol", "-s", help="Trading symbol (e.g., BTCUSDT)")
     ] = "BTCUSDT",
     market: Annotated[
         MarketTypeChoice,
         typer.Option(
             "--market",
+            "-m",
             help="Market type: spot, um (USDT-M futures), cm (Coin-M futures)",
         ),
     ] = MarketTypeChoice.SPOT,
     interval: Annotated[
-        str, typer.Option("--interval", help="Time interval (e.g., 1m, 5m, 1h)")
+        str, typer.Option("--interval", "-i", help="Time interval (e.g., 1m, 5m, 1h)")
     ] = "1m",
     start_time: Annotated[
         Optional[str],
         typer.Option(
             "--start-time",
+            "-st",
             help="Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
         ),
     ] = None,
@@ -631,6 +635,7 @@ def main(
         Optional[str],
         typer.Option(
             "--end-time",
+            "-et",
             help="End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD",
         ),
     ] = None,
@@ -638,13 +643,14 @@ def main(
         int,
         typer.Option(
             "--days",
+            "-d",
             help="Number of days to fetch (used if start-time and end-time not provided)",
         ),
     ] = 3,
     no_cache: Annotated[
         bool,
         typer.Option(
-            "--no-cache", help="Disable caching (cache is enabled by default)"
+            "--no-cache", "-nc", help="Disable caching (cache is enabled by default)"
         ),
     ] = False,
     clear_cache: Annotated[
@@ -656,21 +662,22 @@ def main(
     enforce_source: Annotated[
         DataSourceChoice,
         typer.Option(
-            "--enforce-source", help="Force specific data source (default: AUTO)"
+            "--enforce-source", "-es", help="Force specific data source (default: AUTO)"
         ),
     ] = DataSourceChoice.AUTO,
     test_fcp_pm: Annotated[
         bool,
         typer.Option(
             "--test-fcp-pm",
+            "-tfp",
             help="Run the special test for Failover Composition and Parcel Merge mechanism",
         ),
     ] = False,
     retries: Annotated[
-        int, typer.Option("--retries", help="Maximum number of retry attempts")
+        int, typer.Option("--retries", "-r", help="Maximum number of retry attempts")
     ] = 3,
     chart_type: Annotated[
-        ChartTypeChoice, typer.Option("--chart-type", help="Type of chart data")
+        ChartTypeChoice, typer.Option("--chart-type", "-ct", help="Type of chart data")
     ] = ChartTypeChoice.KLINES,
     log_level: Annotated[
         LogLevel,
@@ -684,6 +691,7 @@ def main(
         bool,
         typer.Option(
             "--prepare-cache",
+            "-pc",
             help="Pre-populate cache with the first segment of data (for FCP-PM test)",
         ),
     ] = False,
