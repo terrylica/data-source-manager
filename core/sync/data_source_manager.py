@@ -133,7 +133,7 @@ class DataSourceConfig:
 
         Args:
             market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
-            provider: Data provider (currently only BINANCE is supported)
+            provider: Data provider (BINANCE)
             **kwargs: Optional parameter overrides
 
         Returns:
@@ -881,46 +881,20 @@ class DataSourceManager:
 
         # Log information about DataFrames to be merged
         logger.debug(f"Merging {len(dfs)} DataFrames")
+
+        # Log source counts before merging
         for i, df in enumerate(dfs):
-            logger.debug(
-                f"DataFrame {i}: {len(df)} rows, source: {df.get('_data_source', 'unknown')[0] if not df.empty and '_data_source' in df.columns else 'unknown'}"
-            )
-
-            # Debug timestamp precision
-            if not df.empty and isinstance(df.index, pd.DatetimeIndex):
-                sample_ts = df.index[0].value
-                precision = (
-                    "microsecond" if len(str(abs(sample_ts))) > 13 else "millisecond"
-                )
-                logger.debug(f"DataFrame {i} has {precision} precision")
-
-            # Ensure each DataFrame is properly formatted
-            dfs[i] = self._standardize_columns(df)
-
-            # Ensure open_time is set as index for proper merging
-            if "open_time" in df.columns and df.index.name != CANONICAL_INDEX_NAME:
-                dfs[i] = ensure_open_time_as_index(df)
-
-            # Debug timestamp information
-            if not dfs[i].empty:
-                logger.debug(f"DataFrame {i} index type: {type(dfs[i].index)}")
-                if isinstance(dfs[i].index, pd.DatetimeIndex):
-                    logger.debug(f"DataFrame {i} index name: {dfs[i].index.name}")
-                    logger.debug(f"DataFrame {i} index timezone: {dfs[i].index.tz}")
-
-                    # Debug first few timestamps
-                    if len(dfs[i]) > 0:
-                        logger.debug(
-                            f"DataFrame {i} first index timestamp: {dfs[i].index[0]}"
-                        )
-                        if "open_time" in dfs[i].columns:
-                            logger.debug(
-                                f"DataFrame {i} open_time type: {dfs[i]['open_time'].dtype}"
-                            )
+            if not df.empty and "_data_source" in df.columns:
+                source_counts = df["_data_source"].value_counts()
+                for source, count in source_counts.items():
+                    logger.debug(
+                        f"DataFrame {i} contains {count} records from source={source}"
+                    )
 
         # Now merge the DataFrames
         # First, concatenate all DataFrames
         logger.debug(f"Concatenating {len(dfs)} DataFrames")
+
         merged = pd.concat(dfs)
 
         # Ensure the index is sorted
@@ -1047,6 +1021,9 @@ class DataSourceManager:
                 # Determine which source to use based on enforce_source
                 if enforce_source == DataSource.REST:
                     # Skip Vision API, use REST directly
+                    logger.info(
+                        "Enforce REST API: Skipping Vision API and going directly to REST API"
+                    )
                     for miss_start, miss_end in missing_ranges:
                         rest_fallback_ranges.append((miss_start, miss_end))
                 elif enforce_source == DataSource.VISION:
@@ -1093,6 +1070,40 @@ class DataSourceManager:
                                     self._save_to_cache(
                                         range_df, symbol, interval, source="VISION"
                                     )
+
+                                # Check if we got all expected data from Vision API
+                                # Calculate expected record count
+                                expected_seconds = int(
+                                    (miss_end - miss_start).total_seconds()
+                                )
+                                interval_seconds = interval.to_seconds()
+                                expected_records = (
+                                    expected_seconds // interval_seconds
+                                ) + 1
+
+                                # Check if Vision API returned all expected records
+                                if len(range_df) < expected_records:
+                                    logger.info(
+                                        f"Vision API returned incomplete data: {len(range_df)}/{expected_records} records. Identifying missing segments for REST API..."
+                                    )
+
+                                    # Identify missing segments
+                                    missing_segments = self._identify_missing_segments(
+                                        range_df, miss_start, miss_end, interval
+                                    )
+
+                                    # Add missing segments to REST fallback ranges
+                                    if missing_segments:
+                                        logger.info(
+                                            f"Found {len(missing_segments)} missing segments to fetch from REST API"
+                                        )
+                                        for (
+                                            segment_start,
+                                            segment_end,
+                                        ) in missing_segments:
+                                            rest_fallback_ranges.append(
+                                                (segment_start, segment_end)
+                                            )
                             else:
                                 # If Vision failed, add to REST fallback ranges
                                 rest_fallback_ranges.append((miss_start, miss_end))
@@ -1115,6 +1126,9 @@ class DataSourceManager:
                             and "_data_source" not in rest_df.columns
                         ):
                             rest_df["_data_source"] = "REST"
+                            logger.debug(
+                                f"Tagged {len(rest_df)} records with source = REST"
+                            )
                         dfs.append(rest_df)
 
                         # If REST data was retrieved successfully and caching is enabled, save it
@@ -1422,3 +1436,79 @@ class DataSourceManager:
 
         logger.info(f"Successfully loaded {len(filtered_df)} records from cache")
         return filtered_df
+
+    def _identify_missing_segments(
+        self,
+        df: pd.DataFrame,
+        start_time: datetime,
+        end_time: datetime,
+        interval: Interval,
+    ) -> List[Tuple[datetime, datetime]]:
+        """Identify missing segments in the data.
+
+        Args:
+            df: The retrieved DataFrame
+            start_time: Start time for data retrieval
+            end_time: End time for data retrieval
+            interval: Time interval between data points
+
+        Returns:
+            List of missing segments as (start, end) tuples
+        """
+        if df.empty:
+            # If the dataframe is empty, the entire range is missing
+            return [(start_time, end_time)]
+
+        # Ensure we have open_time as a datetime column
+        df = ensure_open_time_as_column(df)
+
+        # Validate that open_time is a datetime column
+        if not pd.api.types.is_datetime64_any_dtype(df["open_time"]):
+            logger.warning("open_time is not a datetime column, converting...")
+            df["open_time"] = pd.to_datetime(df["open_time"], unit="ms", utc=True)
+
+        # Sort by open_time to ensure chronological order
+        df = df.sort_values("open_time")
+
+        # Generate the expected timestamps for the given interval
+        interval_seconds = interval.to_seconds()
+        expected_timestamps = []
+        current = start_time
+
+        while current <= end_time:
+            expected_timestamps.append(current)
+            current += timedelta(seconds=interval_seconds)
+
+        # Convert expected timestamps to a set for faster lookups
+        expected_set = set(pd.DatetimeIndex(expected_timestamps))
+
+        # Find actual timestamps in the DataFrame
+        actual_set = set(df["open_time"])
+
+        # Find missing timestamps
+        missing_timestamps = sorted(list(expected_set - actual_set))
+
+        # Group consecutive missing timestamps into segments
+        missing_segments = []
+        if missing_timestamps:
+            segment_start = missing_timestamps[0]
+            prev_timestamp = segment_start
+
+            for timestamp in missing_timestamps[1:]:
+                # Check if timestamps are consecutive
+                if (timestamp - prev_timestamp).total_seconds() > interval_seconds:
+                    # End the current segment and start a new one
+                    segment_end = prev_timestamp + timedelta(seconds=interval_seconds)
+                    missing_segments.append((segment_start, segment_end))
+                    segment_start = timestamp
+
+                prev_timestamp = timestamp
+
+            # Add the last segment
+            segment_end = prev_timestamp + timedelta(seconds=interval_seconds)
+            missing_segments.append((segment_start, segment_end))
+
+        logger.debug(
+            f"Identified {len(missing_segments)} missing segments in data: {missing_segments}"
+        )
+        return missing_segments
