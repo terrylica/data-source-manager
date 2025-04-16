@@ -43,6 +43,7 @@ from utils.time_utils import (
 from utils.config import (
     KLINE_COLUMNS,
     MAXIMUM_CONCURRENT_DOWNLOADS,
+    VISION_DATA_DELAY_HOURS,
     FileType,
 )
 from utils.dataframe_types import TimestampedDataFrame
@@ -1261,112 +1262,35 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             # If neither column exists, just return the filtered dataframe
             # TimestampedDataFrame initialization will handle validation
             logger.debug("No timestamp column found for index, returning as is")
-            return TimestampedDataFrame(filtered_df)
+            # Check if the dataframe has required columns before attempting to create TimestampedDataFrame
+            if filtered_df.empty:
+                logger.warning(
+                    "Filtered dataframe is empty, returning empty TimestampedDataFrame"
+                )
+                return self.create_empty_dataframe()
 
-    def _fill_boundary_gaps_with_rest(
-        self, df: pd.DataFrame, boundary_gaps: List[Gap]
-    ) -> Optional[pd.DataFrame]:
-        """Fill day boundary gaps using REST API data.
-
-        This method is used to fill specific gaps that occur at day boundaries
-        by fetching the missing data directly from the REST API.
-
-        Args:
-            df: DataFrame with Vision API data that has gaps
-            boundary_gaps: List of Gap objects representing day boundary gaps
-
-        Returns:
-            DataFrame with gaps filled, or None if filling failed
-        """
-        if not boundary_gaps:
-            return df
-
-        # Import RestDataClient here to avoid circular import
-        from core.sync.rest_data_client import RestDataClient
-
-        try:
-            # Create a REST client with the same parameters
-            rest_client = RestDataClient(
-                market_type=self.market_type,
-                symbol=self._symbol,
-                interval=self.interval_obj,
+            # Debug the available columns
+            logger.debug(
+                f"Available columns in filtered_df: {list(filtered_df.columns)}"
             )
 
-            # Create a list to hold the gap data we'll fetch
-            gap_dfs = []
-            gap_dfs.append(df)
-
-            # For each gap, fetch the specific missing data
-            for gap in boundary_gaps:
-                # Add a small buffer around the gap to ensure we get the needed data
-                # Use 50% of the interval duration as buffer
-                interval_seconds = self.interval_obj.to_seconds()
-                buffer_seconds = interval_seconds * 0.5
-
-                # Fetch a bit before and after the actual gap to ensure we get the needed data
-                gap_start = gap.start_time - timedelta(seconds=buffer_seconds)
-                gap_end = gap.end_time + timedelta(seconds=buffer_seconds)
-
-                logger.debug(
-                    f"Fetching gap data from REST API: {gap_start} to {gap_end} "
-                    f"(to fill missing data)"
-                )
-
-                # Fetch the gap data using REST API
-                gap_data = rest_client.fetch(
-                    self._symbol,
-                    self.interval_obj.value,
-                    start_time=gap_start,
-                    end_time=gap_end,
-                )
-
-                if not gap_data.empty:
-                    # Check if we got data around midnight
-                    expected_midnight = (
-                        gap.start_time + (gap.end_time - gap.start_time) / 2
-                    )
-                    midnight_time = datetime(
-                        expected_midnight.year,
-                        expected_midnight.month,
-                        expected_midnight.day,
-                        0,
-                        0,
-                        0,
-                        tzinfo=expected_midnight.tzinfo,
-                    )
-
-                    # Look for records near midnight
-                    midnight_records = gap_data[
-                        (gap_data["open_time"] - midnight_time).abs()
-                        < timedelta(seconds=interval_seconds)
-                    ]
-
-                    if not midnight_records.empty:
-                        logger.debug(
-                            f"Found {len(midnight_records)} records near midnight in REST API data"
-                        )
-                    else:
-                        logger.debug("No midnight records found in REST API data")
-
-                    gap_dfs.append(gap_data)
+            # Check if open_time column exists, add it if necessary
+            if "open_time" not in filtered_df.columns:
+                # Try to find an alternative time column
+                time_cols = [
+                    col for col in filtered_df.columns if "time" in col.lower()
+                ]
+                if time_cols:
+                    logger.debug(f"Found alternative time columns: {time_cols}")
+                    # Use the first available time column
+                    filtered_df["open_time"] = filtered_df[time_cols[0]]
+                    logger.debug(f"Created open_time from {time_cols[0]}")
                 else:
-                    logger.warning(f"No data retrieved from REST API for gap")
+                    logger.error("No suitable time column found to create open_time")
+                    # Return empty dataframe to avoid KeyError
+                    return self.create_empty_dataframe()
 
-            # If we have gap data, merge it with the original data
-            if len(gap_dfs) > 1:  # More than just the original df
-                # Concatenate all dataframes and remove duplicates
-                merged_df = pd.concat(gap_dfs, ignore_index=True)
-                merged_df = merged_df.drop_duplicates(
-                    subset=["open_time"], keep="first"
-                )
-                merged_df = merged_df.sort_values("open_time").reset_index(drop=True)
-                return merged_df
-
-            # If we didn't add any gap data, return the original
-            return df
-        except Exception as e:
-            logger.error(f"Error filling boundary gaps with REST API: {e}")
-            return None
+            return TimestampedDataFrame(filtered_df)
 
     def fetch(
         self,
@@ -1488,8 +1412,11 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                         logger.info(f"Returning {len(df)} rows despite checksum issues")
                         return df
                     else:
-                        logger.warning("No data available, returning empty dataframe")
-                        return self.create_empty_dataframe()
+                        # Change from warning to critical
+                        logger.critical(
+                            "No data available due to checksum verification failure"
+                        )
+                        raise RuntimeError(f"VISION API DATA INTEGRITY ERROR: {str(e)}")
                 else:
                     logger.error(f"Error in _download_data: {e}")
                     import traceback
@@ -1504,8 +1431,25 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 # This is critical and should be propagated to trigger failover
                 raise
 
-            logger.error(f"Error fetching data: {e}")
-            return self.create_empty_dataframe()
+            # Check if the request is within the allowed delay window for Vision API
+            # Only tolerate failures for recent data that may not be available yet
+            current_time = datetime.now(timezone.utc)
+            vision_delay = timedelta(hours=VISION_DATA_DELAY_HOURS)
+
+            if end_time > (current_time - vision_delay):
+                # This falls within the allowable delay window for Vision API
+                logger.warning(
+                    f"Error fetching recent data from Vision API (within {VISION_DATA_DELAY_HOURS}h delay window): {e}"
+                )
+                return self.create_empty_dataframe()
+            else:
+                # For historical data outside the delay window, this is a critical error
+                logger.critical(
+                    f"CRITICAL ERROR fetching historical data from Vision API: {e}"
+                )
+                raise RuntimeError(
+                    f"Vision API failed to retrieve historical data: {str(e)}"
+                )
 
     @staticmethod
     def fetch_multiple(
@@ -1564,7 +1508,15 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 return symbol, df
             except Exception as e:
                 logger.error(f"Error fetching data for {symbol}: {e}")
-                # Return empty dataframe on error
+                # Rather than silently returning an empty dataframe, propagate critical errors
+                if "CRITICAL ERROR" in str(e) or "DATA INTEGRITY ERROR" in str(e):
+                    logger.critical(f"Critical download failure for {symbol}: {e}")
+                    raise  # Propagate critical errors to trigger proper handling
+
+                # Only create empty dataframe for non-critical errors
+                logger.warning(
+                    f"Non-critical error for {symbol}, returning empty dataframe"
+                )
                 client = VisionDataClient(
                     symbol=symbol, interval=interval, market_type=market_type
                 )
@@ -1595,5 +1547,15 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                     )
                     results[symbol] = client.create_empty_dataframe()
                     client.close()
+
+        # Check if all downloads failed (all results are empty dataframes)
+        all_empty = all(df.empty for df in results.values()) if results else True
+        if all_empty and symbols:
+            logger.critical(
+                f"CRITICAL ERROR: All {len(symbols)} symbols failed to download"
+            )
+            raise RuntimeError(
+                "All symbol downloads failed. No data available from Vision API."
+            )
 
         return results
