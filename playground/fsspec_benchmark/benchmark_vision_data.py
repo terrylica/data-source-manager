@@ -20,6 +20,7 @@ import platform
 import psutil
 import resource
 import math
+import hashlib
 
 # Ensure parent directory is in path
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -101,6 +102,7 @@ class BenchmarkRunner:
             follow_redirects=True,
         )
         self.zip_path = None
+        self.checksum_path = None
         self.file_size = 0
 
     def __enter__(self):
@@ -116,6 +118,11 @@ class BenchmarkRunner:
                 Path(self.zip_path).unlink()
             except Exception as e:
                 logger.warning(f"Error cleaning up zip file: {e}")
+        if self.checksum_path and Path(self.checksum_path).exists():
+            try:
+                Path(self.checksum_path).unlink()
+            except Exception as e:
+                logger.warning(f"Error cleaning up checksum file: {e}")
 
     def download_zip_file(self):
         """Download ZIP file from Binance Vision API."""
@@ -150,6 +157,56 @@ class BenchmarkRunner:
             f"Downloaded file to {self.zip_path} ({self.file_size / 1024:.2f} KB)"
         )
         return self.zip_path
+
+    def download_checksum(self) -> str:
+        """Download checksum file from Binance Vision API."""
+        url = get_vision_url(
+            symbol=self.symbol,
+            interval=self.interval,
+            date=self.date,
+            market_type=self.market_type,
+            file_type="CHECKSUM",
+        )
+
+        logger.info(f"Downloading checksum from URL: {url}")
+
+        # Create temporary file with meaningful name
+        filename = f"{self.symbol}-{self.interval}-{self.date.format('YYYY-MM-DD')}"
+        temp_dir = tempfile.gettempdir()
+        self.checksum_path = str(Path(temp_dir) / f"{filename}.zip.CHECKSUM")
+
+        # Download the file
+        response = self.client.get(url)
+        if response.status_code != 200:
+            raise Exception(
+                f"HTTP error {response.status_code} while downloading checksum"
+            )
+
+        # Save to temporary file
+        checksum_content = response.content.decode("utf-8").strip()
+        with open(self.checksum_path, "w") as f:
+            f.write(checksum_content)
+
+        logger.info(f"Downloaded checksum to {self.checksum_path}")
+        return checksum_content
+
+    def compute_sha256(self, file_path: str) -> str:
+        """Compute SHA-256 hash for a file."""
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            # Read and update hash in chunks of 4K
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
+    def verify_checksum(self, file_path: str, expected_checksum: str) -> bool:
+        """Verify the SHA-256 checksum of a file."""
+        computed_hash = self.compute_sha256(file_path)
+        # Handle case where checksum file might include filename
+        if " " in expected_checksum:
+            expected_checksum = expected_checksum.split(" ")[0]
+
+        return computed_hash.lower() == expected_checksum.lower()
 
     def get_file_stats(self) -> Dict[str, Any]:
         """Get statistics about the ZIP file and its contents."""
@@ -187,7 +244,7 @@ class BenchmarkRunner:
         except Exception as e:
             return {"error": f"Error getting file stats: {str(e)}"}
 
-    def method_original(self, measure_memory=False):
+    def method_original(self, measure_memory=False, validate_checksum=False):
         """Original method using zipfile and tempfile."""
         # Force garbage collection before test
         gc.collect()
@@ -198,6 +255,13 @@ class BenchmarkRunner:
         start_time = time.perf_counter()
 
         try:
+            # Validate checksum if requested
+            if validate_checksum:
+                expected_checksum = self.download_checksum()
+                checksum_valid = self.verify_checksum(self.zip_path, expected_checksum)
+                if not checksum_valid:
+                    raise ValueError("ZIP file checksum validation failed")
+
             with zipfile.ZipFile(self.zip_path, "r") as zip_ref:
                 # Find the CSV file in the zip
                 csv_files = [f for f in zip_ref.namelist() if f.endswith(".csv")]
@@ -256,7 +320,7 @@ class BenchmarkRunner:
             "memory_kb": memory_diff,
         }
 
-    def method_fsspec(self, measure_memory=False):
+    def method_fsspec(self, measure_memory=False, validate_checksum=False):
         """Method using fsspec for accessing files in ZIP."""
         # Force garbage collection before test
         gc.collect()
@@ -267,6 +331,13 @@ class BenchmarkRunner:
         start_time = time.perf_counter()
 
         try:
+            # Validate checksum if requested
+            if validate_checksum:
+                expected_checksum = self.download_checksum()
+                checksum_valid = self.verify_checksum(self.zip_path, expected_checksum)
+                if not checksum_valid:
+                    raise ValueError("ZIP file checksum validation failed")
+
             # Get list of files in the ZIP
             with zipfile.ZipFile(self.zip_path, "r") as zip_ref:
                 # Find the CSV file in the zip
@@ -338,15 +409,19 @@ def run_benchmark_case(
     runs: int,
     warmup_runs: int,
     measure_memory: bool,
+    validate_checksum: bool = False,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Run a single benchmark case with the given parameters."""
     print(f"[bold cyan]Running benchmark case[/bold cyan]")
     print(
         f"Symbol: {symbol}, Interval: {interval}, Date: {date}, Market: {market_type}"
     )
-    print(f"Runs: {runs}, Warmup runs: {warmup_runs}")
+    print(
+        f"Runs: {runs}, Warmup runs: {warmup_runs}, Validate checksum: {validate_checksum}"
+    )
 
     results = []
+    expected_checksum = None
 
     try:
         with BenchmarkRunner(symbol, interval, date, market_type) as runner:
@@ -356,12 +431,190 @@ def run_benchmark_case(
             # Get file stats
             file_stats = runner.get_file_stats()
 
+            # Get checksum once at the beginning if needed
+            if validate_checksum:
+                expected_checksum = runner.download_checksum()
+                print(
+                    f"\n[yellow]Downloaded and verified checksum for all test runs[/yellow]"
+                )
+                checksum_valid = runner.verify_checksum(
+                    runner.zip_path, expected_checksum
+                )
+                if not checksum_valid:
+                    raise ValueError("ZIP file checksum validation failed")
+
             # Run warmup (results discarded)
             print("\n[yellow]Running warmup iterations...[/yellow]")
             for i in range(warmup_runs):
                 print(f"  Warmup {i+1}/{warmup_runs}")
-                runner.method_original()
-                runner.method_fsspec()
+                # Pass the pre-downloaded checksum to avoid network calls during timing
+                if validate_checksum:
+                    # Create monkey-patched methods that use the pre-downloaded checksum
+                    def method_original_warmed(measure_memory=False):
+                        # Force garbage collection before test
+                        gc.collect()
+
+                        start_memory = (
+                            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                            if measure_memory
+                            else 0
+                        )
+                        start_time = time.perf_counter()
+
+                        try:
+                            # Validate checksum (using pre-downloaded value)
+                            checksum_valid = runner.verify_checksum(
+                                runner.zip_path, expected_checksum
+                            )
+                            if not checksum_valid:
+                                raise ValueError("ZIP file checksum validation failed")
+
+                            with zipfile.ZipFile(runner.zip_path, "r") as zip_ref:
+                                csv_files = [
+                                    f for f in zip_ref.namelist() if f.endswith(".csv")
+                                ]
+                                if not csv_files:
+                                    raise Exception("No CSV file found in ZIP")
+
+                                csv_file = csv_files[0]
+
+                                with tempfile.TemporaryDirectory() as temp_dir:
+                                    zip_ref.extract(csv_file, temp_dir)
+                                    csv_path = os.path.join(temp_dir, csv_file)
+
+                                    with open(csv_path, "r") as f:
+                                        first_lines = [next(f) for _ in range(3) if f]
+                                        has_header = any(
+                                            "high" in line.lower()
+                                            for line in first_lines[:1]
+                                        )
+
+                                    if has_header:
+                                        df = pd.read_csv(csv_path, header=0)
+                                    else:
+                                        columns = [
+                                            "open_time",
+                                            "open",
+                                            "high",
+                                            "low",
+                                            "close",
+                                            "volume",
+                                            "close_time",
+                                            "quote_asset_volume",
+                                            "count",
+                                            "taker_buy_base_volume",
+                                            "taker_buy_quote_volume",
+                                            "ignore",
+                                        ]
+                                        df = pd.read_csv(
+                                            csv_path, header=None, names=columns
+                                        )
+                        except Exception as e:
+                            logger.error(f"Error in original method: {e}")
+                            raise
+
+                        elapsed = time.perf_counter() - start_time
+
+                        end_memory = (
+                            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                            if measure_memory
+                            else 0
+                        )
+                        memory_diff = end_memory - start_memory if measure_memory else 0
+
+                        return {
+                            "time": elapsed,
+                            "rows": len(df) if "df" in locals() else 0,
+                            "memory_kb": memory_diff,
+                        }
+
+                    def method_fsspec_warmed(measure_memory=False):
+                        # Force garbage collection before test
+                        gc.collect()
+
+                        start_memory = (
+                            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                            if measure_memory
+                            else 0
+                        )
+                        start_time = time.perf_counter()
+
+                        try:
+                            # Validate checksum (using pre-downloaded value)
+                            checksum_valid = runner.verify_checksum(
+                                runner.zip_path, expected_checksum
+                            )
+                            if not checksum_valid:
+                                raise ValueError("ZIP file checksum validation failed")
+
+                            with zipfile.ZipFile(runner.zip_path, "r") as zip_ref:
+                                csv_files = [
+                                    f for f in zip_ref.namelist() if f.endswith(".csv")
+                                ]
+                                if not csv_files:
+                                    raise Exception("No CSV file found in ZIP")
+
+                                csv_file = csv_files[0]
+
+                            with fsspec.open(
+                                f"zip://{csv_file}::{runner.zip_path}", "rt"
+                            ) as f:
+                                preview_lines = []
+                                for _ in range(3):
+                                    line = f.readline()
+                                    if not line:
+                                        break
+                                    preview_lines.append(line)
+
+                                f.seek(0)
+
+                                has_header = any(
+                                    "high" in line.lower() for line in preview_lines[:1]
+                                )
+
+                                if has_header:
+                                    df = pd.read_csv(f, header=0)
+                                else:
+                                    columns = [
+                                        "open_time",
+                                        "open",
+                                        "high",
+                                        "low",
+                                        "close",
+                                        "volume",
+                                        "close_time",
+                                        "quote_asset_volume",
+                                        "count",
+                                        "taker_buy_base_volume",
+                                        "taker_buy_quote_volume",
+                                        "ignore",
+                                    ]
+                                    df = pd.read_csv(f, header=None, names=columns)
+                        except Exception as e:
+                            logger.error(f"Error in fsspec method: {e}")
+                            raise
+
+                        elapsed = time.perf_counter() - start_time
+
+                        end_memory = (
+                            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                            if measure_memory
+                            else 0
+                        )
+                        memory_diff = end_memory - start_memory if measure_memory else 0
+
+                        return {
+                            "time": elapsed,
+                            "rows": len(df) if "df" in locals() else 0,
+                            "memory_kb": memory_diff,
+                        }
+
+                    # Use the warmed versions for the warmup runs
+                    method_original_warmed()
+                    method_fsspec_warmed()
+                else:
+                    runner.method_original(validate_checksum=False)
+                    runner.method_fsspec(validate_checksum=False)
 
             # Test runs
             print("\n[yellow]Running benchmark iterations...[/yellow]")
@@ -377,7 +630,14 @@ def run_benchmark_case(
 
                 # Original method
                 try:
-                    result = runner.method_original(measure_memory=measure_memory)
+                    # Use the modified methods with pre-downloaded checksum if needed
+                    if validate_checksum:
+                        result = method_original_warmed(measure_memory=measure_memory)
+                    else:
+                        result = runner.method_original(
+                            measure_memory=measure_memory, validate_checksum=False
+                        )
+
                     original_times.append(result["time"])
                     if measure_memory:
                         original_memory.append(result["memory_kb"])
@@ -391,7 +651,14 @@ def run_benchmark_case(
 
                 # fsspec method
                 try:
-                    result = runner.method_fsspec(measure_memory=measure_memory)
+                    # Use the modified methods with pre-downloaded checksum if needed
+                    if validate_checksum:
+                        result = method_fsspec_warmed(measure_memory=measure_memory)
+                    else:
+                        result = runner.method_fsspec(
+                            measure_memory=measure_memory, validate_checksum=False
+                        )
+
                     fsspec_times.append(result["time"])
                     if measure_memory:
                         fsspec_memory.append(result["memory_kb"])
@@ -507,6 +774,8 @@ def run_benchmark_case(
                 # Print detailed results
                 console = Console()
                 title = f"Benchmark Results: {symbol} {interval} {market_type} ({runs} runs)"
+                if validate_checksum:
+                    title += " with checksum validation"
                 table = Table(title=title)
 
                 table.add_column("Metric", style="cyan")
@@ -576,6 +845,7 @@ def run_benchmark_case(
                         "runs": runs,
                         "warmup_runs": warmup_runs,
                         "measure_memory": measure_memory,
+                        "validate_checksum": validate_checksum,
                     },
                     "stats": {
                         "original": original_stats,
@@ -623,6 +893,9 @@ def benchmark_all(
     ),
     measure_memory: bool = typer.Option(
         False, "--memory", "-m", help="Measure memory usage (may affect timing results)"
+    ),
+    validate_checksum: bool = typer.Option(
+        False, "--checksum", "-c", help="Validate checksum during benchmark"
     ),
 ):
     """Run comprehensive benchmarks across multiple configurations."""
@@ -697,6 +970,7 @@ def benchmark_all(
             runs=runs,
             warmup_runs=warmup_runs,
             measure_memory=measure_memory,
+            validate_checksum=validate_checksum,
         )
 
         if result:
@@ -736,9 +1010,10 @@ def benchmark_all(
     # Print summary table
     if summary_data:
         console = Console()
-        summary_table = Table(
-            title=f"Benchmark Summary ({runs} runs, {warmup_runs} warmup runs)"
-        )
+        title = f"Benchmark Summary ({runs} runs, {warmup_runs} warmup runs)"
+        if validate_checksum:
+            title += " with checksum validation"
+        summary_table = Table(title=title)
 
         summary_table.add_column("Case", style="cyan")
         summary_table.add_column("Symbol")
@@ -826,6 +1101,9 @@ def benchmark(
         3, "--warmup", "-w", help="Number of warmup runs to perform"
     ),
     measure_memory: bool = typer.Option(False, "--memory", help="Measure memory usage"),
+    validate_checksum: bool = typer.Option(
+        False, "--checksum", "-c", help="Validate checksum during benchmark"
+    ),
 ):
     """Run benchmark for a single configuration."""
 
@@ -837,6 +1115,7 @@ def benchmark(
         runs=runs,
         warmup_runs=warmup_runs,
         measure_memory=measure_memory,
+        validate_checksum=validate_checksum,
     )
 
     if result:
@@ -851,6 +1130,166 @@ def benchmark(
             )
         else:
             print("  [yellow]Could not determine clear winner[/yellow]")
+
+
+@app.command()
+def benchmark_checksum(
+    symbol: str = typer.Option(
+        "BTCUSDT", "--symbol", "-s", help="Symbol to download data for"
+    ),
+    interval: str = typer.Option("1m", "--interval", "-i", help="Kline interval"),
+    date: str = typer.Option(
+        "2023-12-01", "--date", "-d", help="Date in YYYY-MM-DD format"
+    ),
+    market_type: str = typer.Option(
+        "spot", "--market", "-m", help="Market type (spot, um, cm)"
+    ),
+    runs: int = typer.Option(
+        15, "--runs", "-r", help="Number of benchmark runs to perform"
+    ),
+    warmup_runs: int = typer.Option(
+        3, "--warmup", "-w", help="Number of warmup runs to perform"
+    ),
+    measure_memory: bool = typer.Option(False, "--memory", help="Measure memory usage"),
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output JSON file for detailed results"
+    ),
+):
+    """Run benchmark with and without checksum validation for direct comparison."""
+
+    print(f"[bold]Benchmarking with and without checksum validation[/bold]")
+    print(
+        f"Symbol: {symbol}, Interval: {interval}, Date: {date}, Market: {market_type}"
+    )
+
+    # Run benchmark without checksum
+    print("\n[bold cyan]Running benchmark WITHOUT checksum validation:[/bold cyan]")
+    result_without_checksum, _ = run_benchmark_case(
+        symbol=symbol,
+        interval=interval,
+        date=date,
+        market_type=market_type,
+        runs=runs,
+        warmup_runs=warmup_runs,
+        measure_memory=measure_memory,
+        validate_checksum=False,
+    )
+
+    # Run benchmark with checksum
+    print("\n[bold cyan]Running benchmark WITH checksum validation:[/bold cyan]")
+    result_with_checksum, _ = run_benchmark_case(
+        symbol=symbol,
+        interval=interval,
+        date=date,
+        market_type=market_type,
+        runs=runs,
+        warmup_runs=warmup_runs,
+        measure_memory=measure_memory,
+        validate_checksum=True,
+    )
+
+    # Create comparison table
+    if result_without_checksum and result_with_checksum:
+        console = Console()
+        title = f"Checksum Validation Impact: {symbol} {interval} {market_type} ({runs} runs)"
+        comparison_table = Table(title=title)
+
+        comparison_table.add_column("Metric", style="cyan")
+        comparison_table.add_column("Without Checksum", justify="right")
+        comparison_table.add_column("With Checksum", justify="right")
+        comparison_table.add_column("Overhead", justify="right")
+
+        # Original method comparison
+        orig_without = (
+            result_without_checksum["stats"]["original"]["median"] * 1000
+        )  # ms
+        orig_with = result_with_checksum["stats"]["original"]["median"] * 1000  # ms
+        orig_overhead = (orig_with - orig_without) / orig_without * 100
+
+        comparison_table.add_row(
+            "Original Method (ms)",
+            f"{orig_without:.2f}",
+            f"{orig_with:.2f}",
+            f"{orig_overhead:.1f}%",
+        )
+
+        # fsspec method comparison
+        fsspec_without = (
+            result_without_checksum["stats"]["fsspec"]["median"] * 1000
+        )  # ms
+        fsspec_with = result_with_checksum["stats"]["fsspec"]["median"] * 1000  # ms
+        fsspec_overhead = (fsspec_with - fsspec_without) / fsspec_without * 100
+
+        comparison_table.add_row(
+            "fsspec Method (ms)",
+            f"{fsspec_without:.2f}",
+            f"{fsspec_with:.2f}",
+            f"{fsspec_overhead:.1f}%",
+        )
+
+        # Winner comparison
+        winner_without = result_without_checksum["stats"]["faster"]
+        winner_with = result_with_checksum["stats"]["faster"]
+        speedup_without = result_without_checksum["stats"]["speedup"]
+        speedup_with = result_with_checksum["stats"]["speedup"]
+
+        comparison_table.add_row("", "", "", "")
+        comparison_table.add_row(
+            "Faster Method",
+            f"{winner_without} by {speedup_without:.2f}x",
+            f"{winner_with} by {speedup_with:.2f}x",
+            "N/A",
+        )
+
+        console.print(comparison_table)
+
+        # Checksum overhead analysis
+        print("\n[bold]Checksum Validation Analysis:[/bold]")
+        print(f"  Original method overhead: {orig_overhead:.1f}%")
+        print(f"  fsspec method overhead: {fsspec_overhead:.1f}%")
+
+        if orig_overhead < fsspec_overhead:
+            print(
+                "  [green]Original method has less checksum validation overhead[/green]"
+            )
+        else:
+            print(
+                "  [green]fsspec method has less checksum validation overhead[/green]"
+            )
+
+        # Save results if requested
+        if output:
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            output_data = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "system_info": get_system_info(),
+                "config": {
+                    "symbol": symbol,
+                    "interval": interval,
+                    "date": date,
+                    "market_type": market_type,
+                    "runs": runs,
+                    "warmup_runs": warmup_runs,
+                },
+                "without_checksum": result_without_checksum,
+                "with_checksum": result_with_checksum,
+                "comparison": {
+                    "original_overhead_percent": orig_overhead,
+                    "fsspec_overhead_percent": fsspec_overhead,
+                    "better_for_checksums": (
+                        "original" if orig_overhead < fsspec_overhead else "fsspec"
+                    ),
+                },
+            }
+
+            with open(output_path, "w") as f:
+                json.dump(output_data, f, indent=2)
+
+            print(
+                f"\n[bold green]Comparison results saved to {output_path}[/bold green]"
+            )
 
 
 if __name__ == "__main__":
