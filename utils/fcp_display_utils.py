@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Display utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+Display utilities for the Failover Control Protocol (FCP) mechanism.
 """
 
 import pandas as pd
@@ -25,7 +25,7 @@ def display_results(
     session_name="fcp_demo",
 ):
     """
-    Display the results of the FCP-PM data retrieval.
+    Display the results of the FCP data retrieval.
 
     Args:
         df: Pandas DataFrame containing the retrieved data

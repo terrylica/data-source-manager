@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Data utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+Data utilities for the Failover Control Protocol (FCP) mechanism.
 """
 
 import pandas as pd
@@ -34,7 +34,7 @@ def fetch_data_with_fcp(
     max_retries: int = 3,
 ):
     """
-    Fetch data using Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+    Fetch data using Failover Control Protocol (FCP) mechanism.
 
     Args:
         market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
@@ -82,7 +82,7 @@ def fetch_data_with_fcp(
             f"Explicitly enforcing VISION API as the data source (no REST fallback)"
         )
     else:
-        logger.info(f"Using AUTO source selection (FCP-PM: Cache → Vision → REST)")
+        logger.info(f"Using AUTO source selection (FCP: Cache → Vision → REST)")
 
     try:
         with Progress(
@@ -103,7 +103,7 @@ def fetch_data_with_fcp(
                 retry_count=max_retries,
             ) as manager:
                 # Retrieve data using the manager
-                # The manager will handle the FCP-PM strategy: cache → Vision API → REST API
+                # The manager will handle the FCP strategy: cache → Vision API → REST API
                 df = manager.get_data(
                     symbol=symbol,
                     start_time=start_time,
@@ -165,7 +165,7 @@ def test_fcp_pm_mechanism(
     cache_dir: Path = None,
 ):
     """
-    Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism.
+    Test the Failover Control Protocol (FCP) mechanism.
 
     This function demonstrates how DataSourceManager combines data from multiple sources:
     1. First retrieves data from local cache
@@ -228,12 +228,12 @@ def test_fcp_pm_mechanism(
 
     print(
         Panel(
-            "[bold green]Testing Failover Control Protocol and Priority Merge (FCP-PM) Mechanism[/bold green]\n"
+            "[bold green]Testing Failover Control Protocol (FCP) Mechanism[/bold green]\n"
             f"Symbol: {symbol}\n"
             f"Market: {market_type.name}\n"
             f"Interval: {interval.value}\n"
             f"Date Range: {start_time.format('YYYY-MM-DD HH:mm:ss.SSS')} to {end_time.format('YYYY-MM-DD HH:mm:ss.SSS')}",
-            title="FCP-PM Test",
+            title="FCP Test",
             border_style="green",
         )
     )
@@ -306,10 +306,10 @@ def test_fcp_pm_mechanism(
             print("[bold red]Failed to cache data for segment 1[/bold red]")
             return
 
-    # Now test the FCP-PM mechanism on the full date range
+    # Now test the FCP mechanism on the full date range
     step_label = "Step 2: " if prepare_cache else ""
     print(
-        f"\n[bold cyan]{step_label}Testing FCP-PM mechanism with all segments...[/bold cyan]"
+        f"\n[bold cyan]{step_label}Testing FCP mechanism with all segments...[/bold cyan]"
     )
     print(
         "[bold yellow]This should demonstrate the automatic merging of data from different sources[/bold yellow]"
@@ -318,7 +318,7 @@ def test_fcp_pm_mechanism(
     try:
         with Progress(
             SpinnerColumn(),
-            TextColumn("[bold green]Fetching data with FCP-PM..."),
+            TextColumn("[bold green]Fetching data with FCP..."),
             transient=True,
         ) as progress:
             task = progress.add_task("Fetching...", total=None)
@@ -337,14 +337,14 @@ def test_fcp_pm_mechanism(
                 use_cache=True,
                 retry_count=3,
             ) as manager:
-                # Retrieve data for the entire range - this should use the FCP-PM mechanism
+                # Retrieve data for the entire range - this should use the FCP mechanism
                 full_df = manager.get_data(
                     symbol=symbol,
                     start_time=start_time,
                     end_time=end_time,
                     interval=interval,
                     chart_type=chart_type,
-                    enforce_source=DataSource.AUTO,  # AUTO will enable the full FCP-PM mechanism
+                    enforce_source=DataSource.AUTO,  # AUTO will enable the full FCP mechanism
                     include_source_info=True,
                 )
 
@@ -429,14 +429,14 @@ def test_fcp_pm_mechanism(
             print(f"\n[bold green]Data saved to: {csv_path}[/bold green]")
 
     except Exception as e:
-        print(f"[bold red]Error testing FCP-PM mechanism: {e}[/bold red]")
+        print(f"[bold red]Error testing FCP mechanism: {e}[/bold red]")
         import traceback
 
         traceback.print_exc()
 
     print(
         Panel(
-            "[bold green]FCP-PM Test Complete[/bold green]\n"
+            "[bold green]FCP Test Complete[/bold green]\n"
             "This test demonstrated how the DataSourceManager automatically:\n"
             "1. Retrieved data from cache for the first segment\n"
             "2. Retrieved missing data from Vision API for the second segment\n"

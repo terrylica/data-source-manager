@@ -1,10 +1,10 @@
-# Failover Control Protocol and Priority Merge (PCP-PM) Mechanism
+# Failover Control Protocol (FCP) Mechanism
 
-The Failover Control Protocol and Priority Merge (PCP-PM) mechanism is a data retrieval strategy implemented in the `DataSourceManager` that automatically fetches data from multiple sources in a prioritized sequence. This document describes how PCP-PM works, its benefits, and how to use it in your applications.
+The Failover Control Protocol (FCP) mechanism is a data retrieval strategy implemented in the `DataSourceManager` that automatically fetches data from multiple sources in a prioritized sequence. This document describes how FCP works, its benefits, and how to use it in your applications.
 
 ## Overview
 
-PCP-PM automatically retrieves data from different sources following a priority order:
+FCP automatically retrieves data from different sources following a priority order:
 
 1. **Cache** (Local Arrow files) - fastest, but may not have all requested data
 2. **VISION API** - reliable for historical data with higher rate limits
@@ -37,7 +37,7 @@ The mechanism seamlessly combines data from these sources to provide a complete 
 
 ## Demo Script
 
-The `fcp_demo.py` script demonstrates the PCP-PM mechanism in action. It shows:
+The `fcp_demo.py` script demonstrates the FCP mechanism in action. It shows:
 
 - Data retrieval from multiple sources
 - Source breakdown statistics
@@ -64,10 +64,10 @@ Force a specific data source:
 ./examples/dsm_sync_simple/fcp_demo.py --enforce-source REST
 ```
 
-Run the special FCP-PM (Parcel Merge) test:
+Run the special FCP (Parcel Merge) test:
 
 ```bash
-./examples/dsm_sync_simple/fcp_demo.py --test-fcp-pm --prepare-cache
+./examples/dsm_sync_simple/fcp_demo.py --test-fcp --prepare-cache
 ```
 
 ## Command-Line Options
@@ -83,8 +83,8 @@ Run the special FCP-PM (Parcel Merge) test:
 | `--no-cache`       | `-nc`     | Disable caching (cache is enabled by default)               |
 | `--clear-cache`    | `-cc`     | Clear the cache directory before running                    |
 | `--enforce-source` | `-es`     | Force specific data source (AUTO, REST, VISION)             |
-| `--test-fcp-pm`    | `-tfp`    | Run FCP-PM (Parcel Merge) mechanism test                    |
+| `--test-fcp`       | `-tfp`    | Run FCP (Parcel Merge) mechanism test                       |
 | `--retries`        | `-r`      | Maximum number of retry attempts                            |
 | `--chart-type`     | `-ct`     | Type of chart data (klines, fundingRate)                    |
 | `--log-level`      | `-l`      | Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)       |
-| `--prepare-cache`  | `-pc`     | Pre-populate cache (for FCP-PM test)                        |
+| `--prepare-cache`  | `-pc`     | Pre-populate cache (for FCP test)                           |

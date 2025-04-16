@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Progress display utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+Progress display utilities for the Failover Control Protocol (FCP) mechanism.
 """
 
 import time

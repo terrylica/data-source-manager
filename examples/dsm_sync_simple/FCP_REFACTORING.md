@@ -1,8 +1,8 @@
-# FCP-PM Demo Refactoring
+# FCP Demo Refactoring
 
 ## Overview
 
-The FCP-PM (Failover Control Protocol and Priority Merge (PCP-PM)) Demo has been refactored to improve maintainability and code organization.
+The FCP (Failover Control Protocol (FCP)) Demo has been refactored to improve maintainability and code organization.
 The refactoring extracts functionality into separate utility modules that follow a more modular design pattern.
 
 ## Refactored Structure

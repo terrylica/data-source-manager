@@ -269,7 +269,7 @@ def get_historical_data_test(
     Run a long-term historical data test for DataSourceManager orchestration.
 
     This test retrieves data from Dec 24, 2024 12:09:03 to Feb 25, 2025 23:56:56
-    and demonstrates the Failover Control Protocol and Priority Merge (PCP-PM) strategy of the orchestrator.
+    and demonstrates the Failover Control Protocol (FCP) strategy of the orchestrator.
 
     Args:
         market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
@@ -357,7 +357,7 @@ def get_historical_data_test(
         retry_count=max_retries,
     ) as manager:
         # If debug mode is enabled, we'll fetch data in smaller chunks to better observe
-        # the Failover Control Protocol and Priority Merge (PCP-PM) strategy at work
+        # the Failover Control Protocol (FCP) strategy at work
         if debug:
             print(
                 "[bold yellow]Debug mode enabled - fetching data in multiple chunks[/bold yellow]"
@@ -1219,7 +1219,7 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description="Demonstrate DataSourceManager with Failover Control Protocol and Priority Merge (PCP-PM) for Binance data retrieval",
+        description="Demonstrate DataSourceManager with Failover Control Protocol (FCP) for Binance data retrieval",
         add_help=False,  # We'll handle help display ourselves
     )
 
@@ -1683,7 +1683,7 @@ def main():
         print(
             f"\n[bold cyan]=================================================[/bold cyan]"
         )
-        print(f"[bold cyan]Running Data Source Merge Demo with FCP-PM[/bold cyan]")
+        print(f"[bold cyan]Running Data Source Merge Demo with FCP[/bold cyan]")
         print(
             f"[bold cyan]Market: {market_str} | Symbol: {symbol_str} | Interval: {interval_str} | Chart Type: {chart_type_str}[/bold cyan]"
         )

@@ -3,11 +3,11 @@
 DEPRECATED: This file is kept for reference only and will be removed in the future.
 Please use the refactored version instead.
 
-FCP-PM Demo: Demonstrates the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+FCP Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
 
 This script allows users to specify a time span and observe how the
 DataSourceManager automatically retrieves data from different sources
-following the Failover Control Protocol and Priority Merge (PCP-PM) strategy:
+following the Failover Control Protocol (FCP) strategy:
 
 1. Cache (Local Arrow files)
 2. VISION API
@@ -80,7 +80,7 @@ CACHE_DIR = Path("./cache")
 
 # Create Typer app with custom rich formatting
 app = typer.Typer(
-    help="FCP-PM Demo: Demonstrate the Failover Control Protocol and Priority Merge (PCP-PM) mechanism",
+    help="FCP Demo: Demonstrate the Failover Control Protocol (FCP) mechanism",
     rich_markup_mode="rich",
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -212,7 +212,7 @@ def fetch_data_with_fcp(
     max_retries: int = 3,
 ):
     """
-    Fetch data using Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+    Fetch data using Failover Control Protocol (FCP) mechanism.
 
     Args:
         market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
@@ -260,7 +260,7 @@ def fetch_data_with_fcp(
             f"Explicitly enforcing VISION API as the data source (no REST fallback)"
         )
     else:
-        logger.info(f"Using AUTO source selection (FCP-PM: Cache → Vision → REST)")
+        logger.info(f"Using AUTO source selection (FCP: Cache → Vision → REST)")
 
     try:
         with Progress(
@@ -281,7 +281,7 @@ def fetch_data_with_fcp(
                 retry_count=max_retries,
             ) as manager:
                 # Retrieve data using the manager
-                # The manager will handle the FCP-PM strategy: cache → Vision API → REST API
+                # The manager will handle the FCP strategy: cache → Vision API → REST API
                 df = manager.get_data(
                     symbol=symbol,
                     start_time=start_time,
@@ -332,7 +332,7 @@ def fetch_data_with_fcp(
 
 
 def display_results(df, symbol, market_type, interval, chart_type, log_timestamp=None):
-    """Display the results of the FCP-PM data retrieval."""
+    """Display the results of the FCP data retrieval."""
     if df is None or df.empty:
         print("[bold red]No data to display[/bold red]")
         return
@@ -479,7 +479,7 @@ def test_fcp_pm_mechanism(
     days: int = 5,
     prepare_cache: bool = False,
 ):
-    """Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism.
+    """Test the Failover Control Protocol (FCP) mechanism.
 
     This function demonstrates how DataSourceManager combines data from multiple sources:
     1. First retrieves data from local cache
@@ -536,12 +536,12 @@ def test_fcp_pm_mechanism(
 
     print(
         Panel(
-            "[bold green]Testing Failover Control Protocol and Priority Merge (FCP-PM) Mechanism[/bold green]\n"
+            "[bold green]Testing Failover Control Protocol (FCP) Mechanism[/bold green]\n"
             f"Symbol: {symbol}\n"
             f"Market: {market_type.name}\n"
             f"Interval: {interval.value}\n"
             f"Date Range: {start_time.format('YYYY-MM-DD HH:mm:ss.SSS')} to {end_time.format('YYYY-MM-DD HH:mm:ss.SSS')}",
-            title="FCP-PM Test",
+            title="FCP Test",
             border_style="green",
         )
     )
@@ -614,10 +614,10 @@ def test_fcp_pm_mechanism(
             print("[bold red]Failed to cache data for segment 1[/bold red]")
             return
 
-    # Now test the FCP-PM mechanism on the full date range
+    # Now test the FCP mechanism on the full date range
     step_label = "Step 2: " if prepare_cache else ""
     print(
-        f"\n[bold cyan]{step_label}Testing FCP-PM mechanism with all segments...[/bold cyan]"
+        f"\n[bold cyan]{step_label}Testing FCP mechanism with all segments...[/bold cyan]"
     )
     print(
         "[bold yellow]This should demonstrate the automatic merging of data from different sources[/bold yellow]"
@@ -626,7 +626,7 @@ def test_fcp_pm_mechanism(
     try:
         with Progress(
             SpinnerColumn(),
-            TextColumn("[bold green]Fetching data with FCP-PM..."),
+            TextColumn("[bold green]Fetching data with FCP..."),
             transient=True,
         ) as progress:
             task = progress.add_task("Fetching...", total=None)
@@ -645,14 +645,14 @@ def test_fcp_pm_mechanism(
                 use_cache=True,
                 retry_count=3,
             ) as manager:
-                # Retrieve data for the entire range - this should use the FCP-PM mechanism
+                # Retrieve data for the entire range - this should use the FCP mechanism
                 full_df = manager.get_data(
                     symbol=symbol,
                     start_time=start_time,
                     end_time=end_time,
                     interval=interval,
                     chart_type=chart_type,
-                    enforce_source=DataSource.AUTO,  # AUTO will enable the full FCP-PM mechanism
+                    enforce_source=DataSource.AUTO,  # AUTO will enable the full FCP mechanism
                     include_source_info=True,
                 )
 
@@ -737,14 +737,14 @@ def test_fcp_pm_mechanism(
             print(f"\n[bold green]Data saved to: {csv_path}[/bold green]")
 
     except Exception as e:
-        print(f"[bold red]Error testing FCP-PM mechanism: {e}[/bold red]")
+        print(f"[bold red]Error testing FCP mechanism: {e}[/bold red]")
         import traceback
 
         traceback.print_exc()
 
     print(
         Panel(
-            "[bold green]FCP-PM Test Complete[/bold green]\n"
+            "[bold green]FCP Test Complete[/bold green]\n"
             "This test demonstrated how the DataSourceManager automatically:\n"
             "1. Retrieved data from cache for the first segment\n"
             "2. Retrieved missing data from Vision API for the second segment\n"
@@ -828,9 +828,9 @@ def main_function(
     test_fcp_pm: Annotated[
         bool,
         typer.Option(
-            "--test-fcp-pm",
+            "--test-fcp",
             "-tfp",
-            help="Run the special test for Failover Control Protocol and Priority Merge mechanism",
+            help="Run the special test for Failover Control Protocol (FCP) mechanism",
         ),
     ] = False,
     prepare_cache: Annotated[
@@ -838,7 +838,7 @@ def main_function(
         typer.Option(
             "--prepare-cache",
             "-pc",
-            help="Pre-populate cache with the first segment of data (only used with --test-fcp-pm)",
+            help="Pre-populate cache with the first segment of data (only used with --test-fcp)",
         ),
     ] = False,
     # Other
@@ -852,7 +852,7 @@ def main_function(
     ] = LogLevel.INFO,
 ):
     """
-    FCP-PM Demo: Demonstrates the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+    FCP Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
 
     This script shows how DataSourceManager automatically retrieves data from different sources:
 
@@ -883,9 +883,9 @@ def main_function(
     try:
         print(
             Panel(
-                "[bold green]FCP-PM Demo: Failover Control Protocol and Priority Merge (PCP-PM)[/bold green]\n"
+                "[bold green]FCP Demo: Failover Control Protocol (FCP)[/bold green]\n"
                 "This script demonstrates how DataSourceManager automatically retrieves data\n"
-                "from different sources using the Failover Control Protocol and Priority Merge (PCP-PM) strategy:\n"
+                "from different sources using the Failover Control Protocol (FCP) strategy:\n"
                 "1. Cache (Local Arrow files)\n"
                 "2. VISION API\n"
                 "3. REST API",
@@ -931,7 +931,7 @@ def main_function(
         print(f"  Clear cache: {clear_cache}")
 
         print(f"[cyan]Test Mode:[/cyan]")
-        print(f"  Test FCP-PM: {test_fcp_pm}")
+        print(f"  Test FCP: {test_fcp_pm}")
         print(f"  Prepare cache: {prepare_cache}")
 
         print(f"[cyan]Other:[/cyan]")
@@ -941,10 +941,10 @@ def main_function(
         if clear_cache:
             clear_cache_directory()
 
-        # Check if we should run the FCP-PM test
+        # Check if we should run the FCP test
         if test_fcp_pm:
             # Add debug logging
-            logger.debug(f"Running FCP-PM test with:")
+            logger.debug(f"Running FCP test with:")
             logger.debug(f"  Symbol: {symbol}")
             logger.debug(f"  Market: {market.value} (converting to enum)")
             logger.debug(f"  Interval: {interval}")
@@ -953,7 +953,7 @@ def main_function(
             logger.debug(f"  Days: {days}")
             logger.debug(f"  Prepare cache: {prepare_cache}")
 
-            # Run the FCP-PM mechanism test
+            # Run the FCP mechanism test
             test_fcp_pm_mechanism(
                 symbol=symbol,
                 market_type=MarketType.from_string(market.value),
@@ -1028,7 +1028,7 @@ def main_function(
             print(f"Max retries: {retries}")
             print()
 
-            # Fetch data using FCP-PM
+            # Fetch data using FCP
             df = fetch_data_with_fcp(
                 market_type=market_type,
                 symbol=symbol_adjusted,
@@ -1195,9 +1195,9 @@ def main(
     test_fcp_pm: Annotated[
         bool,
         typer.Option(
-            "--test-fcp-pm",
+            "--test-fcp",
             "-tfp",
-            help="Run the special test for Failover Control Protocol and Priority Merge mechanism",
+            help="Run the special test for Failover Control Protocol (FCP) mechanism",
         ),
     ] = False,
     prepare_cache: Annotated[
@@ -1205,7 +1205,7 @@ def main(
         typer.Option(
             "--prepare-cache",
             "-pc",
-            help="Pre-populate cache with the first segment of data (only used with --test-fcp-pm)",
+            help="Pre-populate cache with the first segment of data (only used with --test-fcp)",
         ),
     ] = False,
     # Other
@@ -1219,7 +1219,7 @@ def main(
     ] = LogLevel.INFO,
 ):
     """
-    FCP-PM Demo: Demonstrates the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+    FCP Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
 
     This script shows how DataSourceManager automatically retrieves data from different sources:
 
@@ -1317,12 +1317,12 @@ def examples(
         "args": ["-s", "ETHUSDT", "-m", "spot", "-i", "1m", "-es", "REST", "-d", "2"],
     }
 
-    # Example 5: Run FCP-PM mechanism test
+    # Example 5: Run FCP mechanism test
     example5 = {
-        "title": "Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism",
+        "title": "Test the Failover Control Protocol (FCP) mechanism",
         "description": "Runs a comprehensive test demonstrating how data is merged from multiple sources",
         "command": "./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -m spot -i 1m -tfp -pc",
-        "explanation": "Demonstrates the full FCP-PM mechanism by pre-populating cache and then retrieving data across multiple sources.",
+        "explanation": "Demonstrates the full FCP mechanism by pre-populating cache and then retrieving data across multiple sources.",
         "args": ["-s", "BTCUSDT", "-m", "spot", "-i", "1m", "-tfp", "-pc"],
     }
 
@@ -1377,7 +1377,7 @@ def examples(
             elif arg == "-cc" or arg == "--clear-cache":
                 kwargs["clear_cache"] = True
                 i += 1
-            elif arg == "-tfp" or arg == "--test-fcp-pm":
+            elif arg == "-tfp" or arg == "--test-fcp":
                 kwargs["test_fcp_pm"] = True
                 i += 1
             elif arg == "-pc" or arg == "--prepare-cache":
@@ -1393,7 +1393,7 @@ def examples(
     # If no example is specified to run, just show all examples
     console.print(
         Panel(
-            "[bold green]FCP-PM Demo: Tested Usage Examples[/bold green]\n"
+            "[bold green]FCP Demo: Tested Usage Examples[/bold green]\n"
             "Below are some real-world examples of using the fcp_demo.py script",
             expand=False,
             border_style="green",
@@ -1448,7 +1448,7 @@ def examples(
             "1. [green]Cache Management:[/green] Use -cc to clear cache if you suspect stale data\n"
             "2. [green]Debug Mode:[/green] Enable debug logging with -l D to see detailed information\n"
             "3. [green]Symbol Format:[/green] Coin-M futures require _PERP suffix (e.g., BTCUSD_PERP)\n"
-            "4. [green]Test Mode:[/green] Use -tfp to test the full Failover Control Protocol and Priority Merge (PCP-PM) process",
+            "4. [green]Test Mode:[/green] Use -tfp to test the full Failover Control Protocol (FCP) process",
             title="Best Practices",
             border_style="yellow",
         )
@@ -1501,7 +1501,7 @@ if __name__ == "__main__":
         console.print(
             Panel(
                 "[bold cyan]Available Commands:[/bold cyan]\n"
-                "[yellow]main[/yellow]: (default) FCP-PM Demo with all parameters\n"
+                "[yellow]main[/yellow]: (default) FCP Demo with all parameters\n"
                 "   Example: [yellow]./fcp_demo.py main -s BTCUSDT -m spot[/yellow]\n\n"
                 "[yellow]examples[/yellow]: Show and run tested example commands\n"
                 "   Example: [yellow]./fcp_demo.py examples --run 1[/yellow]",

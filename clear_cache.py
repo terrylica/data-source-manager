@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Clear the cache directory for testing the PCP-PM demo.
+Clear the cache directory for testing the FCP demo.
 """
 
 import os

@@ -2,7 +2,7 @@
 
 ## IMPORTANT: Code Refactoring
 
-**The FCP-PM Demo has been refactored for improved maintainability.**
+**The FCP Demo has been refactored for improved maintainability.**
 
 - The refactored implementation is in `fcp_demo.py`
 - The legacy implementation has been moved to `legacy/fcp_demo_legacy.py`
@@ -10,7 +10,7 @@
 
 ## Overview
 
-This directory contains a simple demonstration of the synchronous data retrieval capabilities using the `DataSourceManager` with Failover Control Protocol and Priority Merge (PCP-PM) strategy.
+This directory contains a simple demonstration of the synchronous data retrieval capabilities using the `DataSourceManager` with Failover Control Protocol (FCP) strategy.
 
 The demonstration shows how to retrieve 1-minute candlestick data for Bitcoin in various markets (SPOT, USDT-margined futures, COIN-margined futures) using multiple data sources:
 
@@ -47,7 +47,7 @@ python examples/dsm_sync_simple/demo.py market symbol interval chart_type
 ### Examples
 
 ```bash
-# Run default FCP-PM merge demo for BTCUSDT in SPOT market
+# Run default FCP merge demo for BTCUSDT in SPOT market
 python examples/dsm_sync_simple/demo.py
 
 # Run merge demo for ETH with 5m interval

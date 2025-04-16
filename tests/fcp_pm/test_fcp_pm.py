@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify the Failover Control Protocol and Priority Merge (FCP-PM) mechanism.
+Test script to verify the Failover Control Protocol (FCP) mechanism.
 This script tests that when Vision API returns partial data, the system correctly identifies
 missing segments and fetches them from REST API to complete the dataset.
 """
@@ -25,10 +25,10 @@ logger.setLevel("DEBUG")
 
 
 def test_fcp_pm_mechanism():
-    """Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism."""
+    """Test the Failover Control Protocol (FCP) mechanism."""
     print(
         Panel(
-            "[bold green]Testing Failover Control Protocol and Priority Merge (FCP-PM) Mechanism[/bold green]\n"
+            "[bold green]Testing Failover Control Protocol (FCP) Mechanism[/bold green]\n"
             "This test verifies that when Vision API returns partial data, the system correctly\n"
             "identifies missing segments and fetches them from REST API to complete the dataset.",
             expand=False,
@@ -53,12 +53,12 @@ def test_fcp_pm_mechanism():
     print(f"Interval: {interval.value}")
     print(f"Time Range: {start_time.isoformat()} to {end_time.isoformat()}")
     print(f"Cache Enabled: {use_cache}")
-    print(f"Enforce Source: AUTO (FCP-PM: Cache → Vision → REST)\n")
+    print(f"Enforce Source: AUTO (FCP: Cache → Vision → REST)\n")
 
     try:
         with Progress(
             SpinnerColumn(),
-            TextColumn("[bold green]Fetching data with FCP-PM mechanism..."),
+            TextColumn("[bold green]Fetching data with FCP mechanism..."),
             transient=True,
         ) as progress:
             progress_task = progress.add_task("Fetching...", total=None)
@@ -73,16 +73,16 @@ def test_fcp_pm_mechanism():
                 use_cache=use_cache,
                 retry_count=3,
             ) as manager:
-                print("[bold yellow]Fetching data with FCP-PM...[/bold yellow]")
+                print("[bold yellow]Fetching data with FCP...[/bold yellow]")
 
-                # Use AUTO mode to enable the FCP-PM mechanism
+                # Use AUTO mode to enable the FCP mechanism
                 df = manager.get_data(
                     symbol=symbol,
                     start_time=start_time,
                     end_time=end_time,
                     interval=interval,
                     chart_type=chart_type,
-                    enforce_source=DataSource.AUTO,  # Use AUTO to enable FCP-PM
+                    enforce_source=DataSource.AUTO,  # Use AUTO to enable FCP
                     include_source_info=True,  # Include source information
                 )
 
@@ -199,7 +199,7 @@ def test_fcp_pm_mechanism():
 
         if has_vision_data and has_rest_data:
             print(
-                "\n[bold green]✓ SUCCESS: FCP-PM mechanism worked correctly[/bold green]"
+                "\n[bold green]✓ SUCCESS: FCP mechanism worked correctly[/bold green]"
             )
             print(
                 "The system retrieved data from Vision API and used REST API to fill in missing segments."
@@ -216,7 +216,7 @@ def test_fcp_pm_mechanism():
             )
             return True
         else:
-            print("\n[bold red]✗ FAILURE: FCP-PM mechanism failed[/bold red]")
+            print("\n[bold red]✗ FAILURE: FCP mechanism failed[/bold red]")
             print("The system failed to merge data from multiple sources correctly.")
             return False
 
@@ -229,14 +229,14 @@ def test_fcp_pm_mechanism():
 
 
 def main():
-    """Run the FCP-PM mechanism test."""
+    """Run the FCP mechanism test."""
     result = test_fcp_pm_mechanism()
 
     if result:
         print(
             Panel(
-                "[bold green]Failover Control Protocol and Priority Merge (FCP-PM) Test Passed[/bold green]\n"
-                "The DataSourceManager correctly implemented the FCP-PM mechanism by:\n"
+                "[bold green]Failover Control Protocol (FCP) Test Passed[/bold green]\n"
+                "The DataSourceManager correctly implemented the FCP mechanism by:\n"
                 "1. Retrieving available data from Vision API\n"
                 "2. Identifying missing segments\n"
                 "3. Fetching missing segments from REST API\n"
@@ -248,8 +248,8 @@ def main():
     else:
         print(
             Panel(
-                "[bold red]Failover Control Protocol and Priority Merge (FCP-PM) Test Failed[/bold red]\n"
-                "The DataSourceManager failed to implement the FCP-PM mechanism correctly.",
+                "[bold red]Failover Control Protocol (FCP) Test Failed[/bold red]\n"
+                "The DataSourceManager failed to implement the FCP mechanism correctly.",
                 border_style="red",
             )
         )

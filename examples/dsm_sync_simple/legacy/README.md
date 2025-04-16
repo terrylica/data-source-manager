@@ -17,7 +17,7 @@ For more information about the refactoring process and the new code structure, s
 
 ## Legacy Files
 
-- `fcp_demo_legacy.py` - Original implementation of the FCP-PM demo (deprecated)
+- `fcp_demo_legacy.py` - Original implementation of the FCP demo (deprecated)
 
 ## Expected Removal
 

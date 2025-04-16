@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Failover Control Protocol and Priority Merge (FCP-PM) Mechanism.
+Test script for Failover Control Protocol (FCP) Mechanism.
 
 This script tests the cache functionality of the DataSourceManager,
 ensuring that the progressive data retrieval and merging properly works.
@@ -46,7 +46,7 @@ def test_fcp_cache(
     clear_cache_first: bool = True,
 ):
     """
-    Test the FCP-PM caching mechanism.
+    Test the FCP caching mechanism.
 
     Args:
         symbol: Trading symbol to test with (e.g. BTCUSDT)
@@ -79,7 +79,7 @@ def test_fcp_cache(
     # Initialize market type
     market_type = MarketType.SPOT
 
-    print(f"[bold blue]Test FCP-PM Cache Mechanism[/bold blue]")
+    print(f"[bold blue]Test FCP Cache Mechanism[/bold blue]")
     print(f"Symbol: {symbol}")
     print(f"Interval: {interval.value}")
     print(f"Time range: {start_time.isoformat()} to {end_time.isoformat()}")
@@ -266,7 +266,7 @@ def main(
         bool, typer.Option("--clear-cache", "-c", help="Clear cache before test")
     ] = True,
 ):
-    """Test the FCP-PM cache mechanism."""
+    """Test the FCP cache mechanism."""
     test_fcp_cache(symbol, interval, days, verbose, clear_cache)
 
 

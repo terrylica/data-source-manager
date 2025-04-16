@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Time utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
+Time utilities for the Failover Control Protocol (FCP) mechanism.
 """
 
 import pendulum

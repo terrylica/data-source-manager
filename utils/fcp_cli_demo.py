@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demo CLI tool for FCP-PM progress utilities
+Demo CLI tool for FCP progress utilities
 """
 
 import time
@@ -60,7 +60,7 @@ def fetch(
     # Print banner
     print(
         Panel(
-            f"[bold]FCP-PM Progress Demo[/bold]\n"
+            f"[bold]FCP Progress Demo[/bold]\n"
             f"Symbol: {symbol}\n"
             f"Log level: {log_level}\n"
             f"Simulate error: {error}\n"

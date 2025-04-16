@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Test script to verify the refactored FCP-PM demo code.
-This script demonstrates importing and using functions from the FCP-PM utility modules.
+Test script to verify the refactored FCP demo code.
+This script demonstrates importing and using functions from the FCP utility modules.
 """
 
 from pathlib import Path
@@ -24,7 +24,7 @@ from utils.logger_setup import logger, configure_session_logging
 from rich import print
 from rich.panel import Panel
 
-# Import FCP-PM utility modules we created
+# Import FCP utility modules we created
 from utils.fcp_time_utils import parse_datetime
 from utils.fcp_cache_utils import clear_cache_directory
 from utils.fcp_project_utils import verify_project_root
@@ -37,8 +37,8 @@ main_log, error_log, log_timestamp = configure_session_logging("fcp_test", "INFO
 # Display welcome message
 print(
     Panel(
-        "[bold green]FCP-PM Refactoring Test[/bold green]\n"
-        "This script verifies the refactored FCP-PM utility modules are working correctly.",
+        "[bold green]FCP Refactoring Test[/bold green]\n"
+        "This script verifies the refactored FCP utility modules are working correctly.",
         border_style="green",
     )
 )
