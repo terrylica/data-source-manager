@@ -340,7 +340,7 @@ python examples/logger_demo/simple_print_demo.py --level ERROR
 - The proxying system uses runtime introspection through `inspect.currentframe()` to detect calling modules
 - Hierarchical control leverages Python's built-in logger hierarchy to propagate settings
 
-## Working with FCP Demo
+## Working with PCP-PM Demo
 
 The smart print functionality has been integrated into the FCP demo to provide a better user experience:
 

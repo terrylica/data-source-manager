@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Data utilities for the Failover Composition Priority (FCP) mechanism.
+Data utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 """
 
 import pandas as pd
@@ -34,7 +34,7 @@ def fetch_data_with_fcp(
     max_retries: int = 3,
 ):
     """
-    Fetch data using Failover Composition Priority (FCP) mechanism.
+    Fetch data using Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 
     Args:
         market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
@@ -82,7 +82,7 @@ def fetch_data_with_fcp(
             f"Explicitly enforcing VISION API as the data source (no REST fallback)"
         )
     else:
-        logger.info(f"Using AUTO source selection (FCP: Cache → Vision → REST)")
+        logger.info(f"Using AUTO source selection (FCP-PM: Cache → Vision → REST)")
 
     try:
         with Progress(
@@ -103,7 +103,7 @@ def fetch_data_with_fcp(
                 retry_count=max_retries,
             ) as manager:
                 # Retrieve data using the manager
-                # The manager will handle the FCP strategy: cache → Vision API → REST API
+                # The manager will handle the FCP-PM strategy: cache → Vision API → REST API
                 df = manager.get_data(
                     symbol=symbol,
                     start_time=start_time,
@@ -165,7 +165,7 @@ def test_fcp_pm_mechanism(
     cache_dir: Path = None,
 ):
     """
-    Test the Failover Composition and Parcel Merge (FCP-PM) mechanism.
+    Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism.
 
     This function demonstrates how DataSourceManager combines data from multiple sources:
     1. First retrieves data from local cache
@@ -228,7 +228,7 @@ def test_fcp_pm_mechanism(
 
     print(
         Panel(
-            "[bold green]Testing Failover Composition and Parcel Merge (FCP-PM) Mechanism[/bold green]\n"
+            "[bold green]Testing Failover Control Protocol and Priority Merge (FCP-PM) Mechanism[/bold green]\n"
             f"Symbol: {symbol}\n"
             f"Market: {market_type.name}\n"
             f"Interval: {interval.value}\n"

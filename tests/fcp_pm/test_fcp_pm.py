@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify the Failover Composition and Parcel Merge (FCP-PM) mechanism.
+Test script to verify the Failover Control Protocol and Priority Merge (FCP-PM) mechanism.
 This script tests that when Vision API returns partial data, the system correctly identifies
 missing segments and fetches them from REST API to complete the dataset.
 """
@@ -25,10 +25,10 @@ logger.setLevel("DEBUG")
 
 
 def test_fcp_pm_mechanism():
-    """Test the Failover Composition and Parcel Merge (FCP-PM) mechanism."""
+    """Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism."""
     print(
         Panel(
-            "[bold green]Testing Failover Composition and Parcel Merge (FCP-PM) Mechanism[/bold green]\n"
+            "[bold green]Testing Failover Control Protocol and Priority Merge (FCP-PM) Mechanism[/bold green]\n"
             "This test verifies that when Vision API returns partial data, the system correctly\n"
             "identifies missing segments and fetches them from REST API to complete the dataset.",
             expand=False,
@@ -235,7 +235,7 @@ def main():
     if result:
         print(
             Panel(
-                "[bold green]Failover Composition and Parcel Merge (FCP-PM) Test Passed[/bold green]\n"
+                "[bold green]Failover Control Protocol and Priority Merge (FCP-PM) Test Passed[/bold green]\n"
                 "The DataSourceManager correctly implemented the FCP-PM mechanism by:\n"
                 "1. Retrieving available data from Vision API\n"
                 "2. Identifying missing segments\n"
@@ -248,7 +248,7 @@ def main():
     else:
         print(
             Panel(
-                "[bold red]Failover Composition and Parcel Merge (FCP-PM) Test Failed[/bold red]\n"
+                "[bold red]Failover Control Protocol and Priority Merge (FCP-PM) Test Failed[/bold red]\n"
                 "The DataSourceManager failed to implement the FCP-PM mechanism correctly.",
                 border_style="red",
             )

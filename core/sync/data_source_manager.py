@@ -319,7 +319,7 @@ class DataSourceManager:
     """Mediator between data sources with smart selection and caching.
 
     This class orchestrates data retrieval from different sources following
-    the Failover Composition Priority (FCP) strategy:
+    the Failover Control Protocol and Priority Merge (PCP-PM) strategy:
 
     1. Cache (Local Arrow files): Check cached data first
     2. VISION API: For missing data, try Binance Vision API
@@ -501,7 +501,7 @@ class DataSourceManager:
     def _should_use_vision_api(self, start_time: datetime, end_time: datetime) -> bool:
         """Determine if Vision API should be used based on time range.
 
-        According to the Failover Composition Priority (FCP) strategy,
+        According to the Failover Control Protocol and Priority Merge (PCP-PM) strategy,
         we should always attempt to use Vision API first before falling back to REST.
 
         This function now returns True to enforce using Vision API as the preferred
@@ -1269,7 +1269,7 @@ class DataSourceManager:
         """Get data for the specified symbol and time range from the best available source.
 
         This method is the main entry point for retrieving data. It implements the
-        Failover Composition and Parcel Merge (FCP-PM) mechanism with three integrated phases:
+        Failover Control Protocol and Priority Merge (FCP-PM) mechanism with three integrated phases:
 
         1. LOCAL CACHE RETRIEVAL: First check local Apache Arrow files for data
            - Data successfully retrieved from cache is immediately merged into the output

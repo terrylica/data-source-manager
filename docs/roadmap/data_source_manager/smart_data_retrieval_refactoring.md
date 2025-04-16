@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines a plan to enhance the DataSourceManager to intelligently split data retrieval between multiple sources using a Failover Composition Priority (FCP) approach:
+This document outlines a plan to enhance the DataSourceManager to intelligently split data retrieval between multiple sources using a Failover Control Protocol and Priority Merge (PCP-PM) approach:
 
 1. **Cache** (highest priority) - Local Arrow files
 2. **Vision API** (for historical data, including 1s intervals in SPOT markets)
@@ -60,7 +60,7 @@ The fallback mechanism (if Vision API fails, try REST API) is already implemente
 
 ### 1. Redesign Source Selection Logic
 
-**Main Change**: Remove the historical data threshold rule and prioritize the Failover Composition Priority (FCP) concept.
+**Main Change**: Remove the historical data threshold rule and prioritize the Failover Control Protocol and Priority Merge (PCP-PM) concept.
 
 1. New `_should_use_vision_api` implementation:
 
@@ -78,7 +78,7 @@ The fallback mechanism (if Vision API fails, try REST API) is already implemente
 
        # Always prefer Vision API for all data retrievals regardless of size
        logger.debug(
-           f"Using Vision API as preferred source for data retrieval (FCP: Cache → Vision → REST)"
+           f"Using Vision API as preferred source for data retrieval (FCP-PM: Cache → Vision → REST)"
        )
        return True
    ```
@@ -88,9 +88,9 @@ The fallback mechanism (if Vision API fails, try REST API) is already implemente
    - Removes the arbitrary historical data threshold (`VISION_DATA_DELAY_HOURS`).
    - Always prefers Vision API as the primary source after cache.
    - Maintains the fallback mechanism where REST API is used if Vision API fails.
-   - Supports the Failover Composition Priority (FCP) approach.
+   - Supports the Failover Control Protocol and Priority Merge (PCP-PM) approach.
 
-### 2. Design Updated Data Flow with Failover Composition Priority (FCP)
+### 2. Design Updated Data Flow with Failover Control Protocol and Priority Merge (PCP-PM)
 
 **New Flow:**
 
@@ -120,7 +120,7 @@ def _split_time_range(
     """Split a time range into segments for Vision and REST APIs based on availability.
 
     Always tries Vision API first, falling back to REST API for recent data not in Vision.
-    This approach follows the Failover Composition Priority (FCP) concept where
+    This approach follows the Failover Control Protocol and Priority Merge (PCP-PM) concept where
     Cache → Vision API → REST API in order of preference.
     """
     # For 1s intervals in non-SPOT markets, always use REST API only
@@ -134,7 +134,7 @@ def _split_time_range(
 
 #### B. Update `_get_data_impl()`
 
-Refactor `_get_data_impl()` to implement the Failover Composition Priority (FCP) concept:
+Refactor `_get_data_impl()` to implement the Failover Control Protocol and Priority Merge (PCP-PM) concept:
 
 ```python
 # After cache retrieval but before current source selection
@@ -146,7 +146,7 @@ if cached_df is not None and not cached_df.empty:
     # Add source metadata for tracking and diagnostics
     cached_df['_data_source'] = DataSource.CACHE.name
     all_results.append(cached_df)
-    logger.debug(f"Using cached data for portions of the requested time range (FCP: Cache)")
+    logger.debug(f"Using cached data for portions of the requested time range (FCP-PM: Cache)")
 
 for missing_start, missing_end in missing_ranges:
     # Only process if user hasn't enforced a specific source
@@ -154,9 +154,9 @@ for missing_start, missing_end in missing_ranges:
         vision_range, rest_range = self._split_time_range(missing_start, missing_end, interval)
 
         if vision_range:
-            # Try Vision API first (FCP: Cache → Vision)
+            # Try Vision API first (FCP-PM: Cache → Vision)
             try:
-                logger.debug(f"Attempting Vision API for range {vision_range[0]} to {vision_range[1]} (FCP: Cache → Vision)")
+                logger.debug(f"Attempting Vision API for range {vision_range[0]} to {vision_range[1]} (FCP-PM: Cache → Vision)")
                 vision_df = await self._fetch_from_source(
                     symbol, vision_range[0], vision_range[1], interval, use_vision=True
                 )
@@ -164,19 +164,19 @@ for missing_start, missing_end in missing_ranges:
                     # Add source metadata
                     vision_df['_data_source'] = DataSource.VISION.name
                     all_results.append(vision_df)
-                    logger.debug(f"Successfully retrieved data from Vision API (FCP: Cache → Vision)")
+                    logger.debug(f"Successfully retrieved data from Vision API (FCP-PM: Cache → Vision)")
                 else:
                     # If Vision API returned empty results, fall back to REST API for this range
-                    logger.debug(f"Vision API returned empty results, falling back to REST API (FCP: Cache → Vision → REST)")
+                    logger.debug(f"Vision API returned empty results, falling back to REST API (FCP-PM: Cache → Vision → REST)")
                     rest_range = vision_range
             except Exception as e:
-                logger.warning(f"Vision API fetch failed, falling back to REST API: {e} (FCP: Cache → Vision → REST)")
+                logger.warning(f"Vision API fetch failed, falling back to REST API: {e} (FCP-PM: Cache → Vision → REST)")
                 rest_range = vision_range
 
         if rest_range:
-            # Use REST API as fallback (FCP: Cache → Vision → REST)
+            # Use REST API as fallback (FCP-PM: Cache → Vision → REST)
             try:
-                logger.debug(f"Using REST API for range {rest_range[0]} to {rest_range[1]} (FCP: Cache → Vision → REST)")
+                logger.debug(f"Using REST API for range {rest_range[0]} to {rest_range[1]} (FCP-PM: Cache → Vision → REST)")
                 rest_df = await self._fetch_from_source(
                     symbol, rest_range[0], rest_range[1], interval, use_vision=False
                 )
@@ -184,7 +184,7 @@ for missing_start, missing_end in missing_ranges:
                     # Add source metadata
                     rest_df['_data_source'] = DataSource.REST.name
                     all_results.append(rest_df)
-                    logger.debug(f"Successfully retrieved data from REST API (FCP: Cache → Vision → REST)")
+                    logger.debug(f"Successfully retrieved data from REST API (FCP-PM: Cache → Vision → REST)")
             except Exception as e:
                 logger.error(f"REST API fetch failed: {e}")
                 # If REST API fails, we've exhausted all fallback options
@@ -232,10 +232,10 @@ def _identify_missing_ranges(
     end_time: datetime,
     interval: Interval
 ) -> List[Tuple[datetime, datetime]]:
-    """Identify missing time ranges in a DataFrame to support the FCP concept.
+    """Identify missing time ranges in a DataFrame to support the FCP-PM concept.
 
     This method identifies gaps in the cached data that need to be filled by
-    Vision API or REST API, following the Failover Composition Priority.
+    Vision API or REST API, following the Failover Control Protocol and Priority Merge (PCP-PM).
 
     Args:
         df: Cached DataFrame (possibly None if cache is empty)
@@ -268,7 +268,7 @@ def _identify_missing_ranges(
 
 #### D. Source Data Identification
 
-Enhance the source data identification to support the FCP concept and LSP compliance:
+Enhance the source data identification to support the FCP-PM concept and LSP compliance:
 
 ```python
 async def get_data(
@@ -283,9 +283,9 @@ async def get_data(
     chart_type: Optional[ChartType] = None,
     include_source_metadata: bool = False,  # New parameter
 ) -> pd.DataFrame:
-    """Get data for symbol within time range using the Failover Composition Priority approach.
+    """Get data for symbol within time range using the Failover Control Protocol and Priority Merge (PCP-PM) approach.
 
-    This method retrieves data following the Failover Composition Priority (FCP):
+    This method retrieves data following the Failover Control Protocol and Priority Merge (PCP-PM):
     1. Check Cache first
     2. Try Vision API for missing data
     3. Fall back to REST API if Vision API fails
@@ -304,11 +304,11 @@ async def get_data(
 
 ### 4. Helper Functions
 
-Enhance helper functions to support the FCP concept:
+Enhance helper functions to support the FCP-PM concept:
 
 ```python
 def _interval_to_freq(self, interval: Interval) -> str:
-    """Convert Interval enum to pandas frequency string for FCP data composition."""
+    """Convert Interval enum to pandas frequency string for FCP-PM data composition."""
     # Mapping from Interval enum to pandas freq string
     interval_to_freq_map = {
         Interval.SECOND_1.name: 'S',
@@ -338,7 +338,7 @@ def _timestamps_to_ranges(
     """Convert a set of timestamps to continuous date ranges for FCP-based data retrieval.
 
     This method consolidates missing timestamps into continuous ranges to minimize
-    the number of API calls needed when following the Failover Composition Priority.
+    the number of API calls needed when following the Failover Control Protocol and Priority Merge (PCP-PM).
     """
     if len(timestamps) == 0:
         return []
@@ -367,7 +367,7 @@ def _timestamps_to_ranges(
 
 ### 5. Caching Strategy Updates
 
-Update caching to work with the Failover Composition Priority (FCP) concept:
+Update caching to work with the Failover Control Protocol and Priority Merge (PCP-PM) concept:
 
 1. Merge all data into a single cache entry regardless of source
 2. Cache the final concatenated DataFrame from all sources
@@ -382,7 +382,7 @@ async def _update_cache_with_merged_data(
     interval: Interval,
     cache_date: datetime,
 ) -> bool:
-    """Update cache with data from multiple sources following the FCP approach.
+    """Update cache with data from multiple sources following the FCP-PM approach.
 
     This method merges data from all sources (Cache, Vision API, REST API) and
     stores it as a single cache entry, maintaining LSP compliance.
@@ -430,7 +430,7 @@ async def _update_cache_with_merged_data(
 
 1. Unit tests:
 
-   - Test time range splitting logic for various scenarios, ensuring FCP implementation
+   - Test time range splitting logic for various scenarios, ensuring FCP-PM implementation
    - Test missing ranges identification with different cache states
    - Test merging logic for data from multiple sources (Cache, Vision, REST)
    - Test LSP compliance - ensure the final DataFrame has the same format regardless of source composition
@@ -439,15 +439,15 @@ async def _update_cache_with_merged_data(
 
 2. Integration tests:
 
-   - Test end-to-end data retrieval with various time ranges using the FCP approach
+   - Test end-to-end data retrieval with various time ranges using the FCP-PM approach
    - Test partial cache hits - verify that only missing portions are retrieved from API
    - Test Vision API failures and confirm fallback to REST API
    - Test the seamless composition of data from all three sources
    - Verify proper handling of 1s data in SPOT markets via Vision API
-   - Test error handling in the FCP chain
+   - Test error handling in the FCP-PM chain
 
 3. Performance tests:
-   - Measure overhead of the FCP approach vs. the current single-source approach
+   - Measure overhead of the FCP-PM approach vs. the current single-source approach
    - Verify the approach scales with large data ranges
    - Benchmark partial cache hits vs. full API retrievals
    - Compare performance with and without the historical threshold
@@ -458,40 +458,40 @@ async def _update_cache_with_merged_data(
 
    - Correct the handling of 1s intervals for SPOT markets
    - Remove the historical threshold rule from `_should_use_vision_api`
-   - Implement the FCP concept in the source selection logic
+   - Implement the FCP-PM concept in the source selection logic
    - Update tests for this function
    - Review with team
 
-2. **Phase 2: Core FCP Logic**
+2. **Phase 2: Core FCP-PM Logic**
 
-   - Implement `_split_time_range()` based on the FCP strategy
+   - Implement `_split_time_range()` based on the FCP-PM strategy
    - Implement `_identify_missing_ranges()` for partial cache hits
    - Add tests for these functions
    - Review with team
 
 3. **Phase 3: Modified Retrieval Flow**
 
-   - Update `_get_data_impl()` to use the FCP approach
+   - Update `_get_data_impl()` to use the FCP-PM approach
    - Implement source tracking metadata
    - Ensure LSP compliance in the merged DataFrame
    - Keep backward compatibility
 
 4. **Phase 4: Caching Refinements**
 
-   - Update caching strategy for the FCP approach
+   - Update caching strategy for the FCP-PM approach
    - Implement single cache entry for merged data from all sources
    - Add source composition metadata
    - Optimize cache utilization for partial hits
 
 5. **Phase 5: Testing and Validation**
 
-   - Add comprehensive tests for all FCP scenarios
+   - Add comprehensive tests for all FCP-PM scenarios
    - Verify LSP compliance in all data retrieval paths
-   - Benchmark performance of the FCP approach
+   - Benchmark performance of the FCP-PM approach
    - Verify behavior in varied scenarios
 
 6. **Phase 6: Documentation and Final Review**
-   - Update documentation to explain the FCP concept
+   - Update documentation to explain the FCP-PM concept
    - Add examples of multi-source data composition
    - Document LSP compliance guarantees
    - Final review with team
@@ -500,7 +500,7 @@ async def _update_cache_with_merged_data(
 
 1. **Complexity Increase**
 
-   - Mitigation: Isolate FCP logic in clear, well-tested functions
+   - Mitigation: Isolate FCP-PM logic in clear, well-tested functions
    - Add comprehensive logging of source transitions
    - Ensure backward compatibility
 
@@ -519,17 +519,17 @@ async def _update_cache_with_merged_data(
 4. **Backward Compatibility**
 
    - Mitigation: Keep existing interfaces working
-   - Add feature flags to enable/disable FCP behavior
+   - Add feature flags to enable/disable FCP-PM behavior
    - Maintain LSP compliance across all code paths
 
 5. **Loss of Historical Data Threshold**
    - Risk: Removing the VISION_DATA_DELAY_HOURS threshold might impact some edge cases
    - Mitigation: Thorough testing to ensure all scenarios are covered
-   - FCP mechanism ensures REST API is used if Vision API fails
+   - FCP-PM mechanism ensures REST API is used if Vision API fails
 
 ## Conclusion
 
-This refactoring will enhance the DataSourceManager to intelligently retrieve data from the most appropriate sources following the Failover Composition Priority (FCP) approach: Cache first, then Vision API, followed by REST API as needed. By implementing this approach while ensuring Liskov Substitution Principle (LSP) compliance, we create a robust and efficient data retrieval system that:
+This refactoring will enhance the DataSourceManager to intelligently retrieve data from the most appropriate sources following the Failover Control Protocol and Priority Merge (PCP-PM) approach: Cache first, then Vision API, followed by REST API as needed. By implementing this approach while ensuring Liskov Substitution Principle (LSP) compliance, we create a robust and efficient data retrieval system that:
 
 1. Minimizes API calls by using cache whenever possible
 2. Prefers Vision API for historical data (including 1s intervals in SPOT markets)
@@ -541,5 +541,5 @@ The result will be a more resilient system that optimizes data retrieval while p
 
 ### Cleanup Tasks
 
-- **Remove `VISION_DATA_DELAY_HOURS`**: This constant is no longer needed due to the FCP approach. Ensure it is removed from `utils/config.py` and any related logic in `core/data_source_manager.py` is updated.
-- **Update Documentation**: Ensure all Markdown documentation referencing `VISION_DATA_DELAY_HOURS` is updated to reflect the FCP approach.
+- **Remove `VISION_DATA_DELAY_HOURS`**: This constant is no longer needed due to the FCP-PM approach. Ensure it is removed from `utils/config.py` and any related logic in `core/data_source_manager.py` is updated.
+- **Update Documentation**: Ensure all Markdown documentation referencing `VISION_DATA_DELAY_HOURS` is updated to reflect the FCP-PM approach.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI example utilities for the Failover Composition Priority (FCP) mechanism.
+CLI example utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 """
 
 from typing import List, Dict, Any, Callable
@@ -70,7 +70,7 @@ def define_example_commands() -> List[Dict[str, Any]]:
 
     # Example 5: Run FCP-PM mechanism test
     example5 = {
-        "title": "Test the Failover Composition and Parcel Merge (FCP-PM) mechanism",
+        "title": "Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism",
         "description": "Runs a comprehensive test demonstrating how data is merged from multiple sources",
         "command": "./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -m spot -i 1m -tfp -pc",
         "explanation": "Demonstrates the full FCP-PM mechanism by pre-populating cache and then retrieving data across multiple sources.",
@@ -92,7 +92,7 @@ def display_examples(examples: List[Dict[str, Any]], run_example_func: Callable 
 
     console.print(
         Panel(
-            "[bold green]FCP Demo: Tested Usage Examples[/bold green]\n"
+            "[bold green]FCP-PM Demo: Tested Usage Examples[/bold green]\n"
             "Below are some real-world examples of using the fcp_demo.py script",
             expand=False,
             border_style="green",
@@ -148,7 +148,7 @@ def display_examples(examples: List[Dict[str, Any]], run_example_func: Callable 
             "1. [green]Cache Management:[/green] Use -cc to clear cache if you suspect stale data\n"
             "2. [green]Debug Mode:[/green] Enable debug logging with -l D to see detailed information\n"
             "3. [green]Symbol Format:[/green] Coin-M futures require _PERP suffix (e.g., BTCUSD_PERP)\n"
-            "4. [green]Test Mode:[/green] Use -tfp to test the full Failover Composition Parcel Merge process",
+            "4. [green]Test Mode:[/green] Use -tfp to test the full Failover Control Protocol and Priority Merge (PCP-PM) process",
             title="Best Practices",
             border_style="yellow",
         )
@@ -196,7 +196,7 @@ def display_humanized_help():
     console.print(
         Panel(
             "[bold cyan]Available Commands:[/bold cyan]\n"
-            "[yellow]main[/yellow]: (default) FCP Demo with all parameters\n"
+            "[yellow]main[/yellow]: (default) FCP-PM Demo with all parameters\n"
             "   Example: [yellow]./fcp_demo.py main -s BTCUSDT -m spot[/yellow]\n\n"
             "[yellow]examples[/yellow]: Show and run tested example commands\n"
             "   Example: [yellow]./fcp_demo.py examples --run 1[/yellow]",

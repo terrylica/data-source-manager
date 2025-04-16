@@ -3,9 +3,9 @@ description:
 globs: 
 alwaysApply: true
 ---
-# Failover Composition and Parcel Merge (FCP-PM) Mechanism
+# Failover Control Protocol and Priority Merge (FCP-PM) Mechanism
 
-The file `core/sync/data_source_manager.py` is the orchestrator responsible for retrieving **1-minute Bitcoin data** for SPOT, UM, or CM markets. This mechanism holistically revises data retrieval by extending the legacy **Failover Composition Priority (FCP)** into an iterative merging strategy, dubbed **Failover Composition and Parcel Merge (FCP-PM)**.
+The file `core/sync/data_source_manager.py` is the orchestrator responsible for retrieving **1-minute Bitcoin data** for SPOT, UM, or CM markets. This mechanism holistically revises data retrieval by extending the legacy **Failover Control Protocol and Priority Merge (PCP-PM)** into an iterative merging strategy, dubbed **Failover Control Protocol and Priority Merge (FCP-PM)**.
 
 ## Mechanism Overview
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Project utilities for the Failover Composition Priority (FCP) mechanism.
+Project utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 """
 
 import os

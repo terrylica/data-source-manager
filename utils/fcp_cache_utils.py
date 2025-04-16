@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cache utilities for the Failover Composition Priority (FCP) mechanism.
+Cache utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 """
 
 import shutil

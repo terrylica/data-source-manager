@@ -34,7 +34,7 @@ flowchart TD
     M --> N[Return Unified DataFrame]
 
     %% Visual grouping for FCP concept
-    subgraph FCP["Failover Composition Priority (FCP)"]
+    subgraph FCP["Failover Control Protocol and Priority Merge (PCP-PM)"]
         direction TB
         P1[1. Cache]
         P2[2. Vision API]

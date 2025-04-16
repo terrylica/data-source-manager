@@ -1,8 +1,8 @@
-# FCP Demo Refactoring
+# FCP-PM Demo Refactoring
 
 ## Important Note About Code Organization
 
-The FCP (Failover Composition Priority) Demo has been refactored to improve maintainability and code organization. This README explains the organization of the code and the transition from the legacy implementation to the refactored implementation.
+The FCP-PM (Failover Control Protocol and Priority Merge (PCP-PM)) Demo has been refactored to improve maintainability and code organization. This README explains the organization of the code and the transition from the legacy implementation to the refactored implementation.
 
 ## Code Organization
 

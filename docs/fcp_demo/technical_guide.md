@@ -1,12 +1,12 @@
-# FCP Technical Implementation Guide
+# FCP-PM Technical Implementation Guide
 
-This guide provides technical details on how the Failover Composition Priority (FCP) mechanism is implemented in the codebase.
+This guide provides technical details on how the Failover Control Protocol and Priority Merge (PCP-PM) mechanism is implemented in the codebase.
 
 ## Core Components
 
 ### 1. DataSourceManager (DSM)
 
-The `DataSourceManager` class is the central component that implements the FCP mechanism:
+The `DataSourceManager` class is the central component that implements the FCP-PM mechanism:
 
 ```python
 class DataSourceManager:
@@ -17,7 +17,7 @@ class DataSourceManager:
 
     def get_data(self, market, symbol, interval, start_time=None, end_time=None,
                 chart_type="klines", enforce_source=None):
-        # This is where FCP logic is implemented
+        # This is where FCP-PM logic is implemented
         # ...
 ```
 
@@ -59,9 +59,9 @@ Three main data sources are used in priority order:
            # ...
    ```
 
-## FCP Algorithm
+## FCP-PM Algorithm
 
-The FCP mechanism follows this algorithm:
+The FCP-PM mechanism follows this algorithm:
 
 1. **Initialize Request**:
 
@@ -140,7 +140,7 @@ def _merge_dataframes(self, dfs, priority_order=None):
 
 ## FCP-PM (Parcel Merge) Extension
 
-FCP-PM extends the basic FCP mechanism with more granular data retrieval:
+FCP-PM extends the basic FCP-PM mechanism with more granular data retrieval:
 
 ```python
 def _fcp_pm_process(self, market, symbol, interval, start_time, end_time, chart_type="klines"):
@@ -160,7 +160,7 @@ FCP-PM handles:
 
 ## Configuration Options
 
-The FCP mechanism can be configured through:
+The FCP-PM mechanism can be configured through:
 
 ```python
 {
@@ -189,7 +189,7 @@ The FCP mechanism can be configured through:
             }
         }
     },
-    "fcp": {
+    "FCP-PM": {
         "use_pm": False,  # Parcel Merge feature
         "parcel_size": "1d",  # For PM mode
         "max_workers": 4  # For parallel processing
@@ -199,7 +199,7 @@ The FCP mechanism can be configured through:
 
 ## Error Handling
 
-The FCP mechanism includes comprehensive error handling:
+The FCP-PM mechanism includes comprehensive error handling:
 
 ```python
 def _handle_source_error(self, source_name, error, retry_count=0):

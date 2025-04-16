@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Table display utilities for the Failover Composition Priority (FCP) mechanism.
+Table display utilities for the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 """
 
 import pandas as pd

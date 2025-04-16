@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-FCP Demo: Demonstrates the Failover Composition Priority (FCP) mechanism.
+FCP-PM Demo: Demonstrates the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 
 This script allows users to specify a time span and observe how the
 DataSourceManager automatically retrieves data from different sources
-following the Failover Composition Priority strategy:
+following the Failover Control Protocol and Priority Merge (PCP-PM) strategy:
 
 1. Cache (Local Arrow files)
 2. VISION API
@@ -55,7 +55,7 @@ CACHE_DIR = Path("./cache")
 
 # Create Typer app with custom rich formatting
 app = typer.Typer(
-    help="FCP Demo: Demonstrate the Failover Composition Priority mechanism",
+    help="FCP-PM Demo: Demonstrate the Failover Control Protocol and Priority Merge (PCP-PM) mechanism",
     rich_markup_mode="rich",
     add_completion=False,
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -187,7 +187,7 @@ def fetch_data_with_fcp(
     max_retries: int = 3,
 ):
     """
-    Fetch data using Failover Composition Priority (FCP) mechanism.
+    Fetch data using Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 
     Args:
         market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
@@ -235,7 +235,7 @@ def fetch_data_with_fcp(
             f"Explicitly enforcing VISION API as the data source (no REST fallback)"
         )
     else:
-        logger.info(f"Using AUTO source selection (FCP: Cache → Vision → REST)")
+        logger.info(f"Using AUTO source selection (FCP-PM: Cache → Vision → REST)")
 
     try:
         with Progress(
@@ -256,7 +256,7 @@ def fetch_data_with_fcp(
                 retry_count=max_retries,
             ) as manager:
                 # Retrieve data using the manager
-                # The manager will handle the FCP strategy: cache → Vision API → REST API
+                # The manager will handle the FCP-PM strategy: cache → Vision API → REST API
                 df = manager.get_data(
                     symbol=symbol,
                     start_time=start_time,
@@ -307,7 +307,7 @@ def fetch_data_with_fcp(
 
 
 def display_results(df, symbol, market_type, interval, chart_type, log_timestamp=None):
-    """Display the results of the FCP data retrieval."""
+    """Display the results of the FCP-PM data retrieval."""
     if df is None or df.empty:
         print("[bold red]No data to display[/bold red]")
         return
@@ -454,7 +454,7 @@ def test_fcp_pm_mechanism(
     days: int = 5,
     prepare_cache: bool = False,
 ):
-    """Test the Failover Composition and Parcel Merge (FCP-PM) mechanism.
+    """Test the Failover Control Protocol and Priority Merge (FCP-PM) mechanism.
 
     This function demonstrates how DataSourceManager combines data from multiple sources:
     1. First retrieves data from local cache
@@ -511,7 +511,7 @@ def test_fcp_pm_mechanism(
 
     print(
         Panel(
-            "[bold green]Testing Failover Composition and Parcel Merge (FCP-PM) Mechanism[/bold green]\n"
+            "[bold green]Testing Failover Control Protocol and Priority Merge (FCP-PM) Mechanism[/bold green]\n"
             f"Symbol: {symbol}\n"
             f"Market: {market_type.name}\n"
             f"Interval: {interval.value}\n"
@@ -838,7 +838,7 @@ def main(
         typer.Option(
             "--test-fcp-pm",
             "-tfp",
-            help="Run the special test for Failover Composition and Parcel Merge mechanism",
+            help="Run the special test for Failover Control Protocol and Priority Merge mechanism",
         ),
     ] = False,
     prepare_cache: Annotated[
@@ -860,7 +860,7 @@ def main(
     ] = LogLevel.INFO,
 ):
     """
-    FCP Demo: Demonstrates the Failover Composition Priority (FCP) mechanism.
+    FCP-PM Demo: Demonstrates the Failover Control Protocol and Priority Merge (PCP-PM) mechanism.
 
     This script shows how DataSourceManager automatically retrieves data from different sources:
 
@@ -891,9 +891,9 @@ def main(
     try:
         print(
             Panel(
-                "[bold green]FCP Demo: Failover Composition Priority[/bold green]\n"
+                "[bold green]FCP-PM Demo: Failover Control Protocol and Priority Merge (PCP-PM)[/bold green]\n"
                 "This script demonstrates how DataSourceManager automatically retrieves data\n"
-                "from different sources using the Failover Composition Priority strategy:\n"
+                "from different sources using the Failover Control Protocol and Priority Merge (PCP-PM) strategy:\n"
                 "1. Cache (Local Arrow files)\n"
                 "2. VISION API\n"
                 "3. REST API",
@@ -1055,7 +1055,7 @@ def main(
             print(f"Max retries: {retries}")
             print()
 
-            # Fetch data using FCP
+            # Fetch data using FCP-PM
             df = fetch_data_with_fcp(
                 market_type=market_type,
                 symbol=symbol_adjusted,

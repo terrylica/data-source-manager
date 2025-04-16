@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Failover Composition and Parcel Merge (FCP-PM) Mechanism.
+Test script for Failover Control Protocol and Priority Merge (FCP-PM) Mechanism.
 
 This script tests the cache functionality of the DataSourceManager,
 ensuring that the progressive data retrieval and merging properly works.

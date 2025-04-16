@@ -14,6 +14,8 @@ A high-performance, robust package for efficient market data retrieval from mult
 
 - To exclude specific symbols from subsequent operations below, simply remove their corresponding lines from `spot_synchronal.csv`
 
+1. Failover Control Protocol and Priority Merge (FCP-PM) Mechanism
+
 1. Cache Building
 
 - Execute `to-be-constructed.sh` to build `.cache/BINANCE/KLINES/...`

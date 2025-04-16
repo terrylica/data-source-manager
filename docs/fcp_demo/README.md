@@ -1,10 +1,10 @@
-# Failover Composition Priority (FCP) Mechanism
+# Failover Control Protocol and Priority Merge (PCP-PM) Mechanism
 
-The Failover Composition Priority (FCP) mechanism is a data retrieval strategy implemented in the `DataSourceManager` that automatically fetches data from multiple sources in a prioritized sequence. This document describes how FCP works, its benefits, and how to use it in your applications.
+The Failover Control Protocol and Priority Merge (PCP-PM) mechanism is a data retrieval strategy implemented in the `DataSourceManager` that automatically fetches data from multiple sources in a prioritized sequence. This document describes how PCP-PM works, its benefits, and how to use it in your applications.
 
 ## Overview
 
-FCP automatically retrieves data from different sources following a priority order:
+PCP-PM automatically retrieves data from different sources following a priority order:
 
 1. **Cache** (Local Arrow files) - fastest, but may not have all requested data
 2. **VISION API** - reliable for historical data with higher rate limits
@@ -37,7 +37,7 @@ The mechanism seamlessly combines data from these sources to provide a complete 
 
 ## Demo Script
 
-The `fcp_demo.py` script demonstrates the FCP mechanism in action. It shows:
+The `fcp_demo.py` script demonstrates the PCP-PM mechanism in action. It shows:
 
 - Data retrieval from multiple sources
 - Source breakdown statistics
