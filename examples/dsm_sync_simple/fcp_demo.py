@@ -17,6 +17,7 @@ and provides a summary of the data source breakdown.
 import pandas as pd
 from pathlib import Path
 import time
+from time import perf_counter
 import sys
 import os
 import shutil
@@ -29,9 +30,6 @@ import pendulum
 # Import the logger or logging and rich formatting
 from utils.logger_setup import logger, configure_session_logging
 from rich import print
-
-# Set initial log level (will be overridden by command line args)
-logger.setLevel("DEBUG")
 
 # Rich components - import after enabling smart print
 from rich.panel import Panel
@@ -49,6 +47,8 @@ from utils_for_debug.dataframe_output import (
     print_no_data_message,
 )
 
+# Start the performance timer at module initialization
+start_time_perf = perf_counter()
 
 # We'll use this cache dir for all demos
 CACHE_DIR = Path("./cache")
@@ -608,9 +608,9 @@ def test_fcp_pm_mechanism(
 
             start_time_retrieval = time.time()
 
-            # Set log level to DEBUG temporarily to see detailed merging logs
-            original_log_level = logger.level
-            logger.setLevel("DEBUG")
+            # Use current log level, don't force DEBUG level
+            # original_log_level = logger.level
+            # logger.setLevel("DEBUG")
 
             # Create a fresh DataSourceManager (this will use the cache we prepared)
             with DataSourceManager(
@@ -631,8 +631,8 @@ def test_fcp_pm_mechanism(
                     include_source_info=True,
                 )
 
-            # Restore original log level
-            logger.setLevel(original_log_level)
+            # No need to restore log level since we didn't change it
+            # logger.setLevel(original_log_level)
 
             elapsed_time = time.time() - start_time_retrieval
             progress.update(task, completed=100)
@@ -643,6 +643,15 @@ def test_fcp_pm_mechanism(
 
         print(
             f"[bold green]Retrieved {len(full_df)} records in {elapsed_time:.2f} seconds[/bold green]"
+        )
+
+        # Calculate records per second and per minute for this operation
+        records_per_second = len(full_df) / elapsed_time if elapsed_time > 0 else 0
+        records_per_minute = records_per_second * 60
+
+        # Add performance metrics for the data retrieval
+        print(
+            f"[cyan]Performance: {records_per_second:.2f} records/second, {records_per_minute:.2f} records/minute[/cyan]"
         )
 
         # Analyze and display the source breakdown
@@ -717,6 +726,30 @@ def test_fcp_pm_mechanism(
 
         traceback.print_exc()
 
+    # Calculate and display script execution time
+    end_time_perf = perf_counter()
+    elapsed_time = end_time_perf - start_time_perf
+
+    # Calculate records per second and per minute for the entire script
+    records_count = 0
+    if "full_df" in locals() and full_df is not None and not full_df.empty:
+        records_count = len(full_df)
+
+    records_per_second = records_count / elapsed_time if elapsed_time > 0 else 0
+    records_per_minute = records_per_second * 60
+
+    # First show performance results
+    print(
+        Panel(
+            f"[cyan]Total script execution time: {elapsed_time:.4f} seconds[/cyan]\n"
+            f"[green]Records processed: {records_count:,}[/green]\n"
+            f"[yellow]Processing rate: {records_per_second:.2f} records/second, {records_per_minute:.2f} records/minute[/yellow]",
+            title="Performance Timing",
+            border_style="cyan",
+        )
+    )
+
+    # Then show summary panel
     print(
         Panel(
             "[bold green]FCP-PM Test Complete[/bold green]\n"
@@ -928,17 +961,36 @@ def main(
             logger.debug(f"  Days: {days}")
             logger.debug(f"  Prepare cache: {prepare_cache}")
 
+            # Calculate dates based on days parameter if provided
+            days_provided = "--days" in sys.argv or "-d" in sys.argv
+            if days_provided:
+                calculated_end_time = pendulum.now("UTC")
+                calculated_start_time = calculated_end_time.subtract(days=days)
+                logger.debug(f"Using calculated date range based on days={days}")
+                logger.debug(
+                    f"Calculated start time: {calculated_start_time.isoformat()}"
+                )
+                logger.debug(f"Calculated end time: {calculated_end_time.isoformat()}")
+                pass_start_date = calculated_start_time.isoformat()
+                pass_end_date = calculated_end_time.isoformat()
+            else:
+                # Use the provided start_time and end_time
+                pass_start_date = start_time
+                pass_end_date = end_time
+
             # Run the FCP-PM mechanism test
             test_fcp_pm_mechanism(
                 symbol=symbol,
                 market_type=MarketType.from_string(market.value),
                 interval=Interval(interval),
                 chart_type=ChartType.from_string(chart_type.value),
-                start_date=start_time,
-                end_date=end_time,
+                start_date=pass_start_date,
+                end_date=pass_end_date,
                 days=days,
                 prepare_cache=prepare_cache,
             )
+            # Return from function after running test_fcp_pm_mechanism
+            # to avoid duplicating performance output
             return
 
         # Validate and process arguments
@@ -1041,6 +1093,25 @@ def main(
                 )
             )
 
+            # Calculate and display script execution time
+            end_time_perf = perf_counter()
+            elapsed_time = end_time_perf - start_time_perf
+
+            # Calculate records per second and per minute
+            records_count = 0 if df is None or df.empty else len(df)
+            records_per_second = records_count / elapsed_time if elapsed_time > 0 else 0
+            records_per_minute = records_per_second * 60
+
+            print(
+                Panel(
+                    f"[cyan]Total script execution time: {elapsed_time:.4f} seconds[/cyan]\n"
+                    f"[green]Records processed: {records_count:,}[/green]\n"
+                    f"[yellow]Processing rate: {records_per_second:.2f} records/second, {records_per_minute:.2f} records/minute[/yellow]",
+                    title="Performance Timing",
+                    border_style="cyan",
+                )
+            )
+
         except ValueError as e:
             print(f"[bold red]Error: {e}[/bold red]")
             import traceback
@@ -1064,6 +1135,18 @@ def main(
                     c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_str
                 )
                 print(safe_tb)
+
+                # Even in case of error, display the execution time
+                end_time_perf = perf_counter()
+                elapsed_time = end_time_perf - start_time_perf
+                print(
+                    Panel(
+                        f"[cyan]Total script execution time: {elapsed_time:.4f} seconds[/cyan]\n"
+                        "[red]Unable to calculate processing rate due to error[/red]",
+                        title="Performance Timing",
+                        border_style="cyan",
+                    )
+                )
                 sys.exit(1)
             except Exception as nested_error:
                 # If even our error handling fails, print a simple message without rich formatting
@@ -1071,6 +1154,7 @@ def main(
                 print(f"Error type: {type(e).__name__}")
                 print(f"Error handling also failed: {type(nested_error).__name__}")
                 sys.exit(1)
+
     except Exception as e:
         try:
             # Safely handle the error to prevent rich text formatting issues
@@ -1088,6 +1172,21 @@ def main(
                 c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_str
             )
             print(safe_tb)
+
+            # Even in case of error, show execution time
+            end_time_perf = perf_counter()
+            elapsed_time = end_time_perf - start_time_perf
+
+            # In case of error, we might not have record count
+            print(
+                Panel(
+                    f"[cyan]Total script execution time: {elapsed_time:.4f} seconds[/cyan]\n"
+                    "[red]Unable to calculate processing rate due to error[/red]",
+                    title="Performance Timing",
+                    border_style="cyan",
+                )
+            )
+
             sys.exit(1)
         except Exception as nested_error:
             # If even our error handling fails, print a simple message without rich formatting
