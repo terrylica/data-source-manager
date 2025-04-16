@@ -25,7 +25,6 @@ import httpx
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 from pathlib import Path
-
 import pandas as pd
 from tenacity import (
     retry,
@@ -35,10 +34,17 @@ from tenacity import (
 )
 
 from utils.logger_setup import logger
-from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
+from utils.market_constraints import (
+    MarketType,
+    Interval,
+    DataProvider,
+    ChartType,
+    get_market_capabilities,
+)
 from utils.time_utils import (
     filter_dataframe_by_time,
     detect_timestamp_unit,
+    enforce_utc_timezone,
 )
 from utils.config import (
     KLINE_COLUMNS,
@@ -48,14 +54,11 @@ from utils.config import (
 )
 from utils.dataframe_types import TimestampedDataFrame
 from core.sync.vision_constraints import get_vision_url
-from utils.gap_detector import detect_gaps, Gap
+from utils.gap_detector import detect_gaps
 from utils.dataframe_utils import ensure_open_time_as_column
 from core.sync.data_client_interface import DataClientInterface
 from utils.validation import DataFrameValidator
-from utils.for_core.vision_timestamp import (
-    process_timestamp_columns,
-    parse_interval,
-)
+from utils.for_core.vision_timestamp import parse_interval, process_timestamp_columns
 from utils.for_core.vision_file_utils import (
     fill_boundary_gaps_with_rest,
     find_day_boundary_gaps,
@@ -505,9 +508,37 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
         try:
             # Create the file URL
-            base_interval = (
-                "1m" if self._interval_str == "1s" else self._interval_str
-            )  # 1s data stored with filename as 1m
+            # Get proper interval based on market capabilities
+            market_type_enum = MarketType.from_string(self.market_type_str)
+            market_caps = get_market_capabilities(market_type_enum)
+
+            # Convert string interval to enum for validation
+            try:
+                interval_enum = parse_interval(self._interval_str)
+
+                # Validate if interval is supported by market type
+                if interval_enum not in market_caps.supported_intervals:
+                    logger.warning(
+                        f"Interval {self._interval_str} not supported by {market_type_enum.name} market. "
+                        f"Supported intervals: {[i.value for i in market_caps.supported_intervals]}"
+                    )
+                    return (
+                        None,
+                        f"Interval {self._interval_str} not supported by {market_type_enum.name} market",
+                    )
+
+                # Use the validated interval for URL construction
+                base_interval = self._interval_str
+                logger.debug(
+                    f"Using interval {base_interval} for URL construction (market: {market_type_enum.name})"
+                )
+
+            except ValueError as e:
+                logger.error(
+                    f"Invalid interval format: {self._interval_str}. Error: {e}"
+                )
+                return None, f"Invalid interval format: {self._interval_str}"
+
             url = get_vision_url(
                 symbol=self._symbol,
                 interval=base_interval,
@@ -515,6 +546,9 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 file_type=FileType.DATA,
                 market_type=self.market_type_str,
             )
+
+            # Log the constructed URL for debugging
+            logger.debug(f"Vision API URL: {url}")
 
             # Create the checksum URL
             checksum_url = get_vision_url(
