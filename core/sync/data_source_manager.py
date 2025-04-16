@@ -897,8 +897,31 @@ class DataSourceManager:
                     c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message
                 )
 
-                logger.error(f"Error in _fetch_from_vision: {safe_error_message}")
-                logger.error(f"Error type: {type(e).__name__}")
+                # Check if this is a critical error that should be propagated
+                if (
+                    "CRITICAL ERROR" in safe_error_message
+                    or "DATA INTEGRITY ERROR" in safe_error_message
+                ):
+                    logger.critical(f"Vision API critical error: {safe_error_message}")
+                    raise  # Re-raise to trigger failover
+
+                # Check if the request is within the allowed delay window for Vision API
+                # Only tolerate failures for recent data that may not be available yet
+                current_time = datetime.now(timezone.utc)
+                vision_delay = timedelta(hours=self.VISION_DATA_DELAY_HOURS)
+
+                if end_time > (current_time - vision_delay):
+                    # This falls within the allowable delay window for Vision API
+                    logger.warning(
+                        f"Error fetching recent data from Vision API (within {self.VISION_DATA_DELAY_HOURS}h delay window): {safe_error_message}"
+                    )
+                    return create_empty_dataframe()
+
+                # For historical data outside the delay window, log critical error
+                logger.critical(
+                    f"Vision API failed to retrieve historical data: {safe_error_message}"
+                )
+                logger.critical(f"Error type: {type(e).__name__}")
 
                 # More controlled traceback handling
                 import traceback
@@ -910,21 +933,33 @@ class DataSourceManager:
                 )
                 tb_lines = safe_tb.splitlines()
 
-                logger.error("Traceback summary:")
+                logger.critical("Traceback summary:")
                 for line in tb_lines[:3]:  # Just log first few lines
-                    logger.error(line)
-                logger.error("...")
+                    logger.critical(line)
+                logger.critical("...")
                 for line in tb_lines[-3:]:  # And last few lines
-                    logger.error(line)
+                    logger.critical(line)
+
+                # Propagate the error to trigger failover
+                raise RuntimeError(
+                    f"CRITICAL: Vision API failed to retrieve historical data: {safe_error_message}"
+                )
+
             except Exception as nested_error:
                 # If even our error handling fails, log a simpler message
-                logger.error(
+                logger.critical(
                     f"Vision API error occurred (details unavailable): {type(e).__name__}"
                 )
-                logger.error(
+                logger.critical(
                     f"Error handling also failed: {type(nested_error).__name__}"
                 )
 
+                # Propagate the error to trigger failover
+                raise RuntimeError(
+                    "CRITICAL: Vision API error could not be handled properly"
+                )
+
+            # This line should never be reached due to the raises above
             return create_empty_dataframe()
 
     def _fetch_from_rest(
@@ -940,6 +975,11 @@ class DataSourceManager:
 
         Returns:
             DataFrame with data from REST API
+
+        Raises:
+            RuntimeError: When REST API fails to retrieve data. As this is the final
+                          data source in the FCP-PM chain, failures here represent
+                          complete failure of all data sources.
         """
         logger.info(
             f"Fetching data from REST API for {symbol} from {start_time} to {end_time}"
@@ -972,8 +1012,8 @@ class DataSourceManager:
             )
 
             if df.empty:
-                logger.warning(f"REST API returned no data for {symbol}")
-                return create_empty_dataframe()
+                logger.critical(f"REST API returned no data for {symbol}")
+                raise RuntimeError(f"CRITICAL: REST API returned no data for {symbol}")
 
             # Add source information
             df["_data_source"] = "REST"
@@ -984,26 +1024,54 @@ class DataSourceManager:
             return df
         except Exception as e:
             # Sanitize error message to prevent binary data from causing rich formatting issues
-            error_message = str(e)
-            # Replace any non-printable characters to prevent rich markup errors
-            safe_error_message = "".join(
-                c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message
-            )
+            try:
+                error_message = str(e)
+                # Replace any non-printable characters to prevent rich markup errors
+                safe_error_message = "".join(
+                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message
+                )
 
-            logger.error(f"Error in _fetch_from_rest: {safe_error_message}")
-            logger.error(f"Error type: {type(e).__name__}")
+                logger.critical(f"Error in _fetch_from_rest: {safe_error_message}")
+                logger.critical(f"Error type: {type(e).__name__}")
 
-            # More controlled traceback handling
-            import traceback
+                # More controlled traceback handling
+                import traceback
 
-            tb_lines = traceback.format_exc().splitlines()
-            logger.error("Traceback summary:")
-            for line in tb_lines[:3]:  # Just log first few lines to avoid binary data
-                logger.error(line)
-            logger.error("...")
-            for line in tb_lines[-3:]:  # And last few lines
-                logger.error(line)
+                tb_string = traceback.format_exc()
+                # Sanitize the traceback
+                safe_tb = "".join(
+                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string
+                )
+                tb_lines = safe_tb.splitlines()
 
+                logger.critical("Traceback summary:")
+                for line in tb_lines[
+                    :3
+                ]:  # Just log first few lines to avoid binary data
+                    logger.critical(line)
+                logger.critical("...")
+                for line in tb_lines[-3:]:  # And last few lines
+                    logger.critical(line)
+
+                # This is the final fallback in the FCP-PM chain, so raise an error
+                # to indicate complete failure of all sources
+                raise RuntimeError(
+                    f"CRITICAL: REST API fallback failed: {safe_error_message}"
+                )
+
+            except Exception as nested_error:
+                # If even our error handling fails, log a simpler message
+                logger.critical(f"REST API critical error: {type(e).__name__}")
+                logger.critical(
+                    f"Error handling also failed: {type(nested_error).__name__}"
+                )
+
+                # Propagate the error
+                raise RuntimeError(
+                    "CRITICAL: REST API error could not be handled properly"
+                )
+
+            # This line should never be reached due to the raises above
             return create_empty_dataframe()
 
     def _merge_dataframes(self, dfs: List[pd.DataFrame]) -> pd.DataFrame:
@@ -1404,8 +1472,12 @@ class DataSourceManager:
             # Final check and standardization
             # ----------------------------------------------------------------
             if result_df.empty:
-                logger.warning("[FCP-PM] No data available from any source")
-                return create_empty_dataframe()
+                logger.critical(
+                    "[FCP-PM] CRITICAL ERROR: No data available from any source"
+                )
+                raise RuntimeError(
+                    "All data sources failed. Unable to retrieve data for the requested time range."
+                )
 
             # Standardize columns
             result_df = self._standardize_columns(result_df)
@@ -1451,8 +1523,8 @@ class DataSourceManager:
                     c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message
                 )
 
-                logger.error(f"Error in get_data: {safe_error_message}")
-                logger.error(f"Error type: {type(e).__name__}")
+                logger.critical(f"Error in get_data: {safe_error_message}")
+                logger.critical(f"Error type: {type(e).__name__}")
 
                 # More controlled traceback handling
                 import traceback
@@ -1464,21 +1536,26 @@ class DataSourceManager:
                 )
                 tb_lines = safe_tb.splitlines()
 
-                logger.error("Traceback summary:")
+                logger.critical("Traceback summary:")
                 for line in tb_lines[:3]:
-                    logger.error(line)
-                logger.error("...")
+                    logger.critical(line)
+                logger.critical("...")
                 for line in tb_lines[-3:]:
-                    logger.error(line)
+                    logger.critical(line)
             except Exception as nested_error:
                 # If even our error handling fails, log a simpler message
-                logger.error(f"Critical error in get_data: {type(e).__name__}")
-                logger.error(
+                logger.critical(f"Critical error in get_data: {type(e).__name__}")
+                logger.critical(
                     f"Error handling also failed: {type(nested_error).__name__}"
                 )
 
-            # Return empty DataFrame instead of re-raising
-            return create_empty_dataframe()
+            # Re-raise the exception to properly exit with error rather than returning an empty DataFrame
+            if "All data sources failed" in str(e):
+                raise
+            else:
+                raise RuntimeError(
+                    f"Failed to retrieve data from all sources: {safe_error_message}"
+                )
 
     def _merge_adjacent_ranges(
         self, ranges: List[Tuple[datetime, datetime]], interval: Interval
