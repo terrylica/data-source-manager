@@ -514,7 +514,7 @@ class DataSourceManager:
         Returns:
             True to always try Vision API first
         """
-        # According to FCP, always attempt Vision API first
+        # According to PCP-PM, always attempt Vision API first
         return True
 
     def _get_from_cache(

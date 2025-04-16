@@ -33,16 +33,16 @@ flowchart TD
     L --> M[Cache Merged Result]
     M --> N[Return Unified DataFrame]
 
-    %% Visual grouping for FCP concept
-    subgraph FCP["Failover Control Protocol and Priority Merge (PCP-PM)"]
+    %% Visual grouping for PCP-PM concept
+    subgraph PCP-PM["Failover Control Protocol and Priority Merge (PCP-PM)"]
         direction TB
         P1[1. Cache]
         P2[2. Vision API]
         P3[3. REST API w/Chunking]
     end
 
-    %% Connect FCP concept to flow
-    FCP -.-> F
+    %% Connect PCP-PM concept to flow
+    PCP-PM -.-> F
 
     %% LSP compliance
     subgraph LSP["LSP Compliance"]

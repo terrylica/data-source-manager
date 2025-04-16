@@ -342,7 +342,7 @@ python examples/logger_demo/simple_print_demo.py --level ERROR
 
 ## Working with PCP-PM Demo
 
-The smart print functionality has been integrated into the FCP demo to provide a better user experience:
+The smart print functionality has been integrated into the PCP-PM demo to provide a better user experience:
 
 ```python
 # Import only logger
