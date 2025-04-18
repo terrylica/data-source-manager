@@ -2,7 +2,8 @@
 """
 Documentation utilities for FCP demo CLI applications.
 
-This module contains functions to generate Markdown documentation from Typer help text.
+This module contains functions to generate Markdown documentation from Typer help text
+using the official typer-cli tool for optimal GitHub-friendly output.
 """
 
 from pathlib import Path
@@ -12,66 +13,11 @@ import subprocess
 import sys
 import re
 import json
-import importlib.util
 import shutil
 from rich.console import Console
 from rich.markdown import Markdown
 
 from utils.logger_setup import logger
-
-
-def extract_commands_and_options(help_text):
-    """Extract commands and options from help text for better formatting.
-
-    Args:
-        help_text: The help text from the CLI command
-
-    Returns:
-        dict: Dictionary containing extracted sections
-    """
-    result = {"commands": [], "options": [], "usage": ""}
-
-    # Extract usage
-    usage_match = re.search(r"Usage: (.+?)\n", help_text)
-    if usage_match:
-        result["usage"] = usage_match.group(1).strip()
-
-    # Extract options
-    options_section = re.search(r"Options:(.*?)(?:Commands:|$)", help_text, re.DOTALL)
-    if options_section:
-        options_text = options_section.group(1).strip()
-        options_lines = options_text.split("\n")
-        current_option = None
-
-        for line in options_lines:
-            line = line.strip()
-            if line and not line.startswith(" "):
-                # This is an option line
-                current_option = {
-                    "name": line.split("  ")[0].strip(),
-                    "description": line.split("  ")[-1].strip() if "  " in line else "",
-                }
-                result["options"].append(current_option)
-            elif current_option and line:
-                # This is a continuation of the previous option description
-                current_option["description"] += " " + line
-
-    # Extract commands
-    commands_section = re.search(r"Commands:(.*?)(?:$)", help_text, re.DOTALL)
-    if commands_section:
-        commands_text = commands_section.group(1).strip()
-        commands_lines = commands_text.split("\n")
-
-        for line in commands_lines:
-            line = line.strip()
-            if line:
-                parts = [p.strip() for p in re.split(r"\s{2,}", line)]
-                if len(parts) >= 2:
-                    result["commands"].append(
-                        {"name": parts[0], "description": parts[1]}
-                    )
-
-    return result
 
 
 def is_typer_cli_available():
@@ -284,9 +230,6 @@ It displays real-time source information about where each data point comes from.
 # Generate documentation with typer-cli format (default)
 ./examples/dsm_sync_simple/fcp_demo.py -gd
 
-# Generate GitHub-optimized documentation
-./examples/dsm_sync_simple/fcp_demo.py -gd -df github
-
 # Generate documentation with linting configuration files
 ./examples/dsm_sync_simple/fcp_demo.py -gd -glc
 ```
@@ -323,11 +266,8 @@ def generate_markdown_docs(
 ):
     """Generate Markdown documentation from a Typer app.
 
-    This function captures the help output from a Typer app and converts it to
-    a structured Markdown document optimized for GitHub display.
-
-    It first tries to use the official typer-cli if available, then falls back to
-    our custom implementation if typer-cli is not installed.
+    This function generates GitHub-friendly documentation using the official typer-cli tool.
+    If typer-cli is not available, it will automatically install it before proceeding.
 
     Args:
         app: The Typer app to generate documentation for
@@ -339,219 +279,56 @@ def generate_markdown_docs(
     Returns:
         Path: Path to the generated documentation file
     """
-    # Try to use typer-cli first if it's available (preferred method)
-    if is_typer_cli_available():
-        logger.info("Found typer-cli, using it for GitHub-friendly documentation")
-        result = generate_markdown_docs_with_typer_cli(
-            app, output_dir, filename, cli_name=cli_name
-        )
-        if result:
-            # Create linting configuration files if requested
-            if gen_lint_config:
-                output_path = Path(output_dir)
-                # Define the markdownlint configuration with proper Python booleans
-                # The json.dumps will convert Python's True/False to JSON true/false
-                markdownlint_config = {
-                    "MD013": {"code_blocks": False, "tables": False},
-                    "MD014": False,  # Disable dollar signs used before commands 
-                    "MD040": False,  # Disable requiring language in code blocks
-                    "MD047": False   # Disable requiring single newline at end of file
-                }
-                config_file = output_path / ".markdownlint.json"
-                config_file.write_text(json.dumps(markdownlint_config, indent=2))
-                logger.info(f"Created markdownlint config at {config_file}")
+    # Check if typer-cli is available, if not, try to install it
+    if not is_typer_cli_available():
+        logger.info("typer-cli not found. Installing typer-cli for documentation generation...")
+        try:
+            import subprocess
 
-            # Print success message
-            logger.info("Documentation generated successfully using typer-cli")
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "typer-cli"],
+                check=True,
+                capture_output=True,
+            )
+            logger.info("typer-cli installed successfully")
+            
+            # Double check installation
+            if not is_typer_cli_available():
+                logger.error("Failed to find typer-cli after installation. Documentation cannot be generated.")
+                return None
+        except Exception as e:
+            logger.error(f"Failed to install typer-cli: {e}")
+            logger.error("Documentation cannot be generated without typer-cli.")
+            return None
 
-            # Preview the markdown
-            console = Console()
-            output_file = Path(output_dir) / filename
-            console.print(Markdown(output_file.read_text()))
+    # Now we're sure typer-cli is available
+    logger.info("Using typer-cli for GitHub-friendly documentation")
+    result = generate_markdown_docs_with_typer_cli(
+        app, output_dir, filename, cli_name=cli_name
+    )
+    
+    if result:
+        # Create linting configuration files if requested
+        if gen_lint_config:
+            output_path = Path(output_dir)
+            # Define the markdownlint configuration with proper Python booleans
+            # The json.dumps will convert Python's True/False to JSON true/false
+            markdownlint_config = {
+                "MD013": {"code_blocks": False, "tables": False},
+                "MD014": False,  # Disable dollar signs used before commands 
+                "MD040": False,  # Disable requiring language in code blocks
+                "MD047": False   # Disable requiring single newline at end of file
+            }
+            config_file = output_path / ".markdownlint.json"
+            config_file.write_text(json.dumps(markdownlint_config, indent=2))
+            logger.info(f"Created markdownlint config at {config_file}")
 
-            return result
+        # Print success message
+        logger.info("Documentation generated successfully using typer-cli")
 
-    # Fall back to our custom implementation
-    logger.info("typer-cli not found, using custom documentation generator")
+        # Preview the markdown in the console
+        console = Console()
+        output_file = Path(output_dir) / filename
+        console.print(Markdown(output_file.read_text()))
 
-    # Create output directory if it doesn't exist
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    # Get the current timestamp
-    timestamp = pendulum.now().format("YYYY-MM-DD HH:mm:ss.SSS")
-
-    # Get help text by running the script with --help flag
-    script_path = Path(sys.argv[0]).resolve()
-    try:
-        # Run the script with --help to capture its output
-        result = subprocess.run(
-            [str(script_path), "--help"],
-            capture_output=True,
-            text=True,
-            check=False,  # Don't raise exception on non-zero exit
-        )
-        help_text = result.stdout.strip()
-
-        # If stdout is empty, try stderr (some programs output help to stderr)
-        if not help_text and result.stderr:
-            help_text = result.stderr.strip()
-
-        # If still empty, fall back to a default message
-        if not help_text:
-            help_text = "Unable to capture help text. Please run the script with --help flag manually."
-    except Exception as e:
-        logger.error(f"Error capturing help text: {e}")
-        help_text = f"Error capturing help text: {e}"
-
-    # Extract structured information from help text
-    extracted_info = extract_commands_and_options(help_text)
-
-    # Format CLI options as a table
-    options_table = ""
-    if extracted_info["options"]:
-        options_table = "| Option | Description |\n| ------ | ----------- |\n"
-        for opt in extracted_info["options"]:
-            # Escape pipe characters in markdown table
-            name = opt["name"].replace("|", "\\|")
-            description = opt["description"].replace("|", "\\|")
-            options_table += f"| `{name}` | {description} |\n"
-
-    # Format commands as a table
-    commands_table = ""
-    if extracted_info["commands"]:
-        commands_table = "| Command | Description |\n| ------- | ----------- |\n"
-        for cmd in extracted_info["commands"]:
-            # Escape pipe characters in markdown table
-            name = cmd["name"].replace("|", "\\|")
-            description = cmd["description"].replace("|", "\\|")
-            commands_table += f"| `{cmd['name']}` | {cmd['description']} |\n"
-
-    # Check if the help text already includes the "Sample Commands" section
-    if "Sample Commands:" in help_text:
-        # Don't add additional examples - use the ones from the built-in help
-        examples_section = """
-## Usage Examples
-
-For convenience, you can generate this documentation using:
-
-```bash
-# Generate this documentation
-./examples/dsm_sync_simple/fcp_demo.py --gen-doc
-./examples/dsm_sync_simple/fcp_demo.py -gd
-
-# Generate documentation with linting configuration files
-./examples/dsm_sync_simple/fcp_demo.py -gd -glc
-```
-"""
-    else:
-        # If there's no sample commands section in the help text, add our full examples
-        examples_section = """
-## Examples
-
-Here are some examples of how to use this command:
-
-### Basic Usage
-
-```bash
-./examples/dsm_sync_simple/fcp_demo.py
-./examples/dsm_sync_simple/fcp_demo.py --symbol ETHUSDT --market spot
-```
-
-### Different Time Ranges
-
-```bash
-# Using days parameter (highest priority)
-./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -d 7
-
-# Using explicit start and end times
-./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -st 2025-04-05T00:00:00 -et 2025-04-06T00:00:00
-```
-
-### Market Types
-
-```bash
-./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -m um
-./examples/dsm_sync_simple/fcp_demo.py -s BTCUSD_PERP -m cm
-```
-
-### Documentation Generation
-
-```bash
-# Generate this documentation
-./examples/dsm_sync_simple/fcp_demo.py --gen-doc
-./examples/dsm_sync_simple/fcp_demo.py -gd
-
-# Generate documentation with linting configuration files
-./examples/dsm_sync_simple/fcp_demo.py -gd -glc
-```
-"""
-
-    # Format the markdown content with GitHub-friendly structure
-    markdown_content = f"""# FCP Demo CLI Documentation
-
-Generated on: {timestamp}
-
-## Overview
-
-This documentation was automatically generated from the Typer CLI help text.
-
-## Usage
-
-```bash
-{extracted_info['usage']}
-```
-
-## Options
-
-{options_table}
-
-## Commands
-
-{commands_table}
-
-## Original Help Text
-
-<details>
-<summary>Click to expand full help text</summary>
-
-```bash
-{help_text}
-```
-
-</details>
-{examples_section}
-"""
-
-    # Fix markdown linting issues:
-    # 1. Remove multiple consecutive blank lines (MD012)
-    markdown_content = re.sub(r"\n{3,}", "\n\n", markdown_content)
-
-    # Add an additional cleanup to ensure no trailing multiple blank lines
-    markdown_content = markdown_content.rstrip() + "\n"
-
-    # Write to the output file
-    output_file = output_path / filename
-    output_file.write_text(markdown_content)
-
-    logger.info(f"Generated documentation at {output_file}")
-
-    # Create linting configuration files if requested
-    if gen_lint_config:
-        # Create a markdownlint config file with customized rules
-        markdownlint_config = {
-            "MD013": {"code_blocks": False, "tables": False},
-            "MD014": False,  # Disable dollar signs used before commands 
-            "MD040": False,  # Disable requiring language in code blocks
-            "MD047": False   # Disable requiring single newline at end of file
-        }
-
-        config_file = output_path / ".markdownlint.json"
-        config_file.write_text(json.dumps(markdownlint_config, indent=2))
-        logger.info(f"Created markdownlint config at {config_file}")
-
-    # Print the markdown to the console if desired
-    console = Console()
-    console.print(Markdown(markdown_content))
-
-    return output_file
+    return result
