@@ -105,8 +105,42 @@ def main(
         # Check if we should generate documentation
         if gen_doc:
             logger.info("Generating Markdown documentation from Typer help...")
-            doc_path = generate_markdown_docs(app, gen_lint_config=gen_lint_config)
+
+            # Check if typer-cli is installed
+            try:
+                import shutil
+
+                typer_cli_available = shutil.which("typer") is not None
+
+                if not typer_cli_available:
+                    logger.info(
+                        "typer-cli not found. Installing typer-cli for optimal documentation..."
+                    )
+                    import subprocess
+
+                    subprocess.run(
+                        [sys.executable, "-m", "pip", "install", "typer-cli"],
+                        check=True,
+                        capture_output=True,
+                    )
+                    logger.info("typer-cli installed successfully")
+                    typer_cli_available = True
+            except Exception as e:
+                logger.warning(f"Could not install typer-cli: {e}")
+                typer_cli_available = False
+
+            # Generate documentation
+            doc_path = generate_markdown_docs(
+                app, gen_lint_config=gen_lint_config, cli_name="fcp-demo"
+            )
             logger.info(f"Documentation generated and saved to {doc_path}")
+
+            # If typer-cli was installed and used, provide additional information
+            if typer_cli_available:
+                logger.info(
+                    "Documentation was generated using typer-cli for optimal GitHub rendering"
+                )
+
             return
 
         # Print introductory information

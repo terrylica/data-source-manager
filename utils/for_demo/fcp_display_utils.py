@@ -84,8 +84,8 @@ def display_results(
     # Generate timestamp with pendulum
     timestamp = log_timestamp or pendulum.now("UTC").format("YYYYMMDD_HHmmss")
 
-    # Define the CSV path using pendulum timestamp
-    csv_dir = Path(f"logs/{session_name}")
+    # Define the CSV path using pendulum timestamp - save to workspace logs directory
+    csv_dir = Path("logs") / session_name
     csv_dir.mkdir(parents=True, exist_ok=True)
     csv_path = csv_dir / f"{market_str}_{symbol}_{interval}_{timestamp}.csv"
 
@@ -98,34 +98,33 @@ def display_results(
 
         # If log_timestamp is provided, use it for log paths
         if log_timestamp:
-            main_log_path = Path(
-                f"logs/{session_name}_logs/{session_name}_{log_timestamp}.log"
+            main_log_path = (
+                Path("logs")
+                / f"{session_name}_logs"
+                / f"{session_name}_{log_timestamp}.log"
             )
-            error_log_path = Path(
-                f"logs/error_logs/{session_name}_errors_{log_timestamp}.log"
+            error_log_path = (
+                Path("logs/error_logs") / f"{session_name}_errors_{log_timestamp}.log"
             )
         else:
             # Fall back to timestamp from CSV file if log_timestamp not provided
-            main_log_path = Path(
-                f"logs/{session_name}_logs/{session_name}_{timestamp}.log"
+            main_log_path = (
+                Path("logs")
+                / f"{session_name}_logs"
+                / f"{session_name}_{timestamp}.log"
             )
-            error_log_path = Path(
-                f"logs/error_logs/{session_name}_errors_{timestamp}.log"
+            error_log_path = (
+                Path("logs/error_logs") / f"{session_name}_errors_{timestamp}.log"
             )
 
         # Check detailed logs
-        main_log_path = (
-            Path(main_log_path)
-            if not isinstance(main_log_path, Path)
-            else main_log_path
-        )
         if main_log_path.exists():
             log_size = main_log_path.stat().st_size
             print(f"[green]Detailed logs: {main_log_path} ({log_size:,} bytes)[/green]")
         else:
             # Try looking for a log file with a similar timestamp (within the same minute)
             found_log = False
-            log_dir = Path(f"logs/{session_name}_logs")
+            log_dir = Path("logs") / f"{session_name}_logs"
             if log_dir.exists():
                 # First try exact match
                 if main_log_path.exists():
@@ -227,11 +226,6 @@ def display_results(
                 )
 
         # Check error logs
-        error_log_path = (
-            Path(error_log_path)
-            if not isinstance(error_log_path, Path)
-            else error_log_path
-        )
         if error_log_path.exists():
             error_size = error_log_path.stat().st_size
             if error_size > 0:
@@ -358,8 +352,9 @@ def display_results(
                         logger.debug(f"Found error log file: {error_file}")
                 print(f"[yellow]Error logs: {error_log_path} (file not found)[/yellow]")
 
+        # Update command for viewing logs to use absolute path
         print(
-            f"\n[dim]To view logs: cat logs/{session_name}_logs/{session_name}_*.log[/dim]"
+            f"\n[dim]To view logs: cat {Path('logs') / f'{session_name}_logs' / f'{session_name}_*.log'}[/dim]"
         )
 
         return csv_path

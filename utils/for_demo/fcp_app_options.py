@@ -8,6 +8,7 @@ This module contains Typer app options and argument definitions for FCP demo CLI
 from typing import Optional, Dict, Any
 import typer
 from typing_extensions import Annotated
+from enum import Enum
 
 from utils.for_demo.fcp_cli_utils import (
     MarketTypeChoice,
@@ -15,6 +16,14 @@ from utils.for_demo.fcp_cli_utils import (
     ChartTypeChoice,
     LogLevel,
 )
+
+
+class DocFormatChoice(str, Enum):
+    """Documentation format choices."""
+
+    TYPER_CLI = "typer-cli"
+    GITHUB = "github"
+    CONSOLE = "console"
 
 
 def create_typer_app(app_name="FCP Demo"):
@@ -43,35 +52,29 @@ def get_standard_options() -> Dict[str, Any]:
     """Get standard CLI options for FCP demo applications.
 
     Returns:
-        dict: Dictionary of standard Typer CLI options
+        Dict: Dictionary of standard options with their default values
     """
     return {
-        # Data Selection
+        # Data Selection options
         "symbol": typer.Option(
-            "BTCUSDT", "--symbol", "-s", help="Trading symbol (e.g., BTCUSDT)"
+            "BTCUSDT", "--symbol", "-s", help="Symbol to fetch data for"
         ),
         "market": typer.Option(
             MarketTypeChoice.SPOT,
             "--market",
             "-m",
-            help="Market type: spot, um (USDT-M futures), cm (Coin-M futures)",
+            help="Market type (spot, um, cm)",
         ),
         "interval": typer.Option(
-            "1m", "--interval", "-i", help="Time interval (e.g., 1m, 5m, 1h)"
+            "1m", "--interval", "-i", help="Time interval for klines/premiums"
         ),
         "chart_type": typer.Option(
             ChartTypeChoice.KLINES,
             "--chart-type",
             "-ct",
-            help="Type of chart data",
+            help="Chart type (klines, premiums)",
         ),
-        # Time Range options - ordered by priority
-        "days": typer.Option(
-            3,
-            "--days",
-            "-d",
-            help="[HIGHEST PRIORITY] Number of days to fetch from current time. Overrides --start-time/--end-time if provided",
-        ),
+        # Time Range options
         "start_time": typer.Option(
             None,
             "--start-time",
@@ -83,6 +86,12 @@ def get_standard_options() -> Dict[str, Any]:
             "--end-time",
             "-et",
             help="[SECOND PRIORITY] End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Used only if both --start-time AND --end-time are provided AND --days is NOT provided",
+        ),
+        "days": typer.Option(
+            3,
+            "--days",
+            "-d",
+            help="[HIGHEST PRIORITY] Number of days of data to fetch. If provided, overrides --start-time and --end-time",
         ),
         # Data Source options
         "enforce_source": typer.Option(
@@ -132,6 +141,12 @@ def get_standard_options() -> Dict[str, Any]:
             "--gen-lint-config",
             "-glc",
             help="Generate markdown linting configuration files along with documentation (only used with --gen-doc)",
+        ),
+        "doc_format": typer.Option(
+            DocFormatChoice.TYPER_CLI,
+            "--doc-format",
+            "-df",
+            help="Documentation format to use (typer-cli, github, console). typer-cli uses the official Typer CLI tool, github optimizes for GitHub display, console uses plain console output.",
         ),
         # Other options
         "log_level": typer.Option(
@@ -209,6 +224,16 @@ def get_cmd_help_text():
     [green]Testing FCP Mechanism:[/green]
       ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -fcp
       ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -fcp -pc
+      
+    [green]Documentation Generation:[/green]
+      # Generate documentation with typer-cli format (default)
+      ./examples/dsm_sync_simple/fcp_demo.py -gd
+      
+      # Generate GitHub-optimized documentation
+      ./examples/dsm_sync_simple/fcp_demo.py -gd -df github
+      
+      # Generate documentation with linting configuration files
+      ./examples/dsm_sync_simple/fcp_demo.py -gd -glc
 
     [green]Combined Examples:[/green]
       ./examples/dsm_sync_simple/fcp_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG

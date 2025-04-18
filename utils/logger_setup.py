@@ -1241,8 +1241,8 @@ def configure_session_logging(session_name, log_level="DEBUG"):
     # Generate timestamp for consistent filenames
     timestamp = pendulum.now("UTC").format("YYYYMMDD_HHmmss")
 
-    # Create log directories
-    main_log_dir = Path(f"logs/{session_name}_logs")
+    # Create log directories in workspace root
+    main_log_dir = Path("logs") / f"{session_name}_logs"
     error_log_dir = Path("logs/error_logs")
 
     main_log_dir.mkdir(parents=True, exist_ok=True)

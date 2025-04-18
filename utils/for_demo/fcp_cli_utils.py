@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 import rich.box as box
 import sys
+from pathlib import Path
 
 from utils.logger_setup import logger
 from utils.market_constraints import MarketType
@@ -103,11 +104,15 @@ def print_logging_panel(main_log, error_log):
         main_log: Path to the main log file
         error_log: Path to the error log file
     """
+    # Convert to Path objects if they aren't already
+    main_log_path = Path(main_log)
+    error_log_path = Path(error_log)
+
     print(
         Panel(
             f"[bold cyan]Logging Configuration:[/bold cyan]\n"
-            f"Detailed logs: [green]{main_log}[/green]\n"
-            f"Error logs: [yellow]{error_log}[/yellow]",
+            f"Detailed logs: [green]{main_log_path}[/green]\n"
+            f"Error logs: [yellow]{error_log_path}[/yellow]",
             title="Logging Info",
             border_style="blue",
         )
