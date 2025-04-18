@@ -8,7 +8,6 @@ using the official typer-cli tool for optimal GitHub-friendly output.
 
 from pathlib import Path
 import typer
-import pendulum
 import subprocess
 import sys
 import re
@@ -267,7 +266,7 @@ def generate_markdown_docs(
     """Generate Markdown documentation from a Typer app.
 
     This function generates GitHub-friendly documentation using the official typer-cli tool.
-    If typer-cli is not available, it will automatically install it before proceeding.
+    If typer-cli is not available, it will log an error message and raise an exception.
 
     Args:
         app: The Typer app to generate documentation for
@@ -278,28 +277,15 @@ def generate_markdown_docs(
 
     Returns:
         Path: Path to the generated documentation file
+        
+    Raises:
+        RuntimeError: When typer-cli is not installed
     """
-    # Check if typer-cli is available, if not, try to install it
+    # Check if typer-cli is available
     if not is_typer_cli_available():
-        logger.info("typer-cli not found. Installing typer-cli for documentation generation...")
-        try:
-            import subprocess
-
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", "typer-cli"],
-                check=True,
-                capture_output=True,
-            )
-            logger.info("typer-cli installed successfully")
-            
-            # Double check installation
-            if not is_typer_cli_available():
-                logger.error("Failed to find typer-cli after installation. Documentation cannot be generated.")
-                return None
-        except Exception as e:
-            logger.error(f"Failed to install typer-cli: {e}")
-            logger.error("Documentation cannot be generated without typer-cli.")
-            return None
+        logger.error("typer-cli not found. Documentation cannot be generated.")
+        logger.error("Please install typer-cli manually with: pip install typer-cli")
+        raise RuntimeError("typer-cli is required for documentation generation but was not found")
 
     # Now we're sure typer-cli is available
     logger.info("Using typer-cli for GitHub-friendly documentation")
