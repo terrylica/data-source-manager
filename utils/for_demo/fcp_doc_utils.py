@@ -192,7 +192,7 @@ It displays real-time source information about where each data point comes from.
 ## Usage
 
 ```bash
-$ {cli_name} [OPTIONS]
+{cli_name} [OPTIONS]
 ```
 
 """
@@ -301,7 +301,7 @@ $ {cli_name} [OPTIONS]
             markdown_content += examples_section
 
         # Write the final content to the output file
-        output_file.write_text(markdown_content)
+        output_file.write_text(markdown_content + "\n")  # Ensure trailing newline
 
         # Clean up the temporary file
         if temp_file.exists():
@@ -349,7 +349,14 @@ def generate_markdown_docs(
             # Create linting configuration files if requested
             if gen_lint_config:
                 output_path = Path(output_dir)
-                markdownlint_config = {"MD013": {"code_blocks": False, "tables": False}}
+                # Define the markdownlint configuration with proper Python booleans
+                # The json.dumps will convert Python's True/False to JSON true/false
+                markdownlint_config = {
+                    "MD013": {"code_blocks": False, "tables": False},
+                    "MD014": False,  # Disable dollar signs used before commands 
+                    "MD040": False,  # Disable requiring language in code blocks
+                    "MD047": False   # Disable requiring single newline at end of file
+                }
                 config_file = output_path / ".markdownlint.json"
                 config_file.write_text(json.dumps(markdownlint_config, indent=2))
                 logger.info(f"Created markdownlint config at {config_file}")
@@ -531,8 +538,13 @@ This documentation was automatically generated from the Typer CLI help text.
 
     # Create linting configuration files if requested
     if gen_lint_config:
-        # Create a markdownlint config file to ignore line length in code blocks
-        markdownlint_config = {"MD013": {"code_blocks": False, "tables": False}}
+        # Create a markdownlint config file with customized rules
+        markdownlint_config = {
+            "MD013": {"code_blocks": False, "tables": False},
+            "MD014": False,  # Disable dollar signs used before commands 
+            "MD040": False,  # Disable requiring language in code blocks
+            "MD047": False   # Disable requiring single newline at end of file
+        }
 
         config_file = output_path / ".markdownlint.json"
         config_file.write_text(json.dumps(markdownlint_config, indent=2))
