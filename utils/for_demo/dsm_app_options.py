@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Application options for FCP demo CLI applications.
+Application options for DSM Demo CLI applications.
 
-This module contains Typer app options and argument definitions for FCP demo CLI tools.
+This module contains Typer app options and argument definitions for DSM Demo CLI tools.
 """
 
 from typing import Optional, Dict, Any
@@ -10,7 +10,7 @@ import typer
 from typing_extensions import Annotated
 from enum import Enum
 
-from utils.for_demo.fcp_cli_utils import (
+from utils.for_demo.dsm_cli_utils import (
     MarketTypeChoice,
     DataSourceChoice,
     ChartTypeChoice,
@@ -26,7 +26,7 @@ class DocFormatChoice(str, Enum):
     CONSOLE = "console"
 
 
-def create_typer_app(app_name="FCP Demo"):
+def create_typer_app(app_name="DSM Demo"):
     """Create a preconfigured Typer app with consistent styling and settings.
 
     Args:
@@ -49,7 +49,7 @@ def create_typer_app(app_name="FCP Demo"):
 
 
 def get_standard_options() -> Dict[str, Any]:
-    """Get standard CLI options for FCP demo applications.
+    """Get standard CLI options for DSM Demo applications.
 
     Returns:
         Dict: Dictionary of standard options with their default values
@@ -117,7 +117,7 @@ def get_standard_options() -> Dict[str, Any]:
             help="Clear the cache directory before running",
         ),
         # Test Mode options
-        "test_fcp_pm": typer.Option(
+        "test_fcp": typer.Option(
             False,
             "--test-fcp",
             "-fcp",
@@ -134,7 +134,7 @@ def get_standard_options() -> Dict[str, Any]:
             False,
             "--gen-doc",
             "-gd",
-            help="Generate Markdown documentation from Typer help into docs/fcp_demo/ directory",
+            help="Generate Markdown documentation from Typer help into docs/dsm_demo/ directory",
         ),
         "gen_lint_config": typer.Option(
             False,
@@ -159,13 +159,13 @@ def get_standard_options() -> Dict[str, Any]:
 
 
 def get_cmd_help_text():
-    """Get a standardized help text for FCP demo command.
+    """Get a standardized help text for DSM Demo command.
 
     Returns:
         str: Help text for the command with examples
     """
     return """
-    FCP Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
+    DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
 
     This script shows how DataSourceManager automatically retrieves data from different sources:
 
@@ -194,48 +194,48 @@ def get_cmd_help_text():
     [bold cyan]Sample Commands:[/bold cyan]
 
     [green]Basic Usage:[/green]
-      ./examples/dsm_sync_simple/fcp_demo.py
-      ./examples/dsm_sync_simple/fcp_demo.py --symbol ETHUSDT --market spot
+      ./examples/dsm_sync_simple/dsm_demo.py
+      ./examples/dsm_sync_simple/dsm_demo.py --symbol ETHUSDT --market spot
 
     [green]Time Range Options (By Priority):[/green]
       # PRIORITY 1: Using --days flag (overrides any start/end times)
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -d 7
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -d 7
       
       # PRIORITY 2: Using start and end times (only if --days is NOT provided)
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -st 2025-04-05T00:00:00 -et 2025-04-06T00:00:00
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -st 2025-04-05T00:00:00 -et 2025-04-06T00:00:00
       
       # FALLBACK: No time flags (uses default days=3)
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT
 
     [green]Market Types:[/green]
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -m um
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSD_PERP -m cm
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -m um
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSD_PERP -m cm
 
     [green]Different Intervals:[/green]
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -i 5m
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -i 1h
-      ./examples/dsm_sync_simple/fcp_demo.py -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -i 5m
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -i 1h
+      ./examples/dsm_sync_simple/dsm_demo.py -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
 
     [green]Data Source Options:[/green]
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -es REST
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -nc
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -cc
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -es REST
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -nc
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -cc
 
     [green]Testing FCP Mechanism:[/green]
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -fcp
-      ./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -fcp -pc
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -fcp
+      ./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -fcp -pc
       
     [green]Documentation Generation:[/green]
       # Generate documentation with typer-cli format (default)
-      ./examples/dsm_sync_simple/fcp_demo.py -gd
+      ./examples/dsm_sync_simple/dsm_demo.py -gd
       
       # Generate GitHub-optimized documentation
-      ./examples/dsm_sync_simple/fcp_demo.py -gd -df github
+      ./examples/dsm_sync_simple/dsm_demo.py -gd -df github
       
       # Generate documentation with linting configuration files
-      ./examples/dsm_sync_simple/fcp_demo.py -gd -glc
+      ./examples/dsm_sync_simple/dsm_demo.py -gd -glc
 
     [green]Combined Examples:[/green]
-      ./examples/dsm_sync_simple/fcp_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
-      ./examples/dsm_sync_simple/fcp_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -fcp -pc -l D -cc
+      ./examples/dsm_sync_simple/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
+      ./examples/dsm_sync_simple/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -fcp -pc -l D -cc
     """

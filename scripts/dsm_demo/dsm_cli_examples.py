@@ -20,7 +20,7 @@ def define_example_commands() -> List[Dict[str, Any]]:
     example1 = {
         "title": "Fetch recent BTCUSDT 1-minute data from SPOT market",
         "description": "Retrieves 3 days of 1-minute candles for BTCUSDT in SPOT market with default settings",
-        "command": "./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -m spot -i 1m",
+        "command": "./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -m spot -i 1m",
         "explanation": "This is the simplest form of data retrieval, using default settings for most parameters.",
         "args": ["-s", "BTCUSDT", "-m", "spot", "-i", "1m"],
     }
@@ -29,7 +29,7 @@ def define_example_commands() -> List[Dict[str, Any]]:
     example2 = {
         "title": "Fetch BTCUSD_PERP from Coin-M futures market with specific date range",
         "description": "Gets data for a specific date range with debug logging enabled",
-        "command": "./examples/dsm_sync_simple/fcp_demo.py -s BTCUSD_PERP -m cm -i 1m -l D -st 2025-04-01 -et 2025-04-05",
+        "command": "./examples/dsm_sync_simple/dsm_demo.py -s BTCUSD_PERP -m cm -i 1m -l D -st 2025-04-01 -et 2025-04-05",
         "explanation": "Uses Coin-M futures market (cm) with a specific date range and debug logging enabled.",
         "args": [
             "-s",
@@ -51,7 +51,7 @@ def define_example_commands() -> List[Dict[str, Any]]:
     example3 = {
         "title": "Fetch data from USDT-M futures with cache clearing",
         "description": "Demonstrates how to clear cache before fetching data",
-        "command": "./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -m um -i 1m -cc -d 5",
+        "command": "./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -m um -i 1m -cc -d 5",
         "explanation": "Clears the cache directory before fetching 5 days of data from USDT-M futures market.",
         "args": ["-s", "BTCUSDT", "-m", "um", "-i", "1m", "-cc", "-d", "5"],
     }
@@ -60,7 +60,7 @@ def define_example_commands() -> List[Dict[str, Any]]:
     example4 = {
         "title": "Force data retrieval from REST API only",
         "description": "Bypasses the standard failover mechanism to use only REST API",
-        "command": "./examples/dsm_sync_simple/fcp_demo.py -s ETHUSDT -m spot -i 1m -es REST -d 2",
+        "command": "./examples/dsm_sync_simple/dsm_demo.py -s ETHUSDT -m spot -i 1m -es REST -d 2",
         "explanation": "Forces data retrieval directly from REST API, bypassing cache and Vision API.",
         "args": ["-s", "ETHUSDT", "-m", "spot", "-i", "1m", "-es", "REST", "-d", "2"],
     }
@@ -69,7 +69,7 @@ def define_example_commands() -> List[Dict[str, Any]]:
     example5 = {
         "title": "Test the Failover Control Protocol (FCP) mechanism",
         "description": "Runs a comprehensive test demonstrating how data is merged from multiple sources",
-        "command": "./examples/dsm_sync_simple/fcp_demo.py -s BTCUSDT -m spot -i 1m -fcp -pc",
+        "command": "./examples/dsm_sync_simple/dsm_demo.py -s BTCUSDT -m spot -i 1m -fcp -pc",
         "explanation": "Demonstrates the full FCP mechanism by pre-populating cache and then retrieving data across multiple sources.",
         "args": ["-s", "BTCUSDT", "-m", "spot", "-i", "1m", "-fcp", "-pc"],
     }
@@ -89,8 +89,8 @@ def display_examples(examples: List[Dict[str, Any]], run_example_func: Callable 
 
     console.print(
         Panel(
-            "[bold green]FCP Demo: Tested Usage Examples[/bold green]\n"
-            "Below are some real-world examples of using the fcp_demo.py script",
+            "[bold green]DSM Demo: Tested Usage Examples[/bold green]\n"
+            "Below are some real-world examples of using the dsm_demo.py script",
             expand=False,
             border_style="green",
         )
@@ -108,7 +108,7 @@ def display_examples(examples: List[Dict[str, Any]], run_example_func: Callable 
         console.print(f"[dim]{example['explanation']}[/dim]")
         if run_example_func:
             console.print(
-                f"[bold green]Run this example:[/bold green] [yellow]python examples/dsm_sync_simple/fcp_demo.py examples --run {i}[/yellow]"
+                f"[bold green]Run this example:[/bold green] [yellow]python examples/dsm_sync_simple/dsm_demo.py examples --run {i}[/yellow]"
             )
 
     # Replace markdown with rich formatted text to avoid rendering issues
@@ -164,13 +164,13 @@ def display_humanized_help():
         Panel(
             "[bold cyan]Usage Examples:[/bold cyan]\n"
             "1. Run with default settings:\n"
-            "   [yellow]./fcp_demo.py -s BTCUSDT -m spot -i 1m[/yellow]\n\n"
+            "   [yellow]./dsm_demo.py -s BTCUSDT -m spot -i 1m[/yellow]\n\n"
             "2. Run with specific date range and log level:\n"
-            "   [yellow]./fcp_demo.py -s BTCUSD_PERP -m cm -i 1m -l D -st 2025-04-01 -et 2025-04-05[/yellow]\n\n"
+            "   [yellow]./dsm_demo.py -s BTCUSD_PERP -m cm -i 1m -l D -st 2025-04-01 -et 2025-04-05[/yellow]\n\n"
             "3. View example commands:\n"
-            "   [yellow]./fcp_demo.py examples[/yellow]\n\n"
+            "   [yellow]./dsm_demo.py examples[/yellow]\n\n"
             "4. Run a specific example:\n"
-            "   [yellow]./fcp_demo.py examples --run 1[/yellow]",
+            "   [yellow]./dsm_demo.py examples --run 1[/yellow]",
             title="Quick Reference",
             border_style="green",
         )
@@ -193,10 +193,10 @@ def display_humanized_help():
     console.print(
         Panel(
             "[bold cyan]Available Commands:[/bold cyan]\n"
-            "[yellow]main[/yellow]: (default) FCP Demo with all parameters\n"
-            "   Example: [yellow]./fcp_demo.py main -s BTCUSDT -m spot[/yellow]\n\n"
+            "[yellow]main[/yellow]: (default) DSM Demo with all parameters\n"
+            "   Example: [yellow]./dsm_demo.py main -s BTCUSDT -m spot[/yellow]\n\n"
             "[yellow]examples[/yellow]: Show and run tested example commands\n"
-            "   Example: [yellow]./fcp_demo.py examples --run 1[/yellow]",
+            "   Example: [yellow]./dsm_demo.py examples --run 1[/yellow]",
             title="Commands",
             border_style="blue",
         )

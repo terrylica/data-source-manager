@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Utility functions for managing cache in FCP demo applications.
+Utility functions for managing cache in DSM Demo applications.
 
 This module provides functions for cache directory management and verification
 for the Failover Control Protocol (FCP) demonstrations.

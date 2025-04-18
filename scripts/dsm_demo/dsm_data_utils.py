@@ -153,7 +153,7 @@ def fetch_data_with_fcp(
         return pd.DataFrame()
 
 
-def test_fcp_pm_mechanism(
+def test_fcp_mechanism(
     symbol: str = "BTCUSDT",
     market_type: MarketType = MarketType.SPOT,
     interval: Interval = Interval.MINUTE_1,
@@ -188,15 +188,15 @@ def test_fcp_pm_mechanism(
         prepare_cache: Whether to prepare cache with partial data first
         cache_dir: Path object pointing to the cache directory
     """
-    from utils.for_demo.fcp_time_utils import parse_datetime
+    from utils.for_demo.dsm_time_utils import parse_datetime
     from rich.panel import Panel
     from rich.table import Table
 
     current_time = pendulum.now("UTC")
 
     # Enhanced logging for date parsing
-    logger.debug(f"test_fcp_pm_mechanism received start_date: {start_date!r}")
-    logger.debug(f"test_fcp_pm_mechanism received end_date: {end_date!r}")
+    logger.debug(f"test_fcp_mechanism received start_date: {start_date!r}")
+    logger.debug(f"test_fcp_mechanism received end_date: {end_date!r}")
 
     # Determine the date range
     if start_date and end_date:

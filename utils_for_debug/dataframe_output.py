@@ -91,7 +91,7 @@ def format_dataframe_for_display(df):
 
 
 def save_dataframe_to_csv(
-    df, market_type, symbol, interval, output_dir="./logs/fcp_demo"
+    df, market_type, symbol, interval, output_dir="./logs/dsm_demo"
 ):
     """Save DataFrame to a CSV file in the specified directory.
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Command-line interface utilities for the FCP demo applications.
+Command-line interface utilities for the DSM Demo applications.
 
-This module provides common CLI setup and display functions for FCP demo scripts.
+This module provides common CLI setup and display functions for DSM Demo scripts.
 """
 
 from enum import Enum
@@ -82,10 +82,10 @@ def resolve_log_level(level):
 
 
 def print_intro_panel():
-    """Print the introductory panel for FCP demo applications."""
+    """Print the introductory panel for DSM Demo applications."""
     print(
         Panel(
-            "[bold green]FCP Demo: Failover Control Protocol (FCP)[/bold green]\n"
+            "[bold green]DSM Demo: Failover Control Protocol (FCP)[/bold green]\n"
             "This script demonstrates how DataSourceManager automatically retrieves data\n"
             "from different sources using the Failover Control Protocol (FCP) strategy:\n"
             "1. Cache (Local Arrow files)\n"
@@ -215,8 +215,8 @@ def print_rich_output_help():
             "- When log level is DEBUG, INFO, or WARNING: Rich output is visible\n"
             "- When log level is ERROR or CRITICAL: Rich output is suppressed\n\n"
             "Try running with different log levels to see the difference:\n"
-            "  python examples/dsm_sync_simple/fcp_demo.py --log-level ERROR\n"
-            "  python examples/dsm_sync_simple/fcp_demo.py -l E (shorthand for ERROR)\n",
+            "  python examples/dsm_sync_simple/dsm_demo.py --log-level ERROR\n"
+            "  python examples/dsm_sync_simple/dsm_demo.py -l E (shorthand for ERROR)\n",
             title="Rich Output Control",
             border_style="blue",
         )

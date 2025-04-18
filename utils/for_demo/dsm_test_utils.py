@@ -18,15 +18,15 @@ import pendulum
 from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
 from core.sync.data_source_manager import DataSourceManager, DataSource
 
-from utils.for_demo.fcp_datetime_parser import calculate_date_range
-from utils.for_demo.fcp_cache_utils import ensure_cache_directory
+from utils.for_demo.dsm_datetime_parser import calculate_date_range
+from utils.for_demo.dsm_cache_utils import ensure_cache_directory
 from utils_for_debug.dataframe_output import (
     format_dataframe_for_display,
     save_dataframe_to_csv,
 )
 
 
-def test_fcp_pm_mechanism(
+def test_fcp_mechanism(
     symbol: str = "BTCUSDT",
     market_type: MarketType = MarketType.SPOT,
     interval: Interval = Interval.MINUTE_1,

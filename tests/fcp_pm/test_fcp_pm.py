@@ -24,7 +24,7 @@ from utils_for_debug.data_integrity import analyze_data_integrity
 logger.setLevel("DEBUG")
 
 
-def test_fcp_pm_mechanism():
+def test_fcp_mechanism():
     """Test the Failover Control Protocol (FCP) mechanism."""
     print(
         Panel(
@@ -230,7 +230,7 @@ def test_fcp_pm_mechanism():
 
 def main():
     """Run the FCP mechanism test."""
-    result = test_fcp_pm_mechanism()
+    result = test_fcp_mechanism()
 
     if result:
         print(

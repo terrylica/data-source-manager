@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FCP Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
+DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
 
 This script allows users to specify a time span and observe how the
 DataSourceManager automatically retrieves data from different sources
@@ -25,14 +25,14 @@ from utils.logger_setup import logger, configure_session_logging
 
 from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
 
-# Import utility modules for FCP demo
-from utils.for_demo.fcp_datetime_parser import parse_datetime, calculate_date_range
-from utils.for_demo.fcp_cache_utils import clear_cache_directory, verify_project_root
-from utils.for_demo.fcp_data_fetcher import fetch_data_with_fcp
-from utils.for_demo.fcp_display_utils import display_results
-from utils.for_demo.fcp_test_utils import test_fcp_pm_mechanism
-from utils.for_demo.fcp_doc_utils import generate_markdown_docs
-from utils.for_demo.fcp_cli_utils import (
+# Import utility modules for DSM Demo
+from utils.for_demo.dsm_datetime_parser import parse_datetime, calculate_date_range
+from utils.for_demo.dsm_cache_utils import clear_cache_directory, verify_project_root
+from utils.for_demo.dsm_data_fetcher import fetch_data_with_fcp
+from utils.for_demo.dsm_display_utils import display_results
+from utils.for_demo.dsm_test_utils import test_fcp_mechanism
+from utils.for_demo.dsm_doc_utils import generate_markdown_docs
+from utils.for_demo.dsm_cli_utils import (
     resolve_log_level,
     print_intro_panel,
     print_logging_panel,
@@ -47,7 +47,7 @@ from utils.for_demo.fcp_cli_utils import (
     ChartTypeChoice,
     LogLevel,
 )
-from utils.for_demo.fcp_app_options import (
+from utils.for_demo.dsm_app_options import (
     create_typer_app,
     get_standard_options,
     get_cmd_help_text,
@@ -84,7 +84,7 @@ def main(
     no_cache: bool = options["no_cache"],
     clear_cache: bool = options["clear_cache"],
     # Test Mode options
-    test_fcp_pm: bool = options["test_fcp_pm"],
+    test_fcp: bool = options["test_fcp"],
     prepare_cache: bool = options["prepare_cache"],
     # Documentation options
     gen_doc: bool = options["gen_doc"],
@@ -92,12 +92,12 @@ def main(
     # Other options
     log_level: LogLevel = options["log_level"],
 ):
-    """FCP Demo: Demonstrates the Failover Control Protocol (FCP) mechanism."""
+    """DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism."""
     # Convert shorthand log levels to full names
     level = resolve_log_level(log_level.value)
 
     # Set up session logging (delegated to logger_setup.py)
-    main_log, error_log, log_timestamp = configure_session_logging("fcp_demo", level)
+    main_log, error_log, log_timestamp = configure_session_logging("dsm_demo", level)
 
     logger.info(f"Current time: {pendulum.now().isoformat()}")
 
@@ -131,7 +131,7 @@ def main(
 
             # Generate documentation
             doc_path = generate_markdown_docs(
-                app, gen_lint_config=gen_lint_config, cli_name="fcp-demo"
+                app, gen_lint_config=gen_lint_config, cli_name="dsm_demo"
             )
             logger.info(f"Documentation generated and saved to {doc_path}")
 
@@ -164,7 +164,7 @@ def main(
             retries,
             no_cache,
             clear_cache,
-            test_fcp_pm,
+            test_fcp,
             prepare_cache,
             level,
         )
@@ -174,7 +174,7 @@ def main(
             clear_cache_directory(CACHE_DIR)
 
         # Check if we should run the FCP test
-        if test_fcp_pm:
+        if test_fcp:
             # Add debug logging
             logger.debug(f"Running FCP test with:")
             logger.debug(f"  Symbol: {symbol}")
@@ -200,7 +200,7 @@ def main(
                 pass_end_date = end_time
 
             # Run the FCP mechanism test
-            test_fcp_pm_mechanism(
+            test_fcp_mechanism(
                 symbol=symbol,
                 market_type=MarketType.from_string(market.value),
                 interval=Interval(interval),
@@ -212,7 +212,7 @@ def main(
                 cache_dir=CACHE_DIR,
                 performance_timer_start=start_time_perf,
             )
-            # Return from function after running test_fcp_pm_mechanism
+            # Return from function after running test_fcp_mechanism
             # to avoid duplicating performance output
             return
 

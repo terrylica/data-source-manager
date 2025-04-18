@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Clear cache and log directories for testing the FCP demo.
+Clear cache and log directories for testing the DSM Demo.
 Supports local and remote filesystems via fsspec.
 """
 
