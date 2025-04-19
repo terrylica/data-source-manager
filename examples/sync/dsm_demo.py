@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
+DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism specified in
+`.cursor/rules/always_focus_demo.mdc`
 
 This script allows users to specify a time span and observe how the
 DataSourceManager automatically retrieves data from different sources
