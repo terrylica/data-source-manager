@@ -194,50 +194,9 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         return TimestampedDataFrame(df)
 
     def validate_data(self, df: pd.DataFrame) -> Tuple[bool, Optional[str]]:
-        """Validate that a DataFrame contains valid market data.
-
-        Args:
-            df: DataFrame to validate
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
+        """Validate that a DataFrame contains valid market data."""
         validator = DataFrameValidator(df)
         return validator.validate_klines_data()
-
-    def _parse_interval(self, interval_str: str) -> Interval:
-        """Parse and validate interval string against market_constraints.Interval.
-
-        Args:
-            interval_str: Interval string (e.g., "1m", "1h")
-
-        Returns:
-            Parsed Interval enum
-
-        Raises:
-            ValueError: If interval is invalid or not supported
-        """
-        try:
-            # Try to find the interval enum by value
-            interval_obj = next((i for i in Interval if i.value == interval_str), None)
-            if interval_obj is None:
-                # Try by enum name (upper case with _ instead of number)
-                try:
-                    interval_obj = Interval[interval_str.upper()]
-                except KeyError:
-                    raise ValueError(f"Invalid interval: {interval_str}")
-
-            # Check if this interval is supported for this market type
-            # Could implement is_interval_supported() function if needed
-            logger.debug(
-                f"Using interval {interval_obj.name} ({interval_obj.value}) for {self.market_type_str}"
-            )
-
-            return interval_obj
-        except Exception as e:
-            logger.error(f"Error parsing interval {interval_str}: {e}")
-            # Default to 1s as a failsafe
-            return Interval.SECOND_1
 
     def _get_interval_seconds(self, interval: str) -> int:
         """Get interval duration in seconds from interval string.
@@ -273,38 +232,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             raise ValueError(f"Unknown interval unit: {unit}")
 
         return num * multipliers[unit]
-
-    def _validate_timestamp_safety(self, date: datetime) -> bool:
-        """Check if a given timestamp is safe to use with pandas datetime conversion.
-
-        Args:
-            date: The datetime to check
-
-        Returns:
-            True if the timestamp is safe, False if it might cause out-of-bounds errors
-
-        Note:
-            Pandas can have issues with timestamps very far in the future due to
-            nanosecond conversion limitations. This check helps prevent those issues.
-        """
-        try:
-            # Check if date is within pandas timestamp limits
-            # The max timestamp supported is approximately year 2262
-            max_safe_year = 2262
-            if date.year > max_safe_year:
-                logger.warning(
-                    f"Date {date.isoformat()} exceeds pandas timestamp safe year limit ({max_safe_year})"
-                )
-                return False
-
-            # Test conversion to pandas timestamp to see if it would raise an error
-            _ = pd.Timestamp(date)
-            return True
-        except (OverflowError, ValueError, pd.errors.OutOfBoundsDatetime) as e:
-            logger.warning(
-                f"Date {date.isoformat()} caused timestamp validation error: {e}"
-            )
-            return False
 
     def _process_timestamp_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process timestamp columns in the dataframe, handling various formats.

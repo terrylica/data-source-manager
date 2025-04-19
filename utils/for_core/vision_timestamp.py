@@ -195,39 +195,6 @@ def get_interval_seconds(interval: str) -> int:
     return num * multipliers[unit]
 
 
-def validate_timestamp_safety(date: datetime) -> bool:
-    """Check if a given timestamp is safe to use with pandas datetime conversion.
-
-    Args:
-        date: The datetime to check
-
-    Returns:
-        True if the timestamp is safe, False if it might cause out-of-bounds errors
-
-    Note:
-        Pandas can have issues with timestamps very far in the future due to
-        nanosecond conversion limitations. This check helps prevent those issues.
-    """
-    try:
-        # Check if date is within pandas timestamp limits
-        # The max timestamp supported is approximately year 2262
-        max_safe_year = 2262
-        if date.year > max_safe_year:
-            logger.warning(
-                f"Date {date.isoformat()} exceeds pandas timestamp safe year limit ({max_safe_year})"
-            )
-            return False
-
-        # Test conversion to pandas timestamp to see if it would raise an error
-        _ = pd.Timestamp(date)
-        return True
-    except (OverflowError, ValueError, pd.errors.OutOfBoundsDatetime) as e:
-        logger.warning(
-            f"Date {date.isoformat()} caused timestamp validation error: {e}"
-        )
-        return False
-
-
 def parse_interval(interval_str: str) -> Interval:
     """Parse and validate interval string against market_constraints.Interval.
 

@@ -41,29 +41,7 @@ def _process_timestamp_columns(self, df: pd.DataFrame) -> pd.DataFrame:
 
 This ensures that `open_time` values from the Vision API are correctly interpreted as representing the beginning of each candle period, rather than the end.
 
-### 2. Added a Robust Interval Parsing Method
-
-A new `_parse_interval` method was added to validate interval strings against the `market_constraints.Interval` enum:
-
-```python
-def _parse_interval(self, interval_str: str) -> Interval:
-    """Parse and validate interval string against market_constraints.Interval.
-
-    Args:
-        interval_str: Interval string (e.g., "1m", "1h")
-
-    Returns:
-        Parsed Interval enum
-
-    Raises:
-        ValueError: If interval is invalid or not supported
-    """
-    # ... implementation ...
-```
-
-This ensures that interval parsing is consistently handled across all interval types.
-
-### 3. Updated TimestampedDataFrame Creation
+### 2. Updated TimestampedDataFrame Creation
 
 The `_download_data` method was updated to correctly create `TimestampedDataFrame` objects, preserving the semantic meaning of timestamps:
 
