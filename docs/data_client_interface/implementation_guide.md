@@ -31,9 +31,6 @@ class DataClientInterface(ABC):
               end_time: datetime, **kwargs) -> pd.DataFrame: ...
 
     @abstractmethod
-    def is_data_available(self, start_time: datetime, end_time: datetime) -> bool: ...
-
-    @abstractmethod
     def create_empty_dataframe(self) -> pd.DataFrame: ...
 
     @abstractmethod

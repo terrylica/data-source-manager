@@ -92,23 +92,6 @@ class DataClientInterface(ABC):
         """
 
     @abstractmethod
-    def is_data_available(self, start_time: datetime, end_time: datetime) -> bool:
-        """Check if data is available for the specified time range.
-
-        This method is used to determine if the specific data source can
-        provide data for the given time range. It should consider factors
-        such as exchange launch date, recent data availability, and any
-        other source-specific constraints.
-
-        Args:
-            start_time: Start time as timezone-aware datetime
-            end_time: End time as timezone-aware datetime
-
-        Returns:
-            True if data is available, False otherwise
-        """
-
-    @abstractmethod
     def create_empty_dataframe(self) -> pd.DataFrame:
         """Create an empty DataFrame with the correct structure.
 

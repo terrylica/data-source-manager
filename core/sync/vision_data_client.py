@@ -193,34 +193,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
         return TimestampedDataFrame(df)
 
-    def is_data_available(self, start_time: datetime, end_time: datetime) -> bool:
-        """Check if data is available for the specified time range.
-
-        Args:
-            start_time: Start time
-            end_time: End time
-
-        Returns:
-            True if data is available, False otherwise
-        """
-        # For Binance Vision API, data is available from the start of the exchange
-        # (September 2017 for most pairs), up to around 24-48 hours ago
-        launch_date = datetime(2017, 9, 1, tzinfo=timezone.utc)
-
-        # Check if the requested time range is after the launch date
-        if end_time < launch_date:
-            return False
-
-        # Check if the requested time range is too recent
-        # Vision data typically has a 24-48 hour delay
-        now = datetime.now(timezone.utc)
-        vision_cutoff = now - timedelta(hours=48)
-        if start_time > vision_cutoff:
-            return False
-
-        # Otherwise, data should be available
-        return True
-
     def validate_data(self, df: pd.DataFrame) -> Tuple[bool, Optional[str]]:
         """Validate that a DataFrame contains valid market data.
 
@@ -485,6 +457,11 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException)
         ),
         reraise=True,
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry attempt {retry_state.attempt_number}/3 for {retry_state.args[0] if retry_state.args else 'unknown date'} "
+            f"after error: {retry_state.outcome.exception()} - "
+            f"waiting {retry_state.next_action.sleep} seconds"
+        ),
     )
     def _download_file(
         self, date: datetime
@@ -916,7 +893,10 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                                 df = df.sort_values("open_time").reset_index(drop=True)
                             downloaded_dfs.append(df)
                     except Exception as exc:
-                        logger.error(f"Error downloading data for {date}: {exc}")
+                        logger.error(
+                            f"Error downloading data for {date}: {exc} - This date will be treated as unavailable"
+                        )
+                        # Note: We silently continue without adding this date to downloaded_dfs
 
             # After all downloads, check if there were any checksum failures
             if checksum_failures:
@@ -945,30 +925,33 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             # Check if we have specific warnings about missing dates
             if warning_messages:
                 # Group warnings about 404 (missing data)
-                missing_dates = [
-                    msg.split(": ")[1].split(" ")[0]
-                    for msg in warning_messages
-                    if "404" in msg
-                ]
+                missing_dates = []
+                for msg in warning_messages:
+                    if "404" in msg:
+                        # Fix the date extraction to properly get the date value
+                        parts = msg.split("for ")
+                        if len(parts) > 1:
+                            missing_dates.append(parts[1].strip())
+
                 if missing_dates:
                     # Log a consolidated warning instead of individual ones
                     dates_str = ", ".join(missing_dates)
                     logger.warning(
                         f"No data downloaded from Binance Vision API - dates not available: {dates_str}. "
                         f"This may happen for recent data or less common markets. "
-                        f"The system will attempt to fetch from REST API instead."
+                        f"Returning empty dataframe - higher-level components may fall back to REST API."
                     )
                 else:
                     # Log a generic warning for other issues
                     logger.warning(
                         "No data downloaded from Binance Vision API - this may happen for recent data or less common markets. "
-                        "The system will attempt to fetch from REST API instead."
+                        "Returning empty dataframe - higher-level components may fall back to REST API."
                     )
             else:
                 # No specific warnings
                 logger.warning(
                     "No data downloaded from Binance Vision API - this may happen for recent data or less common markets. "
-                    "The system will attempt to fetch from REST API instead."
+                    "Returning empty dataframe - higher-level components may fall back to REST API."
                 )
             return self.create_empty_dataframe()
 
@@ -1201,7 +1184,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         # Try to fill day boundary gaps using REST API
         if boundary_gaps:
             logger.debug(
-                f"Detected {len(boundary_gaps)} day boundary gaps. Attempting to fill with REST API data."
+                f"Detected {len(boundary_gaps)} day boundary gaps. Attempting to fill specific gaps with REST API data."
             )
             filled_df = fill_boundary_gaps_with_rest(
                 filtered_df,
@@ -1213,7 +1196,12 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             if filled_df is not None:
                 filtered_df = filled_df
                 logger.debug(
-                    f"Successfully filled boundary gaps. New row count: {len(filtered_df)}"
+                    f"Successfully filled boundary gaps with REST API. New row count: {len(filtered_df)}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to fill {len(boundary_gaps)} boundary gaps with REST API. "
+                    f"Continuing with potentially incomplete data."
                 )
 
         # Store original timestamp for reference
@@ -1477,13 +1465,15 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             if end_time > (current_time - vision_delay):
                 # This falls within the allowable delay window for Vision API
                 logger.warning(
-                    f"Error fetching recent data from Vision API (within {VISION_DATA_DELAY_HOURS}h delay window): {e}"
+                    f"Expected data unavailability from Vision API (within {VISION_DATA_DELAY_HOURS}h delay window): {e}. "
+                    f"Returning empty dataframe - caller (not this client) may attempt REST API fallback."
                 )
                 return self.create_empty_dataframe()
             else:
                 # For historical data outside the delay window, this is a critical error
                 logger.critical(
-                    f"CRITICAL ERROR fetching historical data from Vision API: {e}"
+                    f"CRITICAL ERROR fetching historical data from Vision API: {e}. "
+                    f"This data should be available in Vision API but could not be retrieved."
                 )
                 raise RuntimeError(
                     f"Vision API failed to retrieve historical data: {str(e)}"

@@ -229,32 +229,6 @@ class BinanceFundingRateClient(DataClientInterface):
             logger.error(f"Error validating funding rate data: {e}")
             return False, f"Validation error: {str(e)}"
 
-    def is_data_available(self, start_time: datetime, end_time: datetime) -> bool:
-        """Check if funding rate data is available for the specified time range.
-
-        Args:
-            start_time: Start time
-            end_time: End time
-
-        Returns:
-            True if data is available, False otherwise
-        """
-        # For Binance futures, funding rate data should be available from the
-        # launch of the futures platform (September 2019)
-        launch_date = datetime(2019, 9, 1, tzinfo=timezone.utc)
-
-        # Check if the requested time range is after the launch date
-        if end_time < launch_date:
-            return False
-
-        # Check if the requested time range is in the future
-        now = datetime.now(timezone.utc)
-        if start_time > now:
-            return False
-
-        # Otherwise, data should be available
-        return True
-
     def fetch(
         self,
         symbol: str,

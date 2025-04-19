@@ -11,7 +11,6 @@ The RestDataClient has these interface methods:
 - ✅ `symbol()` property - Returns the symbol from the instance
 - ✅ `interval()` property - Returns the interval from the instance
 - ✅ `fetch()` method - Properly implemented with parameter matching
-- ✅ `is_data_available()` method - Implements availability check
 - ✅ `create_empty_dataframe()` method - Creates empty DataFrame with correct columns
 - ✅ `validate_data()` method - Uses DataFrameValidator to validate klines data
 - ✅ `close()` method - Closes the HTTP client if it exists
@@ -30,7 +29,6 @@ The BinanceFundingRateClient has these interface methods:
 - ✅ `symbol()` property - Returns the symbol from the instance
 - ✅ `interval()` property - Returns the interval from the instance
 - ✅ `fetch()` method - Implemented, but with optional parameters different from interface
-- ✅ `is_data_available()` method - Implements availability check
 - ✅ `create_empty_dataframe()` method - Creates empty funding rate DataFrame
 - ✅ `validate_data()` method - Validates funding rate data
 - ✅ `close()` method - Closes HTTP client
@@ -51,7 +49,6 @@ The VisionDataClient has been refactored to properly implement the DataClientInt
 - ✅ `symbol()` property - Returns the symbol from the instance
 - ✅ `interval()` property - Returns the interval from the instance
 - ✅ `fetch()` method - Now properly accepts all required parameters while maintaining backward compatibility
-- ✅ `is_data_available()` method - Implements Vision API-specific availability check
 - ✅ `create_empty_dataframe()` method - Properly implemented as a non-static method
 - ✅ `validate_data()` method - Uses DataFrameValidator to validate klines data
 - ✅ `close()` method - Closes the HTTP client if it exists

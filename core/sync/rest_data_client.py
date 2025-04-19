@@ -776,32 +776,6 @@ class RestDataClient(DataClientInterface):
         """
         return ChartType.KLINES
 
-    def is_data_available(self, start_time: datetime, end_time: datetime) -> bool:
-        """Check if data is available for the specified time range.
-
-        Args:
-            start_time: Start time
-            end_time: End time
-
-        Returns:
-            True if data is available, False otherwise
-        """
-        # For Binance, data is available from the start of the exchange
-        # (September 2017 for most pairs)
-        launch_date = datetime(2017, 9, 1, tzinfo=timezone.utc)
-
-        # Check if the requested time range is after the launch date
-        if end_time < launch_date:
-            return False
-
-        # Check if the requested time range is in the future
-        now = datetime.now(timezone.utc)
-        if start_time > now:
-            return False
-
-        # Otherwise, data should be available
-        return True
-
     def validate_data(self, df: pd.DataFrame) -> Tuple[bool, Optional[str]]:
         """Validate that a DataFrame contains valid market data.
 
