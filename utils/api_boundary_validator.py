@@ -534,3 +534,217 @@ class ApiBoundaryValidator:
 
         # This should never be reached
         raise Exception("API call retry loop exited unexpectedly")
+
+    def is_valid_time_range_sync(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        interval: Interval,
+        symbol: str = "BTCUSDT",
+    ) -> bool:
+        """Synchronous version that validates if the given time range and interval are valid according to Binance API.
+
+        This method provides a synchronous interface to validate time ranges.
+        For new code, prefer using this method over the async version.
+
+        Args:
+            start_time: The start time for data retrieval
+            end_time: The end time for data retrieval
+            interval: The data interval
+            symbol: The trading pair symbol to check
+
+        Returns:
+            True if the time range is valid for the API, False otherwise
+        """
+        logger.debug(
+            f"Validating time range (sync): {start_time} -> {end_time} for {symbol} {interval}"
+        )
+        try:
+            # Call API to check if data exists for this range
+            api_data = self._call_api_sync(
+                start_time, end_time, interval, limit=1, symbol=symbol
+            )
+
+            is_valid = len(api_data) > 0
+            logger.debug(
+                f"Time range validation result (sync): {'Valid' if is_valid else 'Invalid'}"
+            )
+            return is_valid
+        except Exception as e:
+            logger.warning(f"Error validating time range (sync): {e}")
+            return False
+
+    def get_api_boundaries_sync(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        interval: Interval,
+        symbol: str = "BTCUSDT",
+    ) -> Dict[str, Any]:
+        """Synchronous version that determines the actual boundaries of API data.
+
+        This method provides a synchronous interface to get API boundaries.
+        For new code, prefer using this method over the async version.
+
+        Args:
+            start_time: The requested start time
+            end_time: The requested end time
+            interval: The data interval
+            symbol: The trading pair symbol to check
+
+        Returns:
+            Dictionary containing API-aligned boundaries:
+            {
+                'api_start_time': datetime,  # Actual first timestamp in API response
+                'api_end_time': datetime,    # Actual last timestamp in API response
+                'record_count': int,         # Number of records returned
+                'matches_request': bool      # Whether API boundaries match requested boundaries
+            }
+        """
+        logger.debug(
+            f"Getting API boundaries (sync) for {symbol} {interval}: {start_time} -> {end_time}"
+        )
+
+        # Ensure timezone awareness for input times
+        start_time = enforce_utc_timezone(start_time)
+        end_time = enforce_utc_timezone(end_time)
+
+        try:
+            # Call API to get data for the requested range
+            api_data = self._call_api_sync(
+                start_time, end_time, interval, limit=1000, symbol=symbol
+            )
+
+            if not api_data:
+                logger.warning("API returned no data for the requested range (sync)")
+                return {
+                    "api_start_time": None,
+                    "api_end_time": None,
+                    "record_count": 0,
+                    "matches_request": False,
+                }
+
+            # Extract timestamps from first and last records
+            first_timestamp_ms = api_data[0][0]
+            last_timestamp_ms = api_data[-1][0]
+
+            # Convert to datetime objects
+            api_start_time = datetime.fromtimestamp(
+                first_timestamp_ms / 1000, tz=timezone.utc
+            )
+            api_end_time = datetime.fromtimestamp(
+                last_timestamp_ms / 1000, tz=timezone.utc
+            )
+
+            # Check if API boundaries match requested boundaries (within millisecond precision)
+            start_matches = abs((api_start_time - start_time).total_seconds()) < 0.001
+            end_within_range = api_end_time <= end_time
+
+            result = {
+                "api_start_time": api_start_time,
+                "api_end_time": api_end_time,
+                "record_count": len(api_data),
+                "matches_request": start_matches and end_within_range,
+            }
+
+            logger.debug(
+                f"API boundaries found (sync) - Start: {api_start_time}, End: {api_end_time}, "
+                f"Records: {len(api_data)}, Matches Request: {start_matches and end_within_range}"
+            )
+
+            return result
+        except Exception as e:
+            logger.warning(f"Error getting API boundaries (sync): {e}")
+            return {
+                "api_start_time": None,
+                "api_end_time": None,
+                "record_count": 0,
+                "matches_request": False,
+                "error": str(e),
+            }
+
+    def _call_api_sync(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        interval: Interval,
+        limit: int = 1000,
+        symbol: str = "BTCUSDT",
+    ) -> List[List[Any]]:
+        """Synchronous version of _call_api that makes a direct HTTP request to the Binance API.
+
+        This method handles the low-level API call logic for synchronous operations.
+        For new code, prefer using this method over the async version.
+
+        Args:
+            start_time: Start time for data request
+            end_time: End time for data request
+            interval: Data interval
+            limit: Maximum number of records to retrieve
+            symbol: Trading pair symbol
+
+        Returns:
+            List of data points from the API response
+
+        Raises:
+            Exception: If API call fails after MAX_RETRIES attempts
+        """
+        # Implementation similar to async _call_api but using synchronous HTTP client methods
+        import time
+        import requests
+
+        # Format timestamps for API request (in milliseconds)
+        start_ms = int(start_time.timestamp() * 1000)
+        end_ms = int(end_time.timestamp() * 1000)
+
+        # Construct API endpoint URL for the specific market type
+        endpoint = get_endpoint_url(
+            self.market_type, ChartType.KLINES, symbol, interval
+        )
+
+        params = {
+            "symbol": symbol,
+            "interval": interval.value,
+            "startTime": start_ms,
+            "endTime": end_ms,
+            "limit": limit,
+        }
+
+        logger.debug(f"Making sync API call to {endpoint} with params {params}")
+
+        # Retry logic
+        retries = 0
+        while retries < MAX_RETRIES:
+            try:
+                response = requests.get(endpoint, params=params, timeout=10.0)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.debug(f"Received {len(data)} records from API (sync)")
+                    return data
+                elif response.status_code == RATE_LIMIT_STATUS:
+                    # Rate limited, wait and retry
+                    wait_time = RETRY_DELAY * (2**retries) * (0.5 + random.random())
+                    logger.warning(
+                        f"Rate limited (sync), retrying in {wait_time:.2f}s (attempt {retries+1}/{MAX_RETRIES})"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    # Other error, log and retry
+                    logger.warning(
+                        f"API error (sync): {response.status_code} - {response.text}, "
+                        f"retrying in {RETRY_DELAY}s (attempt {retries+1}/{MAX_RETRIES})"
+                    )
+                    time.sleep(RETRY_DELAY)
+            except Exception as e:
+                # Connection error or timeout, retry
+                logger.warning(
+                    f"Connection error (sync): {str(e)}, "
+                    f"retrying in {RETRY_DELAY}s (attempt {retries+1}/{MAX_RETRIES})"
+                )
+                time.sleep(RETRY_DELAY)
+
+            retries += 1
+
+        # If we get here, all retries failed
+        raise Exception(f"Failed to call API after {MAX_RETRIES} attempts")

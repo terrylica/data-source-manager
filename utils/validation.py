@@ -186,7 +186,7 @@ class DataValidation:
 
         return start_time, end_time
 
-    async def validate_api_time_range(
+    def validate_api_time_range(
         self,
         start_time: datetime,
         end_time: datetime,
@@ -216,11 +216,11 @@ class DataValidation:
         if isinstance(interval, str):
             interval = Interval(interval)
 
-        return await self.api_boundary_validator.is_valid_time_range(
+        return self.api_boundary_validator.is_valid_time_range_sync(
             start_time, end_time, interval, symbol=symbol
         )
 
-    async def get_api_aligned_boundaries(
+    def get_api_aligned_boundaries(
         self,
         start_time: datetime,
         end_time: datetime,
@@ -250,7 +250,7 @@ class DataValidation:
         if isinstance(interval, str):
             interval = Interval(interval)
 
-        return await self.api_boundary_validator.get_api_boundaries(
+        return self.api_boundary_validator.get_api_boundaries_sync(
             start_time, end_time, interval, symbol=symbol
         )
 

@@ -6,16 +6,14 @@ to adjust concurrency parameters for optimal data retrieval.
 """
 
 import os
-import asyncio
+import time
 import psutil
+import requests
+import random
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, Coroutine
-
-# Import curl_cffi for HTTP client implementation
-from curl_cffi.requests import AsyncSession
+from typing import Optional, List, Dict, Any
 
 from utils.logger_setup import logger
-from utils.network_utils import create_client, safely_close_client
 
 
 @dataclass
@@ -44,7 +42,7 @@ class HardwareMonitor:
         self._bandwidth_requirement = 0.5  # MB per request
         self._binance_rate_limit = 1200  # Requests per minute
 
-    async def measure_network_speed(self) -> float:
+    def measure_network_speed(self) -> float:
         """Measure network speed to Binance API endpoints.
 
         Returns:
@@ -52,21 +50,12 @@ class HardwareMonitor:
         """
         try:
             bandwidths = []
-            # Test multiple endpoints in parallel
-            client = create_client(
-                timeout=2.0,
-                headers={"User-Agent": "BinanceDataServices/BandwidthTest"},
-            )
-            try:
-                tasks: List[Coroutine[Any, Any, float]] = []
-                for endpoint in self._endpoints:
-                    for _ in range(2):  # 2 requests per endpoint
-                        tasks.append(self._measure_single_endpoint(client, endpoint))
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                bandwidths = [r for r in results if isinstance(r, float)]
-            finally:
-                # Ensure client is properly closed
-                await safely_close_client(client)
+            # Test multiple endpoints
+            for endpoint in self._endpoints:
+                for _ in range(2):  # 2 requests per endpoint
+                    bandwidth = self._measure_single_endpoint(endpoint)
+                    if bandwidth > 0:
+                        bandwidths.append(bandwidth)
 
             if not bandwidths:
                 return 50.0  # Default to 50 Mbps if all measurements fail
@@ -78,21 +67,20 @@ class HardwareMonitor:
             logger.warning(f"Failed to measure network speed: {e}")
             return 50.0  # Default to 50 Mbps
 
-    async def _measure_single_endpoint(
-        self, session: AsyncSession, endpoint: str
-    ) -> float:
-        """Measure bandwidth for a single endpoint using curl_cffi."""
+    def _measure_single_endpoint(self, endpoint: str) -> float:
+        """Measure bandwidth for a single endpoint using requests."""
         try:
-            start_time = asyncio.get_event_loop().time()
+            start_time = time.time()
 
-            # Use curl_cffi AsyncSession
-            response = await session.get(
+            response = requests.get(
                 f"{endpoint}/api/v3/klines",
                 params={"symbol": "BTCUSDT", "interval": "1s", "limit": 100},
+                timeout=2.0,
+                headers={"User-Agent": "BinanceDataServices/BandwidthTest"},
             )
             data = response.content
 
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             size_mb = len(data) / (1024 * 1024)  # Convert to MB
             return (size_mb * 8) / duration  # Convert to Mbps
         except Exception as e:
@@ -115,13 +103,44 @@ class HardwareMonitor:
             iowait_percent=iowait,
         )
 
-    async def update_metrics(self) -> None:
+    def update_metrics(self) -> None:
         """Update hardware metrics including network speed."""
         metrics = self.get_hardware_metrics()
-        network_speed = await self.measure_network_speed()
+        network_speed = self.measure_network_speed()
         metrics.network_bandwidth_mbps = network_speed
         self._metrics = metrics
-        self._last_update = asyncio.get_event_loop().time()
+        self._last_update = time.time()
+
+    # Legacy async methods maintained for backward compatibility
+    async def measure_network_speed(self) -> float:
+        """Async version of measure_network_speed for backward compatibility.
+
+        DEPRECATED: Use the synchronous version instead.
+        """
+        logger.warning(
+            "Async measure_network_speed is deprecated. Use synchronous version instead."
+        )
+        return self.measure_network_speed()
+
+    async def _measure_single_endpoint(self, session, endpoint: str) -> float:
+        """Async version of _measure_single_endpoint for backward compatibility.
+
+        DEPRECATED: Use the synchronous version instead.
+        """
+        logger.warning(
+            "Async _measure_single_endpoint is deprecated. Use synchronous version instead."
+        )
+        return self._measure_single_endpoint(endpoint)
+
+    async def update_metrics(self) -> None:
+        """Async version of update_metrics for backward compatibility.
+
+        DEPRECATED: Use the synchronous version instead.
+        """
+        logger.warning(
+            "Async update_metrics is deprecated. Use synchronous version instead."
+        )
+        self.update_metrics()
 
     def calculate_optimal_concurrency(
         self,
