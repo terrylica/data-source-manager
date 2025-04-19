@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Memory Monitoring System is a comprehensive solution for monitoring, diagnosing, and optimizing memory usage in the Binance Data Services infrastructure. This project evolves from the successful diagnostic garbage collection tools developed initially in the `playground/timeout_testing` directory.
+The Memory Monitoring System is a comprehensive solution for monitoring, diagnosing, and optimizing memory usage in the Binance Data Services infrastructure. This project evolves from the successful diagnostic garbage collection tools developed in playground demos.
 
 ## Key Documentation
 
@@ -38,7 +38,6 @@ Initial prototype development is complete with the following components:
 
 - `diagnostic_gc_run()` - Diagnostic garbage collection with metrics
 - `MemoryMonitor` class - Basic memory usage monitoring and alerting
-- Test demonstration script in `playground/timeout_testing/data_retrieval_samples.py`
 
 This prototype has successfully validated the core concepts and demonstrated the ability to:
 
