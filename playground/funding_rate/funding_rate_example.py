@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 """Example of fetching funding rate data using the unified data source manager."""
 
-import asyncio
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from utils.logger_setup import logger
 from utils.market_constraints import MarketType, ChartType, Interval, DataProvider
-from core.data_source_manager import DataSourceManager
+from core.sync.data_source_manager import DataSourceManager
 
 
-async def fetch_funding_rates():
+def fetch_funding_rates():
     """Fetch and display funding rate data."""
     # Create a temporary cache directory
     cache_dir = Path("tmp/funding_rate_cache")
@@ -20,7 +19,7 @@ async def fetch_funding_rates():
     logger.info("Creating DataSourceManager with FUTURES_USDT market type")
 
     # Create a DataSourceManager configured for funding rate data
-    async with DataSourceManager(
+    with DataSourceManager(
         market_type=MarketType.FUTURES_USDT,
         provider=DataProvider.BINANCE,
         chart_type=ChartType.FUNDING_RATE,
@@ -36,7 +35,7 @@ async def fetch_funding_rates():
         )
 
         # Fetch funding rate data
-        df = await dsm.get_data(
+        df = dsm.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -66,7 +65,7 @@ async def fetch_funding_rates():
 
         # You can also fetch for multiple symbols if needed
         logger.info("Fetching funding rate data for ETHUSDT")
-        df_eth = await dsm.get_data(
+        df_eth = dsm.get_data(
             symbol="ETHUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -80,4 +79,4 @@ async def fetch_funding_rates():
 
 
 if __name__ == "__main__":
-    asyncio.run(fetch_funding_rates())
+    fetch_funding_rates()

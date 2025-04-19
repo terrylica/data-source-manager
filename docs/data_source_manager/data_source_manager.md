@@ -14,7 +14,7 @@ The `DataSourceManager` serves as a mediator between different data sources acro
 ### Module Location
 
 ```python
-from core.data_source_manager import DataSourceManager, DataSource
+from core.sync.data_source_manager import DataSourceManager, DataSource
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
 ```
 
@@ -152,7 +152,7 @@ class DataClientInterface(ABC):
         pass
 
     @abstractmethod
-    async def fetch(
+    def fetch(
         self,
         start_time: datetime,
         end_time: datetime,
@@ -209,7 +209,7 @@ def __init__(
 #### Main Method
 
 ```python
-async def get_data(
+def get_data(
     symbol: str,                                 # Trading pair (e.g., "BTCUSDT")
     start_time: datetime,                        # Start time in UTC
     end_time: datetime,                          # End time in UTC
@@ -228,7 +228,7 @@ async def get_data(
 
 ```python
 # Create a DataSourceManager for funding rate data
-async with DataSourceManager(
+with DataSourceManager(
     market_type=MarketType.FUTURES_USDT,
     provider=DataProvider.BINANCE,
     chart_type=ChartType.FUNDING_RATE,
@@ -236,7 +236,7 @@ async with DataSourceManager(
     use_cache=True,
 ) as dsm:
     # Fetch funding rate data
-    funding_df = await dsm.get_data(
+    funding_df = dsm.get_data(
         symbol="BTCUSDT",
         start_time=start_time,
         end_time=end_time,
@@ -248,14 +248,14 @@ async with DataSourceManager(
 
 ```python
 # Create a DataSourceManager that can handle all data types
-async with DataSourceManager(
+with DataSourceManager(
     market_type=MarketType.FUTURES_USDT,
     provider=DataProvider.BINANCE,
     cache_dir=Path("./cache"),
     use_cache=True,
 ) as dsm:
     # Fetch price data
-    klines_df = await dsm.get_data(
+    klines_df = dsm.get_data(
         symbol="BTCUSDT",
         start_time=start_time,
         end_time=end_time,
@@ -264,7 +264,7 @@ async with DataSourceManager(
     )
 
     # Fetch funding rate data from the same manager
-    funding_df = await dsm.get_data(
+    funding_df = dsm.get_data(
         symbol="BTCUSDT",
         start_time=start_time,
         end_time=end_time,

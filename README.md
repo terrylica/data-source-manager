@@ -92,20 +92,20 @@ The `scripts/binance_vision_api_aws_s3/reports/spot_synchronal.csv` file is part
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from core.data_source_manager import DataSourceManager
+from core.sync.data_source_manager import DataSourceManager
 
 # Set time range for data retrieval
 end_time = datetime.now(timezone.utc)
 start_time = end_time - timedelta(days=5)
 
-async def basic_example():
+def basic_example():
     # Initialize DataSourceManager using the factory method
-    async with DataSourceManager.create(
+    with DataSourceManager.create(
         market_type=MarketType.SPOT,  # Required: Specify market type
         cache_dir=Path("./cache"),     # Optional: Specify cache directory
     ) as dsm:
         # Fetch data
-        df = await dsm.get_data(
+        df = dsm.get_data(
             symbol="BTCUSDT",          # Required: Trading pair symbol
             start_time=start_time,     # Required: Start time (UTC)
             end_time=end_time,         # Required: End time (UTC)
@@ -122,13 +122,13 @@ async def basic_example():
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from core.data_source_manager import DataSourceManager
+from core.sync.data_source_manager import DataSourceManager
 
 # Set time range for data retrieval
 end_time = datetime.now(timezone.utc)
 start_time = end_time - timedelta(days=5)
 
-async def config_example():
+def config_example():
     # Create manager configuration
     config = DataSourceConfig.create(
         market_type=MarketType.SPOT,   # Required: Market type
@@ -137,7 +137,7 @@ async def config_example():
     )
 
     # Initialize DataSourceManager with configuration
-    async with DataSourceManager.create(
+    with DataSourceManager.create(
         MarketType.SPOT,               # Shorthand for market_type
         **config.__dict__,             # Pass all config values
     ) as dsm:
@@ -150,7 +150,7 @@ async def config_example():
         )
 
         # Query data with configuration object
-        df = await dsm.query_data(query)
+        df = dsm.query_data(query)
 
         print(f"Retrieved {len(df)} records")
         print(df.head())
@@ -162,16 +162,16 @@ You can configure a global default market type to simplify code when working pri
 
 ```python
 from utils.market_constraints import MarketType
-from core.data_source_manager import DataSourceManager
+from core.sync.data_source_manager import DataSourceManager
 
 # Configure FUTURES_USDT as the default market type for all new instances
 DataSourceManager.configure_defaults(MarketType.FUTURES_USDT)
 
-async def futures_example():
+def futures_example():
     # Create manager with default market type (FUTURES_USDT)
-    async with DataSourceManager.create() as dsm:
+    with DataSourceManager.create() as dsm:
         # Fetch futures data
-        df = await dsm.get_data(
+        df = dsm.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -181,9 +181,9 @@ async def futures_example():
         print(f"Retrieved {len(df)} FUTURES_USDT records")
 
     # You can still override the default when needed
-    async with DataSourceManager.create(MarketType.SPOT) as spot_dsm:
+    with DataSourceManager.create(MarketType.SPOT) as spot_dsm:
         # Fetch spot data
-        spot_df = await spot_dsm.get_data(
+        spot_df = spot_dsm.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -199,22 +199,22 @@ async def futures_example():
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from core.data_source_manager import DataSourceManager
+from core.sync.data_source_manager import DataSourceManager
 
 # Set time range for data retrieval
 end_time = datetime.now(timezone.utc)
 start_time = end_time - timedelta(days=5)
 
-async def funding_rate_example():
+def funding_rate_example():
     # Initialize DataSourceManager for funding rate data
-    async with DataSourceManager.create(
+    with DataSourceManager.create(
         market_type=MarketType.FUTURES_USDT,
         chart_type=ChartType.FUNDING_RATE,
         cache_dir=Path("./cache"),
         use_httpx=True,  # Use httpx instead of curl_cffi for better stability
     ) as dsm:
         # Fetch funding rate data
-        df = await dsm.get_data(
+        df = dsm.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -228,9 +228,9 @@ async def funding_rate_example():
 ### Working with Multiple Data Types
 
 ```python
-async def multi_data_example():
+def multi_data_example():
     # Create a DataSourceManager that can handle all data types
-    async with DataSourceManager.create(
+    with DataSourceManager.create(
         market_type=MarketType.FUTURES_USDT,
         cache_dir=Path("./cache"),
     ) as dsm:
@@ -253,8 +253,8 @@ async def multi_data_example():
         )
 
         # Fetch both data types from the same manager
-        klines_df = await dsm.query_data(klines_query)
-        funding_df = await dsm.query_data(funding_query)
+        klines_df = dsm.query_data(klines_query)
+        funding_df = dsm.query_data(funding_query)
 
         print(f"Retrieved {len(klines_df)} kline records and {len(funding_df)} funding rate records")
 ```
@@ -262,10 +262,10 @@ async def multi_data_example():
 ### Forcing Specific Data Sources
 
 ```python
-from core.data_source_manager import DataSource
+from core.sync.data_source_manager import DataSource
 
-async def force_data_source_example():
-    async with DataSourceManager.create(MarketType.SPOT) as dsm:
+def force_data_source_example():
+    with DataSourceManager.create(MarketType.SPOT) as dsm:
         # Create query that forces REST API usage
         rest_query = DataQueryConfig.create(
             symbol="BTCUSDT",
@@ -283,8 +283,8 @@ async def force_data_source_example():
         )
 
         # Execute both queries
-        rest_df = await dsm.query_data(rest_query)
-        vision_df = await dsm.query_data(vision_query)
+        rest_df = dsm.query_data(rest_query)
+        vision_df = dsm.query_data(vision_query)
 ```
 
 ## Performance Characteristics
@@ -312,7 +312,7 @@ manager = DataSourceManager.create(
 )
 
 # Query data with the manager
-df = await manager.get_data(
+df = manager.get_data(
     symbol="BTCUSDT",  # Required: Trading pair symbol
     start_time=datetime(...),  # Required: Start time (UTC)
     end_time=datetime(...),  # Required: End time (UTC)
@@ -330,7 +330,7 @@ query_config = DataQueryConfig.create(
     end_time=datetime(...),  # Required: End time (UTC)
     interval=Interval.MINUTE_1,  # Optional: Time interval
 )
-df = await manager.query_data(query_config)
+df = manager.query_data(query_config)
 ```
 
 ## Architecture

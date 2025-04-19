@@ -79,15 +79,15 @@ Parameters:
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from core.data_source_manager import DataSourceManager
+from core.sync.data_source_manager import DataSourceManager
 
 # Set time range for data retrieval
 end_time = datetime.now(timezone.utc)
 start_time = end_time - timedelta(days=30)  # Last 30 days of funding rate data
 
-async def funding_rate_example():
+def funding_rate_example():
     # Initialize DataSourceManager for funding rate data
-    async with DataSourceManager(
+    with DataSourceManager(
         market_type=MarketType.FUTURES_USDT,
         provider=DataProvider.BINANCE,
         chart_type=ChartType.FUNDING_RATE,
@@ -95,7 +95,7 @@ async def funding_rate_example():
         use_cache=True,
     ) as dsm:
         # Fetch funding rate data
-        df = await dsm.get_data(
+        df = dsm.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,

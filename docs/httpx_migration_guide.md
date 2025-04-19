@@ -25,7 +25,7 @@ Switching to `httpx` provides a more reliable alternative that:
 The simplest way to switch is to use the `use_httpx` parameter when creating a `DataSourceManager`:
 
 ```python
-from core.data_source_manager import DataSourceManager
+from core.sync.data_source_manager import DataSourceManager
 from utils.market_constraints import MarketType
 
 # Create a DataSourceManager with httpx
@@ -35,7 +35,7 @@ manager = DataSourceManager(
 )
 
 # Use the manager as usual
-async with manager:
+with manager:
     # Your data retrieval code here
     ...
 ```
@@ -43,7 +43,7 @@ async with manager:
 This parameter is also available on the `RestDataClient` class:
 
 ```python
-from core.rest_data_client import RestDataClient
+from core.sync.rest_data_client import RestDataClient
 from utils.market_constraints import MarketType
 
 # Create a RestDataClient with httpx
@@ -53,7 +53,7 @@ client = RestDataClient(
 )
 
 # Use the client as usual
-async with client:
+with client:
     # Your data retrieval code here
     ...
 ```
@@ -64,7 +64,7 @@ For more control, you can create a custom `httpx` client:
 
 ```python
 from utils.network_utils import create_httpx_client
-from core.rest_data_client import RestDataClient
+from core.sync.rest_data_client import RestDataClient
 from utils.market_constraints import MarketType
 
 # Create a custom httpx client
@@ -81,7 +81,7 @@ client = RestDataClient(
 )
 
 # The client will use your custom httpx client
-async with client:
+with client:
     # Your data retrieval code here
     ...
 ```

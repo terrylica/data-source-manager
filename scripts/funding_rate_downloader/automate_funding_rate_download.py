@@ -2,7 +2,6 @@
 
 from utils.logger_setup import logger
 import pandas as pd
-import asyncio
 import os
 from datetime import datetime
 import argparse
