@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Data source manager that mediates between different data sources."""
+"""Data Source Manager (DSM) that mediates between different data sources."""
 
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Tuple, TypeVar, Type, List, Union
@@ -32,7 +32,7 @@ from utils.dataframe_utils import (
 from core.sync.rest_data_client import RestDataClient
 from core.sync.vision_data_client import VisionDataClient
 from core.sync.cache_manager import UnifiedCacheManager
-from core.sync.vision_constraints import is_date_too_fresh_for_vision
+from utils.for_core.vision_constraints import is_date_too_fresh_for_vision
 
 
 class DataSource(Enum):

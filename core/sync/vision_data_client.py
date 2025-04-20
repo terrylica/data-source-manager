@@ -48,7 +48,10 @@ from utils.config import (
     FileType,
 )
 from utils.dataframe_types import TimestampedDataFrame
-from core.sync.vision_constraints import get_vision_url, is_date_too_fresh_for_vision
+from utils.for_core.vision_constraints import (
+    get_vision_url,
+    is_date_too_fresh_for_vision,
+)
 from utils.gap_detector import detect_gaps
 from utils.dataframe_utils import ensure_open_time_as_column
 from core.sync.data_client_interface import DataClientInterface

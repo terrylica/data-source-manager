@@ -14,7 +14,7 @@ Key Features:
 - Concurrent download management
 """
 
-from core.vision_constraints import TimestampedDataFrame
-from core.vision_data_client import VisionDataClient
+from utils.for_core.vision_constraints import TimestampedDataFrame
+from core.sync.vision_data_client import VisionDataClient
 
 __all__ = ["VisionDataClient", "TimestampedDataFrame"]
