@@ -17,13 +17,12 @@ directly with this client.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Sequence, TypeVar, Generic, Union, List, Dict, Tuple
+from typing import Optional, TypeVar, Generic, Union, List, Dict, Tuple
 import os
 import tempfile
 import zipfile
 import httpx
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import re
 from pathlib import Path
 import pandas as pd
 from tenacity import (
@@ -41,10 +40,7 @@ from utils.market_constraints import (
     ChartType,
     get_market_capabilities,
 )
-from utils.time_utils import (
-    filter_dataframe_by_time,
-    detect_timestamp_unit,
-)
+from utils.time_utils import filter_dataframe_by_time
 from utils.config import (
     KLINE_COLUMNS,
     MAXIMUM_CONCURRENT_DOWNLOADS,
@@ -253,10 +249,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
                 # Use the validated interval for URL construction
                 base_interval = self._interval_str
-                logger.debug(
-                    f"Using interval {base_interval} for URL construction (market: {market_type_enum.name})"
-                )
-
             except ValueError as e:
                 logger.error(
                     f"Invalid interval format: {self._interval_str}. Error: {e}"
@@ -270,9 +262,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 file_type=FileType.DATA,
                 market_type=self.market_type_str,
             )
-
-            # Log the constructed URL for debugging
-            logger.debug(f"Vision API URL: {url}")
 
             # Create the checksum URL
             checksum_url = get_vision_url(
@@ -320,47 +309,15 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 # Get checksum content
                 checksum_content = checksum_response.content
 
-                # Log the raw checksum content for debugging
-                content_length = len(checksum_content)
-                preview_length = min(40, content_length)
-                truncated_content = checksum_content[:preview_length]
-                logger.debug(
-                    f"Raw checksum content: {truncated_content!r} (+ {content_length - preview_length} more bytes, {content_length} total)"
-                )
-
                 # Save checksum to the temporary file
                 with open(temp_checksum_path, "wb") as f:
                     f.write(checksum_content)
 
-                # Print content of the saved file for debugging
-                try:
-                    with open(temp_checksum_path, "rb") as f:
-                        file_content = f.read()
-                        content_length = len(file_content)
-                        preview_length = min(30, content_length)
-
-                        # Create a concise preview of the checksum content
-                        if content_length > 0:
-                            content_preview = file_content[:preview_length]
-                            remaining = content_length - preview_length
-                            logger.debug(
-                                f"CHECKSUM FILE SUMMARY: {content_preview!r} ({remaining} more bytes, {content_length} total)"
-                            )
-                        else:
-                            logger.warning(f"CHECKSUM FILE EMPTY (0 bytes)")
-                except Exception as e:
-                    logger.critical(f"Error reading checksum file: {e}")
-
                 # Log file size after saving
                 checksum_file_size = temp_checksum_path.stat().st_size
-                logger.debug(f"Saved checksum file size: {checksum_file_size} bytes")
 
-                # If the checksum file is empty or suspiciously small, log a warning but continue
-                if checksum_file_size < 10:
-                    logger.warning(
-                        f"Checksum file is suspiciously small: {checksum_file_size} bytes. Skipping verification."
-                    )
-                else:
+                # If the checksum file is not empty or too small, verify checksum
+                if checksum_file_size >= 10:
                     # Verify checksum if available
                     try:
                         from utils.for_core.vision_checksum import (
@@ -371,15 +328,10 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                         # Small delay to ensure filesystem sync
                         time.sleep(0.1)
 
-                        # Skip the problematic standard verification and go straight to direct verification
-                        logger.debug(
-                            f"Verifying checksum for {date.date()} - data file: {temp_file_path}"
-                        )
-
-                        # Directly calculate the checksum using our own method
+                        # Calculate the checksum
                         actual_checksum = calculate_sha256_direct(temp_file_path)
 
-                        # For debugging purposes, also get the expected checksum if possible
+                        # Extract expected checksum
                         expected_checksum = None
                         try:
                             # Try to read the checksum file directly
@@ -419,10 +371,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                             logger.debug(
                                 f"Could not extract checksum from file: {extract_e}"
                             )
-
-                        # If we couldn't read the expected checksum, self-verify
-                        if expected_checksum is None:
-                            logger.info(f"Self-verification passed for {date.date()}")
 
                     except Exception as e:
                         # Only log a warning, don't set checksum_failed
@@ -515,24 +463,18 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             except Exception as e:
                 logger.warning(f"Error cleaning up temporary files: {e}")
 
-        # If checksum verification failed, return None with a warning
-        if checksum_failed:
-            return None, f"Checksum verification failed for {date.date()}"
-
         return None, None
 
     def _download_data(
         self,
         start_time: datetime,
         end_time: datetime,
-        columns: Optional[Sequence[str]] = None,
     ) -> TimestampedDataFrame:
         """Download data from Binance Vision API for a specific time range.
 
         Args:
             start_time: Start time
             end_time: End time
-            columns: Optional column names to use
 
         Returns:
             TimestampedDataFrame with downloaded data
@@ -596,7 +538,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                         df, warning = future.result()
                         if warning:
                             # Only track actual checksum failures as warnings
-                            # Ignore checksum extraction issues
                             if (
                                 "Checksum verification failed" in warning
                                 and "extraction" not in warning
@@ -620,45 +561,36 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                         logger.error(
                             f"Error downloading data for {date}: {exc} - This date will be treated as unavailable"
                         )
-                        # Note: We silently continue without adding this date to downloaded_dfs
 
             # After all downloads, check if there were any checksum failures
             if checksum_failures:
                 failed_dates = [d.strftime("%Y-%m-%d") for d, _ in checksum_failures]
-
-                error_msg = (
+                logger.critical(
                     f"CRITICAL: Checksum verification failed for {len(checksum_failures)} files: {', '.join(failed_dates)}. "
                     f"Data integrity is compromised. This indicates possible data corruption "
                     f"or tampering with the Binance Vision API data."
                 )
-                logger.critical(error_msg)
-
-                # Instead of raising an exception, continue with a warning
                 logger.warning(
                     "Proceeding with data despite checksum verification failures"
                 )
-
         except Exception as e:
             logger.error(f"Error in ThreadPoolExecutor: {e}")
             # Re-raise if this was a checksum failure
             if "Checksum verification failed" in str(e):
                 raise
 
-        # If no data was downloaded, log a consolidated warning and return empty dataframe
+        # If no data was downloaded, return empty dataframe with consolidated warning
         if not downloaded_dfs:
-            # Check if we have specific warnings about missing dates
             if warning_messages:
                 # Group warnings about 404 (missing data)
                 missing_dates = []
                 for msg in warning_messages:
                     if "404" in msg:
-                        # Fix the date extraction to properly get the date value
                         parts = msg.split("for ")
                         if len(parts) > 1:
                             missing_dates.append(parts[1].strip())
 
                 if missing_dates:
-                    # Log a consolidated warning instead of individual ones
                     dates_str = ", ".join(missing_dates)
                     logger.warning(
                         f"No data downloaded from Binance Vision API - dates not available: {dates_str}. "
@@ -666,13 +598,11 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                         f"Returning empty dataframe - higher-level components may fall back to REST API."
                     )
                 else:
-                    # Log a generic warning for other issues
                     logger.warning(
                         "No data downloaded from Binance Vision API - this may happen for recent data or less common markets. "
                         "Returning empty dataframe - higher-level components may fall back to REST API."
                     )
             else:
-                # No specific warnings
                 logger.warning(
                     "No data downloaded from Binance Vision API - this may happen for recent data or less common markets. "
                     "Returning empty dataframe - higher-level components may fall back to REST API."
@@ -703,11 +633,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             )
 
         # Filter data to requested time range
-        logger.debug(
-            f"Filtering dataframe with time range: {start_time} (inclusive) to {end_time} (inclusive)"
-        )
-
-        # Filter data to requested time range
         filtered_df = filter_dataframe_by_time(
             concatenated_df, start_time, end_time, "open_time"
         )
@@ -715,14 +640,12 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         # Log filtering results for debugging
         if not filtered_df.empty:
             logger.debug(f"Filtered dataframe contains {len(filtered_df)} rows")
-            logger.debug(f"DataFrame columns: {list(filtered_df.columns)}")
         else:
             logger.warning(
                 "Filtered dataframe is empty - no data within requested time range"
             )
 
-        # Use gap_detector to find gaps
-        # Convert the interval string to Interval enum for proper gap detection
+        # Find gaps in the data
         try:
             interval_obj = next(
                 (i for i in Interval if i.value == self._interval_str), None
@@ -736,26 +659,20 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             logger.warning(f"Error parsing interval for gap detection: {e}")
             interval_obj = Interval.MINUTE_1
 
-        logger.debug(f"Using interval {interval_obj.value} for gap detection")
-
-        # Detect gaps in the data using the standardized gap_detector
-        # Only enforce min span requirement if we're querying a longer timeframe
+        # Detect gaps in the data
         time_span_days = (end_time - start_time).total_seconds() / 86400
         min_span_required = time_span_days > 1
 
         if filtered_df.empty:
             gaps = []
-            logger.debug("Skipping gap detection for empty dataframe")
         else:
             try:
-                # Create a copy to ensure we don't modify the original
                 df_for_gap_detection = filtered_df.copy()
 
                 # Ensure open_time is present and is a datetime type
                 if "open_time" not in df_for_gap_detection.columns and isinstance(
                     df_for_gap_detection.index, pd.DatetimeIndex
                 ):
-                    logger.debug("Adding open_time column from index for gap detection")
                     df_for_gap_detection["open_time"] = df_for_gap_detection.index
                 elif (
                     "open_time" in df_for_gap_detection.columns
@@ -763,9 +680,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                         df_for_gap_detection["open_time"]
                     )
                 ):
-                    logger.debug(
-                        f"Converting open_time to datetime - current type: {df_for_gap_detection['open_time'].dtype}"
-                    )
                     try:
                         df_for_gap_detection["open_time"] = pd.to_datetime(
                             df_for_gap_detection["open_time"], unit="ms", utc=True
@@ -775,34 +689,19 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
                 # Check if we have a valid time column now
                 if "open_time" in df_for_gap_detection.columns:
-                    logger.debug("Using open_time column for gap detection")
                     gaps, stats = detect_gaps(
                         df_for_gap_detection,
                         interval_obj,
                         time_column="open_time",
                         enforce_min_span=min_span_required,
                     )
+                    if gaps:
+                        logger.debug(f"Detected {len(gaps)} gaps in Vision data")
                 else:
                     logger.warning("No open_time column available for gap detection")
                     gaps = []
-                    stats = {"total_gaps": 0}
-
-                # Log the gaps and stats
-                if gaps:
-                    logger.debug(f"Detected {len(gaps)} gaps in Vision data")
-                    logger.debug(f"Gap stats: {stats}")
-                    for gap in gaps:
-                        logger.debug(
-                            f"Gap: {gap.start_time} to {gap.end_time} ({gap.duration.total_seconds()}s)"
-                        )
-                else:
-                    logger.debug("No gaps detected in Vision data")
-
             except Exception as e:
                 logger.error(f"Error detecting gaps: {e}")
-                import traceback
-
-                logger.error(f"Traceback: {traceback.format_exc()}")
                 gaps = []
 
         # Check for day boundary gaps (gaps at midnight)
@@ -811,7 +710,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         # Try to fill day boundary gaps using REST API
         if boundary_gaps:
             logger.debug(
-                f"Detected {len(boundary_gaps)} day boundary gaps. Attempting to fill specific gaps with REST API data."
+                f"Detected {len(boundary_gaps)} day boundary gaps. Attempting to fill with REST API data."
             )
             filled_df = fill_boundary_gaps_with_rest(
                 filtered_df,
@@ -827,8 +726,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 )
             else:
                 logger.warning(
-                    f"Failed to fill {len(boundary_gaps)} boundary gaps with REST API. "
-                    f"Continuing with potentially incomplete data."
+                    f"Failed to fill {len(boundary_gaps)} boundary gaps with REST API."
                 )
 
         # Store original timestamp for reference
@@ -837,85 +735,34 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             and "original_timestamp" not in filtered_df.columns
         ):
             filtered_df["original_timestamp"] = filtered_df["open_time"]
-            logger.debug("Preserved original open_time timestamp for reference")
 
-        # Log timestamp semantics for debugging
-        logger.debug(
-            "Creating TimestampedDataFrame with timestamps representing the START of each candle period"
-        )
-
-        # First check if we should be using open_time_us as index
+        # Create TimestampedDataFrame based on available columns
         if (
             "open_time_us" not in filtered_df.columns
             and "open_time" in filtered_df.columns
         ):
-            logger.debug(f"Creating TimestampedDataFrame using open_time as index")
-
-            # Create a copy to maintain the original dataframe
             df_for_index = filtered_df.copy()
-
-            # IMPORTANT: When setting open_time as index, we're preserving the semantic meaning
-            # that open_time represents the BEGINNING of the candle period for all interval types
             df_for_index = df_for_index.set_index("open_time")
-
-            # Log the first and last timestamps for debugging
-            if not df_for_index.empty:
-                logger.debug(
-                    f"First index timestamp: {df_for_index.index[0]} (represents BEGINNING of candle)"
-                )
-                logger.debug(
-                    f"Last index timestamp: {df_for_index.index[-1]} (represents BEGINNING of candle)"
-                )
-
-            # Create TimestampedDataFrame preserving exact timestamps and their semantic meaning
-            timestamped_df = TimestampedDataFrame(df_for_index)
-
-            return timestamped_df
+            return TimestampedDataFrame(df_for_index)
         elif "open_time_us" in filtered_df.columns:
-            # If open_time_us exists, use it as index
             df_for_index = filtered_df.copy()
-
             if "open_time" in df_for_index.columns:
-                # Avoid ambiguity by removing open_time column before setting index
                 df_for_index = df_for_index.drop(columns=["open_time"])
-
-            # Set open_time_us as index
             df_for_index = df_for_index.set_index("open_time_us")
-            logger.debug(
-                f"Set index to open_time_us with first value {df_for_index.index[0] if not df_for_index.empty else 'N/A'}"
-            )
-
             return TimestampedDataFrame(df_for_index)
         else:
-            # If neither column exists, just return the filtered dataframe
-            # TimestampedDataFrame initialization will handle validation
-            logger.debug("No timestamp column found for index, returning as is")
-            # Check if the dataframe has required columns before attempting to create TimestampedDataFrame
             if filtered_df.empty:
-                logger.warning(
-                    "Filtered dataframe is empty, returning empty TimestampedDataFrame"
-                )
                 return self.create_empty_dataframe()
-
-            # Debug the available columns
-            logger.debug(
-                f"Available columns in filtered_df: {list(filtered_df.columns)}"
-            )
 
             # Check if open_time column exists, add it if necessary
             if "open_time" not in filtered_df.columns:
-                # Try to find an alternative time column
                 time_cols = [
                     col for col in filtered_df.columns if "time" in col.lower()
                 ]
                 if time_cols:
-                    logger.debug(f"Found alternative time columns: {time_cols}")
-                    # Use the first available time column
                     filtered_df["open_time"] = filtered_df[time_cols[0]]
-                    logger.debug(f"Created open_time from {time_cols[0]}")
                 else:
                     logger.error("No suitable time column found to create open_time")
-                    # Return empty dataframe to avoid KeyError
                     return self.create_empty_dataframe()
 
             return TimestampedDataFrame(filtered_df)
@@ -963,10 +810,8 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             symbol = self._symbol
         elif symbol != self._symbol:
             logger.warning(
-                f"Symbol mismatch: requested {symbol}, client configured for {self._symbol}. "
-                f"Using client configuration."
+                f"Symbol mismatch: requested {symbol}, client configured for {self._symbol}. Using client configuration."
             )
-            # Continue with the client's configured symbol
 
         if not isinstance(interval, str) or not interval:
             logger.warning(
@@ -975,10 +820,8 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             interval = self._interval_str
         elif interval != self._interval_str:
             logger.warning(
-                f"Interval mismatch: requested {interval}, client configured for {self._interval_str}. "
-                f"Using client configuration."
+                f"Interval mismatch: requested {interval}, client configured for {self._interval_str}. Using client configuration."
             )
-            # Continue with the client's configured interval
 
         if not isinstance(start_time, datetime) or not isinstance(end_time, datetime):
             raise ValueError("Start time and end time must be datetime objects")
@@ -995,9 +838,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
             # Calculate date range
             delta_days = (end_time - start_time).days + 1
-            logger.debug(
-                f"Requested date range spans {delta_days} days from {start_time} to {end_time}"
-            )
 
             # Log if it's a large request
             if delta_days > 90:
@@ -1007,50 +847,37 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
             # Download data
             try:
-                logger.debug(f"Calling _download_data from {start_time} to {end_time}")
                 timestamped_df = self._download_data(start_time, end_time)
 
-                # Use the centralized utility to ensure open_time is properly handled
-                # Convert to standard pandas DataFrame first
+                # Convert to standard pandas DataFrame
                 if hasattr(timestamped_df, "to_pandas"):
                     df = timestamped_df.to_pandas()
-                    logger.debug(
-                        f"Converted TimestampedDataFrame to DataFrame using to_pandas()"
-                    )
                 else:
                     df = pd.DataFrame(timestamped_df)
-                    logger.debug(
-                        f"Converted TimestampedDataFrame using pd.DataFrame constructor"
-                    )
 
                 # Ensure open_time is properly handled
                 df = ensure_open_time_as_column(df)
-
-                logger.debug(f"Final DataFrame columns: {list(df.columns)}")
-                logger.debug(f"Final DataFrame has {len(df)} rows")
-
                 return df
+
             except Exception as e:
                 if "Checksum verification failed" in str(e):
                     # Log but don't stop execution for checksum failures
                     logger.critical(f"Checksum verification issues detected: {e}")
                     logger.warning("Continuing despite checksum verification issues")
+
                     # Return the data we have, or empty dataframe if none
                     if "df" in locals() and df is not None and not df.empty:
                         logger.info(f"Returning {len(df)} rows despite checksum issues")
                         return df
                     else:
-                        # Change from warning to critical
                         logger.critical(
                             "No data available due to checksum verification failure"
                         )
                         raise RuntimeError(f"VISION API DATA INTEGRITY ERROR: {str(e)}")
                 else:
                     logger.error(f"Error in _download_data: {e}")
-                    import traceback
-
-                    logger.error(f"Traceback: {traceback.format_exc()}")
                     raise
+
         except Exception as e:
             # Check if this is a checksum error that needs to be propagated
             if "Checksum verification failed" in str(
@@ -1060,7 +887,6 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 raise
 
             # Check if the request is within the allowed delay window for Vision API
-            # Only tolerate failures for recent data that may not be available yet
             current_time = datetime.now(timezone.utc)
             vision_delay = timedelta(hours=VISION_DATA_DELAY_HOURS)
 
@@ -1119,7 +945,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         # Log large requests but don't limit them
         if delta_days > 90:
             logger.info(
-                f"Processing a large date range of {delta_days} days for {len(symbols)} symbols. This is supported with parallel downloads."
+                f"Processing a large date range of {delta_days} days for {len(symbols)} symbols with parallel downloads."
             )
 
         logger.info(
@@ -1138,12 +964,12 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 return symbol, df
             except Exception as e:
                 logger.error(f"Error fetching data for {symbol}: {e}")
-                # Rather than silently returning an empty dataframe, propagate critical errors
+                # Propagate critical errors
                 if "CRITICAL ERROR" in str(e) or "DATA INTEGRITY ERROR" in str(e):
                     logger.critical(f"Critical download failure for {symbol}: {e}")
-                    raise  # Propagate critical errors to trigger proper handling
+                    raise
 
-                # Only create empty dataframe for non-critical errors
+                # Return empty dataframe for non-critical errors
                 logger.warning(
                     f"Non-critical error for {symbol}, returning empty dataframe"
                 )
