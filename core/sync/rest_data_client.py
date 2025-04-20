@@ -508,21 +508,6 @@ class RestDataClient(DataClientInterface):
         # Return the interval duration
         return interval_map.get(interval, 60 * 1000)  # Default to 1 minute if unknown
 
-    def _align_interval_boundaries(
-        self, start_time: datetime, end_time: datetime, interval: Interval
-    ) -> Tuple[datetime, datetime]:
-        """Align time boundaries to interval boundaries.
-
-        Args:
-            start_time: Start time
-            end_time: End time
-            interval: Time interval
-
-        Returns:
-            Aligned start and end times
-        """
-        return align_time_boundaries(start_time, end_time, interval)
-
     def fetch(
         self,
         symbol: str,
@@ -630,15 +615,10 @@ class RestDataClient(DataClientInterface):
         # Process the data into a DataFrame
         df = process_kline_data(all_data)
 
-        # Filter to requested time range - check signature before calling
-        try:
-            # First try with 4 arguments (newer signature)
-            filtered_df = filter_dataframe_by_time(
-                df, aligned_start, aligned_end, "open_time"
-            )
-        except TypeError:
-            # Fall back to 3 arguments (older signature)
-            filtered_df = filter_dataframe_by_time(df, aligned_start, aligned_end)
+        # Filter to requested time range
+        filtered_df = filter_dataframe_by_time(
+            df, aligned_start, aligned_end, "open_time"
+        )
 
         # Log success stats
         logger.info(
@@ -647,30 +627,6 @@ class RestDataClient(DataClientInterface):
         )
 
         return filtered_df
-
-    def _estimate_expected_records(
-        self, start_time: datetime, end_time: datetime, interval: Interval
-    ) -> int:
-        """Estimate the expected number of records for a time range.
-
-        Args:
-            start_time: Start time
-            end_time: End time
-            interval: Time interval
-
-        Returns:
-            Estimated number of records
-        """
-        # Calculate time difference in seconds
-        time_diff = (end_time - start_time).total_seconds()
-
-        # Get interval duration in seconds
-        interval_seconds = self._get_interval_ms(interval) / 1000
-
-        # Calculate expected records
-        expected_records = int(time_diff / interval_seconds) + 1
-
-        return expected_records
 
     def create_empty_dataframe(self) -> pd.DataFrame:
         """Create an empty DataFrame with the correct structure.
