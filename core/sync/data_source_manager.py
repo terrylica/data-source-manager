@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Data Source Manager (DSM) that mediates between different data sources."""
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Optional, Tuple, TypeVar, Type, List, Union
+from datetime import datetime
+from typing import Dict, Optional, Tuple, TypeVar, Type, List
 from enum import Enum, auto
 import pandas as pd
 from pathlib import Path
@@ -11,11 +11,7 @@ from dataclasses import dataclass
 from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
 from utils.market_utils import get_market_type_str
-from utils.time_utils import (
-    filter_dataframe_by_time,
-    align_time_boundaries,
-    standardize_timestamp_precision,
-)
+from utils.time_utils import align_time_boundaries
 from utils.config import (
     OUTPUT_DTYPES,
     FUNDING_RATE_DTYPES,
@@ -23,16 +19,25 @@ from utils.config import (
     REST_CHUNK_SIZE,
     REST_MAX_CHUNKS,
     create_empty_dataframe,
-    REST_IS_STANDARD,
-)
-from utils.dataframe_utils import (
-    ensure_open_time_as_column,
-    standardize_dataframe,
 )
 from core.sync.rest_data_client import RestDataClient
 from core.sync.vision_data_client import VisionDataClient
 from core.sync.cache_manager import UnifiedCacheManager
-from utils.for_core.vision_constraints import is_date_too_fresh_for_vision
+from utils.for_core.dsm_time_range_utils import (
+    merge_adjacent_ranges,
+    standardize_columns,
+    identify_missing_segments,
+    merge_dataframes,
+)
+from utils.for_core.dsm_cache_utils import (
+    save_to_cache,
+    get_from_cache,
+)
+from utils.for_core.dsm_api_utils import (
+    fetch_from_vision,
+    fetch_from_rest,
+    create_client_if_needed,
+)
 
 
 class DataSource(Enum):
@@ -324,737 +329,88 @@ class DataSourceManager:
     def _get_from_cache(
         self, symbol: str, start_time: datetime, end_time: datetime, interval: Interval
     ) -> Tuple[pd.DataFrame, List[Tuple[datetime, datetime]]]:
-        """Retrieve data from cache and identify missing ranges.
-
-        Args:
-            symbol: Symbol to retrieve data for
-            start_time: Start time for data retrieval
-            end_time: End time for data retrieval
-            interval: Time interval between data points
-
-        Returns:
-            Tuple of (cached DataFrame, list of missing date ranges)
-        """
-        if not self.use_cache or self.cache_manager is None:
-            # Return empty DataFrame and the entire date range as missing
+        """Retrieve data from cache and identify missing ranges using the utility function."""
+        if not self.use_cache:
             logger.debug(
-                f"Cache disabled or not initialized. Returning entire range as missing: {start_time} to {end_time}"
+                f"Cache disabled. Returning entire range as missing: {start_time} to {end_time}"
             )
             return create_empty_dataframe(), [(start_time, end_time)]
 
-        # Align time boundaries
-        aligned_start, aligned_end = align_time_boundaries(
-            start_time, end_time, interval
+        return get_from_cache(
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            interval=interval,
+            cache_manager=self.cache_manager,
+            provider=self.provider.name,
+            chart_type=self.chart_type.name,
+            market_type=self._get_market_type_str(),
         )
-
-        logger.debug(
-            f"[FCP] Cache retrieval with aligned boundaries: {aligned_start} to {aligned_end}"
-        )
-
-        # Get market type string for cache key
-        market_type_str = self._get_market_type_str()
-
-        # Generate list of dates in the range
-        dates = []
-        current_date = aligned_start.replace(hour=0, minute=0, second=0, microsecond=0)
-        while current_date <= aligned_end:
-            dates.append(current_date)
-            current_date += timedelta(days=1)
-
-        logger.debug(
-            f"[FCP] Checking cache for {len(dates)} dates from {dates[0].date()} to {dates[-1].date()}"
-        )
-
-        # Try to load each date from cache
-        cached_dfs = []
-        missing_ranges = []
-        last_missing_start = None
-        incomplete_days = []
-        all_empty = True
-
-        for date in dates:
-            df = self.cache_manager.load_from_cache(
-                symbol=symbol,
-                interval=interval.value,
-                date=date,
-                provider=self.provider.name,
-                chart_type=self.chart_type.name,
-                market_type=market_type_str,
-            )
-
-            if df is not None and not df.empty:
-                all_empty = False
-                # Add source information
-                df["_data_source"] = "CACHE"
-
-                # Check if this day has complete data (1440 minutes for a full day)
-                expected_records = 1440  # Full day of 1-minute data
-                if len(df) < expected_records:
-                    incomplete_days.append((date, len(df)))
-                    logger.debug(
-                        f"[FCP] Day {date.date()} has incomplete data: {len(df)}/{expected_records} records"
-                    )
-                else:
-                    logger.debug(
-                        f"[FCP] Loaded {len(df)} records from cache for {date.date()}"
-                    )
-
-                cached_dfs.append(df)
-                # If we were tracking a missing range, close it
-                if last_missing_start is not None:
-                    missing_end = date - timedelta(microseconds=1)
-                    missing_ranges.append((last_missing_start, missing_end))
-                    logger.debug(
-                        f"[FCP] Identified missing range: {last_missing_start} to {missing_end}"
-                    )
-                    last_missing_start = None
-            else:
-                # Start tracking a missing range if we haven't already
-                if last_missing_start is None:
-                    last_missing_start = date
-                    logger.debug(
-                        f"[FCP] Started tracking missing range from {date.date()}"
-                    )
-
-        # Close any open missing range
-        if last_missing_start is not None:
-            missing_end = aligned_end
-            missing_ranges.append((last_missing_start, missing_end))
-            logger.debug(
-                f"[FCP] Closing final missing range: {last_missing_start} to {missing_end}"
-            )
-
-        # If we have no cached data, return empty DataFrame and the entire range as missing
-        if all_empty or not cached_dfs:
-            logger.debug(
-                f"[FCP] No cached data found for entire range. Missing: {aligned_start} to {aligned_end}"
-            )
-            return create_empty_dataframe(), [(aligned_start, aligned_end)]
-
-        # Combine cached DataFrames
-        combined_df = pd.concat(cached_dfs, ignore_index=True)
-        logger.debug(
-            f"[FCP] Combined {len(cached_dfs)} cache dataframes with total {len(combined_df)} records"
-        )
-
-        # Remove duplicates and sort by open_time
-        if not combined_df.empty:
-            combined_df = combined_df.drop_duplicates(subset=["open_time"])
-            combined_df = combined_df.sort_values("open_time").reset_index(drop=True)
-            logger.debug(
-                f"[FCP] After deduplication: {len(combined_df)} records from cache"
-            )
-
-            # Filter to requested time range
-            before_filter_len = len(combined_df)
-            combined_df = filter_dataframe_by_time(
-                combined_df, aligned_start, aligned_end, "open_time"
-            )
-            logger.debug(
-                f"[FCP] After time filtering: {len(combined_df)} records (removed {before_filter_len - len(combined_df)})"
-            )
-
-            # Check time bounds of the filtered data
-            if not combined_df.empty:
-                min_time = combined_df["open_time"].min()
-                max_time = combined_df["open_time"].max()
-                logger.debug(f"[FCP] Cache data spans from {min_time} to {max_time}")
-
-                # Check for gaps at the beginning or end of the range
-                if min_time > aligned_start:
-                    logger.debug(
-                        f"[FCP] Missing data at beginning: {aligned_start} to {min_time}"
-                    )
-                    missing_ranges.append(
-                        (aligned_start, min_time - timedelta(seconds=1))
-                    )
-
-                if max_time < aligned_end:
-                    # This is the critical fix - detect missing data at the end!
-                    logger.debug(
-                        f"[FCP] Missing data at end: {max_time} to {aligned_end}"
-                    )
-                    missing_ranges.append(
-                        (max_time + timedelta(minutes=1), aligned_end)
-                    )
-
-                # Now check for incomplete days and add them to missing ranges
-                # This ensures that days with just a few records get fully refreshed
-                for date, record_count in incomplete_days:
-                    # If this day is within our aligned range and significantly incomplete
-                    if (
-                        date.date() >= aligned_start.date()
-                        and date.date() <= aligned_end.date()
-                        and record_count < 1440 * 0.9
-                    ):  # If less than 90% complete
-
-                        # Create a range for this day
-                        day_start = date.replace(
-                            hour=0, minute=0, second=0, microsecond=0
-                        )
-                        day_end = date.replace(
-                            hour=23, minute=59, second=59, microsecond=999999
-                        )
-
-                        # If this is the first day, adjust start time
-                        if day_start.date() == aligned_start.date():
-                            day_start = aligned_start
-
-                        # If this is the last day, adjust end time
-                        if day_end.date() == aligned_end.date():
-                            day_end = aligned_end
-
-                        logger.debug(
-                            f"[FCP] Adding incomplete day to missing ranges: {day_start} to {day_end} ({record_count}/1440 records)"
-                        )
-                        missing_ranges.append((day_start, day_end))
-
-        # Merge overlapping or adjacent ranges
-        if missing_ranges:
-            merged_ranges = self._merge_adjacent_ranges(missing_ranges, interval)
-            logger.debug(
-                f"[FCP] Merged {len(missing_ranges)} missing ranges into {len(merged_ranges)} ranges"
-            )
-            missing_ranges = merged_ranges
-
-        # Log the missing ranges in detail
-        if missing_ranges:
-            for i, (miss_start, miss_end) in enumerate(missing_ranges):
-                logger.debug(
-                    f"[FCP] Missing range {i+1}/{len(missing_ranges)}: {miss_start} to {miss_end}"
-                )
-
-        return combined_df, missing_ranges
 
     def _save_to_cache(
         self, df: pd.DataFrame, symbol: str, interval: Interval, source: str = None
     ) -> None:
-        """Save data to cache.
-
-        Args:
-            df: DataFrame to cache
-            symbol: Symbol the data is for
-            interval: Time interval of the data
-            source: Data source (VISION, REST, etc.) - used to prioritize Vision API data for caching
-
-        Note:
-            Following the FCP mechanism requirements, Vision data is delivered in daily packs.
-            When Vision data is requested for any part of a day, the entire day's data is
-            downloaded and cached. This ensures complete daily data availability in the cache
-            regardless of the specific time range requested.
-        """
-        if not self.use_cache or self.cache_manager is None:
-            logger.debug(
-                "Caching disabled or cache manager is None - skipping cache save"
-            )
+        """Save data to cache using the utility function."""
+        if not self.use_cache:
             return
 
-        if df.empty:
-            logger.error(f"Empty DataFrame for {symbol} - skipping cache save")
-            return
-
-        # Enhanced debug info about incoming data
-        logger.debug(f"_save_to_cache called for {symbol} with {len(df)} records")
-        logger.debug(f"DataFrame columns: {list(df.columns)}")
-        logger.debug(f"DataFrame dtypes: {df.dtypes}")
-
-        try:
-            # Ensure data is sorted by open_time before caching to prevent unsorted cache entries
-            if (
-                "open_time" in df.columns
-                and not df["open_time"].is_monotonic_increasing
-            ):
-                logger.debug(f"Sorting data by open_time before caching for {symbol}")
-                df = df.sort_values("open_time").reset_index(drop=True)
-
-            # Get market type string for cache key
-            market_type_str = self._get_market_type_str()
-
-            # Group data by date
-            if "open_time" not in df.columns:
-                logger.error(f"DataFrame missing open_time column: {list(df.columns)}")
-                return
-
-            logger.debug(f"Creating date column from open_time for grouping")
-            df["date"] = df["open_time"].dt.date
-
-            logger.debug(f"Grouping {len(df)} records by date")
-            date_groups = df.groupby("date")
-            logger.debug(f"Found {len(date_groups)} date groups")
-
-            for date, group in date_groups:
-                logger.debug(
-                    f"Processing group for date {date} with {len(group)} records"
-                )
-                # Remove the date column
-                group = group.drop(columns=["date"])
-
-                # Convert date to datetime at midnight
-                cache_date = datetime.combine(date, datetime.min.time()).replace(
-                    tzinfo=timezone.utc
-                )
-
-                logger.debug(
-                    f"Saving {len(group)} records for {symbol} on {cache_date.date()} to cache"
-                )
-
-                # Always save data directly to Arrow cache
-                success = self.cache_manager.save_to_cache(
-                    df=group,
-                    symbol=symbol,
-                    interval=interval.value,
-                    date=cache_date,
-                    provider=self.provider.name,
-                    chart_type=self.chart_type.name,
-                    market_type=market_type_str,
-                )
-
-                if success:
-                    logger.debug(
-                        f"Successfully saved cache data for {symbol} on {cache_date.date()}"
-                    )
-                else:
-                    logger.warning(
-                        f"Failed to save cache data for {symbol} on {cache_date.date()}"
-                    )
-        except Exception as e:
-            logger.error(f"Error in _save_to_cache: {e}")
-            import traceback
-
-            logger.error(f"Traceback: {traceback.format_exc()}")
+        save_to_cache(
+            df=df,
+            symbol=symbol,
+            interval=interval,
+            cache_manager=self.cache_manager,
+            provider=self.provider.name,
+            chart_type=self.chart_type.name,
+            market_type=self._get_market_type_str(),
+            source=source,
+        )
 
     def _fetch_from_vision(
         self, symbol: str, start_time: datetime, end_time: datetime, interval: Interval
     ) -> pd.DataFrame:
-        """Fetch data from the Vision API.
-
-        Args:
-            symbol: Symbol to retrieve data for
-            start_time: Start time for data retrieval
-            end_time: End time for data retrieval
-            interval: Time interval between data points
-
-        Returns:
-            DataFrame with data from Vision API filtered to the requested time range
-
-        Note:
-            As a core part of the FCP mechanism, this method implements the Daily Pack Caching requirement:
-            1. Regardless of the requested time range (start_time to end_time), the method expands
-               the request to fetch full days of data from Vision API
-            2. The complete daily data is cached to ensure consistent and complete availability
-            3. Only the originally requested time range is returned to the caller
-
-            This ensures that even if a request specifies a start time at the beginning, middle, or end
-            of the day, the entire day's data is cached for future use.
-        """
-        logger.info(
-            f"Fetching data from Vision API for {symbol} from {start_time} to {end_time}"
+        """Fetch data from the Vision API using the utility function."""
+        # Create or reconfigure Vision client if needed
+        self.vision_client = create_client_if_needed(
+            client=self.vision_client,
+            client_class=VisionDataClient,
+            symbol=symbol,
+            interval=interval.value,
+            market_type=self.market_type,
         )
 
-        try:
-            # Create Vision client if not already created
-            if self.vision_client is None:
-                logger.debug("Creating new Vision API client")
-                self.vision_client = VisionDataClient(
-                    symbol=symbol,
-                    interval=interval.value,
-                    market_type=self.market_type,
-                )
-            elif self.vision_client.symbol != symbol:
-                # If client exists but for a different symbol, reconfigure it
-                logger.debug("Reconfiguring Vision API client for new symbol")
-                # Close existing client if needed
-                if hasattr(self.vision_client, "close"):
-                    self.vision_client.close()
-                # Create new client
-                self.vision_client = VisionDataClient(
-                    symbol=symbol,
-                    interval=interval.value,
-                    market_type=self.market_type,
-                )
-
-            # Get aligned boundaries to ensure complete data
-            aligned_start, aligned_end = align_time_boundaries(
-                start_time, end_time, interval
-            )
-
-            # For the FCP mechanism, we need to ensure that the full days' data is downloaded
-            # and cached from Vision API, even if only a partial day is requested
-
-            # Calculate full-day boundaries for Vision API data retrieval
-            # Start from the beginning of the day for start_time
-            vision_start = aligned_start.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-            # End at the end of the day for end_time
-            vision_end = aligned_end.replace(
-                hour=23, minute=59, second=59, microsecond=999999
-            )
-
-            logger.debug(
-                f"[FCP] Expanding Vision API request to full days: {vision_start} to {vision_end}"
-            )
-
-            # Vision API has date-based files, fetch with chunking
-            df = self.vision_client.fetch(
-                symbol=symbol,
-                interval=interval.value,
-                start_time=vision_start,
-                end_time=vision_end,
-                chart_type=self.chart_type,
-            )
-
-            if df is not None and not df.empty:
-                # Add debugging information about dataframe
-                logger.debug(f"Vision API returned DataFrame with shape: {df.shape}")
-                if hasattr(df, "index") and df.index is not None:
-                    logger.debug(
-                        f"DataFrame index name: {df.index.name}, type: {type(df.index).__name__}"
-                    )
-
-                # Add source information
-                df["_data_source"] = "VISION"
-
-                # Save the entire day's data to cache before filtering to the requested range
-                if self.use_cache:
-                    logger.debug(f"[FCP] Caching full day's data from Vision API")
-                    self._save_to_cache(df, symbol, interval, source="VISION")
-
-                # Filter the dataframe to the originally requested time range
-                logger.debug(
-                    f"[FCP] Filtering Vision API data to originally requested range: {aligned_start} to {aligned_end}"
-                )
-                filtered_df = filter_dataframe_by_time(
-                    df, aligned_start, aligned_end, "open_time"
-                )
-
-                # Help with debugging
-                logger.info(
-                    f"Retrieved {len(filtered_df)} records from Vision API (after filtering to requested range)"
-                )
-
-                return filtered_df
-            else:
-                logger.warning(f"Vision API returned no data for {symbol}")
-                # Check if end_time is within the Vision API delay window using our centralized function
-                if is_date_too_fresh_for_vision(end_time):
-                    logger.warning(
-                        f"No data returned from Vision API - end_time {end_time.isoformat()} "
-                        f"is within the {VISION_DATA_DELAY_HOURS}h delay window. "
-                        f"This is expected for recent data. Trying REST API."
-                    )
-                else:
-                    logger.warning(
-                        f"No data returned from Vision API for {symbol} despite being outside "
-                        f"the {VISION_DATA_DELAY_HOURS}h delay window. "
-                        f"This is unexpected for historical data. Trying REST API as fallback."
-                    )
-                return create_empty_dataframe()
-
-        except Exception as e:
-            # Sanitize error message to prevent binary data from causing rich formatting issues
-            try:
-                error_message = str(e)
-                # Replace any non-printable characters to prevent rich markup errors
-                safe_error_message = "".join(
-                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message
-                )
-
-                # Check if this is a critical error that should be propagated
-                if (
-                    "CRITICAL ERROR" in safe_error_message
-                    or "DATA INTEGRITY ERROR" in safe_error_message
-                ):
-                    logger.critical(f"Vision API critical error: {safe_error_message}")
-                    raise  # Re-raise to trigger failover
-
-                # Check if the request is within the allowed delay window for Vision API using our centralized function
-                if is_date_too_fresh_for_vision(end_time):
-                    # This falls within the allowable delay window for Vision API
-                    logger.warning(
-                        f"Error fetching recent data from Vision API "
-                        f"(within {self.VISION_DATA_DELAY_HOURS}h delay window): {safe_error_message}"
-                    )
-                    return create_empty_dataframe()
-
-                # For historical data outside the delay window, log critical error
-                logger.critical(
-                    f"Vision API failed to retrieve historical data: {safe_error_message}"
-                )
-                logger.critical(f"Error type: {type(e).__name__}")
-
-                # More controlled traceback handling
-                import traceback
-
-                tb_string = traceback.format_exc()
-                # Sanitize the traceback too
-                safe_tb = "".join(
-                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string
-                )
-                tb_lines = safe_tb.splitlines()
-
-                logger.critical("Traceback summary:")
-                for line in tb_lines[:3]:  # Just log first few lines
-                    logger.critical(line)
-                logger.critical("...")
-                for line in tb_lines[-3:]:  # And last few lines
-                    logger.critical(line)
-
-                # Propagate the error to trigger failover
-                raise RuntimeError(
-                    f"CRITICAL: Vision API failed to retrieve historical data: {safe_error_message}"
-                )
-
-            except Exception as nested_error:
-                # If even our error handling fails, log a simpler message
-                logger.critical(
-                    f"Vision API error occurred (details unavailable): {type(e).__name__}"
-                )
-                logger.critical(
-                    f"Error handling also failed: {type(nested_error).__name__}"
-                )
-
-                # Propagate the error to trigger failover
-                raise RuntimeError(
-                    "CRITICAL: Vision API error could not be handled properly"
-                )
+        # Call the extracted utility function
+        return fetch_from_vision(
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            interval=interval,
+            vision_client=self.vision_client,
+            chart_type=self.chart_type,
+            use_cache=self.use_cache,
+            save_to_cache_func=self._save_to_cache if self.use_cache else None,
+        )
 
     def _fetch_from_rest(
         self, symbol: str, start_time: datetime, end_time: datetime, interval: Interval
     ) -> pd.DataFrame:
-        """Fetch data from REST API with chunking.
-
-        Args:
-            symbol: Symbol to retrieve data for
-            start_time: Start time for data retrieval
-            end_time: End time for data retrieval
-            interval: Time interval between data points
-
-        Returns:
-            DataFrame with data from REST API
-
-        Raises:
-            RuntimeError: When REST API fails to retrieve data. As this is the final
-                          data source in the FCP chain, failures here represent
-                          complete failure of all data sources.
-        """
-        logger.info(
-            f"Fetching data from REST API for {symbol} from {start_time} to {end_time}"
+        """Fetch data from REST API with chunking using the utility function."""
+        # Create REST client if not already created
+        self.rest_client = create_client_if_needed(
+            client=self.rest_client,
+            client_class=RestDataClient,
+            market_type=self.market_type,
+            retry_count=self.retry_count,
         )
 
-        try:
-            # Create REST client if not already created
-            if self.rest_client is None:
-                logger.debug("Initialized RestDataClient")
-                self.rest_client = RestDataClient(
-                    market_type=self.market_type,
-                    retry_count=self.retry_count,
-                )
-
-            # Get aligned boundaries to ensure complete data
-            aligned_start, aligned_end = align_time_boundaries(
-                start_time, end_time, interval
-            )
-            logger.debug(
-                f"Complete data range after alignment: {aligned_start} to {aligned_end}"
-            )
-
-            # REST API has limits, so get data with chunking
-            df = self.rest_client.fetch(
-                symbol=symbol,
-                interval=interval.value,
-                start_time=aligned_start,
-                end_time=aligned_end,
-                chart_type=self.chart_type,
-            )
-
-            if df.empty:
-                logger.critical(f"REST API returned no data for {symbol}")
-                raise RuntimeError(f"CRITICAL: REST API returned no data for {symbol}")
-
-            # Add source information
-            df["_data_source"] = "REST"
-
-            # Help with debugging
-            logger.info(f"Retrieved {len(df)} records from REST API")
-
-            return df
-        except Exception as e:
-            # Sanitize error message to prevent binary data from causing rich formatting issues
-            try:
-                error_message = str(e)
-                # Replace any non-printable characters to prevent rich markup errors
-                safe_error_message = "".join(
-                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message
-                )
-
-                logger.critical(f"Error in _fetch_from_rest: {safe_error_message}")
-                logger.critical(f"Error type: {type(e).__name__}")
-
-                # More controlled traceback handling
-                import traceback
-
-                tb_string = traceback.format_exc()
-                # Sanitize the traceback
-                safe_tb = "".join(
-                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string
-                )
-                tb_lines = safe_tb.splitlines()
-
-                logger.critical("Traceback summary:")
-                for line in tb_lines[
-                    :3
-                ]:  # Just log first few lines to avoid binary data
-                    logger.critical(line)
-                logger.critical("...")
-                for line in tb_lines[-3:]:  # And last few lines
-                    logger.critical(line)
-
-                # This is the final fallback in the FCP chain, so raise an error
-                # to indicate complete failure of all sources
-                raise RuntimeError(
-                    f"CRITICAL: REST API fallback failed: {safe_error_message}"
-                )
-
-            except Exception as nested_error:
-                # If even our error handling fails, log a simpler message
-                logger.critical(f"REST API critical error: {type(e).__name__}")
-                logger.critical(
-                    f"Error handling also failed: {type(nested_error).__name__}"
-                )
-
-                # Propagate the error
-                raise RuntimeError(
-                    "CRITICAL: REST API error could not be handled properly"
-                )
-
-    def _merge_dataframes(self, dfs: List[pd.DataFrame]) -> pd.DataFrame:
-        """Merge multiple DataFrames into one, handling overlaps.
-
-        This method is a critical part of the FCP mechanism that ensures:
-        1. Each DataFrame has consistent open_time formatting
-        2. Source information is preserved during merging
-        3. When duplicate timestamps exist, higher priority sources are preferred
-           (REST > VISION > CACHE, unless the data came from recent updates)
-        4. Columns are consistently named, typed, and aligned
-        5. The resulting DataFrame maintains 1-minute granularity
-
-        Args:
-            dfs: List of DataFrames to merge
-
-        Returns:
-            Merged DataFrame with consistent schema
-        """
-        if not dfs:
-            logger.warning("[FCP] Empty list of DataFrames to merge")
-            return create_empty_dataframe()
-
-        if len(dfs) == 1:
-            logger.debug(
-                "[FCP] Only one DataFrame to merge, standardizing and returning"
-            )
-            # Ensure consistent formatting even for single DataFrame
-            result = dfs[0].copy()
-            return self._standardize_columns(result)
-
-        # Log information about DataFrames to be merged
-        logger.debug(f"[FCP] Merging {len(dfs)} DataFrames")
-
-        # Ensure all DataFrames have open_time as a column, not just an index
-        for i, df in enumerate(dfs):
-            if df.empty:
-                logger.warning(f"[FCP] DataFrame {i} is empty, skipping")
-                continue
-
-            if "open_time" not in df.columns:
-                logger.debug(
-                    f"[FCP] Converting index to open_time column in DataFrame {i}"
-                )
-                if df.index.name == "open_time":
-                    df = df.reset_index()
-                else:
-                    logger.warning(
-                        f"[FCP] DataFrame {i} has no open_time column or index"
-                    )
-
-            # Ensure open_time is a datetime column
-            if not pd.api.types.is_datetime64_any_dtype(df["open_time"]):
-                logger.debug(f"[FCP] Converting open_time to datetime in DataFrame {i}")
-                df["open_time"] = pd.to_datetime(df["open_time"], utc=True)
-
-            # Add data source information if missing
-            if "_data_source" not in df.columns:
-                logger.debug(f"[FCP] Adding unknown source tag to DataFrame {i}")
-                df["_data_source"] = "UNKNOWN"
-
-            # Replace the DataFrame in the list with the processed version
-            dfs[i] = df
-
-        # Log source counts before merging
-        for i, df in enumerate(dfs):
-            if not df.empty and "_data_source" in df.columns:
-                source_counts = df["_data_source"].value_counts()
-                for source, count in source_counts.items():
-                    logger.debug(
-                        f"[FCP] DataFrame {i} contains {count} records from source={source}"
-                    )
-
-        # Concatenate all DataFrames
-        logger.debug(f"[FCP] Concatenating {len(dfs)} DataFrames")
-        merged = pd.concat(dfs, ignore_index=True)
-
-        # Set source priority for resolving duplicates (higher number = higher priority)
-        source_priority = {
-            "UNKNOWN": 0,
-            "CACHE": 1,
-            "VISION": 2,
-            "REST": 3,
-        }
-
-        # Add a numeric priority column based on data source
-        if "_data_source" in merged.columns:
-            merged["_source_priority"] = merged["_data_source"].map(source_priority)
-        else:
-            merged["_source_priority"] = 0
-
-        # Sort by open_time and source priority (high priority last to keep in drop_duplicates)
-        logger.debug("[FCP] Sorting merged DataFrame by open_time and source priority")
-        merged = merged.sort_values(["open_time", "_source_priority"])
-
-        # Remove duplicates, keeping the highest priority source for each timestamp
-        if "open_time" in merged.columns:
-            before_count = len(merged)
-            merged = merged.drop_duplicates(subset=["open_time"], keep="last")
-            after_count = len(merged)
-
-            if before_count > after_count:
-                logger.debug(
-                    f"[FCP] Removed {before_count - after_count} duplicate timestamps, keeping highest priority source"
-                )
-
-        # Remove the temporary source priority column
-        if "_source_priority" in merged.columns:
-            merged = merged.drop(columns=["_source_priority"])
-
-        # Sort by open_time to ensure chronological order
-        merged = merged.sort_values("open_time").reset_index(drop=True)
-
-        # Final standardization to ensure consistency across all columns
-        merged = self._standardize_columns(merged)
-
-        # Log statistics about the merged result
-        if "_data_source" in merged.columns and not merged.empty:
-            source_counts = merged["_data_source"].value_counts()
-            for source, count in source_counts.items():
-                percentage = (count / len(merged)) * 100
-                logger.debug(
-                    f"[FCP] Final merged DataFrame contains {count} records ({percentage:.1f}%) from {source}"
-                )
-
-        logger.debug(
-            f"[FCP] Successfully merged {len(dfs)} DataFrames into one with {len(merged)} rows"
+        # Call the extracted utility function
+        return fetch_from_rest(
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            interval=interval,
+            rest_client=self.rest_client,
+            chart_type=self.chart_type,
         )
-        return merged
 
     def get_data(
         self,
@@ -1220,9 +576,7 @@ class DataSourceManager:
                                 logger.debug(
                                     f"[FCP] Merging {len(range_df)} Vision records with existing {len(result_df)} records"
                                 )
-                                result_df = self._merge_dataframes(
-                                    [result_df, range_df]
-                                )
+                                result_df = merge_dataframes([result_df, range_df])
                             else:
                                 # Otherwise just use the Vision data
                                 result_df = range_df
@@ -1233,7 +587,7 @@ class DataSourceManager:
                             # Check if Vision API returned all expected records or if there are gaps
                             if not result_df.empty:
                                 # Identify any remaining missing segments from Vision API
-                                missing_segments = self._identify_missing_segments(
+                                missing_segments = identify_missing_segments(
                                     result_df, miss_start, miss_end, interval
                                 )
 
@@ -1254,7 +608,7 @@ class DataSourceManager:
                     # Update missing_ranges to only include what's still missing after Vision API
                     if remaining_ranges:
                         # Merge adjacent or overlapping ranges
-                        missing_ranges = self._merge_adjacent_ranges(
+                        missing_ranges = merge_adjacent_ranges(
                             remaining_ranges, interval
                         )
                         logger.debug(
@@ -1273,9 +627,7 @@ class DataSourceManager:
                 )
 
                 # Merge adjacent ranges to minimize API calls
-                merged_rest_ranges = self._merge_adjacent_ranges(
-                    missing_ranges, interval
-                )
+                merged_rest_ranges = merge_adjacent_ranges(missing_ranges, interval)
 
                 for range_idx, (miss_start, miss_end) in enumerate(merged_rest_ranges):
                     logger.debug(
@@ -1299,7 +651,7 @@ class DataSourceManager:
                             logger.debug(
                                 f"[FCP] Merging {len(rest_df)} REST records with existing {len(result_df)} records"
                             )
-                            result_df = self._merge_dataframes([result_df, rest_df])
+                            result_df = merge_dataframes([result_df, rest_df])
                         else:
                             # Otherwise just use the REST data
                             result_df = rest_df
@@ -1323,7 +675,7 @@ class DataSourceManager:
                 )
 
             # Standardize columns
-            result_df = self._standardize_columns(result_df)
+            result_df = standardize_columns(result_df)
 
             # Final verification of the result
             min_time = result_df["open_time"].min()
@@ -1400,45 +752,6 @@ class DataSourceManager:
                     f"Failed to retrieve data from all sources: {safe_error_message}"
                 )
 
-    def _merge_adjacent_ranges(
-        self, ranges: List[Tuple[datetime, datetime]], interval: Interval
-    ) -> List[Tuple[datetime, datetime]]:
-        """Merge adjacent or overlapping time ranges to minimize API calls.
-
-        Args:
-            ranges: List of (start, end) tuples representing time ranges
-            interval: Time interval to determine adjacency threshold
-
-        Returns:
-            List of merged (start, end) tuples
-        """
-        if not ranges:
-            return []
-
-        # Sort ranges by start time
-        sorted_ranges = sorted(ranges, key=lambda x: x[0])
-
-        # Determine the threshold for what's considered "adjacent"
-        # (allow for a small gap, typically 1-2x the interval)
-        adjacency_threshold = timedelta(seconds=interval.to_seconds() * 2)
-
-        merged = []
-        current_start, current_end = sorted_ranges[0]
-
-        for next_start, next_end in sorted_ranges[1:]:
-            # If ranges overlap or are adjacent, extend the current range
-            if next_start <= current_end + adjacency_threshold:
-                current_end = max(current_end, next_end)
-            else:
-                # Otherwise, add the current range and start a new one
-                merged.append((current_start, current_end))
-                current_start, current_end = next_start, next_end
-
-        # Add the final range
-        merged.append((current_start, current_end))
-
-        return merged
-
     def __enter__(self):
         """Context manager entry."""
         return self
@@ -1467,110 +780,3 @@ class DataSourceManager:
             self.rest_client = None
 
         logger.debug("Closed all data clients")
-
-    def _standardize_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Standardize column names and data types to ensure consistency.
-
-        This method ensures:
-        1. Standardized column names (mapping variant names to canonical names)
-        2. Consistent data types for all columns
-        3. Timestamp precision standardization (to milliseconds, matching REST API)
-        4. Proper handling of all timestamp-related columns
-
-        Args:
-            df: DataFrame to standardize
-
-        Returns:
-            Standardized DataFrame following REST API format
-        """
-        if df.empty:
-            return df
-
-        # Standardize column names
-        column_map = {
-            # Common name variations
-            "open_time_ms": "open_time",
-            "openTime": "open_time",
-            "close_time_ms": "close_time",
-            "closeTime": "close_time",
-            # Volume variants
-            "volume_base": "volume",
-            "baseVolume": "volume",
-            "volume_quote": "quote_asset_volume",
-            "quoteVolume": "quote_asset_volume",
-            # Other variants
-            "trades": "count",
-            "numberOfTrades": "count",
-        }
-
-        # Apply column mapping
-        for old_name, new_name in column_map.items():
-            if old_name in df.columns and new_name not in df.columns:
-                df.rename(columns={old_name: new_name}, inplace=True)
-
-        # First apply the centralized standardize_dataframe function
-        # This function ensures proper column structure and data types
-        df = standardize_dataframe(df)
-
-        # Then standardize timestamp precision to align with REST API format
-        # This ensures Vision API data (which may use microsecond precision in 2025+)
-        # is converted to millisecond precision to match REST API format
-        if REST_IS_STANDARD:
-            logger.debug("Standardizing timestamp precision to match REST API format")
-            df = standardize_timestamp_precision(df)
-
-        return df
-
-    def _identify_missing_segments(
-        self,
-        df: pd.DataFrame,
-        start_time: datetime,
-        end_time: datetime,
-        interval: Interval,
-    ) -> List[Tuple[datetime, datetime]]:
-        """Identify missing segments in the data using gap_detector."""
-        logger.debug(
-            f"[FCP] Identifying missing segments between {start_time} and {end_time}"
-        )
-        if df.empty:
-            logger.debug("[FCP] DataFrame is empty, entire range is missing")
-            return [(start_time, end_time)]
-
-        df = ensure_open_time_as_column(df)
-        if not pd.api.types.is_datetime64_any_dtype(df["open_time"]):
-            logger.warning("[FCP] open_time not datetime, converting...")
-            df["open_time"] = pd.to_datetime(df["open_time"], unit="ms", utc=True)
-        df = df.sort_values("open_time")
-
-        min_time, max_time = df["open_time"].min(), df["open_time"].max()
-        logger.debug(f"[FCP] Data spans from {min_time} to {max_time}")
-
-        from utils.gap_detector import detect_gaps
-
-        gaps, stats = detect_gaps(
-            df=df,
-            interval=interval,
-            time_column="open_time",
-            gap_threshold=0.1,
-            day_boundary_threshold=1.0,
-            enforce_min_span=False,
-        )
-        logger.debug(f"[FCP] Gap detector found {stats['total_gaps']} gaps")
-
-        missing_segments: List[Tuple[datetime, datetime]] = []
-        for gap in gaps:
-            start = gap.start_time + timedelta(seconds=interval.to_seconds())
-            end = gap.end_time
-            missing_segments.append((start, end))
-
-        if min_time > start_time:
-            missing_segments.insert(0, (start_time, min_time))
-        if max_time < end_time:
-            boundary_end = max_time + timedelta(seconds=interval.to_seconds())
-            if boundary_end < end_time:
-                missing_segments.append((boundary_end, end_time))
-
-        if missing_segments:
-            missing_segments = self._merge_adjacent_ranges(missing_segments, interval)
-        logger.debug(f"[FCP] Final missing segments count: {len(missing_segments)}")
-        return missing_segments
