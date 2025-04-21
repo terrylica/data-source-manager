@@ -57,78 +57,78 @@ This script shows how DataSourceManager automatically retrieves data from differ
 
 It displays real-time source information about where each data point comes from.
 
-[bold cyan]Time Range Options:[/bold cyan]
+[bold cyan]Time Range Options[/bold cyan]
 
-[green]1. End Time with Days:[/green]
+[green]1. End Time with Days[/green]
   - Use --end-time with --days to fetch data backward from a specific end time
   - Calculates range as [end_time - days, end_time]
   - Example: --end-time 2025-04-15 --days 5 will fetch data from April 10-15, 2025
 
-[green]2. Start Time with Days:[/green]
+[green]2. Start Time with Days[/green]
   - Use --start-time with --days to fetch data forward from a specific start time
   - Calculates range as [start_time, start_time + days]
   - Example: --start-time 2025-04-10 --days 5 will fetch data from April 10-15, 2025
 
-[green]3. Exact Time Range:[/green]
+[green]3. Exact Time Range[/green]
   - Provide both --start-time and --end-time for an exact time range
   - Example: --start-time 2025-04-10 --end-time 2025-04-15
 
-[green]4. Days Only:[/green]
+[green]4. Days Only[/green]
   - Use --days alone to fetch data relative to current time
   - Calculates range as [current_time - days, current_time]
   - Example: --days 5 will fetch data from 5 days ago until now
 
-[green]5. Default Behavior (No Options):[/green]
+[green]5. Default Behavior (No Options)[/green]
   - If no time options provided, uses default of 3 days from current time
   - Equivalent to --days 3
 
-[bold cyan]Sample Commands:[/bold cyan]
+[bold cyan]Sample Commands[/bold cyan]
 
-[green]Basic Usage:[/green]
+[green]Basic Usage Examples[/green]
   ./examples/sync/dsm_demo.py
   ./examples/sync/dsm_demo.py --symbol ETHUSDT --market spot
 
-[green]Time Range Options:[/green]
-  # End time with days (fetch backward from end time)
+[green]Time Range CLI Examples[/green]
+  > End time with days (fetch backward from end time)
   ./examples/sync/dsm_demo.py -s BTCUSDT -et 2025-04-15 -d 7
   
-  # Start time with days (fetch forward from start time)
+  > Start time with days (fetch forward from start time)
   ./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05 -d 10
   
-  # Exact time range (start time to end time)
+  > Exact time range (start time to end time)
   ./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05 -et 2025-04-15
   
-  # Days only (fetch backward from current time)
+  > Days only (fetch backward from current time)
   ./examples/sync/dsm_demo.py -s BTCUSDT -d 7
   
-  # Default (3 days backward from current time)
+  > Default (3 days backward from current time)
   ./examples/sync/dsm_demo.py -s BTCUSDT
 
-[green]Market Types:[/green]
+[green]Market Types[/green]
   ./examples/sync/dsm_demo.py -s BTCUSDT -m um
   ./examples/sync/dsm_demo.py -s BTCUSD_PERP -m cm
 
-[green]Different Intervals:[/green]
+[green]Different Intervals[/green]
   ./examples/sync/dsm_demo.py -s BTCUSDT -i 5m
   ./examples/sync/dsm_demo.py -s BTCUSDT -i 1h
   ./examples/sync/dsm_demo.py -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
 
-[green]Data Source Options:[/green]
+[green]Data Source Options[/green]
   ./examples/sync/dsm_demo.py -s BTCUSDT -es REST
   ./examples/sync/dsm_demo.py -s BTCUSDT -nc
   ./examples/sync/dsm_demo.py -s BTCUSDT -cc
   
-[green]Documentation Generation:[/green]
-  # Generate documentation with typer-cli format (default)
+[green]Documentation Generation[/green]
+  > Generate documentation with typer-cli format (default)
   ./examples/sync/dsm_demo.py -gd
   
-  # Generate GitHub-optimized documentation
+  > Generate GitHub-optimized documentation
   ./examples/sync/dsm_demo.py -gd -df github
   
-  # Generate documentation with linting configuration files
+  > Generate documentation with linting configuration files
   ./examples/sync/dsm_demo.py -gd -glc
 
-[green]Combined Examples:[/green]
+[green]Combined Examples[/green]
   ./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
   ./examples/sync/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
 """

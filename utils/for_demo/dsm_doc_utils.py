@@ -11,12 +11,15 @@ import typer
 import subprocess
 import sys
 import re
-import json
 import shutil
 from rich.console import Console
 from rich.markdown import Markdown
+import textwrap
 
 from utils.logger_setup import logger
+from utils.for_demo.dsm_help_content import (
+    COMMAND_HELP_TEXT,
+)
 
 
 def is_typer_cli_available():
@@ -88,20 +91,13 @@ def generate_markdown_docs_with_typer_cli(
 
         typer_content = temp_file.read_text()
 
-        # Get help text by running the script with --help flag
-        try:
-            help_result = subprocess.run(
-                [str(script_path), "--help"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            help_text = help_result.stdout.strip()
-            if not help_text and help_result.stderr:
-                help_text = help_result.stderr.strip()
-        except Exception as e:
-            logger.warning(f"Could not get help text: {e}")
-            help_text = None
+        # Extract useful content from command_help_text
+        help_sections = parse_command_help_text(COMMAND_HELP_TEXT)
+
+        # No line length constraints - identity function
+        def wrap_text(text, width=None):
+            # Simply return the text as is without any wrapping
+            return text
 
         # Create a new GitHub-friendly markdown file
         markdown_content = f"""# {cli_name}: Failover Control Protocol
@@ -115,24 +111,11 @@ which automatically retrieves Bitcoin data from multiple sources:
 
 It displays real-time source information about where each data point comes from.
 
-## Time Range Priority Hierarchy
+## Time Range Options
 
-### 1. `--days` or `-d` flag (HIGHEST PRIORITY)
+### Priority and Calculation Details
 
-- If provided, overrides any `--start-time` and `--end-time` values
-- Calculates range as `[current_time - days, current_time]`
-- Example: `--days 5` will fetch data from 5 days ago until now
-
-### 2. `--start-time` and `--end-time` (SECOND PRIORITY)
-
-- Used only when BOTH are provided AND `--days` is NOT provided
-- Defines exact time range to fetch data from
-- Example: `--start-time 2025-04-10 --end-time 2025-04-15`
-
-### 3. Default Behavior (FALLBACK)
-
-- If neither of the above conditions are met
-- Uses default `days=3` to calculate range as `[current_time - 3 days, current_time]`
+{help_sections["time_range_options"]}
 
 ## Usage
 
@@ -152,95 +135,32 @@ It displays real-time source information about where each data point comes from.
                 r"\* `([^`]+)`:(.*?)(?=\* |\Z)", options_content, re.DOTALL
             )
 
-            table_header = "| Option | Description |\n|--------|-------------|\n"
-            table_rows = []
+            # Instead of using a table, use standard markdown list format which avoids table linting issues
+            options_formatted = []
+            options_formatted.append("## Options\n")
 
             for option, description in options_list:
                 # Clean up the description
                 description = description.strip()
+                # Format with all on one line, no breaks
+                description = description.replace("\n", " ").strip()
 
-                # Escape pipe characters
-                option_escaped = option.replace("|", "\\|")
-                description_escaped = description.replace("|", "\\|")
+                # Format as bullet point with bold option
+                options_formatted.append(f"- **`{option}`**: {description}")
 
-                table_rows.append(f"| `{option_escaped}` | {description_escaped} |")
+            options_text = "\n".join(options_formatted)
+            markdown_content += f"{options_text}\n\n"
 
-            options_table = table_header + "\n".join(table_rows)
-            markdown_content += f"## Options\n\n{options_table}\n\n"
+        # Add examples section using content directly from COMMAND_HELP_TEXT
+        markdown_content += f"""## Examples
 
-        # Add examples section
-        if help_text:
-            # Extract examples from help text if available
-            examples_section = """## Examples
+{help_sections["sample_commands"]}"""
 
-### Basic Usage
+        # No more line wrapping - simply use the content as is
+        # markdown_content = wrap_text(markdown_content)  # Removed
 
-```bash
-./examples/sync/dsm_demo.py
-./examples/sync/dsm_demo.py --symbol ETHUSDT --market spot
-```
-
-### Time Range Options (By Priority)
-
-```bash
-# PRIORITY 1: Using --days flag (overrides any start/end times)
-./examples/sync/dsm_demo.py -s BTCUSDT -d 7
-  
-# PRIORITY 2: Using start and end times (only if --days is NOT provided)
-./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05T00:00:00 -et 2025-04-06T00:00:00
-  
-# FALLBACK: No time flags (uses default days=3)
-./examples/sync/dsm_demo.py -s BTCUSDT
-```
-
-### Market Types
-
-```bash
-./examples/sync/dsm_demo.py -s BTCUSDT -m um
-./examples/sync/dsm_demo.py -s BTCUSD_PERP -m cm
-```
-
-### Different Intervals
-
-```bash
-./examples/sync/dsm_demo.py -s BTCUSDT -i 5m
-./examples/sync/dsm_demo.py -s BTCUSDT -i 1h
-./examples/sync/dsm_demo.py -s SOLUSDT -m spot -i 1s -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
-```
-
-### Data Source Options
-
-```bash
-./examples/sync/dsm_demo.py -s BTCUSDT -es REST
-./examples/sync/dsm_demo.py -s BTCUSDT -nc
-./examples/sync/dsm_demo.py -s BTCUSDT -cc
-```
-
-### Testing FCP Mechanism
-
-```bash
-./examples/sync/dsm_demo.py -s BTCUSDT -fcp
-./examples/sync/dsm_demo.py -s BTCUSDT -fcp -pc
-```
-
-### Documentation Generation
-
-```bash
-# Generate documentation with typer-cli format (default)
-./examples/sync/dsm_demo.py -gd
-
-# Generate documentation with linting configuration files
-./examples/sync/dsm_demo.py -gd -glc
-```
-
-### Combined Examples
-
-```bash
-./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
-./examples/sync/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -fcp -pc -l D -cc
-```"""
-
-            markdown_content += examples_section
+        # Fix multiple consecutive blank lines (no more than one blank line in a row)
+        markdown_content = re.sub(r"\n{3,}", "\n\n", markdown_content)
 
         # Write the final content to the output file
         output_file.write_text(markdown_content + "\n")  # Ensure trailing newline
@@ -254,6 +174,190 @@ It displays real-time source information about where each data point comes from.
     except Exception as e:
         logger.error(f"Error generating GitHub-friendly documentation: {e}")
         return None
+
+
+def parse_command_help_text(command_help_text):
+    """Parse the command help text to extract sections.
+
+    Args:
+        command_help_text: The help text from dsm_help_content.py
+
+    Returns:
+        dict: A dictionary with extracted and formatted sections
+    """
+    sections = {}
+
+    # Extract time range options section
+    time_range_match = re.search(
+        r"\[bold cyan\]Time Range Options\[/bold cyan\](.*?)\[bold cyan\]Sample Commands",
+        command_help_text,
+        re.DOTALL,
+    )
+    if time_range_match:
+        time_range_text = time_range_match.group(1).strip()
+
+        # Process the content directly with simpler replacements
+        # Don't add the "Priority and Calculation Details" heading here as it's already added in the template
+        formatted_content = ""
+
+        # Replace section headers (removing colons)
+        formatted_content += (
+            time_range_text.replace(
+                "[green]1. End Time with Days[/green]", "\n#### 1. End Time with Days\n"
+            )
+            .replace(
+                "[green]2. Start Time with Days[/green]",
+                "\n#### 2. Start Time with Days\n",
+            )
+            .replace(
+                "[green]3. Exact Time Range[/green]", "\n#### 3. Exact Time Range\n"
+            )
+            .replace("[green]4. Days Only[/green]", "\n#### 4. Days Only\n")
+            .replace(
+                "[green]5. Default Behavior (No Options)[/green]",
+                "\n#### 5. Default Behavior (No Options)\n",
+            )
+        )
+
+        # Process list items for proper markdown formatting
+        formatted_content = formatted_content.replace("  - Use ", "- **Usage:** Use ")
+        formatted_content = formatted_content.replace(
+            "  - Calculates ", "- **Calculation:** Calculates "
+        )
+        formatted_content = formatted_content.replace(
+            "  - Example: ", "- **Example:** "
+        )
+        formatted_content = formatted_content.replace(
+            "  - Provide ", "- **Usage:** Provide "
+        )
+        formatted_content = formatted_content.replace("  - If ", "- **Condition:** If ")
+        formatted_content = formatted_content.replace(
+            "  - Equivalent ", "- **Equivalent:** "
+        )
+
+        # Add proper code backticks
+        formatted_content = formatted_content.replace("as [", "as `[").replace(
+            "]", "]`"
+        )
+
+        sections["time_range_options"] = formatted_content
+
+    # Extract sample commands section using regex with manual processing
+    sample_commands_match = re.search(
+        r"\[bold cyan\]Sample Commands\[/bold cyan\](.*?)$",
+        command_help_text,
+        re.DOTALL,
+    )
+    if sample_commands_match:
+        sample_text = sample_commands_match.group(1).strip()
+
+        # First, process section headers - remove trailing colons
+        sample_text = sample_text.replace("[green]", "### ").replace("[/green]", "")
+
+        # Split into lines for processing
+        lines = sample_text.split("\n")
+        formatted_lines = []
+        section_headers = {}  # Map to track which sections have content
+        current_section = None
+        command_groups = []
+        current_group = {"description": None, "commands": [], "section": None}
+
+        for line in lines:
+            line = line.strip()
+
+            # Skip empty lines in initial processing
+            if not line:
+                continue
+
+            # Handle section headers
+            if line.startswith("### "):
+                # Start new section
+                if current_group["commands"]:
+                    command_groups.append(current_group)
+                    current_group = {
+                        "description": None,
+                        "commands": [],
+                        "section": None,
+                    }
+
+                current_section = line
+                # Don't append section header yet - we'll only do this if it has content
+                section_headers[current_section] = False  # Initialize section as empty
+                current_group["section"] = current_section
+
+            # Handle command descriptions with '>'
+            elif line.startswith(">"):
+                # If we have commands in the current group, save it and start a new one
+                if current_group["commands"]:
+                    command_groups.append(current_group)
+                    current_group = {
+                        "description": None,
+                        "commands": [],
+                        "section": current_section,
+                    }
+
+                # Convert to heading and remove trailing colon if present
+                desc = line.replace(">", "").strip()
+                if desc.endswith(":"):
+                    desc = desc[:-1]  # Remove trailing colon
+                current_group["description"] = desc
+
+            # Handle command lines
+            elif line.startswith("./"):
+                current_group["commands"].append(line)
+                if current_section:
+                    section_headers[current_section] = (
+                        True  # Mark section as having content
+                    )
+
+        # Don't forget the last group
+        if current_group["commands"]:
+            command_groups.append(current_group)
+
+        # Now format, but only include sections with content
+        previous_section = None
+        for group in command_groups:
+            # Only add section header if this is the first group in a section with content
+            current_section = group["section"]
+            if (
+                current_section
+                and current_section != previous_section
+                and section_headers[current_section]
+            ):
+                # Add a blank line before the section header (unless it's the first one)
+                if formatted_lines:
+                    formatted_lines.append("")
+                formatted_lines.append(current_section)
+                formatted_lines.append("")
+                previous_section = current_section
+
+            if group["description"]:
+                # Add heading without excessive blank lines
+                formatted_lines.append(f"#### {group['description']}")
+                formatted_lines.append("")
+
+            if group["commands"]:
+                # Add code block without excessive blank lines
+                formatted_lines.append("```bash")
+                for cmd in group["commands"]:
+                    formatted_lines.append(cmd)
+                formatted_lines.append("```")
+                formatted_lines.append("")
+
+        # Ensure there are no consecutive blank lines
+        clean_lines = []
+        prev_line_empty = False
+        for line in formatted_lines:
+            is_empty = line.strip() == ""
+            if not (is_empty and prev_line_empty):
+                clean_lines.append(line)
+            prev_line_empty = is_empty
+
+        # Join the lines back together
+        sections["sample_commands"] = "\n".join(clean_lines).strip()
+
+    # Return an empty dict if no sections were found to prevent KeyError
+    return sections or {"time_range_options": "", "sample_commands": ""}
 
 
 def generate_markdown_docs(
@@ -272,7 +376,7 @@ def generate_markdown_docs(
         app: The Typer app to generate documentation for
         output_dir: Directory to save the generated documentation
         filename: Name of the output file
-        gen_lint_config: Whether to generate linting configuration files
+        gen_lint_config: Whether to generate linting configuration files (ignored - linting config generation has been removed)
         cli_name: The name to use for the CLI app in the docs
 
     Returns:
@@ -296,20 +400,9 @@ def generate_markdown_docs(
     )
 
     if result:
-        # Create linting configuration files if requested
+        # Note: Markdownlint configuration generation has been removed
         if gen_lint_config:
-            output_path = Path(output_dir)
-            # Define the markdownlint configuration with proper Python booleans
-            # The json.dumps will convert Python's True/False to JSON true/false
-            markdownlint_config = {
-                "MD013": {"code_blocks": False, "tables": False},
-                "MD014": False,  # Disable dollar signs used before commands
-                "MD040": False,  # Disable requiring language in code blocks
-                "MD047": False,  # Disable requiring single newline at end of file
-            }
-            config_file = output_path / ".markdownlint.json"
-            config_file.write_text(json.dumps(markdownlint_config, indent=2))
-            logger.info(f"Created markdownlint config at {config_file}")
+            logger.info("Markdownlint configuration generation has been disabled")
 
         # Print success message
         logger.info("Documentation generated successfully using typer-cli")

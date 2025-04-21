@@ -15,7 +15,7 @@ from utils.logger_setup import logger, configure_session_logging
 from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
 
 # Import utility modules for DSM Demo
-from utils.for_demo.dsm_datetime_parser import parse_datetime, calculate_date_range
+from utils.for_demo.dsm_datetime_parser import parse_datetime
 from utils.for_demo.dsm_cache_utils import clear_cache_directory, verify_project_root
 from utils.for_demo.dsm_data_fetcher import fetch_data_with_fcp
 from utils.for_demo.dsm_display_utils import display_results

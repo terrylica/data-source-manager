@@ -10,7 +10,6 @@ from rich import print
 from rich.panel import Panel
 from rich.table import Table
 import rich.box as box
-import sys
 from pathlib import Path
 
 from utils.logger_setup import logger
