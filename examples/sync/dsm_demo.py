@@ -179,17 +179,21 @@ def main(
             # Convert chart type string to enum
             chart_type_enum = ChartType.from_string(chart_type.value)
 
-            # Determine time range using utility function
-            days_provided = sys.argv and "--days" in sys.argv or "-d" in sys.argv
-            if start_time and end_time and not days_provided:
-                # Use specified time range
-                start_datetime = parse_datetime(start_time)
-                end_datetime = parse_datetime(end_time)
-            else:
-                # Use days parameter to calculate time range
-                start_datetime, end_datetime = calculate_date_range(None, None, days)
-                print(f"[yellow]Using dynamic date range based on days={days}[/yellow]")
-                print(f"[yellow]Overriding default start_time and end_time[/yellow]")
+            # Use the core DataSourceManager utility to calculate time range
+            try:
+                # Parse datetime strings if provided
+                st = parse_datetime(start_time) if start_time else None
+                et = parse_datetime(end_time) if end_time else None
+
+                # Use the core data source manager utility
+                from core.sync.data_source_manager import DataSourceManager
+
+                start_datetime, end_datetime = DataSourceManager.calculate_time_range(
+                    start_time=st, end_time=et, days=days, interval=interval_enum
+                )
+            except Exception as e:
+                print(f"[bold red]Error calculating date range: {e}[/bold red]")
+                sys.exit(1)
 
             # Process caching option
             use_cache = not no_cache

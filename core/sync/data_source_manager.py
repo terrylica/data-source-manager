@@ -38,6 +38,10 @@ from utils.for_core.dsm_api_utils import (
     fetch_from_rest,
     create_client_if_needed,
 )
+from utils.for_core.dsm_date_range_utils import (
+    calculate_date_range,
+    get_date_range_description,
+)
 
 
 class DataSource(Enum):
@@ -175,6 +179,45 @@ class DataSourceManager:
 
     # Default market type that can be configured globally
     DEFAULT_MARKET_TYPE = MarketType.SPOT
+
+    @classmethod
+    def calculate_time_range(
+        cls, start_time=None, end_time=None, days=3, interval=Interval.MINUTE_1
+    ) -> Tuple[datetime, datetime]:
+        """Calculate time range with flexible parameters.
+
+        This method delegates to dsm_date_range_utils to handle various time range scenarios:
+        1. End time with days (backward calculation)
+        2. Start time with days (forward calculation)
+        3. Explicit start and end times
+        4. Days-only calculation (backward from current time)
+
+        Args:
+            start_time: Start time string or datetime object, or None
+            end_time: End time string or datetime object, or None
+            days: Number of days for the range if only start_time or end_time is provided
+            interval: Time interval for data, used to align boundaries
+
+        Returns:
+            tuple: (start_datetime, end_datetime) as datetime objects
+
+        Raises:
+            ValueError: If both start_time and end_time are provided and start_time is after end_time
+        """
+        # Use the core utility to calculate date range
+        start_datetime, end_datetime = calculate_date_range(
+            start_time=start_time, end_time=end_time, days=days, interval=interval
+        )
+
+        # Get description for logging
+        description = get_date_range_description(
+            start_datetime,
+            end_datetime,
+            {"start_time": start_time, "end_time": end_time, "days": days},
+        )
+        logger.info(description)
+
+        return start_datetime, end_datetime
 
     @classmethod
     def get_output_format(
