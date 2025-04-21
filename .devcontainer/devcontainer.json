@@ -32,7 +32,8 @@
         "bierner.markdown-mermaid",
         "pdconsec.vscode-print",
         "rioj7.command-variable",
-        "michelemelluso.gitignore"
+        "michelemelluso.gitignore",
+        "ms-toolsai.jupyter-keymap" // helps remove empty folders in FILE EXPLORER when SOURCE CONTROL discards changes but only deletes files, not folders
       ],
       "settings": {
         "extensions.verifySignature": false
