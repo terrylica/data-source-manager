@@ -1,19 +1,7 @@
 #!/usr/bin/env python3
-"""
-DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism specified in
-`.cursor/rules/always_focus_demo.mdc`
+from utils.for_demo.dsm_help_content import MAIN_DOCSTRING
 
-This script allows users to specify a time span and observe how the
-DataSourceManager automatically retrieves data from different sources
-following the Failover Control Protocol (FCP) strategy:
-
-1. Cache (Local Arrow files)
-2. VISION API
-3. REST API
-
-It shows real-time source information about where each data point comes from,
-and provides a summary of the data source breakdown with timeline visualization.
-"""
+__doc__ = MAIN_DOCSTRING
 
 from pathlib import Path
 from time import perf_counter

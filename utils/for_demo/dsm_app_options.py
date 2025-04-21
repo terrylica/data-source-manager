@@ -15,6 +15,11 @@ from utils.for_demo.dsm_cli_utils import (
     ChartTypeChoice,
     LogLevel,
 )
+from utils.for_demo.dsm_help_content import (
+    APP_HELP,
+    COMMAND_HELP_TEXT,
+    CLI_OPTIONS,
+)
 
 
 class DocFormatChoice(str, Enum):
@@ -35,7 +40,7 @@ def create_typer_app(app_name="DSM Demo"):
         typer.Typer: Configured Typer app
     """
     return typer.Typer(
-        help=f"{app_name}: Demonstrate the Failover Control Protocol (FCP) mechanism",
+        help=APP_HELP,
         rich_markup_mode="rich",
         add_completion=False,
         context_settings={
@@ -56,90 +61,99 @@ def get_standard_options() -> Dict[str, Any]:
     return {
         # Data Selection options
         "symbol": typer.Option(
-            "BTCUSDT", "--symbol", "-s", help="Symbol to fetch data for"
+            CLI_OPTIONS["symbol"]["default"],
+            CLI_OPTIONS["symbol"]["long_flag"],
+            CLI_OPTIONS["symbol"]["short_flag"],
+            help=CLI_OPTIONS["symbol"]["help"],
         ),
         "market": typer.Option(
             MarketTypeChoice.SPOT,
-            "--market",
-            "-m",
-            help="Market type (spot, um, cm)",
+            CLI_OPTIONS["market"]["long_flag"],
+            CLI_OPTIONS["market"]["short_flag"],
+            help=CLI_OPTIONS["market"]["help"],
         ),
         "interval": typer.Option(
-            "1m", "--interval", "-i", help="Time interval for klines/premiums"
+            CLI_OPTIONS["interval"]["default"],
+            CLI_OPTIONS["interval"]["long_flag"],
+            CLI_OPTIONS["interval"]["short_flag"],
+            help=CLI_OPTIONS["interval"]["help"],
         ),
         "chart_type": typer.Option(
             ChartTypeChoice.KLINES,
-            "--chart-type",
-            "-ct",
-            help="Chart type (klines, premiums)",
+            CLI_OPTIONS["chart_type"]["long_flag"],
+            CLI_OPTIONS["chart_type"]["short_flag"],
+            help=CLI_OPTIONS["chart_type"]["help"],
         ),
         # Time Range options
         "start_time": typer.Option(
-            None,
-            "--start-time",
-            "-st",
-            help="Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Can be used alone with --days to fetch forward, or with --end-time for exact range",
+            CLI_OPTIONS["start_time"]["default"],
+            CLI_OPTIONS["start_time"]["long_flag"],
+            CLI_OPTIONS["start_time"]["short_flag"],
+            help=CLI_OPTIONS["start_time"]["help"],
         ),
         "end_time": typer.Option(
-            None,
-            "--end-time",
-            "-et",
-            help="End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Can be used alone with --days to fetch backward, or with --start-time for exact range",
+            CLI_OPTIONS["end_time"]["default"],
+            CLI_OPTIONS["end_time"]["long_flag"],
+            CLI_OPTIONS["end_time"]["short_flag"],
+            help=CLI_OPTIONS["end_time"]["help"],
         ),
         "days": typer.Option(
-            3,
-            "--days",
-            "-d",
-            help="Number of days of data to fetch. If used with --end-time, fetches data backward from end time. If used with --start-time, fetches data forward from start time. If used alone, fetches data backward from current time",
+            CLI_OPTIONS["days"]["default"],
+            CLI_OPTIONS["days"]["long_flag"],
+            CLI_OPTIONS["days"]["short_flag"],
+            help=CLI_OPTIONS["days"]["help"],
         ),
         # Data Source options
         "enforce_source": typer.Option(
             DataSourceChoice.AUTO,
-            "--enforce-source",
-            "-es",
-            help="Force specific data source (default: AUTO)",
+            CLI_OPTIONS["enforce_source"]["long_flag"],
+            CLI_OPTIONS["enforce_source"]["short_flag"],
+            help=CLI_OPTIONS["enforce_source"]["help"],
         ),
         "retries": typer.Option(
-            3, "--retries", "-r", help="Maximum number of retry attempts"
+            CLI_OPTIONS["retries"]["default"],
+            CLI_OPTIONS["retries"]["long_flag"],
+            CLI_OPTIONS["retries"]["short_flag"],
+            help=CLI_OPTIONS["retries"]["help"],
         ),
         # Cache Control options
         "no_cache": typer.Option(
-            False,
-            "--no-cache",
-            "-nc",
-            help="Disable caching (cache is enabled by default)",
+            CLI_OPTIONS["no_cache"]["default"],
+            CLI_OPTIONS["no_cache"]["long_flag"],
+            CLI_OPTIONS["no_cache"]["short_flag"],
+            help=CLI_OPTIONS["no_cache"]["help"],
         ),
         "clear_cache": typer.Option(
-            False,
-            "--clear-cache",
-            "-cc",
-            help="Clear the cache directory before running",
+            CLI_OPTIONS["clear_cache"]["default"],
+            CLI_OPTIONS["clear_cache"]["long_flag"],
+            CLI_OPTIONS["clear_cache"]["short_flag"],
+            help=CLI_OPTIONS["clear_cache"]["help"],
         ),
         # Documentation options
         "gen_doc": typer.Option(
-            False,
-            "--gen-doc",
-            "-gd",
-            help="Generate Markdown documentation from Typer help into docs/dsm_demo/ directory",
+            CLI_OPTIONS["gen_doc"]["default"],
+            CLI_OPTIONS["gen_doc"]["long_flag"],
+            CLI_OPTIONS["gen_doc"]["short_flag"],
+            help=CLI_OPTIONS["gen_doc"]["help"],
         ),
         "gen_lint_config": typer.Option(
-            False,
-            "--gen-lint-config",
-            "-glc",
-            help="Generate markdown linting configuration files along with documentation (only used with --gen-doc)",
+            CLI_OPTIONS["gen_lint_config"]["default"],
+            CLI_OPTIONS["gen_lint_config"]["long_flag"],
+            CLI_OPTIONS["gen_lint_config"]["short_flag"],
+            help=CLI_OPTIONS["gen_lint_config"]["help"],
         ),
         "doc_format": typer.Option(
             DocFormatChoice.TYPER_CLI,
-            "--doc-format",
-            "-df",
-            help="Documentation format to use (typer-cli, github, console). typer-cli uses the official Typer CLI tool, github optimizes for GitHub display, console uses plain console output.",
+            CLI_OPTIONS["doc_format"]["long_flag"],
+            CLI_OPTIONS["doc_format"]["short_flag"],
+            help=CLI_OPTIONS["doc_format"]["help"],
         ),
         # Other options
         "log_level": typer.Option(
             LogLevel.INFO,
-            "--log-level",
-            "-l",
-            help="Set the log level (default: INFO). Shorthand options: D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL",
+            CLI_OPTIONS["log_level"]["long_flag"],
+            CLI_OPTIONS["log_level"]["short_flag"],
+            help=CLI_OPTIONS["log_level"]["help"],
         ),
     }
 
@@ -150,89 +164,4 @@ def get_cmd_help_text():
     Returns:
         str: Help text for the command with examples
     """
-    return """
-    DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
-
-    This script shows how DataSourceManager automatically retrieves data from different sources:
-
-    1. Cache (Local Arrow files)
-    2. VISION API
-    3. REST API
-
-    It displays real-time source information about where each data point comes from.
-
-    [bold cyan]Time Range Options:[/bold cyan]
-
-    [green]1. End Time with Days:[/green]
-      - Use --end-time with --days to fetch data backward from a specific end time
-      - Calculates range as [end_time - days, end_time]
-      - Example: --end-time 2025-04-15 --days 5 will fetch data from April 10-15, 2025
-
-    [green]2. Start Time with Days:[/green]
-      - Use --start-time with --days to fetch data forward from a specific start time
-      - Calculates range as [start_time, start_time + days]
-      - Example: --start-time 2025-04-10 --days 5 will fetch data from April 10-15, 2025
-
-    [green]3. Exact Time Range:[/green]
-      - Provide both --start-time and --end-time for an exact time range
-      - Example: --start-time 2025-04-10 --end-time 2025-04-15
-
-    [green]4. Days Only:[/green]
-      - Use --days alone to fetch data relative to current time
-      - Calculates range as [current_time - days, current_time]
-      - Example: --days 5 will fetch data from 5 days ago until now
-
-    [green]5. Default Behavior (No Options):[/green]
-      - If no time options provided, uses default of 3 days from current time
-      - Equivalent to --days 3
-
-    [bold cyan]Sample Commands:[/bold cyan]
-
-    [green]Basic Usage:[/green]
-      ./examples/sync/dsm_demo.py
-      ./examples/sync/dsm_demo.py --symbol ETHUSDT --market spot
-
-    [green]Time Range Options:[/green]
-      # End time with days (fetch backward from end time)
-      ./examples/sync/dsm_demo.py -s BTCUSDT -et 2025-04-15 -d 7
-      
-      # Start time with days (fetch forward from start time)
-      ./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05 -d 10
-      
-      # Exact time range (start time to end time)
-      ./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05 -et 2025-04-15
-      
-      # Days only (fetch backward from current time)
-      ./examples/sync/dsm_demo.py -s BTCUSDT -d 7
-      
-      # Default (3 days backward from current time)
-      ./examples/sync/dsm_demo.py -s BTCUSDT
-
-    [green]Market Types:[/green]
-      ./examples/sync/dsm_demo.py -s BTCUSDT -m um
-      ./examples/sync/dsm_demo.py -s BTCUSD_PERP -m cm
-
-    [green]Different Intervals:[/green]
-      ./examples/sync/dsm_demo.py -s BTCUSDT -i 5m
-      ./examples/sync/dsm_demo.py -s BTCUSDT -i 1h
-      ./examples/sync/dsm_demo.py -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
-
-    [green]Data Source Options:[/green]
-      ./examples/sync/dsm_demo.py -s BTCUSDT -es REST
-      ./examples/sync/dsm_demo.py -s BTCUSDT -nc
-      ./examples/sync/dsm_demo.py -s BTCUSDT -cc
-      
-    [green]Documentation Generation:[/green]
-      # Generate documentation with typer-cli format (default)
-      ./examples/sync/dsm_demo.py -gd
-      
-      # Generate GitHub-optimized documentation
-      ./examples/sync/dsm_demo.py -gd -df github
-      
-      # Generate documentation with linting configuration files
-      ./examples/sync/dsm_demo.py -gd -glc
-
-    [green]Combined Examples:[/green]
-      ./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
-      ./examples/sync/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
-    """
+    return COMMAND_HELP_TEXT

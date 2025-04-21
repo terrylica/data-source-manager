@@ -36,25 +36,23 @@ dsm_demo [OPTIONS]
 
 ## Options
 
-| Option                                                                   | Description                                                                                                                                                           |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-s, --symbol TEXT`                                                      | Symbol to fetch data for [default: BTCUSDT]                                                                                                                           |
-| `-m, --market [spot\|um\|cm\|futures_usdt\|futures_coin]`                | Market type (spot, um, cm) [default: spot]                                                                                                                            |
-| `-i, --interval TEXT`                                                    | Time interval for klines/premiums [default: 1m]                                                                                                                       |
-| `-ct, --chart-type [klines\|fundingRate]`                                | Chart type (klines, premiums) [default: klines]                                                                                                                       |
-| `-st, --start-time TEXT`                                                 | [SECOND PRIORITY] Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Used only if both --start-time AND --end-time are provided AND --days is NOT provided |
-| `-et, --end-time TEXT`                                                   | [SECOND PRIORITY] End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Used only if both --start-time AND --end-time are provided AND --days is NOT provided   |
-| `-d, --days INTEGER`                                                     | [HIGHEST PRIORITY] Number of days of data to fetch. If provided, overrides --start-time and --end-time [default: 3]                                                   |
-| `-es, --enforce-source [AUTO\|REST\|VISION]`                             | Force specific data source (default: AUTO) [default: AUTO]                                                                                                            |
-| `-r, --retries INTEGER`                                                  | Maximum number of retry attempts [default: 3]                                                                                                                         |
-| `-nc, --no-cache`                                                        | Disable caching (cache is enabled by default)                                                                                                                         |
-| `-cc, --clear-cache`                                                     | Clear the cache directory before running                                                                                                                              |
-| `-fcp, --test-fcp`                                                       | Run the special test for Failover Control Protocol (FCP) mechanism                                                                                                    |
-| `-pc, --prepare-cache`                                                   | Pre-populate cache with the first segment of data (only used with --test-fcp)                                                                                         |
-| `-gd, --gen-doc`                                                         | Generate Markdown documentation from Typer help into docs/dsm_demo/ directory                                                                                         |
-| `-glc, --gen-lint-config`                                                | Generate markdown linting configuration files along with documentation (only used with --gen-doc)                                                                     |
-| `-l, --log-level [DEBUG\|INFO\|WARNING\|ERROR\|CRITICAL\|D\|I\|W\|E\|C]` | Set the log level (default: INFO). Shorthand options: D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL [default: INFO]                                                 |
-| `--help`                                                                 | Show this message and exit.                                                                                                                                           |
+| Option | Description |
+|--------|-------------|
+| `-s, --symbol TEXT` | Symbol to fetch data for  [default: BTCUSDT] |
+| `-m, --market [spot\|um\|cm\|futures_usdt\|futures_coin]` | Market type (spot, um, cm)  [default: spot] |
+| `-i, --interval TEXT` | Time interval for klines/premiums  [default: 1m] |
+| `-ct, --chart-type [klines\|fundingRate]` | Chart type (klines, premiums)  [default: klines] |
+| `-st, --start-time TEXT` | Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Can be used alone with --days to fetch forward, or with --end-time for exact range |
+| `-et, --end-time TEXT` | End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Can be used alone with --days to fetch backward, or with --start-time for exact range |
+| `-d, --days INTEGER` | Number of days of data to fetch. If used with --end-time, fetches data backward from end time. If used with --start-time, fetches data forward from start time. If used alone, fetches data backward from current time  [default: 3] |
+| `-es, --enforce-source [AUTO\|REST\|VISION]` | Force specific data source (default: AUTO)  [default: AUTO] |
+| `-r, --retries INTEGER` | Maximum number of retry attempts  [default: 3] |
+| `-nc, --no-cache` | Disable caching (cache is enabled by default) |
+| `-cc, --clear-cache` | Clear the cache directory before running |
+| `-gd, --gen-doc` | Generate Markdown documentation from Typer help into docs/dsm_demo/ directory |
+| `-glc, --gen-lint-config` | Generate markdown linting configuration files along with documentation (only used with --gen-doc) |
+| `-l, --log-level [DEBUG\|INFO\|WARNING\|ERROR\|CRITICAL\|D\|I\|W\|E\|C]` | Set the log level (default: INFO). Shorthand options: D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL  [default: INFO] |
+| `--help` | Show this message and exit. |
 
 ## Examples
 
@@ -70,10 +68,10 @@ dsm_demo [OPTIONS]
 ```bash
 # PRIORITY 1: Using --days flag (overrides any start/end times)
 ./examples/sync/dsm_demo.py -s BTCUSDT -d 7
-
+  
 # PRIORITY 2: Using start and end times (only if --days is NOT provided)
 ./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05T00:00:00 -et 2025-04-06T00:00:00
-
+  
 # FALLBACK: No time flags (uses default days=3)
 ./examples/sync/dsm_demo.py -s BTCUSDT
 ```

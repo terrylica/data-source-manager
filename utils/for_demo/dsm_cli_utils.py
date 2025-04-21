@@ -16,6 +16,7 @@ from pathlib import Path
 from utils.logger_setup import logger
 from utils.market_constraints import MarketType
 from core.sync.data_source_manager import DataSource
+from utils.for_demo.dsm_help_content import INTRO_PANEL_TEXT, RICH_OUTPUT_HELP_TEXT
 
 
 class MarketTypeChoice(str, Enum):
@@ -85,12 +86,7 @@ def print_intro_panel():
     """Print the introductory panel for DSM Demo applications."""
     print(
         Panel(
-            "[bold green]DSM Demo: Failover Control Protocol (FCP)[/bold green]\n"
-            "This script demonstrates how DataSourceManager automatically retrieves data\n"
-            "from different sources using the Failover Control Protocol (FCP) strategy:\n"
-            "1. Cache (Local Arrow files)\n"
-            "2. VISION API\n"
-            "3. REST API",
+            INTRO_PANEL_TEXT,
             expand=False,
             border_style="green",
         )
@@ -203,12 +199,7 @@ def print_rich_output_help():
     """Print help information about rich output and log levels."""
     print(
         Panel(
-            "[bold cyan]Note about Log Level and Rich Output:[/bold cyan]\n"
-            "- When log level is DEBUG, INFO, or WARNING: Rich output is visible\n"
-            "- When log level is ERROR or CRITICAL: Rich output is suppressed\n\n"
-            "Try running with different log levels to see the difference:\n"
-            "  python examples/sync/dsm_demo.py --log-level ERROR\n"
-            "  python examples/sync/dsm_demo.py -l E (shorthand for ERROR)\n",
+            RICH_OUTPUT_HELP_TEXT,
             title="Rich Output Control",
             border_style="blue",
         )
@@ -248,53 +239,56 @@ def handle_error(error, start_time_perf=None):
                     f"[cyan]Total script execution time: {elapsed_time:.4f} seconds[/cyan]\n"
                     "[red]Unable to calculate processing rate due to error[/red]",
                     title="Performance Timing",
-                    border_style="cyan",
+                    border_style="red",
                 )
             )
+    except:
+        # Last resort if even error handling fails
+        print("An error occurred, but the error handler encountered an exception.")
+        import traceback
 
-        sys.exit(1)
-    except Exception as nested_error:
-        # If even our error handling fails, print a simple message without rich formatting
-        print("CRITICAL ERROR occurred")
-        print(f"Error type: {type(error).__name__}")
-        print(f"Error handling also failed: {type(nested_error).__name__}")
-        sys.exit(1)
+        traceback.print_exc()
 
 
 def adjust_symbol_for_market(symbol, market_type):
-    """Adjust symbol for market type if needed.
+    """Adjust symbol format based on market type.
 
     Args:
-        symbol: Trading symbol (e.g., "BTCUSDT")
-        market_type: Market type as enum (MarketType)
+        symbol: Trading symbol (e.g. BTCUSDT)
+        market_type: Market type enum
 
     Returns:
         str: Adjusted symbol
     """
-    # Adjust symbol for CM market if needed
-    symbol_adjusted = symbol
-    if market_type == MarketType.FUTURES_COIN and symbol == "BTCUSDT":
-        symbol_adjusted = "BTCUSD_PERP"
-        print(f"[yellow]Adjusted symbol for CM market: {symbol_adjusted}[/yellow]")
-    return symbol_adjusted
+    # For Coin-M futures, we might need to adjust the symbol format
+    if market_type == MarketType.CM:
+        # If the symbol doesn't have _PERP suffix and doesn't contain a digit (quarterly future),
+        # add _PERP suffix
+        if not symbol.endswith("_PERP") and not any(c.isdigit() for c in symbol):
+            # Remove USDT or USD suffix if present before adding _PERP
+            if symbol.endswith("USDT"):
+                symbol = symbol[:-4] + "_PERP"
+            elif symbol.endswith("USD"):
+                symbol = symbol[:-3] + "_PERP"
+            else:
+                symbol = symbol + "_PERP"
+        logger.debug(f"Adjusted symbol for CM market: {symbol}")
+    return symbol
 
 
 def convert_source_choice(enforce_source):
-    """Convert DataSourceChoice to DataSource enum.
+    """Convert DataSourceChoice enum to DataSource enum.
 
     Args:
-        enforce_source: DataSourceChoice value
+        enforce_source: DataSourceChoice enum value
 
     Returns:
-        DataSource: Corresponding DataSource enum value
+        DataSource: Corresponding DataSource enum value or None
     """
     if enforce_source == DataSourceChoice.AUTO:
-        return DataSource.AUTO
+        return None
     elif enforce_source == DataSourceChoice.REST:
-        enforce_source_enum = DataSource.REST
-        logger.debug(f"Enforcing REST API source: {enforce_source_enum}")
-        return enforce_source_enum
+        return DataSource.REST
     elif enforce_source == DataSourceChoice.VISION:
         return DataSource.VISION
-    else:
-        return DataSource.AUTO
+    return None
