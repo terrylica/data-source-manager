@@ -116,7 +116,9 @@ def main(
 
             # Generate documentation
             doc_path = generate_markdown_docs(
-                app, gen_lint_config=gen_lint_config, cli_name="dsm_demo"
+                app,
+                gen_lint_config=gen_lint_config,
+                cli_name="dsm_demo",
             )
             logger.info(f"Documentation generated and saved to {doc_path}")
 
