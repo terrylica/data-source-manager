@@ -78,32 +78,6 @@ following the {FCP_NAME} strategy:
 and provides a summary of the data source breakdown with timeline visualization.
 """
 
-# Time Range Options section
-TIME_RANGE_OPTIONS = """[bold cyan]Time Range Options[/bold cyan]
-
-[green]1. End Time with Days[/green]
-  - Use --end-time with --days to fetch data backward from a specific end time
-  - Calculates range as [end_time - days, end_time]
-  - Example: --end-time 2025-04-15 --days 5 will fetch data from April 10-15, 2025
-
-[green]2. Start Time with Days[/green]
-  - Use --start-time with --days to fetch data forward from a specific start time
-  - Calculates range as [start_time, start_time + days]
-  - Example: --start-time 2025-04-10 --days 5 will fetch data from April 10-15, 2025
-
-[green]3. Exact Time Range[/green]
-  - Provide both --start-time and --end-time for an exact time range
-  - Example: --start-time 2025-04-10 --end-time 2025-04-15
-
-[green]4. Days Only[/green]
-  - Use --days alone to fetch data relative to current time
-  - Calculates range as [current_time - days, current_time]
-  - Example: --days 5 will fetch data from 5 days ago until now
-
-[green]5. Default Behavior (No Options)[/green]
-  - If no time options provided, uses default of 3 days from current time
-  - Equivalent to --days 3"""
-
 # Sample Commands section
 SAMPLE_COMMANDS = """[bold cyan]Sample Commands[/bold cyan]
 
@@ -164,8 +138,6 @@ COMMAND_HELP_TEXT = f"""
 {MECHANISM_DESC}
 
 {SOURCE_INFO_DESC}
-
-{TIME_RANGE_OPTIONS}
 
 {SAMPLE_COMMANDS}
 """

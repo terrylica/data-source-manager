@@ -16,7 +16,6 @@ from rich.markdown import Markdown
 
 from utils.logger_setup import logger
 from utils.for_demo.dsm_help_content import (
-    TIME_RANGE_OPTIONS,
     SAMPLE_COMMANDS,
     FCP_NAME,
     DATA_SOURCES,
@@ -98,12 +97,6 @@ This CLI tool {RETRIEVES_DATA}:
 
 {APP_BEHAVIOR}.
 
-## Time Range Options
-
-### Priority and Calculation Details
-
-{help_sections["time_range_options"]}
-
 ## Usage
 
 ```bash
@@ -167,51 +160,12 @@ def parse_command_help_text():
     """
     sections = {}
 
-    # Define mapping dictionaries for content transformations
-    section_header_mapping = {
-        "[green]1. End Time with Days[/green]": "\n#### 1. End Time with Days\n",
-        "[green]2. Start Time with Days[/green]": "\n#### 2. Start Time with Days\n",
-        "[green]3. Exact Time Range[/green]": "\n#### 3. Exact Time Range\n",
-        "[green]4. Days Only[/green]": "\n#### 4. Days Only\n",
-        "[green]5. Default Behavior (No Options)[/green]": "\n#### 5. Default Behavior (No Options)\n",
-    }
-
-    list_item_mapping = {
-        "  - Use ": "- **Usage:** Use ",
-        "  - Calculates ": "- **Calculation:** Calculates ",
-        "  - Example: ": "- **Example:** ",
-        "  - Provide ": "- **Usage:** Provide ",
-        "  - If ": "- **Condition:** If ",
-        "  - Equivalent ": "- **Equivalent:** ",
-    }
-
-    # Process time range options
-    formatted_content = TIME_RANGE_OPTIONS.strip()
-
-    # Remove the cyan header
-    formatted_content = re.sub(
-        r"\[bold cyan\]Time Range Options\[/bold cyan\]", "", formatted_content
-    ).strip()
-
-    # Apply section header mapping
-    for rich_format, markdown_format in section_header_mapping.items():
-        formatted_content = formatted_content.replace(rich_format, markdown_format)
-
-    # Apply list item mapping
-    for rich_format, markdown_format in list_item_mapping.items():
-        formatted_content = formatted_content.replace(rich_format, markdown_format)
-
-    # Add proper code backticks
-    formatted_content = formatted_content.replace("as [", "as `[").replace("]", "]`")
-
-    sections["time_range_options"] = formatted_content
-
     # Process sample commands
     sample_commands_content = process_sample_commands(SAMPLE_COMMANDS)
     sections["sample_commands"] = sample_commands_content
 
     # Return an empty dict if no sections were found to prevent KeyError
-    return sections or {"time_range_options": "", "sample_commands": ""}
+    return sections or {"sample_commands": ""}
 
 
 def process_sample_commands(sample_commands_text):
