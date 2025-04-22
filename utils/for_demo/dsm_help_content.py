@@ -56,12 +56,12 @@ from different sources using the {FCP_NAME} strategy:
 
 # Rich output help panel text
 RICH_OUTPUT_HELP_TEXT = """[bold cyan]Note about Log Level and Rich Output:[/bold cyan]
-- When log level is DEBUG, INFO, or WARNING: Rich output is visible
-- When log level is ERROR or CRITICAL: Rich output is suppressed
+- When log level is D, I, or W: Rich output is visible
+- When log level is E or C: Rich output is suppressed
 
 Try running with different log levels to see the difference:
-  python examples/sync/dsm_demo.py --log-level ERROR
-  python examples/sync/dsm_demo.py -l E (shorthand for ERROR)"""
+  python examples/sync/dsm_demo.py --log-level E
+  python examples/sync/dsm_demo.py -l E (shorthand for E)"""
 
 # Main script docstring
 MAIN_DOCSTRING = f"""
@@ -153,7 +153,7 @@ SAMPLE_COMMANDS = """[bold cyan]Sample Commands[/bold cyan]
   ./examples/sync/dsm_demo.py -gd -glc
 
 [green]Combined Examples[/green]
-  ./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
+  ./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
   ./examples/sync/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
   ./examples/sync/dsm_demo.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03"""
 
@@ -266,7 +266,7 @@ CLI_OPTIONS = {
     "log_level": {
         "long_flag": "--log-level",
         "short_flag": "-l",
-        "help": "Set the log level (default: I). D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL",
+        "help": "Set the log level (default: I). D, I, W, E, C",
         "default": "I",  # LogLevel.I
     },
     "help": {
