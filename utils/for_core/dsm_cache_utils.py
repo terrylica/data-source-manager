@@ -125,6 +125,14 @@ def get_from_cache(
                 day_start = datetime.combine(current_day, datetime.min.time())
                 day_end = datetime.combine(current_day, datetime.max.time())
 
+                # Make day_start and day_end timezone-aware if start_time is timezone-aware
+                if start_time.tzinfo is not None:
+                    # Convert to pendulum instances with the correct timezone
+                    day_start = pendulum.instance(day_start).in_timezone(
+                        start_time.tzinfo
+                    )
+                    day_end = pendulum.instance(day_end).in_timezone(end_time.tzinfo)
+
                 # Adjust boundary times if necessary
                 if day_start < start_time and current_day == start_day:
                     day_start = start_time
