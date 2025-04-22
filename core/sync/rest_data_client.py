@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 """Client for fetching market data from REST APIs with synchronous implementation."""
 
-import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_incrementing,
+    retry_if_exception_type,
+)
 
 from utils.logger_setup import logger
 from utils.time_utils import (
@@ -241,6 +246,14 @@ class RestDataClient(DataClientInterface):
             self._client = None
             logger.debug("Closed HTTP client")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_incrementing(start=1, increment=1, max=3),
+        retry=retry_if_exception_type(Exception),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Error fetching data (attempt {retry_state.attempt_number}/3): {retry_state.outcome.exception()}"
+        ),
+    )
     def _fetch_chunk(
         self, endpoint: str, params: Dict[str, Any], retry_count: int = 0
     ) -> List[List[Any]]:
@@ -249,7 +262,7 @@ class RestDataClient(DataClientInterface):
         Args:
             endpoint: API endpoint URL
             params: Request parameters
-            retry_count: Current retry attempt
+            retry_count: Current retry attempt (kept for backward compatibility)
 
         Returns:
             List of data points from the API
@@ -257,74 +270,35 @@ class RestDataClient(DataClientInterface):
         Raises:
             Exception: If all retry attempts fail
         """
-        current_attempt = 0
-        last_error = None
+        # Initialize client if not already done
+        if self._client is None:
+            self._client = self._create_optimized_client()
 
-        # Import random only if needed for jitter
-        import random
+        # Send the request with proper headers and explicit timeout
+        response = self._client.get(
+            endpoint,
+            params=params,
+            timeout=self.fetch_timeout,
+        )
 
-        while current_attempt <= retry_count:
-            try:
-                if current_attempt > 0:
-                    # Exponential backoff with jitter
-                    wait_time = min(
-                        0.1 * (2**current_attempt) + 0.1 * random.random(), 5.0
-                    )
-                    logger.warning(
-                        f"Retrying request in {wait_time:.2f}s (attempt {current_attempt+1}/{retry_count+1})"
-                    )
-                    time.sleep(wait_time)
+        # Check for HTTP error codes
+        if response.status_code != 200:
+            error_msg = f"HTTP error {response.status_code}: {response.text}"
+            logger.warning(f"Error response from {endpoint}: {error_msg}")
+            raise Exception(error_msg)
 
-                # Initialize client if not already done
-                if self._client is None:
-                    self._client = self._create_optimized_client()
+        # Parse JSON response
+        data = response.json()
 
-                # Send the request with proper headers and explicit timeout
-                response = self._client.get(
-                    endpoint,
-                    params=params,
-                    timeout=self.fetch_timeout,
-                )
+        # Check for API error
+        if isinstance(data, dict) and "code" in data and data.get("code", 0) != 0:
+            error_msg = (
+                f"API error {data.get('code')}: {data.get('msg', 'Unknown error')}"
+            )
+            logger.warning(f"API error from {endpoint}: {error_msg}")
+            raise Exception(error_msg)
 
-                # Check for HTTP error codes
-                if response.status_code != 200:
-                    error_msg = f"HTTP error {response.status_code}: {response.text}"
-                    logger.warning(
-                        f"Error response from {endpoint}, attempt {current_attempt+1}/{retry_count+1}: {error_msg}"
-                    )
-                    last_error = Exception(error_msg)
-                    current_attempt += 1
-                    continue
-
-                # Parse JSON response
-                data = response.json()
-
-                # Check for API error
-                if (
-                    isinstance(data, dict)
-                    and "code" in data
-                    and data.get("code", 0) != 0
-                ):
-                    error_msg = f"API error {data.get('code')}: {data.get('msg', 'Unknown error')}"
-                    logger.warning(
-                        f"API error from {endpoint}, attempt {current_attempt+1}/{retry_count+1}: {error_msg}"
-                    )
-                    last_error = Exception(error_msg)
-                    current_attempt += 1
-                    continue
-
-                return data
-
-            except Exception as e:
-                logger.warning(
-                    f"Error fetching data from {endpoint}, attempt {current_attempt+1}/{retry_count+1}: {e}"
-                )
-                last_error = e
-                current_attempt += 1
-
-        # If we reach here, all retries failed
-        logger.error(f"All retry attempts failed: {last_error}")
-        raise last_error or Exception("Unknown error during data fetch")
+        return data
 
     def _fetch_chunk_data(
         self,

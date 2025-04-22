@@ -27,7 +27,7 @@ import pandas as pd
 from tenacity import (
     retry,
     stop_after_attempt,
-    wait_exponential,
+    wait_incrementing,
     retry_if_exception_type,
 )
 
@@ -235,7 +235,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
+        wait=wait_incrementing(start=1, increment=1, max=3),
         retry=retry_if_exception_type(
             (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException)
         ),
@@ -243,7 +243,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         before_sleep=lambda retry_state: logger.warning(
             f"Retry attempt {retry_state.attempt_number}/3 for {retry_state.args[0] if retry_state.args else 'unknown date'} "
             f"after error: {retry_state.outcome.exception()} - "
-            f"waiting {retry_state.next_action.sleep} seconds"
+            f"waiting {retry_state.attempt_number} seconds"
         ),
     )
     def _download_file(

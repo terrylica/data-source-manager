@@ -23,7 +23,6 @@ from utils.for_demo.dsm_help_content import (
     APP_TITLE,
     APP_BEHAVIOR,
     RETRIEVES_DATA,
-    build_source_list,
 )
 
 

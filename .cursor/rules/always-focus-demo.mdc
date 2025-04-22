@@ -44,7 +44,7 @@ The FCP mechanism consists of three integrated phases that collectively ensure t
   - The final output is a coherent DataFrame conforming to the REST API schema, with metadata that explicitly identifies the origin (Cache, Vision, or REST) of each data segment.
   
 - **Robust Retry and Failure Handling:**
-  - All network calls are managed using `tenacity` with exponential backoff for up to **3 retries** (totaling a maximum of **10 seconds**).
+  - All network calls are managed using `tenacity` with a consistent retry pattern for up to **3 retries** using `wait_incrementing(start=1, increment=1, max=3)`, providing fixed wait times of 1s, 2s, and 3s respectively.
   - **Conditional Tolerance for Vision API Failures:**
     - If a Vision API download fails, the failure is tolerated only when the Vision data's end time falls within the window specified by `VISION_DATA_DELAY_HOURS` relative to the current time.
     - *Example:* With `VISION_DATA_DELAY_HOURS` set to 48 hours and the current time at 00:00 on 3rd Jan 2025, any Vision data with an end time between 00:00 on 1st Jan 2025 and one millisecond before the current time is acceptable, and such a failure warrants only a WARNING.

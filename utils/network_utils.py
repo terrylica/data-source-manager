@@ -8,10 +8,8 @@ This module provides:
 4. API request helpers with retry logic and response handling
 """
 
-import asyncio
-import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import (
     Dict,
@@ -20,17 +18,15 @@ from typing import (
     List,
     Tuple,
 )
-import os
 import json
 import platform
-import gc
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tenacity import (
     retry,
     stop_after_attempt,
-    wait_exponential,
+    wait_incrementing,
     retry_if_exception_type,
-    before_sleep_log,
 )
 
 from utils.config import (
@@ -41,8 +37,8 @@ from utils.logger_setup import logger
 # Import httpx for HTTP client implementation
 import httpx
 
-# For backwards compatibility, define AsyncSession as an alias to httpx.AsyncClient
-AsyncSession = httpx.AsyncClient
+# Define a generic Client type for HTTP clients
+Client = httpx.Client
 
 
 # ----- HTTP Client Factory Functions -----
@@ -54,22 +50,22 @@ def create_httpx_client(
     headers: Optional[Dict[str, str]] = None,
     **kwargs: Any,
 ) -> Any:
-    """Create an httpx AsyncClient for high-performance HTTP requests.
+    """Create an httpx Client for high-performance HTTP requests.
 
     Args:
         timeout: Request timeout in seconds
         max_connections: Maximum number of connections
         headers: Optional headers to include in all requests
-        **kwargs: Additional keyword arguments to pass to AsyncClient
+        **kwargs: Additional keyword arguments to pass to Client
 
     Returns:
-        httpx.AsyncClient: An initialized async HTTP client
+        httpx.Client: An initialized HTTP client
     """
     try:
-        from httpx import AsyncClient, Limits, Timeout
+        from httpx import Client, Limits, Timeout
 
         # Log the kwargs being passed to identify issues
-        logger.debug(f"Creating httpx AsyncClient with kwargs: {kwargs}")
+        logger.debug(f"Creating httpx Client with kwargs: {kwargs}")
 
         # Remove known incompatible parameters
         if "impersonate" in kwargs:
@@ -98,17 +94,16 @@ def create_httpx_client(
             }
 
         # Create the client
-        client = AsyncClient(
+        client = Client(
             timeout=timeout_obj,
             limits=limits,
             headers=headers,
-            http2=True,  # Enable HTTP/2 for improved performance
             follow_redirects=True,
             **kwargs,
         )
 
         logger.debug(
-            f"Created httpx AsyncClient with timeout={timeout}s, max_connections={max_connections}"
+            f"Created httpx Client with timeout={timeout}s, max_connections={max_connections}"
         )
         return client
 
@@ -288,7 +283,7 @@ class DownloadHandler:
 
     def __init__(
         self,
-        client: Optional[AsyncSession] = None,
+        client=None,
         max_retries: int = 3,
         min_wait: int = 1,
         max_wait: int = 60,
@@ -297,7 +292,7 @@ class DownloadHandler:
         """Initialize download handler.
 
         Args:
-            client: HTTP client (httpx.AsyncClient recommended)
+            client: HTTP client
             max_retries: Maximum number of retry attempts
             min_wait: Minimum wait time between retries in seconds
             max_wait: Maximum wait time between retries in seconds
@@ -310,33 +305,36 @@ class DownloadHandler:
         self.timeout = timeout
         self._client_is_external = client is not None
 
-    async def __aenter__(self):
-        """Enter async context manager."""
+    def __enter__(self):
+        """Enter context manager."""
         if not self.client:
             self.client = create_client(timeout=self.timeout)
             self._client_is_external = False
         return self
 
-    async def __aexit__(self, _exc_type, _exc_val, _exc_tb):
-        """Exit async context manager."""
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
+        """Exit context manager."""
         if self.client and not self._client_is_external:
-            await safely_close_client(self.client)
+            safely_close_client(self.client)
             self.client = None
 
     @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(3),
+        wait=wait_incrementing(start=1, increment=1, max=3),
         retry=retry_if_exception_type(
             (
                 DownloadStalledException,
                 RateLimitException,
-                asyncio.TimeoutError,
+                TimeoutError,
                 ConnectionError,
             )
         ),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry attempt {retry_state.attempt_number}/3 for download after error: {retry_state.outcome.exception()} - "
+            f"waiting {retry_state.attempt_number} seconds"
+        ),
     )
-    async def download_file(
+    def download_file(
         self,
         url: str,
         local_path: Path,
@@ -374,7 +372,7 @@ class DownloadHandler:
             logger.debug(f"Starting download from {url} to {local_path}")
 
             # Perform download with the client
-            response = await self.client.get(url, timeout=timeout)
+            response = self.client.get(url, timeout=timeout)
 
             # Check status code
             if response.status_code != 200:
@@ -422,24 +420,24 @@ class DownloadHandler:
         finally:
             # Clean up client if we created it
             if client_created and self.client:
-                await safely_close_client(self.client)
+                safely_close_client(self.client)
                 self.client = None
 
 
 # ----- Batch Download Handling -----
 
 
-async def download_files_concurrently(
-    client: AsyncSession,
+def download_files_concurrently(
+    client,
     urls: List[str],
     local_paths: List[Path],
     max_concurrent: int = 50,
     **download_kwargs: Any,
 ) -> List[bool]:
-    """Download multiple files concurrently using httpx.AsyncClient.
+    """Download multiple files concurrently using ThreadPoolExecutor.
 
     Args:
-        client: HTTP client (httpx.AsyncClient recommended)
+        client: HTTP client
         urls: List of URLs to download
         local_paths: List of local paths to save files to
         max_concurrent: Maximum number of concurrent downloads
@@ -477,25 +475,34 @@ async def download_files_concurrently(
             f"Adjusting concurrency to {adjusted_concurrency} for {batch_size} files"
         )
 
-    # Set up semaphore for concurrency control
-    semaphore = asyncio.Semaphore(adjusted_concurrency)
+    def download_worker(url: str, path: Path) -> bool:
+        try:
+            return handler.download_file(url, path, **download_kwargs)
+        except Exception as e:
+            logger.error(f"Error downloading {url}: {str(e)}")
+            return False
 
-    async def download_with_semaphore(url: str, path: Path) -> bool:
-        async with semaphore:
+    results = []
+
+    # Use ThreadPoolExecutor for concurrency
+    with ThreadPoolExecutor(max_workers=adjusted_concurrency) as executor:
+        # Submit all download tasks
+        future_to_index = {}
+        for i, (url, path) in enumerate(zip(urls, local_paths)):
+            future = executor.submit(download_worker, url, path)
+            future_to_index[future] = i
+
+        # Create a results list with the same length as urls
+        results = [False] * len(urls)
+
+        # Process results as they complete
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
             try:
-                return await handler.download_file(url, path, **download_kwargs)
+                results[idx] = future.result()
             except Exception as e:
-                logger.error(f"Error downloading {url}: {str(e)}")
-                return False
-
-    # Create tasks for all downloads
-    tasks = [
-        asyncio.create_task(download_with_semaphore(url, path))
-        for url, path in zip(urls, local_paths)
-    ]
-
-    # Wait for all tasks to complete
-    results = await asyncio.gather(*tasks)
+                logger.error(f"Download task raised exception: {e}")
+                results[idx] = False
 
     return results
 
@@ -503,30 +510,38 @@ async def download_files_concurrently(
 # ----- API Request Handling -----
 
 
-async def make_api_request(
-    client: AsyncSession,
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_incrementing(start=1, increment=1, max=3),
+    retry=retry_if_exception_type((json.JSONDecodeError, TimeoutError)),
+    before_sleep=lambda retry_state: logger.warning(
+        f"API request failed (attempt {retry_state.attempt_number}/3): {retry_state.outcome.exception()}"
+    ),
+)
+def make_api_request(
+    client,
     url: str,
     headers: Optional[Dict[str, str]] = None,
     params: Optional[Dict[str, str]] = None,
     method: str = "GET",
     json_data: Optional[Dict] = None,
     timeout: Optional[float] = None,
-    retries: int = 3,
-    retry_delay: float = 1.0,
+    retries: int = 3,  # Kept for backward compatibility but not used
+    retry_delay: float = 1.0,  # Kept for backward compatibility but not used
     raise_for_status: bool = True,
 ) -> Tuple[int, Dict]:
     """Make an API request with retry logic and error handling.
 
     Args:
-        client: HTTP client (httpx.AsyncClient recommended)
+        client: HTTP client
         url: URL to make the request to
         headers: Optional headers to include in the request
         params: Optional query parameters
         method: HTTP method (GET, POST, etc.)
         json_data: Optional JSON data for POST/PUT requests
         timeout: Request timeout in seconds (overrides client timeout)
-        retries: Number of retry attempts
-        retry_delay: Delay between retries in seconds
+        retries: Number of retries (kept for backward compatibility but not used)
+        retry_delay: Delay between retries (kept for backward compatibility but not used)
         raise_for_status: Whether to raise an exception for HTTP errors
 
     Returns:
@@ -536,80 +551,56 @@ async def make_api_request(
     params = params or {}
     timeout_value = timeout or DEFAULT_HTTP_TIMEOUT_SECONDS
 
-    attempt = 0
-    last_status = None
-    last_response_data = None
+    # Use httpx client
+    if method == "GET":
+        response = client.get(
+            url, headers=headers, params=params, timeout=timeout_value
+        )
+    elif method == "POST":
+        response = client.post(
+            url,
+            headers=headers,
+            params=params,
+            json=json_data,
+            timeout=timeout_value,
+        )
+    else:
+        response = client.request(
+            method,
+            url,
+            headers=headers,
+            params=params,
+            json=json_data,
+            timeout=timeout_value,
+        )
 
-    while attempt < retries:
-        try:
-            # Use httpx client
-            if method == "GET":
-                response = await client.get(
-                    url, headers=headers, params=params, timeout=timeout_value
-                )
-            elif method == "POST":
-                response = await client.post(
-                    url,
-                    headers=headers,
-                    params=params,
-                    json=json_data,
-                    timeout=timeout_value,
-                )
-            else:
-                response = await client.request(
-                    method,
-                    url,
-                    headers=headers,
-                    params=params,
-                    json=json_data,
-                    timeout=timeout_value,
-                )
+    status_code = response.status_code
 
-            status_code = response.status_code
+    # Special handling for rate limiting
+    if status_code in (418, 429):
+        retry_after = int(response.headers.get("retry-after", 1))
+        logger.warning(
+            f"Rate limited by API (HTTP {status_code}). Waiting {retry_after}s before continuing"
+        )
+        time.sleep(retry_after)
+        # Re-raise to trigger tenacity retry
+        raise TimeoutError(f"Rate limited (HTTP {status_code})")
 
-            # Check for rate limiting
-            if status_code in (418, 429):
-                retry_after = int(response.headers.get("retry-after", retry_delay))
-                logger.warning(
-                    f"Rate limited by API (HTTP {status_code}). Retry after {retry_after}s ({attempt+1}/{retries})"
-                )
-                await asyncio.sleep(retry_after)
-                attempt += 1
-                last_status = status_code
-                last_response_data = {"error": f"Rate limited (HTTP {status_code})"}
-                continue
+    if raise_for_status and status_code >= 400:
+        raise Exception(f"HTTP error: {status_code} - {response.text}")
 
-            if raise_for_status and status_code >= 400:
-                raise Exception(f"HTTP error: {status_code} - {response.text}")
+    try:
+        if response.headers.get("content-type", "").startswith("application/json"):
+            response_data = json.loads(response.text)
+        else:
+            response_data = {"text": response.text}
+    except json.JSONDecodeError as e:
+        logger.warning(f"Failed to parse JSON response: {e}")
+        # This will be caught by tenacity and retried
+        raise
 
-            try:
-                if response.headers.get("content-type", "").startswith(
-                    "application/json"
-                ):
-                    response_data = json.loads(response.text)
-                else:
-                    response_data = {"text": response.text}
-            except json.JSONDecodeError:
-                response_data = {"text": response.text}
-
-            # Successfully processed the response - return it
-            return status_code, response_data
-
-        except (json.JSONDecodeError, asyncio.TimeoutError) as e:
-            logger.warning(f"API request failed ({attempt+1}/{retries}): {str(e)}")
-            if attempt >= retries - 1:
-                # Last attempt failed, raise the exception
-                raise
-
-            # Exponential backoff
-            wait_time = retry_delay * (2**attempt)
-            logger.info(f"Retrying in {wait_time:.1f}s...")
-            await asyncio.sleep(wait_time)
-            attempt += 1
-
-    # If we got here, we exhausted our retries
-    logger.error(f"API request failed after {retries} attempts: {url}")
-    return last_status or 500, last_response_data or {"error": "Max retries exceeded"}
+    # Successfully processed the response
+    return status_code, response_data
 
 
 class VisionDownloadManager:
@@ -617,7 +608,7 @@ class VisionDownloadManager:
 
     def __init__(
         self,
-        client: AsyncSession,
+        client,
         symbol: str,
         interval: str,
         market_type: str = "spot",
@@ -625,7 +616,7 @@ class VisionDownloadManager:
         """Initialize the Vision Download Manager.
 
         Args:
-            client: HTTP client (httpx.AsyncClient recommended)
+            client: HTTP client
             symbol: Trading pair symbol (e.g., "BTCUSDT")
             interval: Time interval (e.g., "1m", "1h")
             market_type: Market type (spot, futures_usdt, futures_coin)
@@ -634,14 +625,12 @@ class VisionDownloadManager:
         self.symbol = symbol
         self.interval = interval
         self.market_type = market_type
-        self.download_handler = DownloadHandler(
-            client, max_retries=5, min_wait=4, max_wait=60, timeout=3.0
-        )
+        self.download_handler = DownloadHandler(client, max_retries=3, timeout=3.0)
         self._external_client = client is not None
         self._current_tasks = []
         self._temp_files = []
 
-    async def _cleanup_resources(self):
+    def _cleanup_resources(self):
         """Clean up resources used by the download manager.
 
         This ensures proper release of HTTP client and any other resources
@@ -655,21 +644,11 @@ class VisionDownloadManager:
         # Step 1: Cancel any ongoing download tasks
         try:
             if hasattr(self, "_current_tasks") and self._current_tasks:
-                tasks_to_cancel = [t for t in self._current_tasks if not t.done()]
-                if tasks_to_cancel:
-                    logger.debug(
-                        f"[ProgressIndicator] VisionDownloadManager: Cancelling {len(tasks_to_cancel)} ongoing download tasks"
-                    )
-                    for task in tasks_to_cancel:
-                        task.cancel()
-
-                    try:
-                        # Wait briefly for cancellation to complete
-                        await asyncio.wait(tasks_to_cancel, timeout=0.5)
-                    except Exception as e:
-                        error_msg = f"Error waiting for download tasks to cancel: {e}"
-                        logger.warning(error_msg)
-                        cleanup_errors.append(error_msg)
+                logger.debug(
+                    f"[ProgressIndicator] VisionDownloadManager: Cancelling remaining download tasks"
+                )
+                # For synchronous tasks, we can't really cancel them, but we can clear the list
+                self._current_tasks = []
         except Exception as e:
             error_msg = f"Error cancelling download tasks: {e}"
             logger.warning(error_msg)
@@ -686,26 +665,17 @@ class VisionDownloadManager:
                 logger.debug(
                     "[ProgressIndicator] VisionDownloadManager: Safely closing HTTP client"
                 )
-
-                try:
-                    # Use safely_close_client for proper cleanup
-                    from utils.network_utils import safely_close_client
-
-                    await safely_close_client(self.client)
-                    self.client = None
-                    logger.debug(
-                        "[ProgressIndicator] VisionDownloadManager: HTTP client closed successfully"
-                    )
-                except Exception as e:
-                    error_msg = f"Error closing HTTP client: {e}"
-                    logger.warning(error_msg)
-                    cleanup_errors.append(error_msg)
+                safely_close_client(self.client)
+                self.client = None
+                logger.debug(
+                    "[ProgressIndicator] VisionDownloadManager: HTTP client closed"
+                )
         except Exception as e:
-            error_msg = f"Unexpected error during client cleanup: {e}"
+            error_msg = f"Error closing HTTP client: {e}"
             logger.warning(error_msg)
             cleanup_errors.append(error_msg)
 
-        # Step 3: Clean up any temporary files from previous downloads
+        # Step 3: Clean up any temporary files
         try:
             if hasattr(self, "_temp_files") and self._temp_files:
                 logger.debug(
@@ -713,378 +683,137 @@ class VisionDownloadManager:
                 )
                 for temp_file in self._temp_files:
                     try:
-                        if os.path.exists(temp_file):
-                            os.remove(temp_file)
+                        if hasattr(temp_file, "exists") and temp_file.exists():
+                            temp_file.unlink()
                     except Exception as e:
-                        error_msg = f"Error removing temporary file {temp_file}: {e}"
-                        logger.debug(error_msg)
-                        # Don't treat temporary file cleanup failures as critical errors
-
-                # Clear the list of temporary files
+                        logger.debug(f"Error removing temp file {temp_file}: {e}")
                 self._temp_files = []
+                logger.debug(
+                    "[ProgressIndicator] VisionDownloadManager: Temporary files cleaned up"
+                )
         except Exception as e:
             error_msg = f"Error cleaning up temporary files: {e}"
             logger.warning(error_msg)
             cleanup_errors.append(error_msg)
 
-        # Step 4: Force garbage collection to help with circular references
-        gc.collect()
-
-        # Log summary of cleanup
         if cleanup_errors:
+            error_summary = "; ".join(cleanup_errors)
             logger.warning(
-                f"VisionDownloadManager cleanup encountered {len(cleanup_errors)} errors"
+                f"[ProgressIndicator] VisionDownloadManager: Resource cleanup completed with warnings: {error_summary}"
             )
-            for i, error in enumerate(cleanup_errors, 1):
-                logger.debug(f"Cleanup error {i}: {error}")
         else:
             logger.debug(
-                "[ProgressIndicator] VisionDownloadManager: Cleanup completed successfully"
+                "[ProgressIndicator] VisionDownloadManager: Resource cleanup completed successfully"
             )
 
-    async def download_date(self, date: datetime) -> Optional[List[List]]:
-        """Download data for a specific date.
+    def download_date(self, date: datetime) -> Optional[List[List]]:
+        """Download data for a specific date from Binance Vision API.
 
         Args:
-            date: Target date
+            date: Date to download data for
 
         Returns:
-            List of raw data rows if download successful, None otherwise.
-            The raw data needs to be processed by TimeseriesDataProcessor.
+            List of kline data points if successful, None otherwise
         """
-        # Ensure date has proper timezone
-        from utils.validation import DataValidation
-        from urllib.parse import urlparse
-        import tempfile
-        import zipfile
-        import time
-
-        date = DataValidation.enforce_utc_timestamp(date)
-
-        # Add debugging timestamp
-        debug_id = f"{self.symbol}_{self.interval}_{date.strftime('%Y%m%d')}_{int(time.time())}"
-
-        # Check if data is likely available for the date before attempting download
-        is_available = DataValidation.is_data_likely_available(date)
-
-        if not is_available:
-            now = datetime.now(timezone.utc)
-            # This is a future date or very recent data, no need to log as error
-            logger.info(
-                f"[{debug_id}] Data for {date.strftime('%Y-%m-%d')} may not be available yet (current date: {now.strftime('%Y-%m-%d')})"
-            )
-            return None
-
-        logger.info(
-            f"[{debug_id}] Starting download for {self.symbol} {self.interval} on {date.strftime('%Y-%m-%d')}"
-        )
-
-        # Create temporary directory for downloads
-        temp_dir = Path(tempfile.mkdtemp(dir="./tmp"))
-
-        # Get URLs for Vision API
-        from utils.for_core.vision_constraints import get_vision_url, FileType
-
-        data_url = get_vision_url(
-            self.symbol, self.interval, date, FileType.DATA, self.market_type
-        )
-        checksum_url = get_vision_url(
-            self.symbol, self.interval, date, FileType.CHECKSUM, self.market_type
-        )
-
-        # Extract original filenames from URLs
-        data_filename = Path(urlparse(data_url).path).name
-        checksum_filename = Path(urlparse(checksum_url).path).name
-
-        # Use original filenames in temp directory
-        data_file = temp_dir / data_filename
-        checksum_file = temp_dir / checksum_filename
-
         try:
-            # Download data and checksum files sequentially
-            logger.info(
-                f"[{debug_id}] Downloading data for {date.strftime('%Y-%m-%d')} from:"
-            )
-            logger.info(f"[{debug_id}] Data URL: {data_url}")
-            logger.info(f"[{debug_id}] Checksum URL: {checksum_url}")
-
-            download_start = time.time()
-
-            # Download data file first
-            if not await self._download_file(data_url, data_file):
-                # Changed from ERROR to WARNING since this could be an expected condition for future dates
-                logger.warning(f"[{debug_id}] Failed to download data file for {date}")
-                return None
-
-            # Then download checksum file
-            if not await self._download_file(checksum_url, checksum_file):
-                # Changed from ERROR to WARNING
-                logger.warning(
-                    f"[{debug_id}] Failed to download checksum file for {date}"
-                )
-                return None
-
-            download_time = time.time() - download_start
-            logger.info(f"[{debug_id}] Download completed in {download_time:.2f}s")
-
-            # Log file sizes for diagnosis
-            try:
-                data_size = data_file.stat().st_size if data_file.exists() else 0
-                checksum_size = (
-                    checksum_file.stat().st_size if checksum_file.exists() else 0
-                )
-                logger.info(
-                    f"[{debug_id}] Data file size: {data_size} bytes, Checksum file size: {checksum_size} bytes"
-                )
-
-                if data_size == 0:
-                    # Changed from ERROR to WARNING
-                    logger.warning(f"[{debug_id}] Downloaded data file is empty")
-                    return None
-            except Exception as e:
-                logger.error(f"[{debug_id}] Error checking file sizes: {e}")
-
-            # Verify checksum
-            from utils.validation import DataValidation
-            import traceback
-
-            checksum_start = time.time()
-            try:
-                # Read checksum file and normalize whitespace
-                with open(checksum_file, "r") as f:
-                    content = f.read().strip()
-                    # Split on whitespace and take first part (the checksum)
-                    expected = content.split()[0]
-                    content_length = len(content)
-                    preview_length = min(40, content_length)
-                    logger.debug(
-                        f"Raw checksum file content: '{content[:preview_length]}' (+ {content_length - preview_length} more chars, {content_length} total)"
-                    )
-                    logger.debug(f"Expected checksum: '{expected}'")
-
-                # Calculate checksum of the zip file directly
-                actual = DataValidation.calculate_checksum(data_file)
-                logger.debug(f"Calculated checksum: '{actual}'")
-
-                if actual != expected:
-                    logger.error(f"Checksum mismatch:")
-                    logger.error(f"Expected: '{expected}'")
-                    logger.error(f"Actual  : '{actual}'")
-                    # Try normalizing both checksums
-                    expected_norm = expected.lower().strip()
-                    actual_norm = actual.lower().strip()
-                    logger.debug(f"Normalized expected: '{expected_norm}'")
-                    logger.debug(f"Normalized actual  : '{actual_norm}'")
-                    if expected_norm != actual_norm:
-                        return None
-            except Exception as e:
-                logger.error(f"Error verifying checksum: {e}")
-                logger.debug(f"Full traceback: {traceback.format_exc()}")
-                return None
-
-            logger.info(
-                f"[{debug_id}] Checksum verification completed in {time.time() - checksum_start:.2f}s"
+            # Construct URL for the date
+            url_template = "https://data.binance.vision/data/{market_type}/daily/klines/{symbol}/{interval}/{symbol}-{interval}-{date}.zip"
+            url = url_template.format(
+                market_type=self.market_type,
+                symbol=self.symbol,
+                interval=self.interval,
+                date=date.strftime("%Y-%m-%d"),
             )
 
-            # Read CSV data from zip file
-            try:
-                logger.info(f"[{debug_id}] Reading CSV data from {data_file}")
-                csv_start = time.time()
+            # Create a temp file for the download
+            import tempfile
+            from pathlib import Path
 
-                # Read the CSV from the ZIP file
-                raw_data = []
-                with zipfile.ZipFile(data_file, "r") as zip_file:
-                    file_list = zip_file.namelist()
-                    logger.info(f"[{debug_id}] Zip file contents: {file_list}")
+            temp_dir = tempfile.gettempdir()
+            temp_file = (
+                Path(temp_dir)
+                / f"{self.symbol}_{self.interval}_{date.strftime('%Y-%m-%d')}.zip"
+            )
 
-                    if not file_list:
-                        logger.warning(f"[{debug_id}] Empty zip file: {data_file}")
-                        return []
+            # Track the temp file for cleanup
+            self._temp_files.append(temp_file)
 
-                    csv_file = file_list[0]  # Assume first file is the CSV
-
-                    with zip_file.open(csv_file) as file:
-                        # Convert file-like object to bytes
-                        file_content = file.read()
-
-                        if len(file_content) == 0:
-                            logger.warning(f"[{debug_id}] CSV file is empty")
-                            return []
-
-                        # Use StringIO for CSV parsing
-                        import io
-                        import csv
-
-                        csv_buffer = io.StringIO(file_content.decode("utf-8"))
-                        csv_reader = csv.reader(csv_buffer)
-
-                        # Read the first line to check if it contains headers
-                        try:
-                            first_line = next(csv_reader)
-                            # Check if the first line contains headers (likely column names)
-                            headers_detected = any(
-                                isinstance(val, str) and "time" in val.lower()
-                                for val in first_line
-                            )
-
-                            # Reset buffer and create a new reader
-                            csv_buffer.seek(0)
-                            csv_reader = csv.reader(csv_buffer)
-
-                            # Skip header row if detected
-                            if headers_detected:
-                                logger.info(
-                                    f"[{debug_id}] CSV headers detected, skipping first row"
-                                )
-                                next(csv_reader)
-                        except StopIteration:
-                            logger.warning(f"[{debug_id}] CSV file appears to be empty")
-                            return []
-
-                        # Read all rows into a list of lists
-                        for row in csv_reader:
-                            # Convert string values to appropriate types
-                            processed_row = []
-                            for val in row:
-                                try:
-                                    # Try to convert to numeric if possible
-                                    if "." in val:
-                                        processed_row.append(float(val))
-                                    else:
-                                        processed_row.append(int(val))
-                                except (ValueError, TypeError):
-                                    # Keep as string if conversion fails
-                                    processed_row.append(val)
-                            raw_data.append(processed_row)
-
-                logger.info(
-                    f"[{debug_id}] CSV reading completed in {time.time() - csv_start:.2f}s"
-                )
-
-                # Check if we got any data
-                if not raw_data:
-                    logger.warning(f"[{debug_id}] Downloaded CSV is empty")
-                    return None
-
-                logger.info(
-                    f"[{debug_id}] Successfully extracted {len(raw_data)} rows of raw data"
-                )
-                return raw_data
-
-            except Exception as e:
-                logger.error(f"[{debug_id}] Error reading CSV data: {e}")
+            # Download the file
+            success = self.download_handler.download_file(url, temp_file)
+            if not success:
+                logger.warning(f"Failed to download data for {date}")
                 return None
 
+            # Process the zip file
+            import zipfile
+            import csv
+            from io import StringIO
+
+            data = []
+            with zipfile.ZipFile(temp_file, "r") as zip_ref:
+                csv_files = [f for f in zip_ref.namelist() if f.endswith(".csv")]
+                if not csv_files:
+                    logger.warning(f"No CSV file found in downloaded zip for {date}")
+                    return None
+
+                # Extract and read the CSV data
+                with zip_ref.open(csv_files[0]) as csv_file:
+                    content = csv_file.read().decode("utf-8")
+                    reader = csv.reader(StringIO(content))
+                    data = list(reader)
+
+            # Clean up the temp file
+            try:
+                temp_file.unlink()
+                self._temp_files.remove(temp_file)
+            except Exception as e:
+                logger.debug(f"Error removing temp file {temp_file}: {e}")
+
+            return data
         except Exception as e:
-            logger.error(f"[{debug_id}] Error downloading data for {date}: {e}")
+            logger.error(f"Error downloading data for {date}: {e}")
             return None
-        finally:
-            # Cleanup
-            try:
-                import shutil
 
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            except Exception as e:
-                logger.error(f"[{debug_id}] Error cleaning up temp directory: {e}")
-
-    async def _download_file(self, url: str, local_path: Path) -> bool:
-        """Download a file from URL to local path.
+    def _download_file(self, url: str, local_path: Path) -> bool:
+        """Download a file using the download handler.
 
         Args:
-            url: URL to download from
-            local_path: Path to save to
+            url: URL to download
+            local_path: Path to save the file to
 
         Returns:
-            True if download successful, False otherwise
+            True if successful, False otherwise
         """
-        try:
-            logger.debug(f"[ProgressIndicator] Downloading {url} to {local_path}")
+        return self.download_handler.download_file(url, local_path)
 
-            # Make the directory if it doesn't exist
-            local_path.parent.mkdir(parents=True, exist_ok=True)
+    def __enter__(self):
+        """Enter context manager."""
+        return self
 
-            # Make the request
-            response = await self.client.get(url, timeout=30.0)
-
-            # Check for errors
-            if response.status_code >= 400:
-                logger.warning(
-                    f"[ProgressIndicator] HTTP error: {response.status_code} downloading {url}"
-                )
-                return False
-
-            # Save the content
-            with open(local_path, "wb") as f:
-                f.write(response.content)
-
-            logger.debug(
-                f"[ProgressIndicator] Successfully downloaded {url} ({len(response.content)} bytes)"
-            )
-            return True
-
-        except Exception as e:
-            logger.error(f"[ProgressIndicator] Error downloading {url}: {e}")
-            return False
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager. Clean up resources."""
+        self._cleanup_resources()
 
 
-async def safely_close_client(client):
-    """Safely close an HTTP client, with special handling for different client types.
-
-    This function handles safely closing HTTP clients, with proper error handling
-    and cleanup of resources.
+def safely_close_client(client):
+    """Safely close an HTTP client, handling any exceptions.
 
     Args:
-        client: The HTTP client to close (httpx.AsyncClient)
+        client: HTTP client to close
     """
     if client is None:
         return
 
-    # Get client type name for better error messages
-    client_type = client.__class__.__name__
-    logger.debug(f"[ProgressIndicator] Closing HTTP client of type {client_type}")
-
     try:
-        # Try close() method first (available on most HTTP clients)
         if hasattr(client, "close") and callable(client.close):
-            # Check if it's an async method
-            if asyncio.iscoroutinefunction(client.close):
-                await client.close()
-                logger.debug(
-                    f"[ProgressIndicator] Closed {client_type} with await client.close()"
-                )
-            else:
-                client.close()
-                logger.debug(
-                    f"[ProgressIndicator] Closed {client_type} with client.close()"
-                )
-            return
-
-        # Handle httpx.AsyncClient special case
-        if client_type == "AsyncClient" and hasattr(client, "aclose"):
-            await client.aclose()
-            logger.debug(f"[ProgressIndicator] Closed {client_type} via aclose()")
-            return
-
-        # For older versions of httpx
-        if hasattr(client, "transport") and hasattr(client.transport, "close"):
-            client.transport.close()
-            logger.debug(f"[ProgressIndicator] Closed {client_type}.transport")
-            return
-
-        # If we get here, we don't know how to close this client
-        logger.warning(
-            f"[ProgressIndicator] Don't know how to close client of type {client_type}"
-        )
-
+            client.close()
+            logger.debug("HTTP client closed successfully")
     except Exception as e:
-        logger.warning(f"[ProgressIndicator] Error closing {client_type}: {e}")
-    finally:
-        # Suggest garbage collection to clean up resources
-        gc.collect()
+        logger.warning(f"Error while closing HTTP client: {e}")
 
 
-async def test_connectivity(
-    client: Optional[AsyncSession] = None,
+def test_connectivity(
+    client=None,
     url: str = "https://data.binance.vision/",
     timeout: float = 10.0,
     retry_count: int = 2,
@@ -1092,54 +821,48 @@ async def test_connectivity(
     """Test connectivity to a URL.
 
     Args:
-        client: Optional httpx.AsyncClient to use (new one is created if None)
-        url: URL to test connectivity to
+        client: HTTP client to use (creates a new one if None)
+        url: URL to test
         timeout: Request timeout in seconds
         retry_count: Number of retry attempts
 
     Returns:
-        True if connectivity test passes, False otherwise
+        True if connection is successful, False otherwise
     """
-    # Create a client if not provided
-    should_close_client = False
+    client_created = False
     if client is None:
         client = create_client(timeout=timeout)
-        should_close_client = True
+        client_created = True
 
     try:
         for attempt in range(retry_count + 1):
             try:
-                logger.debug(
-                    f"[ProgressIndicator] Testing connectivity to {url} (attempt {attempt+1}/{retry_count+1})"
-                )
-                response = await client.get(url, timeout=timeout)
-
-                if response.status_code < 400:
-                    logger.debug(
-                        f"[ProgressIndicator] Connectivity test successful: {response.status_code}"
-                    )
+                # Try to connect
+                response = client.get(url, timeout=timeout)
+                if response.status_code == 200:
+                    logger.info(f"Successfully connected to {url}")
                     return True
-
-                logger.warning(
-                    f"[ProgressIndicator] Connectivity test failed with status code: {response.status_code}"
-                )
-
-                if attempt < retry_count:
-                    await asyncio.sleep(2**attempt)  # Exponential backoff
-
+                else:
+                    logger.warning(
+                        f"Connection test failed with status code {response.status_code}"
+                    )
+                    if attempt < retry_count:
+                        wait_time = 1 + attempt  # 1s, 2s, etc.
+                        logger.info(
+                            f"Retrying in {wait_time}s... (attempt {attempt+1}/{retry_count})"
+                        )
+                        time.sleep(wait_time)
             except Exception as e:
-                logger.warning(
-                    f"[ProgressIndicator] Connectivity test failed with error: {str(e)}"
-                )
+                logger.warning(f"Connection test attempt {attempt+1} failed: {e}")
                 if attempt < retry_count:
-                    await asyncio.sleep(2**attempt)  # Exponential backoff
+                    wait_time = 1 + attempt
+                    logger.info(
+                        f"Retrying in {wait_time}s... (attempt {attempt+1}/{retry_count})"
+                    )
+                    time.sleep(wait_time)
 
-        # All attempts failed
+        logger.error(f"Failed to connect to {url} after {retry_count+1} attempts")
         return False
     finally:
-        # Close the client if we created it
-        if should_close_client and client:
-            try:
-                await safely_close_client(client)
-            except Exception as e:
-                logger.warning(f"Error closing client after connectivity test: {e}")
+        if client_created and client:
+            safely_close_client(client)
