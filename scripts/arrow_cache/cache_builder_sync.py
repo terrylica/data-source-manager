@@ -1463,7 +1463,7 @@ def setup_argparse():
     )
     parser.add_argument(
         "--market-type",
-        help="Market type (spot, futures_usdt, futures_coin)",
+        help="Market type (spot, um, cm)",
         default="spot",
     )
     parser.add_argument(

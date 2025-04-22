@@ -39,9 +39,7 @@ def setup_argparse() -> argparse.Namespace:
         "--date", help="Date in YYYY-MM-DD format to check (defaults to today)"
     )
     parser.add_argument("--interval", default="1m", help="Kline interval (default: 1m)")
-    parser.add_argument(
-        "--market", default="spot", help="Market type (spot, futures, etc.)"
-    )
+    parser.add_argument("--market", default="spot", help="Market type (spot, um, cm)")
     return parser.parse_args()
 
 

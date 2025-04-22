@@ -24,8 +24,6 @@ class MarketTypeChoice(str, Enum):
     SPOT = "spot"
     UM = "um"
     CM = "cm"
-    FUTURES_USDT = "futures_usdt"
-    FUTURES_COIN = "futures_coin"
 
 
 class DataProviderChoice(str, Enum):
@@ -53,18 +51,12 @@ class ChartTypeChoice(str, Enum):
 class LogLevel(str, Enum):
     """Log level choices."""
 
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-
-    # Add shorthand values explicitly to the enum
-    D = "D"
-    I = "I"
-    W = "W"
-    E = "E"
-    C = "C"
+    # Shorthand values for log levels
+    D = "D"  # DEBUG
+    I = "I"  # INFO
+    W = "W"  # WARNING
+    E = "E"  # ERROR
+    C = "C"  # CRITICAL
 
 
 def resolve_log_level(level):

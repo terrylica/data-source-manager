@@ -50,7 +50,7 @@ dsm_demo [OPTIONS]
 ## Options
 
 - **`-p, --provider [binance]`**: Data provider (binance, tradestation)  [default: binance]
-- **`-m, --market [spot|um|cm|futures_usdt|futures_coin]`**: Market type (spot, um, cm)  [default: spot]
+- **`-m, --market [spot|um|cm]`**: Market type (spot, um, cm)  [default: spot]
 - **`-ct, --chart-type [klines|fundingRate]`**: Chart type (klines, premiums)  [default: klines]
 - **`-s, --symbol TEXT`**: Symbol to fetch data for  [default: BTCUSDT]
 - **`-i, --interval TEXT`**: Time interval for klines/premiums  [default: 1m]
@@ -63,7 +63,7 @@ dsm_demo [OPTIONS]
 - **`-cc, --clear-cache`**: Clear the cache directory before running
 - **`-gd, --gen-doc`**: Generate Markdown documentation from Typer help into docs/dsm_demo/ directory
 - **`-glc, --gen-lint-config`**: Generate markdown linting configuration files along with documentation (only used with --gen-doc)
-- **`-l, --log-level [DEBUG|INFO|WARNING|ERROR|CRITICAL|D|I|W|E|C]`**: Set the log level (default: INFO). Shorthand options: D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL  [default: INFO]
+- **`-l, --log-level [D|I|W|E|C]`**: Set the log level (default: I). D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL  [default: I]
 - **`--help`**: Show this message and exit.
 - **`-h, --help`**: Show this message and exit.
 

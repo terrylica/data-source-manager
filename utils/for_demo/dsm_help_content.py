@@ -231,8 +231,8 @@ CLI_OPTIONS = {
     "log_level": {
         "long_flag": "--log-level",
         "short_flag": "-l",
-        "help": "Set the log level (default: INFO). Shorthand options: D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL",
-        "default": "INFO",  # LogLevel.INFO
+        "help": "Set the log level (default: I). D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL",
+        "default": "I",  # LogLevel.I
     },
     "help": {
         "long_flag": "--help",
