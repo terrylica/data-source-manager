@@ -13,7 +13,10 @@ import rich.box as box
 from pathlib import Path
 
 from utils.logger_setup import logger
-from utils.market_constraints import get_market_symbol_format
+from utils.market_constraints import (
+    get_market_symbol_format,
+    validate_symbol_for_market_type,
+)
 from core.sync.data_source_manager import DataSource
 from utils.for_demo.dsm_help_content import INTRO_PANEL_TEXT, RICH_OUTPUT_HELP_TEXT
 
@@ -260,7 +263,19 @@ def adjust_symbol_for_market(symbol, market_type):
 
     Returns:
         str: Adjusted symbol
+
+    Raises:
+        ValueError: If the symbol is invalid for the market type
     """
+    # First validate the symbol for the market type
+    try:
+        # Validate first to catch incompatible symbol-market combinations
+        validate_symbol_for_market_type(symbol, market_type)
+    except ValueError as e:
+        # Log the error and re-raise
+        logger.error(f"Symbol validation error: {str(e)}")
+        raise
+
     # Use the centralized function from market_constraints.py
     adjusted_symbol = get_market_symbol_format(symbol, market_type)
 
