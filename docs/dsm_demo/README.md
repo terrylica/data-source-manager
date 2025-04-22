@@ -62,7 +62,7 @@ dsm_demo [OPTIONS]
 - **`-cc, --clear-cache`**: Clear the cache directory before running
 - **`-gd, --gen-doc`**: Generate Markdown documentation from Typer help into docs/dsm_demo/ directory
 - **`-glc, --gen-lint-config`**: Generate markdown linting configuration files along with documentation (only used with --gen-doc)
-- **`-l, --log-level [D|I|W|E|C]`**: Set the log level (default: I). D=DEBUG, I=INFO, W=WARNING, E=ERROR, C=CRITICAL  [default: I]
+- **`-l, --log-level [D|I|W|E|C]`**: Set the log level (default: I). D, I, W, E, C  [default: I]
 - **`--help`**: Show this message and exit.
 - **`-h, --help`**: Show this message and exit.
 
@@ -155,7 +155,7 @@ dsm_demo [OPTIONS]
 ### Combined Examples
 
 ```bash
-./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
+./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
 ./examples/sync/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
 ./examples/sync/dsm_demo.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03
 ```
