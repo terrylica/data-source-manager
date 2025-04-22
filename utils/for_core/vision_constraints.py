@@ -42,6 +42,7 @@ from utils.config import (
     VISION_DATA_DELAY_HOURS,
     FILE_EXTENSIONS,
 )
+from utils.market_constraints import MarketType, get_market_symbol_format
 
 # Type definitions for semantic clarity and safety
 TimeseriesIndex = NewType("TimeseriesIndex", pd.DatetimeIndex)
@@ -202,22 +203,22 @@ def get_vision_url(
 
     # Determine path components based on market type
     # Convert market type to lowercase for consistency
-    market_type = market_type.lower()
+    market_type_str = market_type.lower()
 
-    if market_type == "spot":
+    if market_type_str == "spot":
         market_path = "spot"
-    elif market_type in ["futures_usdt", "um"]:
+        market_enum = MarketType.SPOT
+    elif market_type_str in ["futures_usdt", "um"]:
         market_path = "futures/um"
-    elif market_type in ["futures_coin", "cm"]:
+        market_enum = MarketType.FUTURES_USDT
+    elif market_type_str in ["futures_coin", "cm"]:
         market_path = "futures/cm"
+        market_enum = MarketType.FUTURES_COIN
     else:
         raise ValueError(f"Unsupported market type: {market_type}")
 
-    # For coin-margined futures, append _PERP suffix
-    if market_type in ["futures_coin", "cm"]:
-        # If symbol already has _PERP suffix, don't add it again
-        if not symbol.endswith("_PERP"):
-            symbol = f"{symbol}_PERP"
+    # Use the centralized function to transform the symbol
+    symbol = get_market_symbol_format(symbol, market_enum)
 
     # Construct file name
     file_name = f"{symbol}-{interval}-{date_str}.zip"

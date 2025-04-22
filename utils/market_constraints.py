@@ -461,6 +461,56 @@ def safe_enum_compare(enum1: Enum, enum2: Enum) -> bool:
     return enum1.name == enum2.name
 
 
+def get_market_symbol_format(symbol: str, market_type: MarketType) -> str:
+    """Transform a standard symbol to the format required by the specified market type.
+
+    This function serves as the single source of truth for symbol transformations
+    across all market types.
+
+    Args:
+        symbol: Base symbol (e.g., "BTCUSDT")
+        market_type: Target market type
+
+    Returns:
+        str: Properly formatted symbol for the specified market type
+    """
+    # If symbol is already in the correct format, return as is
+    if not symbol:
+        return symbol
+
+    # Get the capabilities for the market type to access the expected format
+    capabilities = get_market_capabilities(market_type)
+
+    # Use name-based comparison for stability with module reloading
+    market_name = market_type.name
+
+    # For CM futures (FUTURES_COIN), perform special transformations
+    if market_name == "FUTURES_COIN":
+        # Already has _PERP suffix? Keep as is
+        if symbol.endswith("_PERP"):
+            return symbol
+
+        # Contains digits? Likely a quarterly contract, keep as is
+        if any(c.isdigit() for c in symbol):
+            return symbol
+
+        # BTCUSDT format -> BTCUSD_PERP
+        if symbol.endswith("USDT"):
+            return symbol[:-4] + "USD_PERP"
+
+        # BTCUSD format -> BTCUSD_PERP
+        elif symbol.endswith("USD"):
+            return symbol[:-3] + "_PERP"
+
+        # Other format -> symbol_PERP
+        else:
+            return symbol + "_PERP"
+
+    # For other market types, default to returning the original symbol
+    # (Usually no transformation needed for SPOT or FUTURES_USDT)
+    return symbol
+
+
 def get_endpoint_url(
     market_type: MarketType, chart_type: str | ChartType, version: str = None
 ) -> str:

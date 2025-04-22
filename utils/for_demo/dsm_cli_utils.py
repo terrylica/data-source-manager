@@ -13,7 +13,7 @@ import rich.box as box
 from pathlib import Path
 
 from utils.logger_setup import logger
-from utils.market_constraints import MarketType
+from utils.market_constraints import MarketType, get_market_symbol_format
 from core.sync.data_source_manager import DataSource
 from utils.for_demo.dsm_help_content import INTRO_PANEL_TEXT, RICH_OUTPUT_HELP_TEXT
 
@@ -261,20 +261,15 @@ def adjust_symbol_for_market(symbol, market_type):
     Returns:
         str: Adjusted symbol
     """
-    # For Coin-M futures, we might need to adjust the symbol format
-    if market_type == MarketType.FUTURES_COIN:
-        # If the symbol doesn't have _PERP suffix and doesn't contain a digit (quarterly future),
-        # add _PERP suffix
-        if not symbol.endswith("_PERP") and not any(c.isdigit() for c in symbol):
-            # Remove USDT or USD suffix if present before adding _PERP
-            if symbol.endswith("USDT"):
-                symbol = symbol[:-4] + "_PERP"
-            elif symbol.endswith("USD"):
-                symbol = symbol[:-3] + "_PERP"
-            else:
-                symbol = symbol + "_PERP"
-        logger.debug(f"Adjusted symbol for CM market: {symbol}")
-    return symbol
+    # Use the centralized function from market_constraints.py
+    adjusted_symbol = get_market_symbol_format(symbol, market_type)
+
+    if adjusted_symbol != symbol:
+        logger.debug(
+            f"Adjusted symbol for {market_type.name} market: {adjusted_symbol}"
+        )
+
+    return adjusted_symbol
 
 
 def convert_source_choice(enforce_source):
