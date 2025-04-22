@@ -1,9 +1,8 @@
-# dsm_demo: Failover Control Protocol
+# dsm_demo: Failover Control Protocol (FCP)
 
-This CLI tool demonstrates the Failover Control Protocol (FCP) mechanism,
-which automatically retrieves Bitcoin data from multiple sources:
+This CLI tool retrieves data from multiple sources:
 
-1. **Cache** (Local Arrow files)
+1. **Cache (Local Arrow files)**
 2. **VISION API**
 3. **REST API**
 
