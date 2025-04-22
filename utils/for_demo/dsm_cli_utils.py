@@ -28,6 +28,13 @@ class MarketTypeChoice(str, Enum):
     FUTURES_COIN = "futures_coin"
 
 
+class DataProviderChoice(str, Enum):
+    """Data provider choices for CLI arguments."""
+
+    BINANCE = "binance"
+    # Add other providers if needed
+
+
 class DataSourceChoice(str, Enum):
     """Data source choices for CLI arguments."""
 
