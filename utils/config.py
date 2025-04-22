@@ -6,6 +6,7 @@ scattered across multiple files, creating a single source of truth for system-wi
 """
 
 import os
+from pathlib import Path
 from datetime import timedelta, timezone
 from typing import Dict, Final, Any, List
 import pandas as pd
@@ -208,8 +209,8 @@ ENV: Final = os.getenv("APP_ENV", "development")
 DEBUG: Final = os.getenv("DEBUG", "false").lower() == "true"
 
 # Base directories
-DEFAULT_CACHE_DIR = os.path.expanduser("~/.binance_data_cache")
-DEFAULT_LOG_DIR = os.path.expanduser("~/.binance_data_logs")
+DEFAULT_CACHE_DIR = Path.home() / ".binance_data_cache"
+DEFAULT_LOG_DIR = Path.home() / ".binance_data_logs"
 
 
 # Feature flags

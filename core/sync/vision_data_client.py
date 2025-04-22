@@ -18,7 +18,6 @@ directly with this client.
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional, TypeVar, Generic, Union, List, Dict, Tuple
-import os
 import tempfile
 import zipfile
 import httpx
@@ -440,7 +439,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                     # Extract and process the CSV file
                     with tempfile.TemporaryDirectory() as temp_dir:
                         zip_ref.extract(csv_file, temp_dir)
-                        csv_path = os.path.join(temp_dir, csv_file)
+                        csv_path = Path(temp_dir) / csv_file
 
                         # Read the CSV file
                         with open(csv_path, "r") as f:

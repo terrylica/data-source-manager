@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional, Any
 import pandas as pd
-import os
 import time
 import pyarrow as pa
 import pyarrow.ipc
@@ -39,7 +38,7 @@ class UnifiedCacheManager:
         # Create directories if needed
         if create_dirs:
             try:
-                os.makedirs(self.cache_dir, exist_ok=True)
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
                 logger.debug(f"Cache directory created: {self.cache_dir}")
             except OSError as e:
                 logger.error(f"Failed to create cache directory: {e}")
@@ -79,7 +78,7 @@ class UnifiedCacheManager:
         try:
             metadata_path = self._get_metadata_path()
             file_size_before = (
-                os.path.getsize(metadata_path) if os.path.exists(metadata_path) else 0
+                metadata_path.stat().st_size if metadata_path.exists() else 0
             )
             logger.debug(
                 f"Metadata will be saved to {metadata_path} (current size: {file_size_before} bytes)"
@@ -126,7 +125,7 @@ class UnifiedCacheManager:
                     )
                     return
 
-                temp_size = os.path.getsize(temp_path)
+                temp_size = temp_path.stat().st_size
                 if temp_size == 0:
                     logger.error("Temporary metadata file is empty")
                     return
@@ -147,7 +146,7 @@ class UnifiedCacheManager:
 
             # Check file size after write
             if metadata_path.exists():
-                file_size_after = os.path.getsize(metadata_path)
+                file_size_after = metadata_path.stat().st_size
                 logger.debug(
                     f"Final metadata file size: {file_size_after} bytes (change: {file_size_after - file_size_before} bytes)"
                 )
@@ -257,7 +256,7 @@ class UnifiedCacheManager:
             interval_dir = symbol_dir / interval.lower()
 
             # Create directories if they don't exist
-            os.makedirs(interval_dir, exist_ok=True)
+            interval_dir.mkdir(parents=True, exist_ok=True)
 
             # Use the date_str as the filename
             return interval_dir / f"{date_str}.arrow"
@@ -414,7 +413,7 @@ class UnifiedCacheManager:
 
         try:
             # Ensure the directory exists
-            os.makedirs(cache_path.parent, exist_ok=True)
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Prepare metadata
             metadata_entry = {
@@ -456,7 +455,7 @@ class UnifiedCacheManager:
                     writer.write_table(table)
 
             # Update metadata
-            metadata_entry["file_size_bytes"] = os.path.getsize(cache_path)
+            metadata_entry["file_size_bytes"] = cache_path.stat().st_size
             self.metadata[cache_key] = metadata_entry
 
             # Save metadata

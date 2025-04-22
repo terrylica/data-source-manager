@@ -3,7 +3,7 @@
 from utils.logger_setup import logger
 import pandas as pd
 import httpx
-import os
+from pathlib import Path
 from datetime import datetime
 
 # No need to initialize logger with get_logger anymore
@@ -67,14 +67,15 @@ def convert_to_csv(data, symbol):
 def save_to_csv(df, symbol, output_dir="tmp"):
     """Save DataFrame to CSV file with the required naming pattern"""
     try:
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            logger.info(f"Created output directory: {output_dir}")
+        output_path = Path(output_dir)
+        if not output_path.exists():
+            output_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created output directory: {output_path}")
 
         # Format current date for filename
         today = datetime.now().strftime("%Y-%m-%d")
         filename = f"Funding Rate History_{symbol} Perpetual_{today}.csv"
-        file_path = os.path.join(output_dir, filename)
+        file_path = output_path / filename
 
         # Save to CSV
         df.to_csv(file_path, index=False)

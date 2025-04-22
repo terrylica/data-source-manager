@@ -2,7 +2,7 @@
 
 from utils.logger_setup import logger
 import pandas as pd
-import os
+from pathlib import Path
 from datetime import datetime
 import argparse
 import time
@@ -80,19 +80,20 @@ def save_to_csv(
 ) -> Optional[str]:
     """Save DataFrame to CSV file with the required naming pattern"""
     try:
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            logger.info(f"Created output directory: {output_dir}")
+        output_path = Path(output_dir)
+        if not output_path.exists():
+            output_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created output directory: {output_path}")
 
         # Format current date for filename
         today = datetime.now().strftime("%Y-%m-%d")
         filename = f"Funding Rate History_{symbol} Perpetual_{today}.csv"
-        file_path = os.path.join(output_dir, filename)
+        file_path = output_path / filename
 
         # Save to CSV
         df.to_csv(file_path, index=False)
         logger.info(f"Saved funding rate history to {file_path}")
-        return file_path
+        return str(file_path)
     except Exception as e:
         logger.error(f"Error saving CSV file for {symbol}: {e}")
         return None
@@ -204,7 +205,7 @@ def main():
     args = parse_arguments()
 
     # Ensure output directory exists
-    os.makedirs(args.output_dir, exist_ok=True)
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
     if args.run_once:
         # Run once and exit

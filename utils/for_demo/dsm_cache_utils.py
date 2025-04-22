@@ -6,7 +6,6 @@ This module provides functions for cache directory management and verification
 for the Failover Control Protocol (FCP) demonstrations.
 """
 
-import os
 import shutil
 from pathlib import Path
 from utils.logger_setup import logger
@@ -66,15 +65,20 @@ def verify_project_root():
     Returns:
         bool: True if running from project root, False otherwise
     """
-    if os.path.isdir("core") and os.path.isdir("utils") and os.path.isdir("examples"):
+    if Path("core").is_dir() and Path("utils").is_dir() and Path("examples").is_dir():
         # Already in project root
         print("Running from project root directory")
         return True
 
     # Try to navigate to project root if we're in the example directory
-    if os.path.isdir("../../core") and os.path.isdir("../../utils"):
-        os.chdir("../..")
-        print(f"Changed to project root directory: {os.getcwd()}")
+    if Path("../../core").is_dir() and Path("../../utils").is_dir():
+        # Get the current working directory
+        current = Path.cwd()
+        # Move two directories up (using Path's parent attribute)
+        target = current.absolute().parent.parent
+        # Change to the new directory using Path.chdir() from Python 3.11
+        Path.chdir(target)
+        print(f"Changed to project root directory: {Path.cwd()}")
         return True
 
     print("[bold red]Error: Unable to locate project root directory[/bold red]")

@@ -1095,7 +1095,6 @@ class DataFrameValidator:
         Returns:
             Error information if validation fails, None if valid
         """
-        import os
         from pathlib import Path
 
         file_path = Path(file_path)
@@ -1109,7 +1108,7 @@ class DataFrameValidator:
             }
 
         # Check file size
-        file_size = os.path.getsize(file_path)
+        file_size = file_path.stat().st_size
         if file_size < min_size:
             return {
                 "error_type": "file_too_small",
