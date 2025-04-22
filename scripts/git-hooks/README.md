@@ -20,7 +20,7 @@ You can install the hooks in two ways:
 Run the installation script:
 
 ```bash
-./scripts/install-git-hooks.sh
+./scripts/git-hooks/install.sh
 ```
 
 ### 2. Manual Installation
@@ -34,6 +34,7 @@ To install hooks manually:
    ```
 
 2. Make it executable:
+
    ```bash
    chmod +x .git/hooks/pre-commit
    ```
