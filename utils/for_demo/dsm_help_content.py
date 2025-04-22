@@ -5,19 +5,54 @@ Centralized help content for DSM Demo applications.
 This module provides all help text content for DSM Demo scripts to maintain DRY principle.
 """
 
+# Core reusable components
+FCP_NAME = "Failover Control Protocol (FCP)"
+APP_TITLE = f"DSM Demo: {FCP_NAME}"
+
+# Data sources (listed in FCP priority order)
+DATA_SOURCES = ["Cache (Local Arrow files)", "VISION API", "REST API"]
+
+# Additional atomic fragments needed by doc utils
+RETRIEVES_DATA = "retrieves data from multiple sources"
+APP_BEHAVIOR = (
+    "It displays real-time source information about where each data point comes from"
+)
+
+
+# String builder for data sources list
+def build_source_list(numbered=True, indent=0):
+    """Build a string of data sources, optionally numbered with custom indentation."""
+    indent_str = " " * indent
+    source_lines = []
+    for i, source in enumerate(DATA_SOURCES, 1):
+        if numbered:
+            source_lines.append(f"{indent_str}{i}. {source}")
+        else:
+            source_lines.append(f"{indent_str}{source}")
+    return "\n".join(source_lines)
+
+
+# Core descriptions
+MECHANISM_DESC_SHORT = f"Demonstrates the {FCP_NAME} mechanism"
+MECHANISM_DESC = f"""This script shows how DataSourceManager automatically retrieves data from different sources:
+
+{build_source_list()}"""
+
+SOURCE_INFO_DESC = (
+    "It displays real-time source information about where each data point comes from."
+)
+
 # App description used in multiple places
-APP_DESCRIPTION = "Demonstrates the Failover Control Protocol (FCP) mechanism"
+APP_DESCRIPTION = MECHANISM_DESC_SHORT
 
 # Brief app help for typer app creation
-APP_HELP = "DSM Demo: Demonstrate the Failover Control Protocol (FCP) mechanism"
+APP_HELP = f"{APP_TITLE}"
 
 # Intro panel text
-INTRO_PANEL_TEXT = """[bold green]DSM Demo: Failover Control Protocol (FCP)[/bold green]
+INTRO_PANEL_TEXT = f"""[bold green]{APP_TITLE}[/bold green]
 This script demonstrates how DataSourceManager automatically retrieves data
-from different sources using the Failover Control Protocol (FCP) strategy:
-1. Cache (Local Arrow files)
-2. VISION API
-3. REST API"""
+from different sources using the {FCP_NAME} strategy:
+{build_source_list()}"""
 
 # Rich output help panel text
 RICH_OUTPUT_HELP_TEXT = """[bold cyan]Note about Log Level and Rich Output:[/bold cyan]
@@ -29,35 +64,22 @@ Try running with different log levels to see the difference:
   python examples/sync/dsm_demo.py -l E (shorthand for ERROR)"""
 
 # Main script docstring
-MAIN_DOCSTRING = """
-DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism specified in
+MAIN_DOCSTRING = f"""
+{APP_TITLE} specified in
 `.cursor/rules/always_focus_demo.mdc`
 
 This script allows users to specify a time span and observe how the
 DataSourceManager automatically retrieves data from different sources
-following the Failover Control Protocol (FCP) strategy:
+following the {FCP_NAME} strategy:
 
-1. Cache (Local Arrow files)
-2. VISION API
-3. REST API
+{build_source_list()}
 
-It shows real-time source information about where each data point comes from,
+{SOURCE_INFO_DESC}
 and provides a summary of the data source breakdown with timeline visualization.
 """
 
-# Help text for the main command
-COMMAND_HELP_TEXT = """
-DSM Demo: Demonstrates the Failover Control Protocol (FCP) mechanism.
-
-This script shows how DataSourceManager automatically retrieves data from different sources:
-
-1. Cache (Local Arrow files)
-2. VISION API
-3. REST API
-
-It displays real-time source information about where each data point comes from.
-
-[bold cyan]Time Range Options[/bold cyan]
+# Time Range Options section
+TIME_RANGE_OPTIONS = """[bold cyan]Time Range Options[/bold cyan]
 
 [green]1. End Time with Days[/green]
   - Use --end-time with --days to fetch data backward from a specific end time
@@ -80,9 +102,10 @@ It displays real-time source information about where each data point comes from.
 
 [green]5. Default Behavior (No Options)[/green]
   - If no time options provided, uses default of 3 days from current time
-  - Equivalent to --days 3
+  - Equivalent to --days 3"""
 
-[bold cyan]Sample Commands[/bold cyan]
+# Sample Commands section
+SAMPLE_COMMANDS = """[bold cyan]Sample Commands[/bold cyan]
 
 [green]End Time Backward Retrieval with Log Control[/green]
   > End time with days and ERROR log level (complex case)
@@ -132,7 +155,19 @@ It displays real-time source information about where each data point comes from.
 [green]Combined Examples[/green]
   ./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l DEBUG
   ./examples/sync/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
-  ./examples/sync/dsm_demo.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03
+  ./examples/sync/dsm_demo.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03"""
+
+# Help text for the main command
+COMMAND_HELP_TEXT = f"""
+{APP_TITLE}.
+
+{MECHANISM_DESC}
+
+{SOURCE_INFO_DESC}
+
+{TIME_RANGE_OPTIONS}
+
+{SAMPLE_COMMANDS}
 """
 
 # CLI Option Definitions
