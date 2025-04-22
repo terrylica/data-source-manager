@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Next‑Level CLI‑to‑README Integration
+
+Below are three complementary strategies to tighten the loop between the Python CLI help and a polished GitHub Flavored Markdown (GFM) README—each one skirting brittle regex hacks and elevating modularity.
+
+---
+
+## 1. Pure‑Python Help Extraction + Templating
+
+1. **Introspect the Typer App**  
+   Use Typer/Click’s Python API (e.g. `app.make_context().get_help()`) instead of spawning an external process.
+
+2. **Define a Data Model**  
+   Represent each help fragment—titles, descriptions, option lists, examples—as fields on a small set of `@dataclass` or Pydantic models.
+
+3. **Render with Jinja2**  
+   Feed those models into a Jinja2 template that emits GFM:
+   ```jinja
+   # {{ cli_name }}: {{ protocol_name }}
+
+   {{ intro_paragraph }}
+
+   ## Options
+   {% for opt in options %}
+   - **`{{ opt.flag }}`**: {{ opt.description }}
+   {% endfor %}
+
+   ## Examples
+   ```bash
+   {% for ex in examples %}{{ ex }}{% endfor %}
+   ```
+   ```
+4. **Lint & Format**  
+   Immediately pass the generated `.md` through `markdownlint-cli` and `mdformat` to guarantee valid GFM.
+
+**Tools:** `typer`, `click`, `pathlib`, `dataclasses`/`pydantic`, `Jinja2`, `re` (minimal), `markdownlint-cli`, `mdformat`.
+
+---
+
+## 2. Content‑First Data Drives Both CLI & Docs
+
+1. **Central YAML/JSON Source**  
+   Store every phrase, option definition, and example snippet in a single structured file.
+
+2. **Code‑Gen for CLI**  
+   A Python script loads the data file to both:
+   - Define the Typer commands/options  
+   - Populate the help‑text constants module
+
+3. **Doc‑Gen with the Same Data**  
+   Use the exact same YAML/JSON input to render a GFM README via Jinja2 or any template engine.
+
+This endows you with one single source of truth, eradicating drift between on‑screen help and GitHub docs.
+
+**Tools:** `PyYAML`/`json`, `typer`, `Jinja2`, `pathlib`, `markdownlint-cli`.
+
+---
+
+## 3. Static Site Generator + Docstring‑Driven Docs
+
+1. **Embed Docstrings**  
+   Write comprehensive Google‑ or NumPy‑style docstrings on each Typer command.
+
+2. **Use MkDocs + mkdocstrings**  
+   Leverage `mkdocs` with the `mkdocs‑typer` or `mkdocs‑mkdocstrings` plugin to auto‑generate GFM pages straight from the Typer app.
+
+3. **Customize GFM Output**  
+   The Sphinx/MkDocs pipeline can be configured to emit pure GitHub Flavored Markdown, complete with tables, admonitions, and syntax‑highlighted code blocks.
+
+4. **Continuous Deployment**  
+   Hook into GitHub Actions to build and deploy the site (or just the `README.md`) on every commit.
+
+**Tools:** `typer`, `mkdocs`, `mkdocs‑mkdocstrings`, `myst-parser` (if needed), `rich` (for terminal previews), `markdownlint-cli`.
+
+---
+
+### Why GFM Matters
+
+- **Tables & Fenced Blocks:** Native GFM tables and triple‑backtick code fences render beautifully on GitHub.  
+- **Task Lists & Badges:** Embedding “To‑Do” checkboxes or status badges directly in your README gives instantaneous visual feedback.  
+- **Consistency:** Running generated Markdown through `markdownlint-cli` ensures the same rules that govern your documentation site also govern the `README.md`.
+
+By combining Python introspection, templating, or a static‑site framework, you can retire fragile regex post‑processors and achieve a single, DRY, and maintainable documentation workflow—all in true GitHub‑Flavoured Markdown.
