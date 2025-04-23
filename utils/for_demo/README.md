@@ -38,7 +38,7 @@ This approach centralizes:
 - `dsm_help_content.py` - Contains all help text constants and CLI option definitions
 - `dsm_app_options.py` - Uses the centralized CLI option definitions for Typer app options
 - `dsm_cli_utils.py` - Uses the centralized help content for CLI utility functions
-- `examples/sync/dsm_demo.py` - Uses the centralized help content via `__doc__ = MAIN_DOCSTRING`
+- `examples/sync/dsm_demo_cli.py` - Uses the centralized help content via `__doc__ = MAIN_DOCSTRING`
 
 ## Benefits
 

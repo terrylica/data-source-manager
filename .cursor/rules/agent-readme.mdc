@@ -3,4 +3,4 @@ description: README
 globs: 
 alwaysApply: false
 ---
-Do not directly modify `docs/dsm_demo/README.md` because it is geenrated by `./examples/sync/dsm_demo.py --gen-doc`
+Do not directly modify `docs/dsm_demo_cli/README.md` because it is geenrated by `./examples/sync/dsm_demo_cli.py --gen-doc`

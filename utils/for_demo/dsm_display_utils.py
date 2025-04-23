@@ -20,7 +20,7 @@ def display_results(
     interval,
     chart_type,
     log_timestamp=None,
-    session_name="dsm_demo",
+    session_name="dsm_demo_cli",
 ):
     """
     Display the results of the FCP data retrieval.
@@ -32,7 +32,7 @@ def display_results(
         interval: Time interval between data points
         chart_type: Type of chart data
         log_timestamp: Optional timestamp for log files
-        session_name: Name of the session used for log files (default: "dsm_demo")
+        session_name: Name of the session used for log files (default: "dsm_demo_cli")
 
     Returns:
         Path to CSV file if data was saved, None otherwise

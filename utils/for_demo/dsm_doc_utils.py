@@ -27,7 +27,7 @@ from utils.for_demo.dsm_help_content import (
 
 def generate_markdown_docs_with_typer_cli(
     app: typer.Typer,
-    output_dir: str = "docs/dsm_demo",
+    output_dir: str = "docs/dsm_demo_cli",
     filename: str = "README.md",
     cli_name: str = None,
 ):
@@ -290,7 +290,7 @@ def process_sample_commands(sample_commands_text):
 
 def generate_markdown_docs(
     app: typer.Typer,
-    output_dir: str = "docs/dsm_demo",
+    output_dir: str = "docs/dsm_demo_cli",
     filename: str = "README.md",
     gen_lint_config: bool = False,
     cli_name: str = None,

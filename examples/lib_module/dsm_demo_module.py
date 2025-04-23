@@ -4,7 +4,7 @@ DSM Demo Showcase: Example of end time backward retrieval with log control.
 This module demonstrates how to use the DSM library functions directly for
 fetching historical data from a specified end time, similar to the CLI usage:
 
-    ./examples/sync/dsm_demo.py -s BTCUSDT -et 2025-04-14T15:59:59 -i 1m -d 10 -l E
+    ./examples/sync/dsm_demo_cli.py -s BTCUSDT -et 2025-04-14T15:59:59 -i 1m -d 10 -l E
 """
 
 import pendulum
@@ -12,7 +12,7 @@ from rich import print
 from utils.logger_setup import logger, configure_session_logging
 import pandas as pd
 
-from dsm_demo_lib import (
+from core.sync.dsm_lib import (
     setup_environment,
     process_market_parameters,
     fetch_market_data,

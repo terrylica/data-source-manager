@@ -45,7 +45,7 @@ from utils.for_demo.dsm_app_options import (
 )
 
 # Import library functions
-from dsm_demo_lib import (
+from core.sync.dsm_lib import (
     setup_environment,
     process_market_parameters,
     fetch_market_data,
@@ -93,7 +93,9 @@ def main(
     level = resolve_log_level(log_level.value)
 
     # Set up session logging (delegated to logger_setup.py)
-    main_log, error_log, log_timestamp = configure_session_logging("dsm_demo", level)
+    main_log, error_log, log_timestamp = configure_session_logging(
+        "dsm_demo_cli", level
+    )
 
     logger.info(f"Current time: {pendulum.now().isoformat()}")
 
@@ -108,8 +110,9 @@ def main(
             # Generate documentation
             doc_path = generate_markdown_docs(
                 app,
+                output_dir="examples/sync",
                 gen_lint_config=gen_lint_config,
-                cli_name="dsm_demo",
+                cli_name="dsm_demo_cli",
             )
             logger.info(f"Documentation generated and saved to {doc_path}")
 

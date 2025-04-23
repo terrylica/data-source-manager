@@ -60,8 +60,8 @@ RICH_OUTPUT_HELP_TEXT = """[bold cyan]Note about Log Level and Rich Output:[/bol
 - When log level is E or C: Rich output is suppressed
 
 Try running with different log levels to see the difference:
-  python examples/sync/dsm_demo.py --log-level E
-  python examples/sync/dsm_demo.py -l E (shorthand for E)"""
+  python examples/sync/dsm_demo_cli.py --log-level E
+  python examples/sync/dsm_demo_cli.py -l E (shorthand for E)"""
 
 # Main script docstring
 MAIN_DOCSTRING = f"""
@@ -83,53 +83,53 @@ SAMPLE_COMMANDS = """[bold cyan]Sample Commands[/bold cyan]
 
 [green]End Time Backward Retrieval with Log Control[/green]
   > End time with days and ERROR log level (complex case)
-  ./examples/sync/dsm_demo.py -s BTCUSDT -et 2025-04-14T15:59:59 -i 3m -d 5 -l E
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -et 2025-04-14T15:59:59 -i 3m -d 5 -l E
 
 [green]Time Range CLI Examples[/green]
   > End time with days (fetch backward from end time)
-  ./examples/sync/dsm_demo.py -s BTCUSDT -et 2025-04-15 -d 7
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -et 2025-04-15 -d 7
   
   > Start time with days (fetch forward from start time)
-  ./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05 -d 10
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -st 2025-04-05 -d 10
   
   > Exact time range (start time to end time)
-  ./examples/sync/dsm_demo.py -s BTCUSDT -st 2025-04-05 -et 2025-04-15
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -st 2025-04-05 -et 2025-04-15
   
   > Days only (fetch backward from current time)
-  ./examples/sync/dsm_demo.py -s BTCUSDT -d 7
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -d 7
   
   > Default (3 days backward from current time)
-  ./examples/sync/dsm_demo.py -s BTCUSDT
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT
 
 [green]Market Types[/green]
-  ./examples/sync/dsm_demo.py -s BTCUSDT -m um
-  ./examples/sync/dsm_demo.py -s BTCUSD_PERP -m cm
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -m um
+  ./examples/sync/dsm_demo_cli.py -s BTCUSD_PERP -m cm
 
 [green]Data Provider Options[/green]
-  ./examples/sync/dsm_demo.py -s BTCUSDT -p binance
-  ./examples/sync/dsm_demo.py -s BTCUSDT -p tradestation
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -p binance
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -p tradestation
 
 [green]Different Intervals[/green]
-  ./examples/sync/dsm_demo.py -s BTCUSDT -i 5m
-  ./examples/sync/dsm_demo.py -s BTCUSDT -i 1h
-  ./examples/sync/dsm_demo.py -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -i 5m
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -i 1h
+  ./examples/sync/dsm_demo_cli.py -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
 
 [green]Data Source Options[/green]
-  ./examples/sync/dsm_demo.py -s BTCUSDT -es REST
-  ./examples/sync/dsm_demo.py -s BTCUSDT -nc
-  ./examples/sync/dsm_demo.py -s BTCUSDT -cc
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -es REST
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -nc
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -cc
   
 [green]Documentation Generation[/green]
   > Generate documentation
-  ./examples/sync/dsm_demo.py -gd
+  ./examples/sync/dsm_demo_cli.py -gd
   
   > Generate documentation with linting configuration files
-  ./examples/sync/dsm_demo.py -gd -glc
+  ./examples/sync/dsm_demo_cli.py -gd -glc
 
 [green]Combined Examples[/green]
-  ./examples/sync/dsm_demo.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
-  ./examples/sync/dsm_demo.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
-  ./examples/sync/dsm_demo.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03"""
+  ./examples/sync/dsm_demo_cli.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
+  ./examples/sync/dsm_demo_cli.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03"""
 
 # Help text for the main command
 COMMAND_HELP_TEXT = f"""
@@ -225,7 +225,7 @@ CLI_OPTIONS = {
     "gen_doc": {
         "long_flag": "--gen-doc",
         "short_flag": "-gd",
-        "help": "Generate Markdown documentation from Typer help into docs/dsm_demo/ directory",
+        "help": "Generate Markdown documentation from Typer help into docs/dsm_demo_cli/ directory",
         "default": False,
     },
     "gen_lint_config": {
