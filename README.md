@@ -13,7 +13,7 @@ A high-performance, robust package for efficient market data retrieval from mult
 
 ### Core Principles
 
-- **[Always Focus Demo Rule](.cursor/rules/always_focus_demo.mdc)**: The authoritative instruction file guiding the Cursor Agent to strictly adhere to the demo plan and maintain focus on the Failover Control Protocol demonstration.
+- **[Always Focus Demo Rule](.cursor/rules/always-focus-demo.mdc)**: The authoritative instruction file guiding the Cursor Agent to strictly adhere to the demo plan and maintain focus on the Failover Control Protocol demonstration.
 
 ## API Documentation
 
