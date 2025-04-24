@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Single Source of Truth Configurations
+
+- `utils/market_constraints.py` is single source of truth for data types
+- `utils/config.py` is the single source of truth of for parameters
+- interval eum in the `utils/market_constraints.py` must be used as the only interval in all codes.
