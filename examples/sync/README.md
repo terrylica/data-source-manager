@@ -83,6 +83,12 @@ dsm_demo_cli [OPTIONS]
 ./examples/sync/dsm_demo_cli.py -s BTCUSD_PERP -m cm
 ```
 
+#### Note: Coin-margined futures (-m cm) require symbols with USD_PERP format (e.g., BTCUSD_PERP, not BTCUSDT)
+
+```bash
+./examples/sync/dsm_demo_cli.py -s BTCUSD_PERP -m cm -d 1 -et 2025-03-01
+```
+
 ### Data Provider Options
 
 ```bash
@@ -126,4 +132,10 @@ dsm_demo_cli [OPTIONS]
 ./examples/sync/dsm_demo_cli.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
 ./examples/sync/dsm_demo_cli.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
 ./examples/sync/dsm_demo_cli.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03
+```
+
+#### Bitcoin historical data for coin-margined futures (using required USD_PERP format)
+
+```bash
+./examples/sync/dsm_demo_cli.py -s BTCUSD_PERP -m cm -i 15m -d 7 -et 2025-03-01 -l D -cc
 ```

@@ -14,10 +14,11 @@ from utils.logger_setup import logger
 
 # Import core types and constraints
 from utils.market_constraints import (
-    MarketType,
-    Interval,
     DataProvider,
+    MarketType,
     ChartType,
+    Interval,
+    get_default_symbol,
 )
 
 # Import utility modules
@@ -80,9 +81,21 @@ def process_market_parameters(
     # Validate interval support
     validate_interval(market_type, interval_enum)
 
-    # Adjust symbol for market type if needed
-    if market_type == MarketType.FUTURES_COIN and not symbol.endswith("_PERP"):
-        symbol = f"{symbol}_PERP"
+    # Validate symbol format for market type
+    # For CM market, ensure symbol ends with _PERP and has USD (not USDT)
+    if market_type == MarketType.FUTURES_COIN:
+        if not symbol.endswith("_PERP"):
+            raise ValueError(
+                f"Symbol for coin-margined futures must end with '_PERP'. Invalid: '{symbol}'"
+            )
+        if "USDT" in symbol:
+            raise ValueError(
+                f"Symbol for coin-margined futures must use USD, not USDT. Invalid: '{symbol}'"
+            )
+
+    # If no symbol is provided, use default symbol for the market type
+    if not symbol:
+        symbol = get_default_symbol(market_type)
 
     return provider_enum, market_type, chart_type_enum, symbol, interval_enum
 

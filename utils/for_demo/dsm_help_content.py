@@ -104,6 +104,9 @@ SAMPLE_COMMANDS = """[bold cyan]Sample Commands[/bold cyan]
 [green]Market Types[/green]
   ./examples/sync/dsm_demo_cli.py -s BTCUSDT -m um
   ./examples/sync/dsm_demo_cli.py -s BTCUSD_PERP -m cm
+  
+  > Note: Coin-margined futures (-m cm) require symbols with USD_PERP format (e.g., BTCUSD_PERP, not BTCUSDT)
+  ./examples/sync/dsm_demo_cli.py -s BTCUSD_PERP -m cm -d 1 -et 2025-03-01
 
 [green]Data Provider Options[/green]
   ./examples/sync/dsm_demo_cli.py -s BTCUSDT -p binance
@@ -129,7 +132,11 @@ SAMPLE_COMMANDS = """[bold cyan]Sample Commands[/bold cyan]
 [green]Combined Examples[/green]
   ./examples/sync/dsm_demo_cli.py -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
   ./examples/sync/dsm_demo_cli.py -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
-  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03"""
+  ./examples/sync/dsm_demo_cli.py -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03
+  
+  > Bitcoin historical data for coin-margined futures (using required USD_PERP format)
+  ./examples/sync/dsm_demo_cli.py -s BTCUSD_PERP -m cm -i 15m -d 7 -et 2025-03-01 -l D -cc
+"""
 
 # Help text for the main command
 COMMAND_HELP_TEXT = f"""

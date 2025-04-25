@@ -4,12 +4,6 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_incrementing,
-    retry_if_exception_type,
-)
 
 from utils.logger_setup import logger
 from utils.time_utils import (
@@ -26,141 +20,36 @@ from utils.market_constraints import (
 )
 from utils.validation import DataFrameValidator
 from utils.config import (
-    OUTPUT_DTYPES,
     REST_MAX_CHUNKS,
     DEFAULT_HTTP_TIMEOUT_SECONDS,
+)
+from utils.for_core.rest_client_utils import (
+    create_optimized_client,
+    fetch_chunk,
+    calculate_chunks,
+    validate_request_params,
+    get_interval_ms,
+    parse_interval_string,
+    log_rest_metrics,
+)
+from utils.for_core.rest_data_processing import (
+    process_kline_data,
+    create_empty_dataframe,
+    REST_OUTPUT_COLUMNS,
+)
+from utils.for_core.rest_exceptions import (
+    RestAPIError,
+    RateLimitError,
+    HTTPError,
+    APIError,
+    NetworkError,
+    TimeoutError,
+    JSONDecodeError,
 )
 from core.sync.data_client_interface import DataClientInterface
 
 # Define the column names as a constant since they aren't in config.py
-OUTPUT_COLUMNS = [
-    "open",
-    "high",
-    "low",
-    "close",
-    "volume",
-    "close_time",
-    "quote_asset_volume",
-    "count",
-    "taker_buy_volume",
-    "taker_buy_quote_volume",
-]
-
-
-def standardize_column_names(df: pd.DataFrame) -> pd.DataFrame:
-    """Standardize column names to ensure consistent naming.
-
-    Args:
-        df: DataFrame to standardize
-
-    Returns:
-        DataFrame with standardized column names
-    """
-    # Define mappings for column name standardization
-    column_mapping = {
-        # Quote volume variants
-        "quote_volume": "quote_asset_volume",
-        "quote_vol": "quote_asset_volume",
-        # Trade count variants
-        "trades": "count",
-        "number_of_trades": "count",
-        # Taker buy base volume variants
-        "taker_buy_base": "taker_buy_volume",
-        "taker_buy_base_volume": "taker_buy_volume",
-        "taker_buy_base_asset_volume": "taker_buy_volume",
-        # Taker buy quote volume variants
-        "taker_buy_quote": "taker_buy_quote_volume",
-        "taker_buy_quote_asset_volume": "taker_buy_quote_volume",
-        # Time field variants
-        "time": "open_time",
-        "timestamp": "open_time",
-        "date": "open_time",
-    }
-
-    # Rename columns that need standardization
-    for col in df.columns:
-        if col.lower() in column_mapping:
-            df = df.rename(columns={col: column_mapping[col.lower()]})
-
-    return df
-
-
-def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
-    """Process raw kline data into a structured DataFrame.
-
-    Args:
-        raw_data: Raw kline data from the API
-
-    Returns:
-        Processed DataFrame with standardized columns
-    """
-    # Create DataFrame from raw data
-    df = pd.DataFrame(
-        raw_data,
-        columns=[
-            "open_time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "close_time",
-            "quote_asset_volume",
-            "number_of_trades",
-            "taker_buy_base_asset_volume",
-            "taker_buy_quote_asset_volume",
-            "ignore",
-        ],
-    )
-
-    # Convert times to datetime
-    df["open_time"] = pd.to_datetime(df["open_time"], unit="ms", utc=True)
-    df["close_time"] = pd.to_datetime(df["close_time"], unit="ms", utc=True)
-
-    # Convert strings to floats
-    for col in [
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "quote_asset_volume",
-        "taker_buy_base_asset_volume",
-        "taker_buy_quote_asset_volume",
-    ]:
-        df[col] = df[col].astype(float)
-
-    # Convert number of trades to integer
-    df["number_of_trades"] = df["number_of_trades"].astype(int)
-
-    # Drop the ignore column
-    df = df.drop(columns=["ignore"])
-
-    # Add extended columns based on existing data
-    df = standardize_column_names(df)
-
-    # Ensure we consistently return a DataFrame with open_time as a column, never as an index
-    # This prevents downstream ambiguity
-    if (
-        hasattr(df, "index")
-        and hasattr(df.index, "name")
-        and df.index.name == "open_time"
-    ):
-        logger.debug("Resetting index to ensure open_time is a column, not an index")
-        df = df.reset_index()
-
-    # Ensure there's only one open_time (column takes precedence over index)
-    if (
-        hasattr(df, "index")
-        and hasattr(df.index, "name")
-        and df.index.name == "open_time"
-        and "open_time" in df.columns
-    ):
-        logger.debug("Resolving ambiguous open_time by keeping only the column version")
-        df = df.reset_index(drop=True)
-
-    # Perform any REST API-specific post-processing here if needed
-    return df
+OUTPUT_COLUMNS = REST_OUTPUT_COLUMNS
 
 
 class RestDataClient(DataClientInterface):
@@ -236,7 +125,7 @@ class RestDataClient(DataClientInterface):
     def __enter__(self):
         """Initialize the client session when entering the context."""
         if self._client is None:
-            self._client = self._create_optimized_client()
+            self._client = create_optimized_client()
         return self
 
     def __exit__(self, _exc_type, _exc_val, _exc_tb):
@@ -246,14 +135,6 @@ class RestDataClient(DataClientInterface):
             self._client = None
             logger.debug("Closed HTTP client")
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_incrementing(start=1, increment=1, max=3),
-        retry=retry_if_exception_type(Exception),
-        before_sleep=lambda retry_state: logger.warning(
-            f"Error fetching data (attempt {retry_state.attempt_number}/3): {retry_state.outcome.exception()}"
-        ),
-    )
     def _fetch_chunk(
         self, endpoint: str, params: Dict[str, Any], retry_count: int = 0
     ) -> List[List[Any]]:
@@ -272,33 +153,10 @@ class RestDataClient(DataClientInterface):
         """
         # Initialize client if not already done
         if self._client is None:
-            self._client = self._create_optimized_client()
+            self._client = create_optimized_client()
 
-        # Send the request with proper headers and explicit timeout
-        response = self._client.get(
-            endpoint,
-            params=params,
-            timeout=self.fetch_timeout,
-        )
-
-        # Check for HTTP error codes
-        if response.status_code != 200:
-            error_msg = f"HTTP error {response.status_code}: {response.text}"
-            logger.warning(f"Error response from {endpoint}: {error_msg}")
-            raise Exception(error_msg)
-
-        # Parse JSON response
-        data = response.json()
-
-        # Check for API error
-        if isinstance(data, dict) and "code" in data and data.get("code", 0) != 0:
-            error_msg = (
-                f"API error {data.get('code')}: {data.get('msg', 'Unknown error')}"
-            )
-            logger.warning(f"API error from {endpoint}: {error_msg}")
-            raise Exception(error_msg)
-
-        return data
+        # Use the utility function to fetch the chunk
+        return fetch_chunk(self._client, endpoint, params, self.fetch_timeout)
 
     def _fetch_chunk_data(
         self,
@@ -340,42 +198,31 @@ class RestDataClient(DataClientInterface):
                 return []
 
             return data
-        except Exception as e:
-            logger.error(f"Error fetching chunk data: {e}")
+        except RateLimitError as e:
+            # Handle rate limiting specifically
+            logger.warning(f"Rate limited when fetching chunk for {symbol}: {e}")
+            logger.warning(f"Will retry after {e.retry_after}s")
             return []
-
-    def _validate_request_params(
-        self, symbol: str, interval: Interval, start_time: datetime, end_time: datetime
-    ) -> None:
-        """Validate request parameters for debugging.
-
-        Args:
-            symbol: Trading pair symbol
-            interval: Time interval
-            start_time: Start time
-            end_time: End time
-
-        Raises:
-            ValueError: If parameters are invalid
-        """
-        # Validate that we have string parameters where needed
-        if not isinstance(symbol, str) or not symbol:
-            raise ValueError(f"Symbol must be a non-empty string, got {symbol}")
-
-        # Validate time ranges
-        if not isinstance(start_time, datetime) or not isinstance(end_time, datetime):
-            raise ValueError(
-                f"Start and end times must be datetime objects, got start={type(start_time)}, end={type(end_time)}"
-            )
-
-        if start_time >= end_time:
-            raise ValueError(
-                f"Start time ({start_time}) must be before end time ({end_time})"
-            )
-
-        # Validate interval
-        if not isinstance(interval, Interval):
-            raise ValueError(f"Interval must be an Interval enum, got {type(interval)}")
+        except (HTTPError, APIError) as e:
+            # Handle HTTP and API errors
+            logger.error(f"API error when fetching chunk for {symbol}: {e}")
+            return []
+        except (NetworkError, TimeoutError) as e:
+            # Handle network and timeout errors
+            logger.error(f"Network error when fetching chunk for {symbol}: {e}")
+            return []
+        except JSONDecodeError as e:
+            # Handle JSON decode errors
+            logger.error(f"JSON decode error when fetching chunk for {symbol}: {e}")
+            return []
+        except RestAPIError as e:
+            # Handle any other REST API errors
+            logger.error(f"REST API error when fetching chunk for {symbol}: {e}")
+            return []
+        except Exception as e:
+            # Catch-all for any other errors
+            logger.error(f"Unexpected error fetching chunk data for {symbol}: {e}")
+            return []
 
     def _create_optimized_client(self) -> Any:
         """Create an optimized HTTP client for REST API requests.
@@ -383,29 +230,12 @@ class RestDataClient(DataClientInterface):
         Returns:
             HTTP client instance optimized for performance
         """
-        # Use the requests library for synchronous HTTP requests
-        import requests
-
-        session = requests.Session()
-
-        # Configure the session with reasonable defaults
-        session.headers.update(
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            }
-        )
-
-        return session
+        return create_optimized_client()
 
     def _calculate_chunks(
         self, start_ms: int, end_ms: int, interval: Interval
     ) -> List[Tuple[int, int]]:
         """Calculate chunk boundaries for a time range.
-
-        This is needed because Binance API limits the number of records per request,
-        so we need to break large time ranges into smaller chunks.
 
         Args:
             start_ms: Start time in milliseconds
@@ -416,71 +246,12 @@ class RestDataClient(DataClientInterface):
             List of (chunk_start_ms, chunk_end_ms) tuples
         """
         # Calculate the interval duration in milliseconds
-        interval_ms = self._get_interval_ms(interval)
+        interval_ms = get_interval_ms(interval)
 
-        # Calculate max time range per request (in milliseconds)
-        # This is based on the chunk size limit and interval duration
-        max_range_ms = interval_ms * self.CHUNK_SIZE
-
-        # Calculate the number of chunks needed
-        chunks = []
-        current_start = start_ms
-
-        # Initialize a safety counter to prevent infinite loops
-        loop_count = 0
-        max_loops = REST_MAX_CHUNKS
-
-        while current_start < end_ms and loop_count < max_loops:
-            # Calculate the end of this chunk
-            chunk_end = min(current_start + max_range_ms, end_ms)
-
-            # Add the chunk to our list
-            chunks.append((current_start, chunk_end))
-
-            # Move to the next chunk
-            current_start = chunk_end
-
-            # Safety counter
-            loop_count += 1
-
-        if loop_count >= max_loops:
-            logger.warning(
-                f"Reached maximum chunk limit ({max_loops}) for time range {start_ms} to {end_ms}"
-            )
-
-        return chunks
-
-    def _get_interval_ms(self, interval: Interval) -> int:
-        """Get the interval duration in milliseconds.
-
-        Args:
-            interval: Time interval
-
-        Returns:
-            Interval duration in milliseconds
-        """
-        # Map of interval values to milliseconds
-        interval_map = {
-            Interval.SECOND_1: 1000,  # 1 second
-            Interval.MINUTE_1: 60 * 1000,  # 1 minute
-            Interval.MINUTE_3: 3 * 60 * 1000,  # 3 minutes
-            Interval.MINUTE_5: 5 * 60 * 1000,  # 5 minutes
-            Interval.MINUTE_15: 15 * 60 * 1000,  # 15 minutes
-            Interval.MINUTE_30: 30 * 60 * 1000,  # 30 minutes
-            Interval.HOUR_1: 60 * 60 * 1000,  # 1 hour
-            Interval.HOUR_2: 2 * 60 * 60 * 1000,  # 2 hours
-            Interval.HOUR_4: 4 * 60 * 60 * 1000,  # 4 hours
-            Interval.HOUR_6: 6 * 60 * 60 * 1000,  # 6 hours
-            Interval.HOUR_8: 8 * 60 * 60 * 1000,  # 8 hours
-            Interval.HOUR_12: 12 * 60 * 60 * 1000,  # 12 hours
-            Interval.DAY_1: 24 * 60 * 60 * 1000,  # 1 day
-            Interval.DAY_3: 3 * 24 * 60 * 60 * 1000,  # 3 days
-            Interval.WEEK_1: 7 * 24 * 60 * 60 * 1000,  # 1 week
-            Interval.MONTH_1: 30 * 24 * 60 * 60 * 1000,  # 1 month (approximation)
-        }
-
-        # Return the interval duration
-        return interval_map.get(interval, 60 * 1000)  # Default to 1 minute if unknown
+        # Use the utility function to calculate chunks
+        return calculate_chunks(
+            start_ms, end_ms, interval_ms, self.CHUNK_SIZE, REST_MAX_CHUNKS
+        )
 
     def fetch(
         self,
@@ -509,29 +280,15 @@ class RestDataClient(DataClientInterface):
         Raises:
             ValueError: If parameters are invalid or inconsistent
         """
-        # Convert interval string to Interval enum if needed
-        interval_enum = None
-        if isinstance(interval, str):
-            try:
-                # Try direct value lookup first
-                interval_enum = next((i for i in Interval if i.value == interval), None)
-                if interval_enum is None:
-                    # Try by enum name if value lookup failed
-                    try:
-                        interval_enum = Interval[interval.upper()]
-                    except KeyError:
-                        raise ValueError(f"Invalid interval: {interval}")
-            except Exception as e:
-                logger.warning(f"Error converting interval string '{interval}': {e}")
-                interval_enum = self._interval  # Fall back to instance default
-        else:
-            # If it's already an Interval enum, use it directly
-            interval_enum = (
-                interval if isinstance(interval, Interval) else self._interval
-            )
+        # Convert interval string to Interval enum using the utility function
+        interval_enum = (
+            parse_interval_string(interval, self._interval)
+            if isinstance(interval, str)
+            else (interval if isinstance(interval, Interval) else self._interval)
+        )
 
         # Validate request parameters
-        self._validate_request_params(symbol, interval_enum, start_time, end_time)
+        validate_request_params(symbol, interval_enum, start_time, end_time)
 
         # Align time boundaries
         aligned_start, aligned_end = align_time_boundaries(
@@ -584,7 +341,7 @@ class RestDataClient(DataClientInterface):
             logger.warning(
                 f"No data retrieved for {symbol} in the specified time range"
             )
-            return self.create_empty_dataframe()
+            return create_empty_dataframe()
 
         # Process the data into a DataFrame
         df = process_kline_data(all_data)
@@ -600,6 +357,10 @@ class RestDataClient(DataClientInterface):
             f"(from {stats['successful_chunks']}/{stats['total_chunks']} chunks)"
         )
 
+        # Log REST metrics (for troubleshooting and monitoring)
+        if kwargs.get("log_metrics", False):
+            log_rest_metrics()
+
         return filtered_df
 
     def create_empty_dataframe(self) -> pd.DataFrame:
@@ -608,12 +369,7 @@ class RestDataClient(DataClientInterface):
         Returns:
             Empty DataFrame
         """
-        # Create an empty DataFrame with the right columns and types
-        df = pd.DataFrame(columns=OUTPUT_COLUMNS)
-        for col, dtype in OUTPUT_DTYPES.items():
-            if col in df.columns:
-                df[col] = df[col].astype(dtype)
-        return df
+        return create_empty_dataframe()
 
     def close(self) -> None:
         """Close the client and release resources."""
