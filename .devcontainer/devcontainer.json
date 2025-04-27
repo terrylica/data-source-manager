@@ -30,9 +30,9 @@
         "mechatroner.rainbow-csv",
         "davidanson.vscode-markdownlint",
         "bierner.markdown-mermaid",
-        "pdconsec.vscode-print",
         "rioj7.command-variable",
         "michelemelluso.gitignore",
+        "ms-edgedevtools.vscode-edge-devtools",
         "lirik.empty-folders-remover" // helps remove empty folders in FILE EXPLORER when SOURCE CONTROL discards changes but only deletes files, not folders
       ],
       "settings": {
