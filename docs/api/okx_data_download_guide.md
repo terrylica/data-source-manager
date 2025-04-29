@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document provides information about OKX's historical market data available through their Alibaba OSS-backed CDN. OKX offers various datasets for download through their data download page at [https://www.okx.com/data-download](https://www.okx.com/data-download).
+This document provides information about OKX's historical market data available through their Alibaba OSS-backed CDN and REST API. OKX offers various datasets for download through their data download page at [https://www.okx.com/data-download](https://www.okx.com/data-download) and through their public REST API endpoints.
 
 ## Data Structure
 
 Based on our investigation, OKX historical data follows this hierarchical structure:
 
-```url
+```
 https://www.okx.com/cdn/okex/traderecords/
 ├── trades/
 │   └── daily/
@@ -44,11 +44,34 @@ From our exploration, we've identified these main data types:
    - Contains: trade_id, side, size, price, created_time
 
 2. **Aggregate Trade Data (`aggtrades`)**:
+
    - Aggregated trade data that might combine multiple trades
    - Example: `BTC-USD-250926-aggtrades-2025-04-23.zip`
    - Contains: trade_id, side, size, price, created_time
 
+3. **Candlestick Data (REST API)**:
+   - Time-based OHLCV data available via REST API
+   - Available for both SPOT (e.g., BTC-USDT) and SWAP (e.g., BTC-USD-SWAP) instruments
+   - Supports multiple time intervals
+   - Provides both current and historical data
+
 Note: Directory listings are disabled on the CDN, so direct browsing of available files is not possible.
+
+## Symbol Formatting
+
+OKX uses a specific format for symbols that differs from some other exchanges:
+
+### SPOT Markets
+
+- Format: `BASE-QUOTE` (e.g., `BTC-USDT`)
+- Examples: `BTC-USDT`, `ETH-USDT`, `SOL-USDT`
+- Note: Binance-style symbols like `BTCUSDT` need to be converted to `BTC-USDT` format for OKX
+
+### Perpetual Futures (SWAP) Markets
+
+- Format: `BASE-USD-SWAP` (e.g., `BTC-USD-SWAP`)
+- Examples: `BTC-USD-SWAP`, `ETH-USD-SWAP`, `SOL-USD-SWAP`
+- Note: Binance-style symbols like `BTCUSDT` need to be converted to `BTC-USD-SWAP` format for OKX futures
 
 ## Data Format
 
@@ -113,12 +136,178 @@ curl -O https://www.okx.com/cdn/okex/traderecords/trades/daily/20250419/BTC-USDT
    print(df.head())
    ```
 
+## REST API Access
+
+OKX provides a comprehensive REST API for accessing market data in real-time. This section details the REST endpoints for fetching candlestick data for both SPOT and SWAP instruments.
+
+### REST API Endpoints
+
+The primary endpoints for candlestick data are:
+
+1. **Current Candles**: `https://www.okx.com/api/v5/market/candles`
+
+   - Returns the most recent candlestick data for a given instrument and interval
+
+2. **Historical Candles**: `https://www.okx.com/api/v5/market/history-candles`
+   - Returns historical candlestick data for a given instrument and interval
+   - Allows fetching data from specific timestamps
+
+### Supported Time Intervals
+
+Both SPOT and SWAP instruments support the following time intervals:
+
+| Interval | Description | Parameter Value |
+| -------- | ----------- | --------------- |
+| 1m       | 1 minute    | `1m`            |
+| 3m       | 3 minutes   | `3m`            |
+| 5m       | 5 minutes   | `5m`            |
+| 15m      | 15 minutes  | `15m`           |
+| 30m      | 30 minutes  | `30m`           |
+| 1H       | 1 hour      | `1H`            |
+| 2H       | 2 hours     | `2H`            |
+| 4H       | 4 hours     | `4H`            |
+| 6H       | 6 hours     | `6H`            |
+| 12H      | 12 hours    | `12H`           |
+| 1D       | 1 day       | `1D`            |
+| 1W       | 1 week      | `1W`            |
+| 1M       | 1 month     | `1M`            |
+
+### Request Parameters
+
+#### Candles Endpoint
+
+```
+GET https://www.okx.com/api/v5/market/candles
+```
+
+Required parameters:
+
+- `instId`: Instrument ID (e.g., `BTC-USDT` for SPOT, `BTC-USD-SWAP` for SWAP)
+- `bar`: Time interval (e.g., `1m`, `1D`)
+
+Optional parameters:
+
+- `limit`: Number of candles to return (default: 100, max: 300)
+- `before`: Pagination of data before a timestamp (Unix timestamp in milliseconds)
+- `after`: Pagination of data after a timestamp (Unix timestamp in milliseconds)
+
+#### History Candles Endpoint
+
+```
+GET https://www.okx.com/api/v5/market/history-candles
+```
+
+Required parameters:
+
+- `instId`: Instrument ID (e.g., `BTC-USDT` for SPOT, `BTC-USD-SWAP` for SWAP)
+- `bar`: Time interval (e.g., `1m`, `1D`)
+
+Optional parameters:
+
+- `limit`: Number of candles to return (default: 100, max: 300)
+- `before`: Pagination of data before a timestamp (Unix timestamp in milliseconds)
+- `after`: Pagination of data after a timestamp (Unix timestamp in milliseconds)
+
+### Request Limits
+
+Our testing has shown that:
+
+- The maximum number of records returned per request is **300**
+- Requesting more than 300 records will still return only 300 records
+
+### Candlestick Data Format
+
+The OKX REST API returns candlestick (Kline) data as an array of arrays in the `data` field. Each sub-array represents a single candlestick with the following structure:
+
+| Index | Field     | Description                      | Type   |
+| ----- | --------- | -------------------------------- | ------ |
+| 0     | timestamp | Unix timestamp in milliseconds   | string |
+| 1     | open      | Opening price                    | string |
+| 2     | high      | Highest price                    | string |
+| 3     | low       | Lowest price                     | string |
+| 4     | close     | Closing price                    | string |
+| 5     | volume    | Trading volume                   | string |
+| 6     | volumeUSD | Volume in USD                    | string |
+| 7     | turnover  | Turnover (quote currency volume) | string |
+| 8     | confirm   | Candle confirmation flag         | string |
+
+Note: All fields are returned as strings and need to be converted to appropriate types for processing.
+
+### Sample API Requests
+
+#### Fetching SPOT Data (BTC-USDT)
+
+```bash
+# Fetch 1-minute candles for BTC-USDT
+curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1m&limit=100"
+
+# Fetch daily candles for BTC-USDT
+curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1D&limit=100"
+
+# Fetch historical 1-day candles for BTC-USDT from 30 days ago
+curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/history-candles?instId=BTC-USDT&bar=1D&limit=100&after=1743356217705"
+```
+
+#### Fetching SWAP Data (BTC-USD-SWAP)
+
+```bash
+# Fetch 1-minute candles for BTC-USD-SWAP
+curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/candles?instId=BTC-USD-SWAP&bar=1m&limit=100"
+
+# Fetch daily candles for BTC-USD-SWAP
+curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/candles?instId=BTC-USD-SWAP&bar=1D&limit=100"
+
+# Fetch historical 1-day candles for BTC-USD-SWAP from 30 days ago
+curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/history-candles?instId=BTC-USD-SWAP&bar=1D&limit=100&after=1743356217928"
+```
+
+### Processing API Response in Python
+
+```python
+import httpx
+import pandas as pd
+from datetime import datetime
+
+# Function to fetch candlestick data
+def fetch_okx_candles(instrument, interval, limit=100):
+    url = "https://www.okx.com/api/v5/market/candles"
+    params = {"instId": instrument, "bar": interval, "limit": limit}
+
+    response = httpx.get(url, params=params)
+    response.raise_for_status()
+    data = response.json()
+
+    if data.get("code") == "0":
+        # Convert array data to DataFrame
+        df = pd.DataFrame(data.get("data", []),
+                          columns=["timestamp", "open", "high", "low", "close",
+                                  "volume", "volumeUSD", "turnover", "confirm"])
+
+        # Convert types
+        df["timestamp"] = pd.to_datetime(df["timestamp"].astype(float), unit="ms")
+        for col in ["open", "high", "low", "close", "volume", "volumeUSD", "turnover"]:
+            df[col] = df[col].astype(float)
+
+        return df
+    else:
+        raise Exception(f"API error: {data.get('msg')}")
+
+# Example usage
+btc_usdt_df = fetch_okx_candles("BTC-USDT", "1D", 30)
+btc_swap_df = fetch_okx_candles("BTC-USD-SWAP", "1D", 30)
+
+print(btc_usdt_df.head())
+print(btc_swap_df.head())
+```
+
 ## Limitations
 
 1. **No Directory Listing**: The OKX CDN has directory listings disabled, meaning you cannot browse available files directly.
 2. **No API Access**: There is no documented API to programmatically discover available datasets.
 3. **Authentication**: The CDN uses Alibaba OSS with authentication, but public access is granted to specific files.
 4. **Date Range Constraints**: Files appear to be organized by date, but without documentation on what date ranges are available.
+5. **API Request Limit**: The REST API has a limit of 300 records per request.
+6. **Data Delay**: Recent data may be delayed or unavailable through the history-candles endpoint.
 
 ## Example Use Cases
 
@@ -166,232 +355,115 @@ for (( i=0; i<$DAYS; i++ )); do
 done
 ```
 
-## Fetching Candlestick Data (REST API)
+### Fetching and Comparing SPOT vs SWAP Data
 
-In addition to historical data available via CDN, OKX also provides access to recent candlestick (Kline) data through its public REST API.
+This example shows how to fetch and compare data from both SPOT and SWAP markets for the same asset:
 
-To fetch the latest 1-minute candlestick data for the `BTC-USDT-SWAP` perpetual futures contract, you can use the `/api/v5/market/candles` endpoint.
+```python
+import httpx
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 
-- Endpoint: `https://www.okx.com/api/v5/market/candles`
-- Required Parameters: `instId` (instrument ID) and `bar` (candlestick granularity).
+# Function to fetch candlestick data
+def fetch_okx_candles(instrument, interval, limit=100):
+    url = "https://www.okx.com/api/v5/market/candles"
+    params = {"instId": instrument, "bar": interval, "limit": limit}
 
-Here are examples using `curl` to fetch this data:
+    response = httpx.get(url, params=params)
+    response.raise_for_status()
+    data = response.json()
 
-1.  **Output to Terminal:**
+    if data.get("code") == "0":
+        # Convert array data to DataFrame
+        df = pd.DataFrame(data.get("data", []),
+                          columns=["timestamp", "open", "high", "low", "close",
+                                  "volume", "volumeUSD", "turnover", "confirm"])
 
-    ```bash
-    curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=1m"
-    ```
+        # Convert types
+        df["timestamp"] = pd.to_datetime(df["timestamp"].astype(float), unit="ms")
+        for col in ["open", "high", "low", "close", "volume", "volumeUSD", "turnover"]:
+            df[col] = df[col].astype(float)
 
-2.  **Save to File (`btc_usdt_swap_1m.json`):**
+        # Sort by timestamp
+        df = df.sort_values("timestamp")
 
-    ```bash
-    curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=1m" -o btc_usdt_swap_1m.json
-    ```
+        return df
+    else:
+        raise Exception(f"API error: {data.get('msg')}")
 
-3.  **Pretty-print and Save to File (`btc_usdt_swap_1m_pretty.json`) using `jq`:**
+# Fetch data for both SPOT and SWAP
+btc_spot = fetch_okx_candles("BTC-USDT", "1D", 30)
+btc_swap = fetch_okx_candles("BTC-USD-SWAP", "1D", 30)
 
-    ```bash
-    curl -H "Accept: application/json" "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=1m" | jq '.' > btc_usdt_swap_1m_pretty.json
-    ```
+# Plot price comparison
+plt.figure(figsize=(12, 6))
+plt.plot(btc_spot["timestamp"], btc_spot["close"], label="BTC-USDT (SPOT)")
+plt.plot(btc_swap["timestamp"], btc_swap["close"], label="BTC-USD-SWAP (FUTURES)")
+plt.title("BTC Price Comparison: SPOT vs SWAP")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.legend()
+plt.grid(True)
+plt.savefig("btc_comparison.png")
+plt.close()
 
-Ensure you have `jq` installed on your system to use the pretty-printing option.
+# Calculate funding rate (premium/discount)
+merged_df = pd.merge(
+    btc_spot[["timestamp", "close"]],
+    btc_swap[["timestamp", "close"]],
+    on="timestamp",
+    suffixes=("_spot", "_swap")
+)
 
-### Candlestick Data Format (REST API)
+merged_df["premium"] = (merged_df["close_swap"] - merged_df["close_spot"]) / merged_df["close_spot"] * 100
 
-The OKX REST API returns candlestick (Kline) data as an array of arrays in the `data` field. Each sub-array represents a single candlestick with the following structure:
-
-| Index | Field     | Description                      |
-| ----- | --------- | -------------------------------- |
-| 0     | timestamp | Unix timestamp in milliseconds   |
-| 1     | open      | Opening price                    |
-| 2     | high      | Highest price                    |
-| 3     | low       | Lowest price                     |
-| 4     | close     | Closing price                    |
-| 5     | volume    | Trading volume                   |
-| 6     | volumeUSD | Volume in USD                    |
-| 7     | turnover  | Turnover (quote currency volume) |
-| 8     | confirm   | Candle confirmation flag         |
-
-#### Example jq Command to Inspect Format
-
-To view the first candlestick entry with labeled fields:
-
-```bash
-jq '.data[0] | {timestamp: .[0], open: .[1], high: .[2], low: .[3], close: .[4], volume: .[5], volumeUSD: .[6], turnover: .[7], confirm: .[8]}' btc_usdt_swap_1m_pretty.json
-```
-
-#### Example Output
-
-```json
-{
-  "timestamp": "1745885580000",
-  "open": "94861.6",
-  "high": "94861.7",
-  "low": "94841.7",
-  "close": "94841.7",
-  "volume": "1530.2",
-  "volumeUSD": "15.302",
-  "turnover": "1451460.628",
-  "confirm": "0"
-}
+print("Average Premium/Discount:", merged_df["premium"].mean(), "%")
+print("Max Premium:", merged_df["premium"].max(), "%")
+print("Max Discount:", merged_df["premium"].min(), "%")
 ```
 
 ## Instrument Analysis
 
-In addition to accessing historical data, we've developed a script to analyze the relationship between different OKX instruments, particularly focusing on identifying which cryptocurrencies are available in both SPOT and SWAP (perpetual futures) markets.
+OKX offers both SPOT and SWAP (perpetual futures) instruments for many cryptocurrencies. Our analysis shows that there are 30 cryptocurrencies that have both SPOT-USD and corresponding SWAP-USD-SWAP instruments.
 
-### Analysis Script
+### Key Pairs Available in Both SPOT and SWAP Markets
 
-We've created a script (`playground/okx/analyze_instruments.py`) that helps analyze the relationship between SPOT and SWAP instruments on the OKX exchange. The script identifies cryptocurrencies that have both spot and perpetual futures markets available with USD as the quote currency.
+The following major cryptocurrencies have both SPOT and SWAP instruments available:
 
-#### Features
+- BTC (Bitcoin): `BTC-USDT` and `BTC-USD-SWAP`
+- ETH (Ethereum): `ETH-USDT` and `ETH-USD-SWAP`
+- SOL (Solana): `SOL-USDT` and `SOL-USD-SWAP`
+- TON (TON): `TON-USDT` and `TON-USD-SWAP`
+- XRP (Ripple): `XRP-USDT` and `XRP-USD-SWAP`
+- DOGE (Dogecoin): `DOGE-USDT` and `DOGE-USD-SWAP`
+- ADA (Cardano): `ADA-USDT` and `ADA-USD-SWAP`
+- AVAX (Avalanche): `AVAX-USDT` and `AVAX-USD-SWAP`
 
-- Identifies SPOT instruments with corresponding SWAP instruments
-- Filters instruments to show only USD quote currency pairs
-- Provides detailed listings of matching pairs
-- Displays statistical summaries of the instrument counts
-- Fetches data directly from OKX API in real-time
-- Optionally saves API responses to local files for offline analysis
-- Supports both online (API) and offline (local file) modes
+### Script for Analyzing Available Instruments
 
-#### Prerequisites
-
-- Python 3.x
-- Required Python packages:
-  - typer
-  - rich
-  - httpx
-
-#### Usage
-
-The script can be run from the command line with the following options:
-
-```bash
-python3 playground/okx/analyze_instruments.py [OPTIONS]
-```
-
-**Options:**
-
-- `-v, --verbose`: Show detailed instrument listings
-- `-u, --usd-only`: Show only SPOT-USD instruments with SWAP-USD-SWAP counterparts
-- `-l, --use-local`: Use local JSON files instead of fetching from API
-- `-s, --save-files`: Save API response to local JSON files
-- `-h, --help`: Show the help message and exit
-
-#### Example Usage
-
-1. Basic analysis (statistics only, fetching from API):
-
-   ```bash
-   python3 playground/okx/analyze_instruments.py
-   ```
-
-2. Show all matched instruments and fetch from API:
-
-   ```bash
-   python3 playground/okx/analyze_instruments.py -v
-   ```
-
-3. Show only USD quote currency matches (fetching from API):
-
-   ```bash
-   python3 playground/okx/analyze_instruments.py -u
-   ```
-
-4. Show detailed USD quote currency matches (fetching from API):
-
-   ```bash
-   python3 playground/okx/analyze_instruments.py -u -v
-   ```
-
-5. Fetch from API and save data to local files:
-
-   ```bash
-   python3 playground/okx/analyze_instruments.py -s
-   ```
-
-6. Use local files instead of API:
-
-   ```bash
-   python3 playground/okx/analyze_instruments.py -l
-   ```
-
-#### API Endpoints Used
-
-The script uses the following OKX API endpoints to fetch instrument data:
-
-- SPOT instruments: `https://www.okx.com/api/v5/public/instruments?instType=SPOT`
-- SWAP instruments: `https://www.okx.com/api/v5/public/instruments?instType=SWAP`
-
-#### Sample Output
-
-```
-Statistics Summary:
-Total SPOT instruments: 783
-Total SWAP instruments with -USD-SWAP: 30
-SPOT-USD instruments with corresponding SWAP-USD-SWAP instruments: 30
-
-SPOT-USD Instruments with SWAP-USD-SWAP Counterparts:
-1. BTC-USD, Base: BTC, Quote: USD
-   └─ Swap: BTC-USD-SWAP
-2. ETH-USD, Base: ETH, Quote: USD
-   └─ Swap: ETH-USD-SWAP
-3. SOL-USD, Base: SOL, Quote: USD
-   └─ Swap: SOL-USD-SWAP
-...
-```
-
-### Findings and Insights
-
-Our analysis of OKX instruments reveals that:
-
-1. OKX has 783 total SPOT instruments across various quote currencies
-2. There are 30 SWAP instruments with the `-USD-SWAP` suffix
-3. All 30 of these SWAP instruments have corresponding SPOT-USD instruments with the same base currency
-
-The matching pairs cover major cryptocurrencies including:
-
-- BTC (Bitcoin)
-- ETH (Ethereum)
-- SOL (Solana)
-- TON (TON)
-- XRP (Ripple)
-- DOGE (Dogecoin)
-- ADA (Cardano)
-- AVAX (Avalanche)
-- And 22 other cryptocurrencies
-
-### Script Implementation
-
-The script works by:
-
-1. Loading instrument data from JSON files
-2. Filtering SWAP instruments to find those with `-USD-SWAP` suffix
-3. Extracting base currencies from both SPOT and SWAP instruments
-4. Matching SPOT instruments with corresponding SWAP instruments
-5. Optionally filtering to show only USD quote currency pairs
-6. Displaying statistics and detailed listings
-
-### Future Enhancements
-
-Potential improvements to the analysis script:
-
-1. Add support for other instrument types (e.g., options, futures)
-2. Include additional filters for market data (e.g., by volume, liquidity)
-3. Implement data visualization features
-4. Add historical data analysis capabilities
-5. Support for other exchanges beyond OKX
+For a comprehensive analysis of available instruments, refer to our script (`playground/okx/analyze_instruments.py`) that identifies all cryptocurrencies available in both SPOT and SWAP markets.
 
 ## Conclusion
 
-OKX offers valuable historical market data through their CDN, but without comprehensive documentation on available datasets or date ranges. This guide provides a starting point for accessing and using the data based on observed patterns and samples. For the most up-to-date information, check OKX's official documentation or contact their support.
+OKX offers comprehensive market data access through both CDN downloads and REST API endpoints. This guide provides a starting point for accessing and using this data based on our testing and exploration.
+
+Key takeaways:
+
+- Use the proper symbol format: `BASE-QUOTE` for SPOT and `BASE-USD-SWAP` for futures
+- REST API provides access to candlestick data with up to 300 records per request
+- Multiple time intervals are supported, from 1-minute to 1-month
+- Both SPOT (USDT) and perpetual futures (USD-SWAP) data is available
+- Historical data can be accessed through both CDN downloads and the history-candles endpoint
+
+For the most up-to-date information, check OKX's official documentation or contact their support.
 
 ## Further Investigation
 
 Further investigation could involve:
 
 1. Programmatically testing various date ranges to determine data availability
-2. Checking for additional data types beyond trades and aggtrades
-3. Exploring other potential hierarchical patterns
+2. Checking for additional data types beyond trades, aggtrades, and candles
+3. Exploring other potential hierarchical patterns in the CDN structure
 4. Contacting OKX support for official documentation on their historical data
+5. Developing comprehensive back-testing frameworks using the available data
