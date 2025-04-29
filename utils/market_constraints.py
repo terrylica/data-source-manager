@@ -13,6 +13,7 @@ class DataProvider(Enum):
 
     BINANCE = auto()  # Binance data provider
     TRADESTATION = auto()  # TradeStation data provider
+    OKX = auto()  # OKX data provider
 
     @classmethod
     def from_string(cls, provider_str: str) -> "DataProvider":
@@ -30,6 +31,7 @@ class DataProvider(Enum):
         mapping = {
             "binance": cls.BINANCE,
             "tradestation": cls.TRADESTATION,
+            "okx": cls.OKX,
         }
 
         provider_str = provider_str.lower()
@@ -104,6 +106,9 @@ class ChartType(Enum):
 
     KLINES = "klines"  # Standard candlestick data
     FUNDING_RATE = "fundingRate"  # Funding rate data (futures)
+    # OKX-specific chart types
+    OKX_CANDLES = "market/candles"  # OKX standard candlestick data
+    OKX_HISTORY_CANDLES = "market/history-candles"  # OKX historical candlestick data
 
     @property
     def endpoint(self) -> str:
@@ -139,6 +144,11 @@ class ChartType(Enum):
                 MarketType.FUTURES_COIN,
                 MarketType.FUTURES,
             ]
+        elif self.name in ("OKX_CANDLES", "OKX_HISTORY_CANDLES"):
+            return [
+                MarketType.SPOT,
+                MarketType.FUTURES_USDT,
+            ]
         else:
             return []
 
@@ -148,6 +158,8 @@ class ChartType(Enum):
         # Use name comparison instead of direct comparison to avoid module reloading issues
         if self.name in ("KLINES", "FUNDING_RATE"):
             return [DataProvider.BINANCE]
+        elif self.name in ("OKX_CANDLES", "OKX_HISTORY_CANDLES"):
+            return [DataProvider.OKX]
         else:
             return []
 
@@ -167,6 +179,8 @@ class ChartType(Enum):
         mapping = {
             "klines": cls.KLINES,
             "fundingrate": cls.FUNDING_RATE,
+            "candles": cls.OKX_CANDLES,
+            "history-candles": cls.OKX_HISTORY_CANDLES,
         }
 
         chart_type_str = chart_type_str.lower()
@@ -399,12 +413,79 @@ MARKET_CAPABILITIES: Dict[MarketType, MarketCapabilities] = {
     ),
 }
 
+# Define OKX-specific market capabilities
+OKX_MARKET_CAPABILITIES: Dict[MarketType, MarketCapabilities] = {
+    MarketType.SPOT: MarketCapabilities(
+        primary_endpoint="https://www.okx.com",
+        backup_endpoints=[],  # No documented backup endpoints
+        data_only_endpoint=None,  # No dedicated data-only endpoint
+        api_version="v5",
+        supported_intervals=[
+            Interval.MINUTE_1,
+            Interval.MINUTE_3,
+            Interval.MINUTE_5,
+            Interval.MINUTE_15,
+            Interval.MINUTE_30,
+            Interval.HOUR_1,
+            Interval.HOUR_2,
+            Interval.HOUR_4,
+            Interval.HOUR_6,
+            Interval.HOUR_12,
+            Interval.DAY_1,
+            Interval.WEEK_1,
+            Interval.MONTH_1,
+        ],  # All intervals except 1s
+        symbol_format="BTC-USDT",
+        description=(
+            "OKX SPOT market with support for most intervals except 1-second data. "
+            "Returns up to 300 records when requested. "
+            "Uses instId parameter with hyphen format (BTC-USDT) instead of concatenated symbols."
+        ),
+        max_limit=300,
+        endpoint_reliability="Primary endpoint is reliable for all data features.",
+        default_symbol="BTC-USDT",  # Default symbol for OKX SPOT market
+    ),
+    MarketType.FUTURES_USDT: MarketCapabilities(
+        primary_endpoint="https://www.okx.com",
+        backup_endpoints=[],  # No documented backup endpoints
+        data_only_endpoint=None,  # No dedicated data-only endpoint
+        api_version="v5",
+        supported_intervals=[
+            Interval.MINUTE_1,
+            Interval.MINUTE_3,
+            Interval.MINUTE_5,
+            Interval.MINUTE_15,
+            Interval.MINUTE_30,
+            Interval.HOUR_1,
+            Interval.HOUR_2,
+            Interval.HOUR_4,
+            Interval.HOUR_6,
+            Interval.HOUR_12,
+            Interval.DAY_1,
+            Interval.WEEK_1,
+            Interval.MONTH_1,
+        ],  # All intervals except 1s
+        symbol_format="BTC-USD-SWAP",
+        description=(
+            "OKX USD-margined perpetual swaps (SWAP) market with support for most intervals except 1-second data. "
+            "Returns up to 300 records when requested. "
+            "Uses instId parameter with hyphen format (BTC-USD-SWAP) for perpetual contracts."
+        ),
+        max_limit=300,
+        endpoint_reliability="Primary endpoint is reliable for all data features.",
+        default_symbol="BTC-USD-SWAP",  # Default symbol for OKX SWAP market
+    ),
+}
 
-def get_market_capabilities(market_type: MarketType) -> MarketCapabilities:
+
+def get_market_capabilities(
+    market_type: MarketType, data_provider: DataProvider = DataProvider.BINANCE
+) -> MarketCapabilities:
     """Get capabilities for a specific market type.
 
     Args:
         market_type: Market type to get capabilities for
+        data_provider: Data provider to get capabilities for, defaults to BINANCE
 
     Returns:
         MarketCapabilities object with API info for the market type
@@ -415,12 +496,23 @@ def get_market_capabilities(market_type: MarketType) -> MarketCapabilities:
     # Check if the market type is in our predefined capabilities
     # Log debug information to help diagnose enum comparison issues
     logger.debug(
-        f"Getting capabilities for market_type={market_type}, type={type(market_type)}"
+        f"Getting capabilities for market_type={market_type}, type={type(market_type)}, provider={data_provider}"
     )
-    logger.debug(f"Available keys: {[k.name for k in MARKET_CAPABILITIES.keys()]}")
+
+    # Select the appropriate capabilities dictionary based on the provider
+    if data_provider.name == "OKX":
+        capabilities_dict = OKX_MARKET_CAPABILITIES
+        logger.debug(
+            f"Using OKX capabilities, keys: {[k.name for k in capabilities_dict.keys()]}"
+        )
+    else:
+        capabilities_dict = MARKET_CAPABILITIES
+        logger.debug(
+            f"Using standard capabilities, keys: {[k.name for k in capabilities_dict.keys()]}"
+        )
 
     # First try direct lookup by name
-    for key, value in MARKET_CAPABILITIES.items():
+    for key, value in capabilities_dict.items():
         # Log each comparison to help debug
         logger.debug(
             f"Comparing: id(market_type)={id(market_type)}, id of first key={id(key)}"
@@ -435,7 +527,9 @@ def get_market_capabilities(market_type: MarketType) -> MarketCapabilities:
             return value
 
     # If we get here, we couldn't find the market by name
-    raise ValueError(f"Unknown market type: {market_type}")
+    raise ValueError(
+        f"Unknown market type: {market_type} for provider: {data_provider.name}"
+    )
 
 
 def is_interval_supported(market_type: MarketType, interval: Interval) -> bool:
@@ -483,7 +577,11 @@ def get_default_symbol(market_type: MarketType) -> str:
     return capabilities.default_symbol
 
 
-def get_market_symbol_format(symbol: str | None, market_type: MarketType) -> str:
+def get_market_symbol_format(
+    symbol: str | None,
+    market_type: MarketType,
+    data_provider: DataProvider = DataProvider.BINANCE,
+) -> str:
     """Transform a standard symbol to the format required by the specified market type.
 
     This function serves as the single source of truth for symbol transformations
@@ -492,6 +590,7 @@ def get_market_symbol_format(symbol: str | None, market_type: MarketType) -> str
     Args:
         symbol: Base symbol (e.g., "BTCUSDT") or None for default
         market_type: Target market type
+        data_provider: Data provider to use, defaults to BINANCE
 
     Returns:
         str: Properly formatted symbol for the specified market type
@@ -501,32 +600,64 @@ def get_market_symbol_format(symbol: str | None, market_type: MarketType) -> str
         return get_default_symbol(market_type)
 
     # Get the capabilities for the market type to access the expected format
-    capabilities = get_market_capabilities(market_type)
+    capabilities = get_market_capabilities(market_type, data_provider)
 
-    # Use name-based comparison for stability with module reloading
-    market_name = market_type.name
-
-    # For CM futures (FUTURES_COIN), perform special transformations
-    if market_name == "FUTURES_COIN":
-        # Already has _PERP suffix? Keep as is
-        if symbol.endswith("_PERP"):
+    # For OKX provider, handle hyphenated symbols
+    if data_provider.name == "OKX":
+        # Already has hyphens? Keep as is
+        if "-" in symbol:
             return symbol
 
-        # Contains digits? Likely a quarterly contract, keep as is
-        if any(c.isdigit() for c in symbol):
+        # Handle SPOT market (convert BTCUSDT to BTC-USDT)
+        if market_type.name == "SPOT":
+            # Try to find standard patterns of base/quote currency
+            if len(symbol) >= 6 and symbol.endswith(("USDT", "BUSD", "USDC")):
+                base = symbol[:-4]
+                quote = symbol[-4:]
+                return f"{base}-{quote}"
+            elif len(symbol) >= 4 and symbol.endswith(("BTC", "ETH", "USD")):
+                base = symbol[:-3]
+                quote = symbol[-3:]
+                return f"{base}-{quote}"
+            # Default approach: assume last 4 characters are quote currency
+            else:
+                return f"{symbol[:-4]}-{symbol[-4:]}" if len(symbol) > 4 else symbol
+
+        # Handle FUTURES_USDT market (convert to BTC-USD-SWAP format)
+        elif market_type.name == "FUTURES_USDT":
+            # Convert BTCUSDT format to BTC-USD-SWAP
+            if symbol.endswith("USDT"):
+                base = symbol[:-4]
+                return f"{base}-USD-SWAP"
+            # If not a standard format, return as is
             return symbol
 
-        # BTCUSDT format -> BTCUSD_PERP
-        if symbol.endswith("USDT"):
-            return symbol[:-4] + "USD_PERP"
+    # For Binance provider, use the original logic
+    else:
+        # Use name-based comparison for stability with module reloading
+        market_name = market_type.name
 
-        # BTCUSD format -> BTCUSD_PERP
-        elif symbol.endswith("USD"):
-            return symbol + "_PERP"
+        # For CM futures (FUTURES_COIN), perform special transformations
+        if market_name == "FUTURES_COIN":
+            # Already has _PERP suffix? Keep as is
+            if symbol.endswith("_PERP"):
+                return symbol
 
-        # Other format -> symbol_PERP
-        else:
-            return symbol + "_PERP"
+            # Contains digits? Likely a quarterly contract, keep as is
+            if any(c.isdigit() for c in symbol):
+                return symbol
+
+            # BTCUSDT format -> BTCUSD_PERP
+            if symbol.endswith("USDT"):
+                return symbol[:-4] + "USD_PERP"
+
+            # BTCUSD format -> BTCUSD_PERP
+            elif symbol.endswith("USD"):
+                return symbol + "_PERP"
+
+            # Other format -> symbol_PERP
+            else:
+                return symbol + "_PERP"
 
     # For other market types, default to returning the original symbol
     # (Usually no transformation needed for SPOT or FUTURES_USDT)
@@ -534,7 +665,9 @@ def get_market_symbol_format(symbol: str | None, market_type: MarketType) -> str
 
 
 def validate_symbol_for_market_type(
-    symbol: str | None, market_type: MarketType
+    symbol: str | None,
+    market_type: MarketType,
+    data_provider: DataProvider = DataProvider.BINANCE,
 ) -> bool:
     """Validate that a symbol is appropriate for the specified market type.
 
@@ -544,6 +677,7 @@ def validate_symbol_for_market_type(
     Args:
         symbol: Trading symbol to validate, or None to use default
         market_type: Market type to validate against
+        data_provider: Data provider to use, defaults to BINANCE
 
     Returns:
         bool: True if the symbol is valid for the market type
@@ -556,55 +690,85 @@ def validate_symbol_for_market_type(
         symbol = get_default_symbol(market_type)
 
     # Get the expected format from market capabilities
-    capabilities = get_market_capabilities(market_type)
+    capabilities = get_market_capabilities(market_type, data_provider)
     market_name = market_type.name
 
-    # Special validation for FUTURES_COIN market
-    if market_name == "FUTURES_COIN":
-        # Check if symbol has PERP suffix for perpetual contracts
-        if not symbol.endswith("_PERP") and not any(c.isdigit() for c in symbol):
-            suggested_symbol = get_market_symbol_format(symbol, market_type)
+    # OKX symbol validation
+    if data_provider.name == "OKX":
+        # OKX symbols should have hyphen format
+        if "-" not in symbol:
+            suggested_symbol = get_market_symbol_format(
+                symbol, market_type, data_provider
+            )
             raise ValueError(
-                f"Invalid symbol format for {market_name} market: '{symbol}'. "
-                f"FUTURES_COIN symbols should end with '_PERP' for perpetual contracts. "
+                f"Invalid symbol format for OKX {market_name} market: '{symbol}'. "
+                f"OKX symbols should use hyphen format. "
                 f"Try using '{suggested_symbol}' instead."
             )
 
-    # Special validation for SPOT market
-    elif market_name == "SPOT":
-        # SPOT symbols should not have _PERP suffix
-        if symbol.endswith("_PERP"):
-            # Strip _PERP suffix to suggest a valid SPOT symbol
-            suggested_symbol = symbol[:-5]
-            if suggested_symbol.endswith("USD"):
-                suggested_symbol += "T"  # Convert BTCUSD to BTCUSDT for SPOT
-
+        # Special validation for FUTURES_USDT (SWAP) market
+        if market_name == "FUTURES_USDT" and not symbol.endswith("-SWAP"):
+            suggested_symbol = symbol if symbol.endswith("-SWAP") else f"{symbol}-SWAP"
+            if not "-USD-" in suggested_symbol:
+                base = suggested_symbol.split("-")[0]
+                suggested_symbol = f"{base}-USD-SWAP"
             raise ValueError(
-                f"Invalid symbol format for {market_name} market: '{symbol}'. "
-                f"'{symbol}' appears to be a FUTURES_COIN symbol. "
-                f"For SPOT market, try using '{suggested_symbol}' instead."
+                f"Invalid symbol format for OKX {market_name} market: '{symbol}'. "
+                f"OKX SWAP symbols should end with '-SWAP'. "
+                f"Try using '{suggested_symbol}' instead."
             )
 
-    # Special validation for OPTIONS market
-    elif market_name == "OPTIONS":
-        # Options symbols should follow the BTC-YYMMDD-STRIKE-C/P format
-        if not (
-            "-" in symbol
-            and (symbol.endswith("-C") or symbol.endswith("-P"))
-            and len(symbol.split("-")) == 4
-        ):
-            raise ValueError(
-                f"Invalid symbol format for {market_name} market: '{symbol}'. "
-                f"OPTIONS symbols should follow the format: BTC-YYMMDD-STRIKE-C/P"
-            )
+    # Binance symbol validation
+    else:
+        # Special validation for FUTURES_COIN market
+        if market_name == "FUTURES_COIN":
+            # Check if symbol has PERP suffix for perpetual contracts
+            if not symbol.endswith("_PERP") and not any(c.isdigit() for c in symbol):
+                suggested_symbol = get_market_symbol_format(
+                    symbol, market_type, data_provider
+                )
+                raise ValueError(
+                    f"Invalid symbol format for {market_name} market: '{symbol}'. "
+                    f"FUTURES_COIN symbols should end with '_PERP' for perpetual contracts. "
+                    f"Try using '{suggested_symbol}' instead."
+                )
 
-    # No additional validation needed for FUTURES_USDT market for now
+        # Special validation for SPOT market
+        elif market_name == "SPOT":
+            # SPOT symbols should not have _PERP suffix
+            if symbol.endswith("_PERP"):
+                # Strip _PERP suffix to suggest a valid SPOT symbol
+                suggested_symbol = symbol[:-5]
+                if suggested_symbol.endswith("USD"):
+                    suggested_symbol += "T"  # Convert BTCUSD to BTCUSDT for SPOT
+
+                raise ValueError(
+                    f"Invalid symbol format for {market_name} market: '{symbol}'. "
+                    f"'{symbol}' appears to be a FUTURES_COIN symbol. "
+                    f"For SPOT market, try using '{suggested_symbol}' instead."
+                )
+
+        # Special validation for OPTIONS market
+        elif market_name == "OPTIONS":
+            # Options symbols should follow the BTC-YYMMDD-STRIKE-C/P format
+            if not (
+                "-" in symbol
+                and (symbol.endswith("-C") or symbol.endswith("-P"))
+                and len(symbol.split("-")) == 4
+            ):
+                raise ValueError(
+                    f"Invalid symbol format for {market_name} market: '{symbol}'. "
+                    f"OPTIONS symbols should follow the format: BTC-YYMMDD-STRIKE-C/P"
+                )
 
     return True
 
 
 def get_endpoint_url(
-    market_type: MarketType, chart_type: str | ChartType, version: str = None
+    market_type: MarketType,
+    chart_type: str | ChartType,
+    version: str = None,
+    data_provider: DataProvider = DataProvider.BINANCE,
 ) -> str:
     """Get the URL for a specific endpoint based on market type.
 
@@ -612,11 +776,12 @@ def get_endpoint_url(
         market_type: Type of market (spot, futures, etc.)
         chart_type: Chart data type (e.g., "klines", "uiKlines", or ChartType enum)
         version: API version to use, defaults to the market's default version
+        data_provider: Data provider to use, defaults to BINANCE
 
     Returns:
         Full URL to the endpoint
     """
-    capabilities = get_market_capabilities(market_type)
+    capabilities = get_market_capabilities(market_type, data_provider)
     base_url = capabilities.api_base_url
 
     # Extract endpoint string from ChartType enum if needed
@@ -632,20 +797,25 @@ def get_endpoint_url(
     if version is None:
         version = capabilities.api_version
 
-    # Construct appropriate path based on market type name instead of direct comparison
-    market_name = market_type.name
-    if market_name == "SPOT":
+    # Handle different providers
+    if data_provider.name == "OKX":
+        # OKX uses a standard API pattern for all market types
         path = f"/api/{version}/{endpoint}"
-    elif market_name == "FUTURES_USDT":
-        path = f"/fapi/{version}/{endpoint}"
-    elif market_name == "FUTURES_COIN":
-        path = f"/dapi/{version}/{endpoint}"
-    elif market_name == "FUTURES":
-        path = f"/fapi/{version}/{endpoint}"  # Use /fapi/ for generic futures too
-    elif market_name == "OPTIONS":
-        path = f"/eapi/{version}/{endpoint}"
     else:
-        path = f"/api/{version}/{endpoint}"  # Fallback for unknown markets
+        # Binance endpoints based on market type
+        market_name = market_type.name
+        if market_name == "SPOT":
+            path = f"/api/{version}/{endpoint}"
+        elif market_name == "FUTURES_USDT":
+            path = f"/fapi/{version}/{endpoint}"
+        elif market_name == "FUTURES_COIN":
+            path = f"/dapi/{version}/{endpoint}"
+        elif market_name == "FUTURES":
+            path = f"/fapi/{version}/{endpoint}"  # Use /fapi/ for generic futures too
+        elif market_name == "OPTIONS":
+            path = f"/eapi/{version}/{endpoint}"
+        else:
+            path = f"/api/{version}/{endpoint}"  # Fallback for unknown markets
 
     url = f"{base_url}{path}"
     return url
