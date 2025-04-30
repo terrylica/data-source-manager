@@ -89,7 +89,7 @@ Note that recent data (within ~48 hours) is typically not available in the Visio
 
 ## API Documentation
 
-The `docs/api` folder provides in-depth documentation on data source characteristics and retrieval mechanisms. Refer to the [API Documentation Overview](docs/api/README.md) for a summary of the contents in this directory.
+The `docs/api` folder provides in-depth documentation on data source characteristics and retrieval mechanisms. Refer to the [API Documentation Overview](docs/api/) for a summary of the contents in this directory.
 
 ## Data Initialization and Shortlisting
 
