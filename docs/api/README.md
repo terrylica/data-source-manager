@@ -1,0 +1,11 @@
+# API Documentation Overview
+
+This directory contains documentation related to interacting with cryptocurrency exchange APIs, specifically focusing on Binance and OKX.
+
+- **Binance API Testing Results**: Summarizes empirical testing results for Binance API endpoints, including historical data availability, supported intervals, rate limit observations, response times, error handling, cross-market data consistency, parameter behavior, and an overview of WebSocket usage.
+- **Binance API Best Practices**: Provides recommendations for efficient Binance API consumption, covering rate limit management strategies, data retrieval optimization, market-specific considerations (Spot, Futures), and robust error handling techniques like retries.
+- **Binance API Rate Limits**: Details the different types of rate limits enforced by the Binance API (REQUEST_WEIGHT, ORDERS, RAW_REQUESTS), limits across various market types, how to track usage using response headers, common error codes (429, 418), and optimization tips.
+- **Binance REST API Boundary Behaviour**: Analyzes how the Binance REST API handles timestamp boundaries for time-series data, explaining the universal behavior of boundary alignment, rounding rules, inclusivity, and handling of future dates.
+- **Binance REST Klines**: Documents the Binance REST API endpoints specifically for retrieving kline (candlestick) data, covering API fundamentals, URL structures by market type, rate limiting details, response limits, historical data availability, and error responses.
+- **Binance Vision Klines**: Describes the availability and format of historical kline data downloadable from the Binance Vision API, including supported intervals, URL structure for Spot and Futures markets, checksum verification, and the CSV data format (including timestamp precision differences).
+- **OKX Data Download Guide**: Guides on accessing historical market data from OKX via their CDN (raw trade/aggtrade data) and REST API (candlestick data). It outlines a Failover Control Protocol (FCP) strategy for data retrieval, details the CDN URL structure and data format, compares the `/candles` and `/history-candles` REST API endpoints, lists supported intervals, and describes the REST API data format.

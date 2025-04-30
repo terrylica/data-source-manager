@@ -89,10 +89,7 @@ Note that recent data (within ~48 hours) is typically not available in the Visio
 
 ## API Documentation
 
-The `docs/api` folder provides in-depth documentation on data source characteristics and retrieval mechanisms, including:
-
-- **[Binance Vision Klines API](docs/api/binance_vision_klines.md)**: Source of Vision API kline data retrieval details.
-- **[Binance REST Klines API](docs/api/binance_rest_klines.md)**: Source of REST API kline data retrieval details.
+The `docs/api` folder provides in-depth documentation on data source characteristics and retrieval mechanisms. Refer to the [API Documentation Overview](docs/api/README.md) for a summary of the contents in this directory.
 
 ## Data Initialization and Shortlisting
 
