@@ -1,2 +1,2 @@
 #!/usr/bin/env python
-"""Tests package for Binance Data Services."""
+"""Tests package for Raw Data Services."""

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Binance Data Service package for efficient market data retrieval.
+"""Raw Data Service package for efficient market data retrieval.
 
 This package provides tools for downloading and caching market data from Binance Vision.
 The primary interface is the VisionDataClient, which uses Apache Arrow MMAP for
