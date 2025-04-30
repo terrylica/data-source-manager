@@ -86,6 +86,7 @@ Note that recent data (within ~48 hours) is typically not available in the Visio
 ### Core Principles
 
 - **[Always Focus Demo Rule](.cursor/rules/always-focus-demo.mdc)**: The authoritative instruction file guiding the Cursor Agent to strictly adhere to the demo plan and maintain focus on the Failover Control Protocol demonstration.
+- `scripts/dev`: Contains various scripts for development and maintenance tasks.
 
 ## API Documentation
 
