@@ -13,11 +13,11 @@ https://www.okx.com/cdn/okex/traderecords/
 ├── trades/
 │   └── daily/
 │       └── YYYYMMDD/
-│           └── SYMBOL-PAIR-trades-YYYY-MM-DD.zip
+│           └── {symbol}-trades-{formatted-date}.zip
 └── aggtrades/
     └── daily/
         └── YYYYMMDD/
-            └── SYMBOL-PAIR-aggtrades-YYYY-MM-DD.zip
+            └── {symbol}-aggtrades-{formatted-date}.zip
 ```
 
 ### URL Pattern
@@ -29,8 +29,8 @@ The URL pattern for accessing specific files follows this format:
 
 Where:
 
-- `{date}` is in format `YYYYMMDD` (e.g., 20250419)
-- `{formatted-date}` is in format `YYYY-MM-DD` (e.g., 2025-04-19)
+- `{date}` is in format `YYYYMMDD` (e.g., 20230419)
+- `{formatted-date}` is in format `YYYY-MM-DD` (e.g., 2023-04-19)
 - `{symbol}` is the trading pair (e.g., BTC-USDT)
 
 ## Available Data Types
@@ -40,20 +40,20 @@ From our exploration, we've identified these main data types:
 1. **Trade Data (`trades`)**:
 
    - Individual trade records
-   - Example: `BTC-USDT-trades-2025-04-19.zip`
+   - Example: `BTC-USDT-trades-2023-04-19.zip`
    - Contains: trade_id, side, size, price, created_time
 
 2. **Aggregate Trade Data (`aggtrades`)**:
 
    - Aggregated trade data that might combine multiple trades
-   - Example: `BTC-USD-250926-aggtrades-2025-04-23.zip`
+   - Example: `BTC-USDT-aggtrades-2023-04-23.zip`
    - Contains: trade_id, side, size, price, created_time
 
 3. **Candlestick Data (REST API)**:
    - Time-based OHLCV data available via REST API
    - Available for both SPOT (e.g., BTC-USDT) and SWAP (e.g., BTC-USD-SWAP) instruments
    - Supports multiple time intervals
-   - Provides both current and historical data
+   - Provides both current and historical data. See the **Candlestick Data Format** section under **REST API Access** for details on the data structure and fields.
 
 Note: Directory listings are disabled on the CDN, so direct browsing of available files is not possible.
 
@@ -76,7 +76,7 @@ OKX uses a specific format for symbols that differs from some other exchanges:
 ### Delivery Futures
 
 - Format: `BASE-QUOTE-YYMMDD` (e.g., `BTC-USD-230630`)
-- Example: `BTCUSD-230630` for BTC futures expiring on June 30, 2023
+- Example: `BTC-USD-230630` for BTC futures expiring on June 30, 2023
 
 ## Data Format
 
@@ -86,8 +86,8 @@ Both trade and aggregate trade data CSV files within zip archives share the same
 
 ```
 trade_id/交易id,side/交易方向,size/数量,price/价格,created_time/成交时间
-719977054,buy,0.00527188,84760.0,1745034103856
-719977057,buy,0.0277,84760.0,1745034103856
+719977054,buy,0.00527188,84760.0,1682434103856
+719977057,buy,0.0277,84760.0,1682434103856
 ...
 ```
 
@@ -106,7 +106,7 @@ Field descriptions:
 To download specific data files, use `curl` or any HTTP client:
 
 ```bash
-curl -O https://www.okx.com/cdn/okex/traderecords/trades/daily/20250419/BTC-USDT-trades-2025-04-19.zip
+curl -O https://www.okx.com/cdn/okex/traderecords/trades/daily/20230419/BTC-USDT-trades-2023-04-19.zip
 ```
 
 ### Processing Downloaded Data
@@ -114,7 +114,7 @@ curl -O https://www.okx.com/cdn/okex/traderecords/trades/daily/20250419/BTC-USDT
 1. Unzip the downloaded file:
 
    ```bash
-   unzip BTC-USDT-trades-2025-04-19.zip -d extracted_data
+   unzip BTC-USDT-trades-2023-04-19.zip -d extracted_data
    ```
 
 2. The CSV file can then be processed using standard data analysis tools such as pandas:
@@ -123,7 +123,7 @@ curl -O https://www.okx.com/cdn/okex/traderecords/trades/daily/20250419/BTC-USDT
    import pandas as pd
 
    # Load the CSV file
-   df = pd.read_csv('extracted_data/BTC-USDT-trades-2025-04-19.csv')
+   df = pd.read_csv('extracted_data/BTC-USDT-trades-2023-04-19.csv')
 
    # Display basic information
    print(df.info())
@@ -151,7 +151,7 @@ Required parameter:
 
 Optional parameters:
 
-- `bar`: Time interval (e.g., `1m`, `1D`) - default is `1m`. While documented as required, testing shows this parameter is technically optional and defaults to `1m` if omitted. See [Supported Time Intervals](#supported-time-intervals) for details.
+- `bar`: Time interval (e.g., `1m`, `1D`). Our testing confirms this parameter is technically optional and defaults to `1m` if omitted. See [Supported Time Intervals](#supported-time-intervals) for details.
 - `limit`: Number of candles to return.
 - `before`: Pagination of data before a timestamp (Unix timestamp in milliseconds, exclusive)
 - `after`: Pagination of data after a timestamp (Unix timestamp in milliseconds, exclusive)
@@ -170,6 +170,8 @@ The two candlestick endpoints have distinct characteristics and limitations:
 | **Historical depth (1D)**       | From May 21, 2021                | From October 10, 2017               |
 | **Rate limit**                  | Same as other public endpoints   | Same as other public endpoints      |
 | **1s Interval Support**         | No                               | Yes                                 |
+
+\*Note: Tests confirm 1D data is available from October 10, 2017 through the history-candles endpoint.
 
 **Notes on Behavior**:
 
@@ -192,10 +194,10 @@ OKX supports various time intervals for both SPOT and SWAP instruments. The foll
 | 15m      | 15 minutes  | `15m`           | Case-insensitive                  | ✅ Available (~15 days)     | ✅ Available (Jan 11, 2018) |
 | 30m      | 30 minutes  | `30m`           | Case-insensitive                  | ✅ Available (~30 days)     | ✅ Available (Jan 11, 2018) |
 | 1H       | 1 hour      | `1H`            | Case-sensitive, must be uppercase | ✅ Available (~60 days)     | ✅ Available (Jan 11, 2018) |
-| 2H       | 2 hours     | `2H`            | Case-sensitive, must be uppercase | ✅ Available (Dec 30, 2024) | ✅ Available (Jan 11, 2018) |
-| 4H       | 4 hours     | `4H`            | Case-sensitive, must be uppercase | ✅ Available (Sep 02, 2024) | ✅ Available (Jan 11, 2018) |
-| 6H       | 6 hours     | `6H`            | Case-sensitive, must be uppercase | ✅ Available (Aug 03, 2024) | ✅ Available (Jan 11, 2018) |
-| 12H      | 12 hours    | `12H`           | Case-sensitive, must be uppercase | ✅ Available (Aug 03, 2024) | ✅ Available (Jan 11, 2018) |
+| 2H       | 2 hours     | `2H`            | Case-sensitive, must be uppercase | ✅ Available (Dec 30, 2022) | ✅ Available (Jan 11, 2018) |
+| 4H       | 4 hours     | `4H`            | Case-sensitive, must be uppercase | ✅ Available (Sep 02, 2022) | ✅ Available (Jan 11, 2018) |
+| 6H       | 6 hours     | `6H`            | Case-sensitive, must be uppercase | ✅ Available (Aug 03, 2022) | ✅ Available (Jan 11, 2018) |
+| 12H      | 12 hours    | `12H`           | Case-sensitive, must be uppercase | ✅ Available (Aug 03, 2022) | ✅ Available (Jan 11, 2018) |
 | 1D       | 1 day       | `1D`            | Case-sensitive, must be uppercase | ✅ Available (May 21, 2021) | ✅ Available (Oct 10, 2017) |
 | 1W       | 1 week      | `1W`            | Case-sensitive, must be uppercase | ✅ Available                | ✅ Available                |
 | 1M       | 1 month     | `1M`            | Case-sensitive, must be uppercase | ✅ Available                | ✅ Available                |
@@ -204,7 +206,7 @@ OKX supports various time intervals for both SPOT and SWAP instruments. The foll
 
 - **Case sensitivity**: For minute intervals (1m, 3m, etc.), case doesn't matter. However, for hour, day, week, and month intervals, OKX requires uppercase letters (e.g., `1H` instead of `1h`). Using lowercase (e.g., `1h`, `1d`) will result in error code 51000: "Parameter bar error".
 
-- **1-second interval**: The `history-candles` endpoint supports the `1s` parameter and returns data. While documented as limited to ~20 days, recent testing observed data availability up to approximately one month. The `candles` endpoint rejects it with "Parameter bar error" and does not support `1s` at all. Historical 1-second data beyond this window is not available via the API and must be collected daily and stored locally.
+- **1-second interval**: The `history-candles` endpoint supports the `1s` parameter and returns data. Our testing confirms data availability of approximately 20 days. The `candles` endpoint rejects it with "Parameter bar error" and does not support `1s` at all. Historical 1-second data beyond this window is not available via the API and must be collected daily and stored locally.
 
 - **Interval format**: Unlike some other exchanges, OKX strictly uses `1H` instead of `1h`, `1D` instead of `1d`, etc. for higher timeframes.
 
@@ -212,28 +214,28 @@ OKX supports various time intervals for both SPOT and SWAP instruments. The foll
 
 The OKX REST API returns candlestick (Kline) data as an array of arrays in the `data` field. Each sub-array represents a single candlestick with the following structure:
 
-| Index | Field     | Description                      | Type   |
-| ----- | --------- | -------------------------------- | ------ |
-| 0     | timestamp | Unix timestamp in milliseconds   | string |
-| 1     | open      | Opening price                    | string |
-| 2     | high      | Highest price                    | string |
-| 3     | low       | Lowest price                     | string |
-| 4     | close     | Closing price                    | string |
-| 5     | volume    | Trading volume                   | string |
-| 6     | volumeUSD | Volume in USD                    | string |
-| 7     | turnover  | Turnover (quote currency volume) | string |
-| 8     | confirm   | Candle confirmation flag         | string |
+| Index | Field     | Description                                                     | Type   |
+| ----- | --------- | --------------------------------------------------------------- | ------ |
+| 0     | timestamp | Unix timestamp in milliseconds                                  | string |
+| 1     | open      | Opening price                                                   | string |
+| 2     | high      | Highest price                                                   | string |
+| 3     | low       | Lowest price                                                    | string |
+| 4     | close     | Closing price                                                   | string |
+| 5     | volume    | Trading volume                                                  | string |
+| 6     | volumeUSD | Volume in USD                                                   | string |
+| 7     | turnover  | Turnover (quote currency volume)                                | string |
+| 8     | confirm   | Candle confirmation flag (1 = confirmed, 0 = not yet confirmed) | string |
 
 Note: All fields are returned as strings and need to be converted to appropriate types for processing.
 
 ### Historical Data Availability
 
-Through our systematic binary search testing, we've precisely determined the earliest available data varies by interval and endpoint.
+Through our systematic testing, we've determined that the earliest available data varies by interval and endpoint.
 
 1. The earliest available data for BTC-USDT is:
 
    - For 1m (1-minute) interval data: From January 11, 2018 (timestamp: 1515669120000) in the history-candles endpoint
-   - For 1D (daily) interval data: From October 10, 2017 in the history-candles endpoint and May 21, 2021 in the candles endpoint.
+   - For 1D (daily) interval data: From May 21, 2021 in the candles endpoint and October 10, 2017 in the history-candles endpoint.
 
 2. Endpoint capabilities differ significantly:
 
@@ -248,7 +250,7 @@ Through our systematic binary search testing, we've precisely determined the ear
      - Successfully returns data for all tested periods (1-730 days back from current date) for intervals it supports historically.
      - Is the only option for obtaining any historical sub-daily data beyond the recent window offered by the `candles` endpoint.
 
-3. Data availability varies by instrument and may be more limited for newer or less popular trading pairs
+3. Data availability varies by instrument and may be more limited for newer or less popular trading pairs.
 
 ### Best Practices for Data Retrieval
 
@@ -260,9 +262,9 @@ Based on our findings, here are recommended practices for efficient data retriev
 4. **For large datasets**: Paginate through data using the `after` parameter, starting from the most recent date and working backward
 5. **For performance**: Use the largest interval that meets your needs to minimize the number of requests
 6. **For interval selection**:
-   - Use 1D interval when possible for historical data as it's available in both endpoints, with the history-candles endpoint offering the earliest data.
+   - Use 1D interval when possible for historical data, with availability back to May 21, 2021 for the candles endpoint and October 10, 2017 for the history-candles endpoint.
    - For sub-daily historical data (1H, 15m, 1m), use the history-candles endpoint unless the required depth is within the recent window provided by the `candles` endpoint (see "Supported Time Intervals" table for specifics).
-   - For 1-second data, be aware that historical data may not be available beyond approximately one month via the API.
+   - For 1-second data, which is available only through the history-candles endpoint, our tests confirm availability for approximately 20 days.
 7. **For 1-minute historical data**:
    - For the most recent ~24 hours: You can use either the candles endpoint (up to 300 records per request) or the history-candles endpoint (up to 100 records per request).
    - For anything older than ~24 hours: You must use the history-candles endpoint.
@@ -277,10 +279,17 @@ Below are examples for accessing both SPOT and SWAP data via the OKX REST API en
 BASE_URL="https://www.okx.com/api/v5/market"
 
 # Fetching recent candles (same parameters for both SPOT and SWAP)
-curl -H "Accept: application/json" "${BASE_URL}/candles?instId=INSTRUMENT_ID&bar=INTERVAL&limit=LIMIT"
+# Note: 'bar' parameter is optional and defaults to '1m'
+curl -H "Accept: application/json" "${BASE_URL}/candles?instId=INSTRUMENT_ID&limit=LIMIT"
 
 # Fetching historical candles (same parameters for both SPOT and SWAP)
 curl -H "Accept: application/json" "${BASE_URL}/history-candles?instId=INSTRUMENT_ID&bar=INTERVAL&limit=LIMIT&after=TIMESTAMP"
+
+# Using the 'before' parameter to get data before a specific timestamp
+curl -H "Accept: application/json" "${BASE_URL}/history-candles?instId=INSTRUMENT_ID&bar=INTERVAL&limit=LIMIT&before=TIMESTAMP"
+
+# Using both 'before' and 'after' parameters to specify a range
+curl -H "Accept: application/json" "${BASE_URL}/history-candles?instId=INSTRUMENT_ID&bar=INTERVAL&limit=LIMIT&before=END_TIMESTAMP&after=START_TIMESTAMP"
 ```
 
 Replace the placeholders with your specific values:
@@ -353,7 +362,7 @@ btc_usdt_df = fetch_okx_candles("BTC-USDT", "1D", 30)
 btc_swap_df = fetch_okx_candles("BTC-USD-SWAP", "1D", 30)
 
 # For historical data beyond the recent window
-btc_historical_df = fetch_okx_candles("BTC-USDT", "1m", 100, endpoint="history-candles", after=1743356217705)
+btc_historical_df = fetch_okx_candles("BTC-USDT", "1m", 100, endpoint="history-candles", after=1674086400000)
 
 print(btc_usdt_df.head())
 print(btc_swap_df.head())
@@ -365,22 +374,23 @@ print(btc_swap_df.head())
 2. **No API Access**: There is no documented API to programmatically discover available datasets.
 3. **Authentication**: The CDN uses Alibaba OSS with authentication, but public access is granted to specific files.
 4. **Date Range Constraints**: Files appear to be organized by date, but without documentation on what date ranges are available.
-5. **API Request Limit**: The REST API has a limit of 300 records per request for candles and 100 for history-candles.
+5. **API Request Limit**: Confirmed through testing, the REST API has a maximum limit of 300 records per request for candles and 100 for history-candles.
 6. **Data Delay**: Recent data may be delayed or unavailable through the history-candles endpoint.
+7. **Historical Data Limitations**: Our tests confirm 1D historical data is available from October 10, 2017 through the history-candles endpoint.
 
 ## Example Use Cases
 
 ### Downloading Historical Trade Data for a Specific Day
 
 ```bash
-# Download trade data for BTC-USDT on April 19, 2025
-curl -O https://www.okx.com/cdn/okex/traderecords/trades/daily/20250419/BTC-USDT-trades-2025-04-19.zip
+# Download trade data for BTC-USDT on April 19, 2023
+curl -O https://www.okx.com/cdn/okex/traderecords/trades/daily/20230419/BTC-USDT-trades-2023-04-19.zip
 
 # Unzip the file
-unzip BTC-USDT-trades-2025-04-19.zip
+unzip BTC-USDT-trades-2023-04-19.zip
 
 # Preview the data
-head BTC-USDT-trades-2025-04-19.csv
+head BTC-USDT-trades-2023-04-19.csv
 ```
 
 ### Batch Downloading Multiple Days
@@ -392,7 +402,7 @@ For downloading multiple consecutive days, you can use a script like this:
 
 # Define parameters
 SYMBOL="BTC-USDT"
-START_DATE="20250419"
+START_DATE="20230419"
 DAYS=5
 
 # Convert to date object for iteration
@@ -492,9 +502,9 @@ Key takeaways:
 
 - Use the proper symbol format: `BASE-QUOTE` for SPOT and `BASE-USD-SWAP` for futures
 - REST API provides access to candlestick data with up to 300 records per request for candles and 100 for history-candles
-- Multiple time intervals are supported, from 1-minute to 1-month, with 1-second data available via history-candles
+- Multiple time intervals are supported, from 1-minute to 1-month, with 1-second data available via history-candles for the most recent ~20 days
 - Both SPOT (USDT) and perpetual futures (USD-SWAP) data is available
-- Historical data can be accessed through both CDN downloads and the history-candles endpoint
+- Historical data can be accessed through both CDN downloads and the history-candles endpoint, with 1D data available back to October 10, 2017
 
 ## Integration with Data Services Stack
 
