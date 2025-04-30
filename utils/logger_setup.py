@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Advanced Logging System for Binance Data Services
+Advanced Logging System for Raw Data Services
 
 This module provides a sophisticated logging system that extends Python's standard
 logging facilities with additional features:

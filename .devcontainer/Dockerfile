@@ -10,7 +10,7 @@ RUN conda install -y python=3.11
 RUN apt-get update && apt-get install -y ripgrep fd-find
 
 # We will install dependencies after workspace is mounted
-# The workspace will be mounted at /workspaces/binance-data-services
+# The workspace will be mounted at /workspaces/raw-data-services
 # and the dependencies will be installed from there
 
 # Add .local/bin to PATH for the vscode user to remove WARNINGs

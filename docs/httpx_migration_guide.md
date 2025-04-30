@@ -1,8 +1,8 @@
-# Migration Guide: curl_cffi to httpx
+# HTTPX Migration Guide
 
 ## Overview
 
-This guide explains how to migrate from `curl_cffi` to `httpx` to resolve hanging issues in the Binance Data Services library, particularly in Python 3.13.
+This guide explains how to migrate from `curl_cffi` to `httpx` to resolve hanging issues in the Raw Data Services library, particularly in Python 3.13.
 
 ## Background
 
