@@ -40,10 +40,12 @@ dev = [
     "pytest-cov",
     "pytest-xdist",
     "pytest-profiling",
-    "pylint",
-    "autoflake",
-    "vulture",
-    "twine"
+    "rope", # for refactoring imports
+    "ruff", # for linting and formatting
+    "pylint", # for linting
+    "autoflake", # for cleaning up imports
+    "vulture", # for dead code detection
+    "twine" # for uploading to PyPI
 ]
 
 # Command-line scripts defined here
