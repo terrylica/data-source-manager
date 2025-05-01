@@ -17,6 +17,23 @@ from rope.refactor.rename import Rename
 
 from utils.logger_setup import logger
 
+# Define the specific Ruff import-related codes to check
+RUFF_IMPORT_CHECKS = [
+    "F821",  # Undefined name
+    "F822",  # Undefined name '...' in __all__
+    "F823",  # Local variable '...' referenced before assignment
+    "F401",  # F401: 'module.name' imported but unused
+    "F402",  # F402: Module 'module' imported more than once
+    "F403",  # F403: 'from module import *' used; unable to detect undefined names
+    "F632",  # F632: Use of `in <constant>` where <constant> is a list or tuple. Use a set instead.
+    "F841",  # F841: Local variable '...' is assigned to but never used
+    "I001",  # Unsorted imports
+    "ARG",  # Unused arguments
+    "B006",  # Mutable argument default
+    "B008",  # Function call in default argument
+    "PLC0415",  # Import outside top level
+]
+
 # Configure typer app with explicit help options to ensure -h works
 app = typer.Typer(
     help="Move files with git, refactor imports, and verify with Ruff",
@@ -67,14 +84,20 @@ def run_ruff(project_path: str, dry_run: bool = False) -> bool:
     """Run Ruff to check for import-related issues."""
     if dry_run:
         logger.info(
-            f"[DRY-RUN] Ruff would run: ruff check {project_path} --select F821,F822,F823"
+            f"[DRY-RUN] Ruff would run: ruff check {project_path} --select {','.join(RUFF_IMPORT_CHECKS)}"
         )
         return True
 
     logger.info("Running Ruff sanity check...")
     try:
         result = subprocess.run(
-            ["ruff", "check", project_path, "--select", "F821,F822,F823"],
+            [
+                "ruff",
+                "check",
+                project_path,
+                "--select",
+                ",".join(RUFF_IMPORT_CHECKS),
+            ],
             capture_output=True,
             text=True,
         )
@@ -173,6 +196,54 @@ def move(
         return 0
     else:
         logger.error("Some operations failed. Check the log for details.")
+        return 1
+
+
+@app.command()
+def check_ruff(
+    project: str = typer.Option(
+        ".", "--project", "-p", help="Root of your Python project"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-d", help="Show what would happen without making changes"
+    ),
+    verbose: int = typer.Option(
+        0,
+        "--verbose",
+        "-v",
+        count=True,
+        help="Increase verbosity: -v for INFO, -vv for DEBUG",
+    ),
+    log_file: Optional[str] = typer.Option(
+        None,
+        "--log-file",
+        "-l",
+        help="Custom log file name (default: refactor_YYYYMMDD_HHMMSS.log)",
+    ),
+):
+    """
+    Run Ruff to check for import-related issues on the current codebase state.
+    """
+    # Setup log file if not provided
+    if not log_file:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = f"ruff_check_{timestamp}.log"
+
+    # Set the log level
+    if verbose >= 2:
+        logger.setLevel(20)  # DEBUG in rich logger
+    elif verbose == 1:
+        logger.setLevel(30)  # INFO in rich logger
+
+    logger.debug(f"Arguments: project={project}, dry_run={dry_run}")
+
+    success = run_ruff(str(Path(project)), dry_run)
+
+    if success:
+        logger.info("Ruff check completed successfully.")
+        return 0
+    else:
+        logger.error("Ruff check failed. Check the log for details.")
         return 1
 
 
