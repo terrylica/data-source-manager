@@ -8,14 +8,13 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from utils.logger_setup import logger
-
 # Import the download function from the scripts
 from scripts.funding_rate_downloader.download_funding_rate import (
-    fetch_funding_rate_history,
     convert_to_csv,
+    fetch_funding_rate_history,
     save_to_csv,
 )
+from utils.logger_setup import logger
 
 # No need to initialize logger with get_logger anymore
 

@@ -1,43 +1,44 @@
 #!/usr/bin/env python
 """Data Source Manager (DSM) that mediates between different data sources."""
 
-from datetime import datetime
-from typing import Dict, Optional, Tuple, TypeVar, Type, List
-from enum import Enum, auto
-import pandas as pd
-from pathlib import Path
 from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum, auto
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
-from utils.logger_setup import logger
-from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from utils.time_utils import align_time_boundaries
-from utils.config import (
-    OUTPUT_DTYPES,
-    FUNDING_RATE_DTYPES,
-    VISION_DATA_DELAY_HOURS,
-    REST_CHUNK_SIZE,
-    REST_MAX_CHUNKS,
-    create_empty_dataframe,
-)
+import pandas as pd
+
+from core.sync.cache_manager import UnifiedCacheManager
 from core.sync.rest_data_client import RestDataClient
 from core.sync.vision_data_client import VisionDataClient
-from core.sync.cache_manager import UnifiedCacheManager
 from core.sync.vision_path_mapper import FSSpecVisionHandler
-from utils.for_core.dsm_time_range_utils import (
-    merge_adjacent_ranges,
-    standardize_columns,
-    identify_missing_segments,
-    merge_dataframes,
+from utils.config import (
+    FUNDING_RATE_DTYPES,
+    OUTPUT_DTYPES,
+    REST_CHUNK_SIZE,
+    REST_MAX_CHUNKS,
+    VISION_DATA_DELAY_HOURS,
+    create_empty_dataframe,
 )
 from utils.for_core.dsm_api_utils import (
-    fetch_from_vision,
-    fetch_from_rest,
     create_client_if_needed,
+    fetch_from_rest,
+    fetch_from_vision,
 )
 from utils.for_core.dsm_date_range_utils import (
     calculate_date_range,
     get_date_range_description,
 )
+from utils.for_core.dsm_time_range_utils import (
+    identify_missing_segments,
+    merge_adjacent_ranges,
+    merge_dataframes,
+    standardize_columns,
+)
+from utils.logger_setup import logger
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from utils.time_utils import align_time_boundaries
 
 
 class DataSource(Enum):
@@ -528,11 +529,11 @@ class DataSourceManager:
             DataFrame with aligned data from the selected sources
         """
         # Import needed at function level to avoid circular imports
-        from utils.market_constraints import (
-            is_interval_supported,
-            get_market_capabilities,
-        )
         from utils.for_core.vision_exceptions import UnsupportedIntervalError
+        from utils.market_constraints import (
+            get_market_capabilities,
+            is_interval_supported,
+        )
 
         # Validate that the interval is supported by the market type
         if not is_interval_supported(self.market_type, interval):

@@ -8,15 +8,38 @@ from utils.for_demo.dsm_help_content import MAIN_DOCSTRING
 
 __doc__ = MAIN_DOCSTRING
 
+import sys
 from pathlib import Path
 from time import perf_counter
-import sys
 from typing import Optional
+
 import pendulum
 
-# Import the logger or logging and rich formatting
-from utils.logger_setup import logger, configure_session_logging
-
+# Import library functions
+from core.sync.dsm_lib import (
+    fetch_market_data,
+    process_market_parameters,
+    setup_environment,
+)
+from utils.for_demo.dsm_app_options import (
+    create_typer_app,
+    get_cmd_help_text,
+    get_standard_options,
+)
+from utils.for_demo.dsm_cli_utils import (
+    ChartTypeChoice,
+    DataProviderChoice,
+    DataSourceChoice,
+    LogLevel,
+    MarketTypeChoice,
+    handle_error,
+    print_config_table,
+    print_intro_panel,
+    print_logging_panel,
+    print_performance_panel,
+    print_rich_output_help,
+    resolve_log_level,
+)
 
 # Import utility modules for DSM Demo
 from utils.for_demo.dsm_display_utils import display_results
@@ -24,32 +47,9 @@ from utils.for_demo.dsm_doc_utils import (
     generate_markdown_docs,
     verify_and_install_typer_cli,
 )
-from utils.for_demo.dsm_cli_utils import (
-    resolve_log_level,
-    print_intro_panel,
-    print_logging_panel,
-    print_config_table,
-    print_performance_panel,
-    print_rich_output_help,
-    handle_error,
-    MarketTypeChoice,
-    DataSourceChoice,
-    ChartTypeChoice,
-    LogLevel,
-    DataProviderChoice,
-)
-from utils.for_demo.dsm_app_options import (
-    create_typer_app,
-    get_standard_options,
-    get_cmd_help_text,
-)
 
-# Import library functions
-from core.sync.dsm_lib import (
-    setup_environment,
-    process_market_parameters,
-    fetch_market_data,
-)
+# Import the logger or logging and rich formatting
+from utils.logger_setup import configure_session_logging, logger
 
 # Start the performance timer at module initialization
 start_time_perf = perf_counter()

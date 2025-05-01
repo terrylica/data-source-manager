@@ -5,19 +5,19 @@ This script tests that when Vision API returns partial data, the system correctl
 missing segments and fetches them from REST API to complete the dataset.
 """
 
-from datetime import datetime, timezone, timedelta
-import pandas as pd
-import time
 import sys
+import time
+from datetime import datetime, timedelta, timezone
 
-from utils.logger_setup import logger
+import pandas as pd
 from rich import print
 from rich.panel import Panel
-from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
-from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
-from core.sync.data_source_manager import DataSourceManager, DataSource
+from core.sync.data_source_manager import DataSource, DataSourceManager
+from utils.logger_setup import logger
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 from utils_for_debug.data_integrity import analyze_data_integrity
 
 # Set log level to DEBUG to see detailed logging

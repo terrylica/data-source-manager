@@ -4,9 +4,10 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, Tuple, Union
+
 import pandas as pd
 
-from utils.market_constraints import DataProvider, ChartType
+from utils.market_constraints import ChartType, DataProvider
 
 
 class DataClientInterface(ABC):

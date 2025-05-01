@@ -9,10 +9,11 @@ from the Binance Vision API using SHA-256 checksums.
 import hashlib
 import re
 from pathlib import Path
-from typing import Tuple, Optional, Dict
+from typing import Dict, Optional, Tuple
+
+from rich import print as rprint
 
 from utils.logger_setup import logger
-from rich import print as rprint
 
 
 def verify_file_checksum(

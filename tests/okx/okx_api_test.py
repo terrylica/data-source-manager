@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
-import httpx
-from datetime import datetime, timedelta
 import time
+from datetime import datetime, timedelta
+
+import httpx
+from rich import print
 from rich.console import Console
 from rich.table import Table
+
 from utils.logger_setup import logger
-from rich import print
 
 OKX_API_BASE_URL = "https://www.okx.com/api/v5"
 CANDLES_ENDPOINT = f"{OKX_API_BASE_URL}/market/candles"

@@ -61,3 +61,22 @@ packages = ["core", "utils", "examples", "utils_for_debug"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*" 
+
+[tool.ruff]
+# Enable Pyflakes, pycodestyle, import sorting, and more
+lint.select = ["E", "F", "W", "I001"]
+lint.ignore = ["E501"]
+# Align with project.requires-python (>=3.11)
+# Ruff comment - this cannot be inherited automatically
+target-version = "py311"
+# Allow autofix for all enabled rules
+lint.fixable = ["ALL"]
+# Allow unused variables when underscored
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+# Respect .gitignore
+respect-gitignore = true
+
+[tool.ruff.lint.isort]
+# Note: This cannot automatically inherit from project dependencies.
+# Make sure to keep this list in sync with [project] dependencies and [project.optional-dependencies]
+known-third-party = ["pandas", "numpy", "polars", "pyarrow", "httpx", "tenacity", "rich", "typer", "pytest", "gitpython", "rope", "pylint", "autoflake", "vulture", "twine"] 

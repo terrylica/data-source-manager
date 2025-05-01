@@ -10,26 +10,26 @@ Usage:
     python rate_limit_tester.py --duration 300  # Run for 5 minutes
 """
 
-import time
 import argparse
 import signal
+import time
 from pathlib import Path
 
-from utils.logger_setup import logger
+import pandas as pd
 from rich import print
 from rich.console import Console
 from rich.progress import (
+    BarColumn,
     Progress,
     TextColumn,
-    BarColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
 
 # For API access
 from core.sync.data_source_manager import DataSourceManager
-from utils.market_constraints import MarketType, Interval, DataProvider
-import pandas as pd
+from utils.logger_setup import logger
+from utils.market_constraints import DataProvider, Interval, MarketType
 
 
 # Rate limit tracking

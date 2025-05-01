@@ -11,29 +11,29 @@ This script demonstrates how to:
 
 import argparse
 import sys
+import tempfile
 import time
 from pathlib import Path
-import tempfile
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
 
 import httpx
+from rich import print as rprint
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import (
-    Progress,
-    TextColumn,
     BarColumn,
     DownloadColumn,
+    Progress,
+    TextColumn,
     TimeRemainingColumn,
 )
 from rich.table import Table
-from rich.panel import Panel
-from rich import print as rprint
 
-from utils.logger_setup import logger
 from utils.for_core.vision_checksum import (
     extract_checksum_from_file,
     verify_file_checksum,
 )
+from utils.logger_setup import logger
 from utils.validation import DataValidation
 
 

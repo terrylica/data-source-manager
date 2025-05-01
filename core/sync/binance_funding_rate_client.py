@@ -1,23 +1,24 @@
 #!/usr/bin/env python
 """Client for Binance funding rate data."""
 
-from datetime import datetime, timezone
-from typing import Optional, Tuple, Union
-from pathlib import Path
-import pandas as pd
 import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional, Tuple, Union
 
-from utils.logger_setup import logger
-from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from utils.time_utils import filter_dataframe_by_time
-from utils.network_utils import create_client
+import pandas as pd
+
+from core.sync.cache_manager import UnifiedCacheManager
+from core.sync.data_client_interface import DataClientInterface
 from utils.config import (
     FUNDING_RATE_DTYPES,
     create_empty_funding_rate_dataframe,
 )
-from core.sync.data_client_interface import DataClientInterface
-from core.sync.cache_manager import UnifiedCacheManager
+from utils.logger_setup import logger
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 from utils.market_utils import get_market_type_str
+from utils.network_utils import create_client
+from utils.time_utils import filter_dataframe_by_time
 
 
 class BinanceFundingRateClient(DataClientInterface):

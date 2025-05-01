@@ -6,12 +6,13 @@ This script shows how to properly use the market_constraints.py enums with the A
 ensuring data is stored in the correct locations and can be found by the ArrowCacheReader.
 """
 
-from rich import print
 from datetime import datetime
 from pathlib import Path
 
-from utils.market_constraints import DataProvider, MarketType, ChartType, Interval
+from rich import print
+
 from utils.arrow_cache_reader import ArrowCacheReader
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 def test_market_constraint_access():

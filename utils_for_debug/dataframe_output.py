@@ -6,9 +6,10 @@ This module contains functions for formatting, displaying, and logging
 information about DataFrames in a readable format.
 """
 
-import pandas as pd
 from datetime import datetime
 from pathlib import Path
+
+import pandas as pd
 
 from utils.logger_setup import logger
 

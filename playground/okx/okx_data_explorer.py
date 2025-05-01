@@ -5,19 +5,19 @@ OKX Data Explorer
 A tool to explore and download available data from the OKX CDN.
 """
 
-from pathlib import Path
 import argparse
-import datetime
 import concurrent.futures
+import datetime
 import zipfile
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+import httpx
 import pandas as pd
 from rich import print
 from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
-from typing import List, Tuple, Dict
-
-import httpx
 
 # Constants
 BASE_URL = "https://www.okx.com/cdn/okex/traderecords"

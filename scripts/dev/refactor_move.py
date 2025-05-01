@@ -8,14 +8,22 @@ and verifying the changes don't introduce import-related errors.
 
 import subprocess
 import sys
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-import typer
 from typing import List, Optional
+
+import git  # Use GitPython instead of subprocess
+import typer
+from rich.console import Console
+from rich.prompt import Confirm
+from rope.base.libutils import path_to_resource
 from rope.base.project import Project
-from rope.refactor.rename import Rename
+from rope.refactor.move import MoveModule
 
 from utils.logger_setup import logger
+
+console = Console()
 
 # Define the specific Ruff import-related codes to check
 RUFF_IMPORT_CHECKS = [
@@ -41,73 +49,63 @@ app = typer.Typer(
 )
 
 
-def git_mv(old_path: str, new_path: str, dry_run: bool = False) -> bool:
+@contextmanager
+def rope_project(project_path: Path):
+    """Context manager for Rope projects to ensure proper cleanup."""
+    project = Project(str(project_path))
+    try:
+        yield project
+    finally:
+        project.close()
+
+
+def git_mv(old_path: Path, new_path: Path, dry_run: bool = False) -> bool:
     """Move a file using git mv."""
     # Check if source file exists
-    if not Path(old_path).exists():
+    if not old_path.exists():
         logger.error(f"Source file does not exist: {old_path}")
         return False
-
-    # Ensure destination directory exists
-    new_path_obj = Path(new_path)
-    if not new_path_obj.parent.exists() and not dry_run:
-        logger.debug(f"Creating destination directory: {new_path_obj.parent}")
-        new_path_obj.parent.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Created directory: {new_path_obj.parent}")
 
     if dry_run:
         logger.info(f"[DRY-RUN] git mv {old_path} {new_path}")
         return True
-    else:
-        logger.debug(f"Running: git mv {old_path} {new_path}")
-        try:
-            # Create the destination directory first
-            if not new_path_obj.parent.exists():
-                new_path_obj.parent.mkdir(parents=True, exist_ok=True)
-                logger.info(f"Created directory: {new_path_obj.parent}")
 
-            subprocess.run(["git", "mv", old_path, new_path], check=True)
-            logger.info(f"Moved {old_path} -> {new_path}")
-            return True
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Git command failed: {e}")
-            return False
-
-
-def rope_refactor_imports(
-    project_path: str, file_path: str, dry_run: bool = False
-) -> bool:
-    """Refactor imports for a moved file using Rope."""
-    if dry_run:
-        logger.info(f"[DRY-RUN] Rope would refactor imports in {file_path}")
-        return True
-
-    # Skip refactoring for non-Python files
-    if not file_path.endswith(".py"):
-        logger.info(f"Skipping import refactoring for non-Python file: {file_path}")
-        return True
-
-    # Check if the file exists
-    if not Path(file_path).exists():
-        logger.error(f"Cannot refactor imports: File not found: {file_path}")
-        return False
-
-    logger.debug(f"Refactoring imports in {file_path} via Rope")
     try:
-        project = Project(project_path)
-        resource = project.get_file(file_path)
-        rename = Rename(project, resource)
-        changes = rename.get_changes(file_path)
-        project.do(changes)
-        project.close()
-        logger.info(f"Imports updated for {file_path}")
+        # Use GitPython to move the file
+        repo = git.Repo(search_parent_directories=True)
+        repo.git.mv(str(old_path), str(new_path))
+        logger.info(f"Moved {old_path} -> {new_path}")
         return True
-    except Exception as e:
-        logger.error(f"Rope refactoring failed: {e}")
+    except git.GitCommandError as e:
+        logger.error(f"Git command failed: {e}")
         return False
 
 
-def run_ruff(project_path: str, dry_run: bool = False) -> bool:
+def run_command(
+    cmd: List[str], dry_run: bool = False, description: str = ""
+) -> subprocess.CompletedProcess:
+    """Run a command with proper error handling and dry-run support."""
+    if dry_run:
+        logger.info(f"[DRY-RUN] Would run: {' '.join(cmd)}")
+        # Return a dummy CompletedProcess for dry runs
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    logger.debug(f"Running: {' '.join(cmd)}")
+    try:
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,  # We'll handle errors ourselves
+        )
+    except Exception as e:
+        logger.error(f"Command failed: {' '.join(cmd)}")
+        logger.error(f"Error: {e}")
+        # Re-raise as CalledProcessError with command info
+        raise subprocess.CalledProcessError(1, cmd, output="", stderr=str(e))
+
+
+def run_ruff(project_path: Path, dry_run: bool = False) -> bool:
     """Run Ruff to check for import-related issues."""
     if dry_run:
         logger.info(
@@ -117,17 +115,15 @@ def run_ruff(project_path: str, dry_run: bool = False) -> bool:
 
     logger.info("Running Ruff sanity check...")
     try:
-        result = subprocess.run(
-            [
-                "ruff",
-                "check",
-                project_path,
-                "--select",
-                ",".join(RUFF_IMPORT_CHECKS),
-            ],
-            capture_output=True,
-            text=True,
-        )
+        cmd = [
+            "ruff",
+            "check",
+            str(project_path),
+            "--select",
+            ",".join(RUFF_IMPORT_CHECKS),
+        ]
+        result = run_command(cmd, dry_run, "Ruff check")
+
         if result.stdout:
             logger.warning(f"Ruff detected issues:\n{result.stdout}")
             return False
@@ -139,18 +135,8 @@ def run_ruff(project_path: str, dry_run: bool = False) -> bool:
         return False
 
 
-def fix_ruff_issues(project_path: str, dry_run: bool = False) -> bool:
-    """Fix import-related issues using Ruff's auto-fix capability.
-
-    This runs after Rope refactoring to clean up any remaining import issues.
-
-    Args:
-        project_path: Path to the project root
-        dry_run: Whether to actually run the fixes or just log
-
-    Returns:
-        True if fixes were applied (or would be in dry run), False if errors occurred
-    """
+def fix_ruff_issues(project_path: Path, dry_run: bool = False) -> bool:
+    """Fix import-related issues using Ruff's auto-fix capability."""
     if dry_run:
         logger.info(
             f"[DRY-RUN] Ruff would fix: ruff check {project_path} --select {','.join(RUFF_IMPORT_CHECKS)} --fix"
@@ -159,18 +145,15 @@ def fix_ruff_issues(project_path: str, dry_run: bool = False) -> bool:
 
     logger.info("Applying Ruff fixes to import-related issues...")
     try:
-        result = subprocess.run(
-            [
-                "ruff",
-                "check",
-                project_path,
-                "--select",
-                ",".join(RUFF_IMPORT_CHECKS),
-                "--fix",
-            ],
-            capture_output=True,
-            text=True,
-        )
+        cmd = [
+            "ruff",
+            "check",
+            str(project_path),
+            "--select",
+            ",".join(RUFF_IMPORT_CHECKS),
+            "--fix",
+        ]
+        result = run_command(cmd, dry_run, "Ruff fix")
 
         if "error:" in result.stderr.lower():
             logger.error(f"Ruff fix encountered errors:\n{result.stderr}")
@@ -188,19 +171,8 @@ def fix_ruff_issues(project_path: str, dry_run: bool = False) -> bool:
         return False
 
 
-def run_ruff_pre_check(project_path: str, dry_run: bool = False) -> bool:
-    """Run Ruff to check for import-related issues before we start moving files.
-
-    This helps identify existing issues before refactoring, to avoid attributing
-    pre-existing issues to the refactoring process.
-
-    Args:
-        project_path: Path to the project root
-        dry_run: Whether to actually run the check or just log
-
-    Returns:
-        True if no issues found or in dry run mode, False if issues found
-    """
+def run_ruff_pre_check(project_path: Path, dry_run: bool = False) -> bool:
+    """Run Ruff to check for import-related issues before we start moving files."""
     if dry_run:
         logger.info(
             f"[DRY-RUN] Ruff would run pre-check: ruff check {project_path} --select {','.join(RUFF_IMPORT_CHECKS)}"
@@ -209,24 +181,22 @@ def run_ruff_pre_check(project_path: str, dry_run: bool = False) -> bool:
 
     logger.info("Running Ruff pre-check for existing import issues...")
     try:
-        result = subprocess.run(
-            [
-                "ruff",
-                "check",
-                project_path,
-                "--select",
-                ",".join(RUFF_IMPORT_CHECKS),
-            ],
-            capture_output=True,
-            text=True,
-        )
+        cmd = [
+            "ruff",
+            "check",
+            str(project_path),
+            "--select",
+            ",".join(RUFF_IMPORT_CHECKS),
+        ]
+        result = run_command(cmd, dry_run, "Ruff pre-check")
+
         if result.stdout:
             logger.warning(f"Ruff detected pre-existing issues:\n{result.stdout}")
             logger.warning(
                 "These issues exist before refactoring. They may not be caused by the move operation."
             )
-            answer = input("Continue despite pre-existing issues? (y/n): ").lower()
-            return answer == "y"
+            # Use rich's Confirm for better UX
+            return Confirm.ask("Continue despite pre-existing issues?")
         else:
             logger.info("Ruff pre-check passed: no pre-existing import issues found.")
             return True
@@ -236,92 +206,66 @@ def run_ruff_pre_check(project_path: str, dry_run: bool = False) -> bool:
 
 
 def update_import_paths(
-    project_path: str, old_path: str, new_path: str, dry_run: bool = False
+    project_path: Path, old_path: Path, new_path: Path, dry_run: bool = False
 ) -> bool:
-    """Update import paths across the codebase by using grep and sed.
-
-    Args:
-        project_path: Path to the project root
-        old_path: Original path of the file
-        new_path: New path of the file
-        dry_run: Whether to actually run the fixes or just log
-
-    Returns:
-        True if operation was successful, False otherwise
-    """
+    """Update import paths across the codebase using Rope."""
     if dry_run:
         logger.info(
-            f"[DRY-RUN] Would update import paths from {old_path} to {new_path}"
+            f"[DRY-RUN] Would update import paths from {old_path} to {new_path} using Rope"
         )
         return True
 
-    # Convert file paths to import paths (remove .py, replace / with .)
-    def path_to_import(path):
-        path = str(path)
-        if path.endswith(".py"):
-            path = path[:-3]
-        return path.replace("/", ".")
-
-    old_import = path_to_import(old_path)
-    new_import = path_to_import(new_path)
-
-    logger.info(f"Updating import paths from '{old_import}' to '{new_import}'")
+    logger.info(f"Updating import paths from '{old_path}' to '{new_path}' using Rope")
 
     try:
-        # Find all Python files that might import the moved file
-        grep_result = subprocess.run(
-            ["grep", "-r", f"import.*{old_import}", "--include=*.py", project_path],
-            capture_output=True,
-            text=True,
-        )
+        # Use context manager for Rope project
+        with rope_project(project_path) as project:
+            # Create relative paths to the project root
+            old_rel_path = str(
+                old_path.relative_to(project_path)
+                if old_path.is_absolute()
+                else old_path
+            )
+            new_rel_path = str(
+                new_path.relative_to(project_path)
+                if new_path.is_absolute()
+                else new_path
+            )
 
-        if grep_result.returncode not in [0, 1]:  # 0 = matches found, 1 = no matches
-            logger.error(f"Error searching for imports: {grep_result.stderr}")
-            return False
+            # Get the resources
+            old_resource = path_to_resource(project, old_rel_path)
 
-        # Parse results to get files with imports
-        files_with_imports = []
-        for line in grep_result.stdout.splitlines():
-            if ":" in line:
-                file_path = line.split(":", 1)[0]
-                files_with_imports.append(file_path)
+            # Use MoveModule for Python files
+            if old_path.suffix == ".py":
+                # Create the destination folder if it doesn't exist
+                new_parent = new_path.parent
+                new_parent.mkdir(parents=True, exist_ok=True)
 
-        if not files_with_imports:
-            logger.info(f"No files found importing {old_import}")
-            return True
+                # Get the destination folder resource
+                dest_folder = str(Path(new_rel_path).parent)
+                if not dest_folder:
+                    dest_folder = "."
 
-        logger.info(f"Found {len(files_with_imports)} files with imports to update")
+                # Get the new module name
+                new_module_name = new_path.stem
 
-        # Update imports in each file
-        for file_path in files_with_imports:
-            try:
-                with open(file_path, "r") as f:
-                    content = f.read()
+                # Perform the move
+                mover = MoveModule(project, old_resource)
+                changes = mover.get_changes(dest_folder, new_module_name)
+                project.do(changes)
 
-                # Replace various import forms
-                # from old_import import X
-                updated_content = content.replace(
-                    f"from {old_import} import", f"from {new_import} import"
+                logger.info(
+                    "Rope successfully updated import references across the codebase"
                 )
-                # import old_import
-                updated_content = updated_content.replace(
-                    f"import {old_import}", f"import {new_import}"
+                return True
+            else:
+                logger.info(
+                    f"Skipping Rope import refactoring for non-Python file: {old_path}"
                 )
-                # import old_import as X
-                updated_content = updated_content.replace(
-                    f"import {old_import} as", f"import {new_import} as"
-                )
+                return True
 
-                if content != updated_content:
-                    with open(file_path, "w") as f:
-                        f.write(updated_content)
-                    logger.info(f"Updated imports in {file_path}")
-            except Exception as e:
-                logger.error(f"Failed to update imports in {file_path}: {e}")
-
-        return True
     except Exception as e:
-        logger.error(f"Error updating import paths: {e}")
+        logger.error(f"Error updating import paths with Rope: {e}")
         return False
 
 
@@ -391,100 +335,105 @@ def move(
 
     # Process each move operation
     success = True
-    project_path = Path(project)
+    project_path = Path(project).resolve()
 
     # Run pre-check if not skipped
     if not skip_pre_check:
-        if not run_ruff_pre_check(str(project_path), dry_run):
+        if not run_ruff_pre_check(project_path, dry_run):
             logger.error("Pre-check failed. Exiting.")
             return 1
     else:
         logger.info("Skipping pre-check for existing import issues as requested.")
 
-    for move_pair in moves:
-        try:
-            old_path, new_path = move_pair.split(":")
-        except ValueError:
-            logger.error(f"Invalid move format '{move_pair}'; use old_path:new_path")
-            success = False
-            continue
-
-        logger.info(f"Processing move: {old_path} -> {new_path}")
-
-        # Check if source exists and destination doesn't already exist
-        old_path_obj = Path(old_path)
-        new_path_obj = Path(new_path)
-
-        if not old_path_obj.exists():
-            if new_path_obj.exists() and not skip_validation:
-                logger.warning(
-                    f"Source file {old_path} does not exist, but destination {new_path} does - assuming already moved"
+    # Process all move pairs
+    with console.status("[bold green]Processing file moves...") as status:
+        for move_pair in moves:
+            try:
+                old_path, new_path = move_pair.split(":")
+                old_path_obj = Path(old_path)
+                new_path_obj = Path(new_path)
+            except ValueError:
+                logger.error(
+                    f"Invalid move format '{move_pair}'; use old_path:new_path"
                 )
-                continue
-            elif skip_validation:
-                logger.warning(
-                    f"Source file {old_path} does not exist, but proceeding due to --skip-validation"
-                )
-            else:
-                logger.error(f"Source file does not exist: {old_path}")
                 success = False
                 continue
 
-        # Move the file with git
-        if not git_mv(old_path, new_path, dry_run):
-            success = False
-            continue
+            status.update(f"[bold green]Processing: {old_path} → {new_path}")
+            logger.info(f"Processing move: {old_path} -> {new_path}")
 
-        # Update import paths across the codebase
-        if not update_import_paths(str(project_path), old_path, new_path, dry_run):
-            logger.warning(
-                f"Failed to update import paths for {old_path} -> {new_path}"
-            )
-            # Continue anyway as Rope might fix some issues
+            # Check if source exists and destination doesn't already exist
+            if not old_path_obj.exists():
+                if new_path_obj.exists() and not skip_validation:
+                    logger.warning(
+                        f"Source file {old_path} does not exist, but destination {new_path} does - assuming already moved"
+                    )
+                    continue
+                elif skip_validation:
+                    logger.warning(
+                        f"Source file {old_path} does not exist, but proceeding due to --skip-validation"
+                    )
+                else:
+                    logger.error(f"Source file does not exist: {old_path}")
+                    success = False
+                    continue
 
-        # Refactor imports
-        if not rope_refactor_imports(str(project_path), new_path, dry_run):
-            success = False
+            # Move the file with git
+            if not git_mv(old_path_obj, new_path_obj, dry_run):
+                success = False
+                continue
+
+            # Update import paths across the codebase using Rope
+            status.update(f"[bold blue]Updating imports: {old_path} → {new_path}")
+            if not update_import_paths(
+                project_path, old_path_obj, new_path_obj, dry_run
+            ):
+                logger.warning(
+                    f"Failed to update import paths for {old_path} -> {new_path}"
+                )
+                success = False
+                continue
 
     # Final verification with Ruff
-    if not run_ruff(str(project_path), dry_run):
-        logger.warning("Ruff check found issues after refactoring")
+    with console.status("[bold yellow]Verifying imports with Ruff..."):
+        if not run_ruff(project_path, dry_run):
+            logger.warning("Ruff check found issues after refactoring")
 
-        # Try to auto-fix import issues if enabled
-        if auto_fix_imports and not dry_run:
-            logger.info("Attempting to auto-fix import issues with Ruff...")
-            if fix_ruff_issues(str(project_path), dry_run):
-                logger.info("Auto-fix applied, running final verification")
-                if run_ruff(str(project_path), dry_run):
-                    logger.info("All issues fixed automatically!")
+            # Try to auto-fix import issues if enabled
+            if auto_fix_imports and not dry_run:
+                logger.info("Attempting to auto-fix import issues with Ruff...")
+                if fix_ruff_issues(project_path, dry_run):
+                    logger.info("Auto-fix applied, running final verification")
+                    if run_ruff(project_path, dry_run):
+                        logger.info("All issues fixed automatically!")
+                    else:
+                        logger.error(
+                            "Some issues remain after auto-fix. Manual intervention required."
+                        )
+                        success = False
                 else:
-                    logger.error(
-                        "Some issues remain after auto-fix. Manual intervention required."
-                    )
+                    logger.error("Auto-fix failed. Manual intervention required.")
                     success = False
             else:
-                logger.error("Auto-fix failed. Manual intervention required.")
+                if auto_fix_imports and dry_run:
+                    logger.info(
+                        "[DRY-RUN] Would attempt to auto-fix import issues with Ruff"
+                    )
+                else:
+                    logger.warning(
+                        "Use --auto-fix flag to attempt automatic fix of import issues"
+                    )
                 success = False
-        else:
-            if auto_fix_imports and dry_run:
-                logger.info(
-                    "[DRY-RUN] Would attempt to auto-fix import issues with Ruff"
-                )
-            else:
-                logger.warning(
-                    "Use --auto-fix flag to attempt automatic fix of import issues"
-                )
-            success = False
 
     if success:
-        logger.info("All operations completed successfully.")
+        console.print("[bold green]✓ All operations completed successfully.")
         return 0
     else:
-        logger.error("Some operations failed. Check the log for details.")
+        console.print("[bold red]✗ Some operations failed. Check the log for details.")
         return 1
 
 
-@app.command()
+@app.command(name="check")
 def check_ruff(
     project: str = typer.Option(
         ".", "--project", "-p", help="Root of your Python project"
@@ -522,13 +471,16 @@ def check_ruff(
 
     logger.debug(f"Arguments: project={project}, dry_run={dry_run}")
 
-    success = run_ruff(str(Path(project)), dry_run)
+    project_path = Path(project).resolve()
+
+    with console.status("[bold yellow]Checking code with Ruff..."):
+        success = run_ruff(project_path, dry_run)
 
     if success:
-        logger.info("Ruff check completed successfully.")
+        console.print("[bold green]✓ Ruff check completed successfully.")
         return 0
     else:
-        logger.error("Ruff check failed. Check the log for details.")
+        console.print("[bold red]✗ Ruff check failed. Check the log for details.")
         return 1
 
 

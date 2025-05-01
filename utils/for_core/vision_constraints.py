@@ -6,43 +6,44 @@ Vision API, leveraging centralized definitions from the utils modules for common
 functionality to maintain DRY principles.
 """
 
+import logging
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import (
-    TypeVar,
-    NewType,
+    Dict,
     Final,
     NamedTuple,
-    Dict,
+    NewType,
     Optional,
+    TypeVar,
 )
-from datetime import datetime, timedelta, timezone
-import pandas as pd
-from pathlib import Path
-import logging
 
-import pyarrow as pa
 import httpx
+import pandas as pd
+import pyarrow as pa
 
-# Import centralized validation utilities
-from utils.validation import DataValidation, DataFrameValidator
 from utils.cache_validator import CacheKeyManager
-from utils.time_utils import (
-    enforce_utc_timezone,
-    TimestampUnit,
-    MILLISECOND_DIGITS,
-    MICROSECOND_DIGITS,
-    detect_timestamp_unit,
-    validate_timestamp_unit,
-)
 from utils.config import (
     CANONICAL_INDEX_NAME,
+    CONSOLIDATION_DELAY,
     DEFAULT_TIMEZONE,
     ERROR_TYPES,
-    CONSOLIDATION_DELAY,
-    FileType,
-    VISION_DATA_DELAY_HOURS,
     FILE_EXTENSIONS,
+    VISION_DATA_DELAY_HOURS,
+    FileType,
 )
 from utils.market_constraints import MarketType, get_market_symbol_format
+from utils.time_utils import (
+    MICROSECOND_DIGITS,
+    MILLISECOND_DIGITS,
+    TimestampUnit,
+    detect_timestamp_unit,
+    enforce_utc_timezone,
+    validate_timestamp_unit,
+)
+
+# Import centralized validation utilities
+from utils.validation import DataFrameValidator, DataValidation
 
 # Type definitions for semantic clarity and safety
 TimeseriesIndex = NewType("TimeseriesIndex", pd.DatetimeIndex)

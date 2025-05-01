@@ -7,18 +7,18 @@ fetching historical data from a specified end time, similar to the CLI usage:
     ./examples/sync/dsm_demo_cli.py -s BTCUSDT -et 2025-04-14T15:59:59 -i 1m -d 10 -l E
 """
 
+import pandas as pd
 import pendulum
 from rich import print
-from utils.logger_setup import logger, configure_session_logging
-import pandas as pd
 
 from core.sync.dsm_lib import (
-    setup_environment,
-    process_market_parameters,
     fetch_market_data,
+    process_market_parameters,
+    setup_environment,
 )
 from utils.deprecation_rules import Interval as DeprecationInterval
 from utils.for_demo.dsm_display_utils import display_results
+from utils.logger_setup import configure_session_logging, logger
 
 
 def showcase_backward_retrieval(

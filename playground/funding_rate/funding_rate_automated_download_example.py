@@ -1,21 +1,20 @@
 #!/usr/bin/env python
 """Example demonstrating automated funding rate history download from Binance API."""
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add project root to path for imports
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from utils.logger_setup import logger
-
 # Import functions from automated downloader
 from scripts.funding_rate_downloader.automate_funding_rate_download import (
-    process_all_symbols,
     parse_arguments,
+    process_all_symbols,
 )
+from utils.logger_setup import logger
 
 
 def run_automated_download_example():

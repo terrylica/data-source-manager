@@ -13,20 +13,20 @@ Usage:
     python scripts/arrow_cache/cache_builder_sync.py --symbols BTCUSDT,ETHUSDT --intervals 1m,5m --start-date 2024-01-01
 """
 
-import sys
-import csv
-import time
-import signal
 import argparse
+import csv
+import hashlib
+import io
+import json
+import signal
+import sqlite3
+import sys
+import time
 import urllib.request
 import zipfile
-import json
-import io
-import hashlib
-import sqlite3
-from pathlib import Path
-from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pyarrow as pa

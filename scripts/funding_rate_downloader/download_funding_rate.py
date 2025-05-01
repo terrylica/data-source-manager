@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
-from utils.logger_setup import logger
-import pandas as pd
-import httpx
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import httpx
+import pandas as pd
+
+from utils.logger_setup import logger
 
 # No need to initialize logger with get_logger anymore
 

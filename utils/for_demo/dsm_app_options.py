@@ -5,20 +5,21 @@ Application options for DSM Demo CLI applications.
 This module contains Typer app options and argument definitions for DSM Demo CLI tools.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 import typer
 
 from utils.for_demo.dsm_cli_utils import (
+    ChartTypeChoice,
     DataProviderChoice,
     DataSourceChoice,
-    MarketTypeChoice,
-    ChartTypeChoice,
     LogLevel,
+    MarketTypeChoice,
 )
 from utils.for_demo.dsm_help_content import (
     APP_HELP,
-    COMMAND_HELP_TEXT,
     CLI_OPTIONS,
+    COMMAND_HELP_TEXT,
 )
 
 

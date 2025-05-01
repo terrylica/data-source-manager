@@ -6,17 +6,19 @@ This script tests making direct API calls to Binance to fetch the most recent
 data points without specifying time ranges.
 """
 
-import asyncio
-import time
-import httpx
-from rich.console import Console
-from utils.logger_setup import logger
-from rich import print
-import pandas as pd
-from datetime import datetime
-import json
-from pathlib import Path
 import argparse
+import asyncio
+import json
+import time
+from datetime import datetime
+from pathlib import Path
+
+import httpx
+import pandas as pd
+from rich import print
+from rich.console import Console
+
+from utils.logger_setup import logger
 
 # Configure logging
 logger.setup_root(level="INFO", show_filename=True)

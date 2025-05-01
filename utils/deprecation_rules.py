@@ -35,10 +35,13 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import ClassVar
 from functools import lru_cache
+from typing import ClassVar
+
 import pandas as pd
+
 from utils.logger_setup import logger
+
 from .market_constraints import Interval as MarketInterval
 
 

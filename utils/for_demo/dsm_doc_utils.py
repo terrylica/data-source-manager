@@ -6,23 +6,24 @@ This module contains functions to generate Markdown documentation from Typer hel
 using the official typer-cli tool for optimal GitHub-friendly output.
 """
 
-from pathlib import Path
-import typer
+import re
 import subprocess
 import sys
-import re
+from pathlib import Path
+
+import typer
 from rich.console import Console
 from rich.markdown import Markdown
 
-from utils.logger_setup import logger
 from utils.for_demo.dsm_help_content import (
-    SAMPLE_COMMANDS,
-    FCP_NAME,
-    DATA_SOURCES,
-    APP_TITLE,
     APP_BEHAVIOR,
+    APP_TITLE,
+    DATA_SOURCES,
+    FCP_NAME,
     RETRIEVES_DATA,
+    SAMPLE_COMMANDS,
 )
+from utils.logger_setup import logger
 
 
 def generate_markdown_docs_with_typer_cli(
@@ -338,6 +339,7 @@ def verify_and_install_typer_cli() -> bool:
     import shutil
     import subprocess
     import sys
+
     from utils.logger_setup import logger
 
     typer_cli_available = shutil.which("typer") is not None

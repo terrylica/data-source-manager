@@ -8,30 +8,30 @@ and tests whether the extraction function correctly handles them.
 """
 
 import argparse
-import tempfile
-from pathlib import Path
 import hashlib
 import random
 import string
 import sys
-from typing import List, Tuple, Dict, Any, Optional
+import tempfile
 import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
+from rich import print as rprint
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import (
-    Progress,
-    TextColumn,
     BarColumn,
     DownloadColumn,
+    Progress,
+    TextColumn,
     TimeRemainingColumn,
 )
 from rich.table import Table
-from rich.panel import Panel
-from rich import print as rprint
 
-from utils.logger_setup import logger
 from utils.for_core.vision_checksum import extract_checksum_from_file
+from utils.logger_setup import logger
 
 
 def setup_argparse() -> argparse.ArgumentParser:

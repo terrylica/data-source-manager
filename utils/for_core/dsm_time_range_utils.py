@@ -3,13 +3,14 @@
 
 from datetime import datetime, timedelta
 from typing import List, Tuple
+
 import pandas as pd
 
+from utils.config import REST_IS_STANDARD
+from utils.dataframe_utils import ensure_open_time_as_column, standardize_dataframe
 from utils.logger_setup import logger
 from utils.market_constraints import Interval
 from utils.time_utils import standardize_timestamp_precision
-from utils.dataframe_utils import ensure_open_time_as_column, standardize_dataframe
-from utils.config import REST_IS_STANDARD
 
 
 def merge_adjacent_ranges(

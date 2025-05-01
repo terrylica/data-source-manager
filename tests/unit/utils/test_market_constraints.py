@@ -2,6 +2,7 @@
 """Unit tests for market constraints utilities."""
 
 import pytest
+
 from utils.market_constraints import (
     MarketType,
     validate_symbol_for_market_type,

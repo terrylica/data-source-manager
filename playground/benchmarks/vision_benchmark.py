@@ -5,36 +5,36 @@ This script measures the download performance of the VisionDataClient
 with the optimized settings and compares it with baseline metrics.
 """
 
-import time
-import concurrent.futures
 import argparse
-import threading
-import os
-import tempfile
-import zipfile
-import json
-import subprocess
 import asyncio
+import concurrent.futures
+import json
+import os
+import subprocess
+import tempfile
+import threading
+import time
+import zipfile
 from datetime import datetime, timedelta
-from pathlib import Path
 from enum import Enum, auto
+from pathlib import Path
 
-import httpx
-import pandas as pd
 import aioboto3
-import nest_asyncio
-from aiobotocore.config import AioConfig
-import botocore
 import boto3  # Add official boto3
+import botocore
+import httpx
+import nest_asyncio
+import pandas as pd
+from aiobotocore.config import AioConfig
+from rich import print
 
-from core.sync.vision_data_client import VisionDataClient
 from core.sync.vision_constraints import (
     detect_timestamp_unit,
 )
-from utils.time_utils import enforce_utc_timezone
-from utils.logger_setup import logger
-from rich import print
+from core.sync.vision_data_client import VisionDataClient
 from utils.config import KLINE_COLUMNS
+from utils.logger_setup import logger
+from utils.time_utils import enforce_utc_timezone
 
 
 class DownloadMethod(Enum):
@@ -889,8 +889,8 @@ def run_single_download(args):
     try:
         if download_method == DownloadMethod.VISION_CLIENT:
             # First use a debug client to see what dates it's using
-            from core.sync.vision_constraints import get_vision_url as client_get_url
             from core.sync.vision_constraints import FileType
+            from core.sync.vision_constraints import get_vision_url as client_get_url
 
             # Force logs from the VisionDataClient
             old_level = logger.level

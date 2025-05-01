@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-import httpx
 import time
 from datetime import datetime, timedelta
+
+import httpx
+from rich import print
 from rich.console import Console
 from rich.table import Table
-from rich import print
+
 from utils.logger_setup import logger
 
 # Set logger level to WARNING to reduce verbosity

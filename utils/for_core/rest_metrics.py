@@ -5,11 +5,11 @@ This module provides functionality for monitoring and tracking metrics related t
 REST API requests, such as response times, success rates, and rate limiting.
 """
 
-import time
-from datetime import datetime
-from typing import Dict, Any, Optional
 import threading
+import time
 from collections import defaultdict, deque
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from utils.logger_setup import logger
 

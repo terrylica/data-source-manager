@@ -4,16 +4,16 @@ Test script to verify that REST API enforcement works correctly in the DataSourc
 This script enforces the use of REST API and verifies that the resulting data has the correct source tag.
 """
 
-from datetime import datetime, timezone, timedelta
 import sys
+from datetime import datetime, timedelta, timezone
 
-from utils.logger_setup import logger
 from rich import print
 from rich.panel import Panel
 from rich.table import Table
 
-from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
-from core.sync.data_source_manager import DataSourceManager, DataSource
+from core.sync.data_source_manager import DataSource, DataSourceManager
+from utils.logger_setup import logger
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 # Set log level to DEBUG to see detailed logging
 logger.setLevel("DEBUG")

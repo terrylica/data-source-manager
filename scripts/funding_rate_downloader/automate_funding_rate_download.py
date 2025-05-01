@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
-from utils.logger_setup import logger
-import pandas as pd
-from pathlib import Path
-from datetime import datetime
 import argparse
 import time
-from typing import List, Dict, Any, Optional
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import httpx
+import pandas as pd
+
+from utils.logger_setup import logger
 
 DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
 DEFAULT_INTERVAL_MINUTES = 60  # Default to download every hour

@@ -2,15 +2,16 @@
 """Integration tests for DataSourceManager cache optimization."""
 
 import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
 import pendulum
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
-from utils.config import FEATURE_FLAGS
 from core.sync.data_source_manager import DataSourceManager
+from utils.config import FEATURE_FLAGS
 from utils.for_core.dsm_cache_utils import get_from_cache
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 class TestDsmCacheUtils(unittest.TestCase):

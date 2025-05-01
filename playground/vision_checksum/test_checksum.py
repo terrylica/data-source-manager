@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-import httpx
-import tempfile
-import os
 import argparse
-import re
 import hashlib
+import os
+import re
+import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
+
+import httpx
 from rich.console import Console
-from rich.table import Table
 from rich.progress import Progress
+from rich.table import Table
 
 from utils.for_core.vision_checksum import extract_checksum_from_file
 from utils.validation import DataValidation

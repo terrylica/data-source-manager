@@ -6,17 +6,24 @@ This module provides functions to fetch data using the Failover Control Protocol
 mechanism, which automatically selects the appropriate data source based on availability.
 """
 
-import pandas as pd
 import time
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.panel import Panel
+
+import pandas as pd
 import pendulum
 from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from core.sync.data_source_manager import DataSource, DataSourceManager
 from utils.logger_setup import logger
-from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
-from utils.market_constraints import is_interval_supported, get_market_capabilities
-from core.sync.data_source_manager import DataSourceManager, DataSource
+from utils.market_constraints import (
+    ChartType,
+    DataProvider,
+    Interval,
+    MarketType,
+    get_market_capabilities,
+    is_interval_supported,
+)
 from utils_for_debug.data_integrity import analyze_data_integrity
 from utils_for_debug.dataframe_output import (
     log_dataframe_info,

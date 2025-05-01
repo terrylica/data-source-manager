@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 """Example of fetching funding rate data using the unified data source manager."""
 
-import pandas as pd
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from utils.logger_setup import logger
-from utils.market_constraints import MarketType, ChartType, Interval, DataProvider
+import pandas as pd
+
 from core.sync.data_source_manager import DataSourceManager
+from utils.logger_setup import logger
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 def fetch_funding_rates():

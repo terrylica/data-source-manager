@@ -12,17 +12,17 @@ The module combines functionality previously scattered across time_alignment.py 
 api_boundary_validator.py to ensure consistent behavior throughout the application.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple, List, Union, Literal
 import re
+from datetime import datetime, timedelta, timezone
+from typing import List, Literal, Optional, Tuple, Union
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from utils.market_constraints import Interval as MarketInterval
+from utils.config import CANONICAL_CLOSE_TIME, CANONICAL_INDEX_NAME, TIMESTAMP_PRECISION
 from utils.deprecation_rules import TimeUnit
 from utils.logger_setup import logger
-from utils.config import TIMESTAMP_PRECISION, CANONICAL_INDEX_NAME, CANONICAL_CLOSE_TIME
+from utils.market_constraints import Interval as MarketInterval
 
 # Re-export the get_interval_micros function at the module level for direct import
 __all__ = [

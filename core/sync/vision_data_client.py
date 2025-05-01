@@ -16,30 +16,26 @@ For most use cases, users should interact with the DataSourceManager rather than
 directly with this client.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional, TypeVar, Generic, Union, List, Dict, Tuple
 import tempfile
 import zipfile
-import httpx
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
+
+import httpx
 import pandas as pd
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_incrementing,
-    retry_if_exception_type,
 )
 
-from utils.logger_setup import logger
-from utils.market_constraints import (
-    MarketType,
-    Interval,
-    DataProvider,
-    ChartType,
-    get_market_capabilities,
+from core.sync.data_client_interface import DataClientInterface
+from core.sync.vision_path_mapper import (
+    FSSpecVisionHandler,
 )
-from utils.time_utils import filter_dataframe_by_time
 from utils.config import (
     KLINE_COLUMNS,
     MAXIMUM_CONCURRENT_DOWNLOADS,
@@ -47,22 +43,27 @@ from utils.config import (
     FileType,
 )
 from utils.dataframe_types import TimestampedDataFrame
+from utils.dataframe_utils import ensure_open_time_as_column
 from utils.for_core.vision_constraints import (
     get_vision_url,
     is_date_too_fresh_for_vision,
 )
-from utils.gap_detector import detect_gaps
-from utils.dataframe_utils import ensure_open_time_as_column
-from core.sync.data_client_interface import DataClientInterface
-from utils.validation import DataFrameValidator
-from utils.for_core.vision_timestamp import parse_interval, process_timestamp_columns
 from utils.for_core.vision_file_utils import (
     fill_boundary_gaps_with_rest,
     find_day_boundary_gaps,
 )
-from core.sync.vision_path_mapper import (
-    FSSpecVisionHandler,
+from utils.for_core.vision_timestamp import parse_interval, process_timestamp_columns
+from utils.gap_detector import detect_gaps
+from utils.logger_setup import logger
+from utils.market_constraints import (
+    ChartType,
+    DataProvider,
+    Interval,
+    MarketType,
+    get_market_capabilities,
 )
+from utils.time_utils import filter_dataframe_by_time
+from utils.validation import DataFrameValidator
 
 # Define the type variable for VisionDataClient
 T = TypeVar("T")
@@ -388,10 +389,11 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                 if checksum_file_size >= 10:
                     # Verify checksum if available
                     try:
+                        import time
+
                         from utils.for_core.vision_checksum import (
                             calculate_sha256_direct,
                         )
-                        import time
 
                         # Small delay to ensure filesystem sync
                         time.sleep(0.1)

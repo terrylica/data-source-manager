@@ -6,11 +6,12 @@ scattered across multiple files, creating a single source of truth for system-wi
 """
 
 import os
-from pathlib import Path
 from datetime import timedelta, timezone
-from typing import Dict, Final, Any, List
-import pandas as pd
 from enum import Enum, auto
+from pathlib import Path
+from typing import Any, Dict, Final, List
+
+import pandas as pd
 
 # Time-related constants
 DEFAULT_TIMEZONE: Final = timezone.utc
@@ -256,8 +257,8 @@ def create_empty_dataframe(chart_type=None) -> pd.DataFrame:
     Returns:
         An empty DataFrame with correct column types and index
     """
-    from utils.market_constraints import ChartType
     from utils.logger_setup import logger
+    from utils.market_constraints import ChartType
 
     # Determine chart type
     if isinstance(chart_type, str):

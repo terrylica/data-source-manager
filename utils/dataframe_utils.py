@@ -10,18 +10,18 @@ across the codebase, particularly for:
 4. Ensuring proper index configuration
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
 import pandas as pd
 
-from utils.logger_setup import logger
 from utils.config import (
     CANONICAL_INDEX_NAME,
-    OUTPUT_DTYPES,
-    FUNDING_RATE_DTYPES,
     DEFAULT_COLUMN_ORDER,
+    FUNDING_RATE_DTYPES,
+    OUTPUT_DTYPES,
 )
+from utils.logger_setup import logger
 
 
 def ensure_open_time_as_column(df: pd.DataFrame) -> pd.DataFrame:

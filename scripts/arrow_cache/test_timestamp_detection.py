@@ -9,11 +9,12 @@ Usage:
     python scripts/arrow_cache/test_timestamp_detection.py
 """
 
-from rich import print
+import os
+import tempfile
+
 import pandas as pd
 import pyarrow as pa
-import tempfile
-import os
+from rich import print
 
 # Constants for timestamp detection
 MILLISECOND_DIGITS = 13

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
+from rich import print
+from rich.console import Console
+from rich.table import Table
+
 from utils.market_constraints import (
+    ChartType,
     DataProvider,
     MarketType,
+    get_endpoint_url,
     get_market_symbol_format,
     validate_symbol_for_market_type,
-    get_endpoint_url,
-    ChartType,
 )
-from rich import print
-from rich.table import Table
-from rich.console import Console
 
 
 def test_okx_symbol_formatting():

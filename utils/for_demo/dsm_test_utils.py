@@ -9,17 +9,17 @@ with multiple data sources and segment testing.
 import time
 from pathlib import Path
 from time import perf_counter
-from rich import print
-from rich.panel import Panel
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 import pendulum
-from utils.market_constraints import MarketType, Interval, DataProvider, ChartType
-from core.sync.data_source_manager import DataSourceManager, DataSource
+from rich import print
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
-from utils.for_demo.dsm_datetime_parser import calculate_date_range
+from core.sync.data_source_manager import DataSource, DataSourceManager
 from utils.for_demo.dsm_cache_utils import ensure_cache_directory
+from utils.for_demo.dsm_datetime_parser import calculate_date_range
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 from utils_for_debug.dataframe_output import (
     format_dataframe_for_display,
     save_dataframe_to_csv,

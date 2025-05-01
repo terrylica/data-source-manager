@@ -8,20 +8,21 @@ data boundaries for given time ranges, ensuring alignment with real API response
 """
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Dict, Tuple, List, Any
 import random
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
 from utils.logger_setup import logger
-from utils.market_constraints import MarketType, Interval, ChartType, get_endpoint_url
+from utils.market_constraints import ChartType, Interval, MarketType, get_endpoint_url
+from utils.network_utils import create_client, safely_close_client
 from utils.time_utils import (
-    enforce_utc_timezone,
     align_time_boundaries as time_utils_align_time_boundaries,
 )
-from utils.network_utils import create_client, safely_close_client
-
+from utils.time_utils import (
+    enforce_utc_timezone,
+)
 
 # Constants for API interaction
 MAX_RETRIES = 3
@@ -678,6 +679,7 @@ class ApiBoundaryValidator:
         """
         # Implementation similar to async _call_api but using synchronous HTTP client methods
         import time
+
         import requests
 
         # Format timestamps for API request (in milliseconds)

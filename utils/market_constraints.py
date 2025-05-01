@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
+import re
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Optional
-import re
 
 from utils.logger_setup import logger
 

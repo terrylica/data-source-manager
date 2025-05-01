@@ -6,26 +6,27 @@ independent of any CLI or presentation logic.
 """
 
 from pathlib import Path
-from typing import Optional, Any, Tuple
 from time import perf_counter
+from typing import Any, Optional, Tuple
+
+from core.sync.data_source_manager import DataSource
+
+# Import utility modules
+from utils.for_demo.dsm_cache_utils import clear_cache_directory, verify_project_root
+from utils.for_demo.dsm_data_fetcher import fetch_data_with_fcp
+from utils.for_demo.dsm_validation_utils import calculate_date_range, validate_interval
 
 # Import the logger
 from utils.logger_setup import logger
 
 # Import core types and constraints
 from utils.market_constraints import (
-    DataProvider,
-    MarketType,
     ChartType,
+    DataProvider,
     Interval,
+    MarketType,
     get_default_symbol,
 )
-
-# Import utility modules
-from utils.for_demo.dsm_cache_utils import clear_cache_directory, verify_project_root
-from utils.for_demo.dsm_data_fetcher import fetch_data_with_fcp
-from utils.for_demo.dsm_validation_utils import validate_interval, calculate_date_range
-from core.sync.data_source_manager import DataSource
 
 # Default cache directory
 CACHE_DIR = Path("./cache")

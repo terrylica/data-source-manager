@@ -8,8 +8,10 @@ for the Failover Control Protocol (FCP) demonstrations.
 
 import shutil
 from pathlib import Path
-from utils.logger_setup import logger
+
 from rich import print
+
+from utils.logger_setup import logger
 
 # Default cache directory
 DEFAULT_CACHE_DIR = Path("./cache")

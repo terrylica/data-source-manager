@@ -4,8 +4,9 @@ Progress display utilities for the Failover Control Protocol (FCP) mechanism.
 """
 
 import time
-from utils.logger_setup import logger
 from typing import Callable, TypeVar
+
+from utils.logger_setup import logger
 
 T = TypeVar("T")
 

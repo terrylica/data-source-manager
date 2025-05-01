@@ -6,8 +6,9 @@ the data services. These types are designed to enforce specific constraints
 and behaviors for consistent data handling.
 """
 
-import pandas as pd
 import traceback
+
+import pandas as pd
 
 from utils.config import CANONICAL_INDEX_NAME
 from utils.logger_setup import logger

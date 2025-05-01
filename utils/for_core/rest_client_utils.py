@@ -7,30 +7,31 @@ This module provides common utilities for REST API client operations including:
 3. Standardized error handling
 """
 
-from typing import Dict, Any, List, Tuple
+import json
+from datetime import datetime
+from typing import Any, Dict, List, Tuple
+
+import requests
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_incrementing,
-    retry_if_exception_type,
 )
-import requests
-from datetime import datetime
-import json
 
-from utils.logger_setup import logger
 from utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS
-from utils.market_constraints import Interval
 from utils.for_core.rest_exceptions import (
-    RestAPIError,
-    RateLimitError,
-    HTTPError,
     APIError,
-    NetworkError,
-    TimeoutError,
+    HTTPError,
     JSONDecodeError,
+    NetworkError,
+    RateLimitError,
+    RestAPIError,
+    TimeoutError,
 )
-from utils.for_core.rest_metrics import track_api_call, metrics_tracker
+from utils.for_core.rest_metrics import metrics_tracker, track_api_call
+from utils.logger_setup import logger
+from utils.market_constraints import Interval
 
 
 def create_optimized_client() -> requests.Session:

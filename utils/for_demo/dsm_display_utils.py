@@ -3,11 +3,13 @@
 Display utilities for the Failover Control Protocol (FCP) mechanism.
 """
 
-import pendulum
 from pathlib import Path
-from utils.logger_setup import logger
+
+import pendulum
 from rich import print
 from rich.table import Table
+
+from utils.logger_setup import logger
 from utils_for_debug.dataframe_output import (
     format_dataframe_for_display,
 )

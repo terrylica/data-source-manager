@@ -1,31 +1,33 @@
 #!/usr/bin/env python3
-import sys
-from pathlib import Path
-import time
-import tempfile
-import zipfile
+import gc
+import hashlib
+import json
+import math
 import os
+import platform
+import resource
+import statistics
+import sys
+import tempfile
+import time
+import zipfile
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import fsspec
 import httpx
 import pandas as pd
-import fsspec
+import psutil
+import typer
 from rich.console import Console
 from rich.table import Table
-import typer
-from typing import Optional, List, Dict, Any, Tuple
-import json
-import statistics
-import gc
-import platform
-import psutil
-import resource
-import math
-import hashlib
 
 # Ensure parent directory is in path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from utils.logger_setup import logger
 from rich import print
+
+from utils.logger_setup import logger
 
 app = typer.Typer(
     help="Benchmark ZIP file handling methods for Binance Vision API data"

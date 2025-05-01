@@ -6,20 +6,21 @@ This module provides common CLI setup and display functions for DSM Demo scripts
 """
 
 from enum import Enum
+from pathlib import Path
+
+import rich.box as box
 from rich import print
 from rich.panel import Panel
 from rich.table import Table
-import rich.box as box
-from pathlib import Path
 
-from utils.logger_setup import logger
-from utils.market_constraints import (
-    get_market_symbol_format,
-    validate_symbol_for_market_type,
-    MarketType,
-)
 from core.sync.data_source_manager import DataSource
 from utils.for_demo.dsm_help_content import INTRO_PANEL_TEXT, RICH_OUTPUT_HELP_TEXT
+from utils.logger_setup import logger
+from utils.market_constraints import (
+    MarketType,
+    get_market_symbol_format,
+    validate_symbol_for_market_type,
+)
 
 
 class MarketTypeChoice(str, Enum):

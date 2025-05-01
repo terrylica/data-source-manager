@@ -7,10 +7,11 @@ to adjust concurrency parameters for optimal data retrieval.
 
 import os
 import time
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
 import psutil
 import requests
-from dataclasses import dataclass
-from typing import Optional, Dict, Any
 
 from utils.logger_setup import logger
 

@@ -6,8 +6,9 @@ This module provides functions for processing timestamp columns from Binance Vis
 ensuring proper conversion and preservation of semantic meaning.
 """
 
-import pandas as pd
 import re
+
+import pandas as pd
 
 from utils.logger_setup import logger
 from utils.market_constraints import Interval

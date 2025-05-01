@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
-import httpx
-from datetime import datetime
-import time
 import json
+import time
+from datetime import datetime
+
+import httpx
+from rich import print
 from rich.console import Console
 from rich.table import Table
-from rich import print
+
 from utils.logger_setup import logger
 
 # API constants

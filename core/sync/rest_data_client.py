@@ -3,50 +3,51 @@
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 import pandas as pd
 
-from utils.logger_setup import logger
-from utils.time_utils import (
-    datetime_to_milliseconds,
-    milliseconds_to_datetime,
-    filter_dataframe_by_time,
-    align_time_boundaries,
-)
-from utils.market_constraints import (
-    Interval,
-    MarketType,
-    ChartType,
-    DataProvider,
-)
-from utils.validation import DataFrameValidator
+from core.sync.data_client_interface import DataClientInterface
 from utils.config import (
-    REST_MAX_CHUNKS,
     DEFAULT_HTTP_TIMEOUT_SECONDS,
+    REST_MAX_CHUNKS,
 )
 from utils.for_core.rest_client_utils import (
+    calculate_chunks,
     create_optimized_client,
     fetch_chunk,
-    calculate_chunks,
-    validate_request_params,
     get_interval_ms,
-    parse_interval_string,
     log_rest_metrics,
+    parse_interval_string,
+    validate_request_params,
 )
 from utils.for_core.rest_data_processing import (
-    process_kline_data,
-    create_empty_dataframe,
     REST_OUTPUT_COLUMNS,
+    create_empty_dataframe,
+    process_kline_data,
 )
 from utils.for_core.rest_exceptions import (
-    RestAPIError,
-    RateLimitError,
-    HTTPError,
     APIError,
-    NetworkError,
-    TimeoutError,
+    HTTPError,
     JSONDecodeError,
+    NetworkError,
+    RateLimitError,
+    RestAPIError,
+    TimeoutError,
 )
-from core.sync.data_client_interface import DataClientInterface
+from utils.logger_setup import logger
+from utils.market_constraints import (
+    ChartType,
+    DataProvider,
+    Interval,
+    MarketType,
+)
+from utils.time_utils import (
+    align_time_boundaries,
+    datetime_to_milliseconds,
+    filter_dataframe_by_time,
+    milliseconds_to_datetime,
+)
+from utils.validation import DataFrameValidator
 
 # Define the column names as a constant since they aren't in config.py
 OUTPUT_COLUMNS = REST_OUTPUT_COLUMNS

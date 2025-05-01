@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-import typer
-from typing import List
 import json
-from rich import print as rprint  # Using rich for formatted output
-from utils.logger_setup import logger  # For logging
-import httpx
-from pathlib import Path
 import sys  # For any additional path handling if needed
+from pathlib import Path
+from typing import List
+
+import httpx
+import typer
+from rich import print as rprint  # Using rich for formatted output
+
+from utils.logger_setup import logger  # For logging
 
 # Ensure we're in the correct directory, but rely on the script being run from there
 app = typer.Typer(

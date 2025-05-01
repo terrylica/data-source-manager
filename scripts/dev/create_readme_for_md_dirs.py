@@ -35,7 +35,9 @@ Features:
 """
 
 from pathlib import Path
+
 import typer
+
 from utils.logger_setup import logger
 
 app = typer.Typer()

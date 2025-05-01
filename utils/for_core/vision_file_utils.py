@@ -6,12 +6,13 @@ This module provides functions for downloading, processing, and handling files f
 the Binance Vision API, including boundary gap filling and related operations.
 """
 
-import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from utils.logger_setup import logger
+import pandas as pd
+
 from utils.gap_detector import Gap
+from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType
 
 

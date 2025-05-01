@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
-import fsspec
-from dataclasses import dataclass
-from typing import Dict, Tuple, Union
 import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Tuple, Union
+
+import fsspec
 import pendulum
 import typer
 from rich import print
+
 from utils.logger_setup import logger
-from utils.market_constraints import MarketType, ChartType
+from utils.market_constraints import ChartType, MarketType
 
 
 @dataclass

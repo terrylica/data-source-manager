@@ -7,11 +7,12 @@ This module provides common utilities for processing data from REST API response
 3. DataFrame creation and manipulation
 """
 
-import pandas as pd
 from typing import List
 
-from utils.logger_setup import logger
+import pandas as pd
+
 from utils.config import OUTPUT_DTYPES
+from utils.logger_setup import logger
 
 # Define the column names as a constant for REST API output
 REST_OUTPUT_COLUMNS = [

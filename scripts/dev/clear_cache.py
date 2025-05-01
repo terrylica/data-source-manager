@@ -4,15 +4,17 @@ Clear cache and log directories for testing the DSM Demo.
 Supports local and remote filesystems via fsspec.
 """
 
+import json
+import logging
+import sys
+from pathlib import Path
+from typing import List
+
 import fsspec
 import typer
-from pathlib import Path
-import json
-from typing import List
 from rich import print
-import sys
+
 from utils.logger_setup import logger
-import logging
 
 logger.setLevel(logging.DEBUG)
 

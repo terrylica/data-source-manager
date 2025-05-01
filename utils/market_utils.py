@@ -1,5 +1,6 @@
-from utils.market_constraints import MarketType
 from rich import print
+
+from utils.market_constraints import MarketType
 
 
 def get_market_type_str(market_type: MarketType) -> str:

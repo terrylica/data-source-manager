@@ -8,34 +8,33 @@ This module provides:
 4. API request helpers with retry logic and response handling
 """
 
+import json
+import platform
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import (
-    Dict,
     Any,
-    Optional,
+    Dict,
     List,
+    Optional,
     Tuple,
 )
-import json
-import platform
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# Import httpx for HTTP client implementation
+import httpx
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_incrementing,
-    retry_if_exception_type,
 )
 
 from utils.config import (
     DEFAULT_HTTP_TIMEOUT_SECONDS,
 )
 from utils.logger_setup import logger
-
-# Import httpx for HTTP client implementation
-import httpx
 
 # Define a generic Client type for HTTP clients
 Client = httpx.Client
@@ -745,8 +744,8 @@ class VisionDownloadManager:
                 return None
 
             # Process the zip file
-            import zipfile
             import csv
+            import zipfile
             from io import StringIO
 
             data = []

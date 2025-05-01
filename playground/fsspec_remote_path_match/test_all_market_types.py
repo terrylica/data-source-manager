@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
+from pathlib import Path
+from typing import Tuple
+
+import pendulum
 import typer
 from rich.console import Console
 from rich.table import Table
-import pendulum
-from typing import Tuple
-from pathlib import Path
+from vision_path_mapper import FSSpecVisionHandler, VisionPathMapper
 
 from utils.market_constraints import MarketType
-
-from vision_path_mapper import VisionPathMapper, FSSpecVisionHandler
-
 
 # Create a console for rich output
 console = Console()

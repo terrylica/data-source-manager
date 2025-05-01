@@ -50,15 +50,17 @@ Advanced Usage:
     enable_smart_print()
 """
 
-import logging, os
+import builtins
 import inspect
-from colorlog import ColoredFormatter
+import logging
+import os
+import sys
+import time
 import traceback
 from pathlib import Path
-import builtins
-import sys
+
 import pendulum
-import time
+from colorlog import ColoredFormatter
 
 try:
     from rich.console import Console
@@ -897,7 +899,7 @@ if __name__ == "__main__":
 
         try:
             1 / 0
-        except Exception as e:
+        except Exception:
             logger.exception("Exception with Rich traceback")
 
         # Switch back to colorlog

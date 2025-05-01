@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 
-import typer
-from rich.console import Console
-from rich.table import Table
-import pendulum
 from datetime import datetime
 from pathlib import Path
 
-from utils.logger_setup import logger
-from utils.market_constraints import MarketType, Interval, ChartType, DataProvider
 import pandas as pd
+import pendulum
+import typer
+from rich.console import Console
+from rich.table import Table
+from vision_path_mapper import FSSpecVisionHandler, VisionPathMapper
 
-from vision_path_mapper import VisionPathMapper, FSSpecVisionHandler
+from utils.logger_setup import logger
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 class DataSourceManagerExample:

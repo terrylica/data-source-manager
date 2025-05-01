@@ -3,18 +3,19 @@
 
 import sys
 from typing import Tuple
+
 import pendulum
 from rich.console import Console
 
-from utils.logger_setup import logger
-from utils.market_constraints import (
-    MarketType,
-    Interval,
-    is_interval_supported,
-    get_market_capabilities,
-)
 from core.sync.data_source_manager import DataSourceManager
 from utils.for_demo.dsm_datetime_parser import parse_datetime
+from utils.logger_setup import logger
+from utils.market_constraints import (
+    Interval,
+    MarketType,
+    get_market_capabilities,
+    is_interval_supported,
+)
 
 
 def validate_interval(market_type: MarketType, interval: Interval) -> None:

@@ -1,11 +1,12 @@
 """Unified cache manager for market data."""
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 import pandas as pd
-import time
 import pyarrow as pa
 import pyarrow.ipc
 

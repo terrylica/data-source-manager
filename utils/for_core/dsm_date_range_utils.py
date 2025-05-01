@@ -12,7 +12,8 @@ various scenarios including:
 """
 
 from datetime import datetime
-from typing import Tuple, Optional, Union
+from typing import Optional, Tuple, Union
+
 import pendulum
 from pendulum import DateTime
 
