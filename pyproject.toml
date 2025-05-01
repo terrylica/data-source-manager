@@ -53,9 +53,10 @@ dev = [
 [project.scripts]
 dsm-demo-cli = "examples.sync.dsm_demo_cli:app"
 dsm-demo-module = "examples.lib_module.dsm_demo_module:main"
+ruff-check = "scripts.dev.refactor_move:app"
 
 [tool.setuptools]
-packages = ["core", "utils", "examples", "utils_for_debug"]
+packages = ["core", "utils", "examples", "utils_for_debug", "scripts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -75,6 +76,8 @@ lint.fixable = ["ALL"]
 lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # Respect .gitignore
 respect-gitignore = true
+# Exclude directories from Ruff checks
+lint.exclude = ["playground/", "tests/", ".git/", "__pycache__/"]
 
 [tool.ruff.lint.isort]
 # Note: This cannot automatically inherit from project dependencies.
