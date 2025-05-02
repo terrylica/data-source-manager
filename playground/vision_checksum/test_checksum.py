@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
 
+from utils.config import HTTP_OK, TEXT_PREVIEW_LENGTH
 from utils.for_core.vision_checksum import extract_checksum_from_file
 from utils.validation import DataValidation
 
@@ -52,7 +53,7 @@ def download_file(url: str, output_path: Path) -> bool:
 
             with httpx.Client(timeout=30.0) as client:
                 with client.stream("GET", url) as response:
-                    if response.status_code != 200:
+                    if response.status_code != HTTP_OK:
                         console.print(
                             f"[red]Error downloading {url}: {response.status_code}"
                         )
@@ -165,10 +166,13 @@ def show_checksums_for_symbol(
                 try:
                     text_content = content.decode("utf-8", errors="replace")
                     text_preview = (
-                        text_content[:60] if len(text_content) > 60 else text_content
+                        text_content[:TEXT_PREVIEW_LENGTH]
+                        if len(text_content) > TEXT_PREVIEW_LENGTH
+                        else text_content
                     )
                     console.print(
-                        f"{text_preview}" + ("..." if len(text_content) > 60 else "")
+                        f"{text_preview}"
+                        + ("..." if len(text_content) > TEXT_PREVIEW_LENGTH else "")
                     )
                 except Exception as e:
                     console.print(f"[red]Error decoding content: {e}")

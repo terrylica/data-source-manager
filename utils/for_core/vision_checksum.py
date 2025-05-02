@@ -13,6 +13,7 @@ from typing import Dict, Optional, Tuple
 
 from rich import print as rprint
 
+from utils.config import SHA256_HASH_LENGTH
 from utils.logger_setup import logger
 
 
@@ -131,7 +132,10 @@ def extract_checksum_from_file(checksum_path: Path) -> Optional[str]:
 
         # Method 1: Common case - file contains a single line with hash and filename
         # Format: <sha256_hash>  <filename>
-        if " " in text_content and len(text_content.split(" ", 1)[0]) == 64:
+        if (
+            " " in text_content
+            and len(text_content.split(" ", 1)[0]) == SHA256_HASH_LENGTH
+        ):
             checksum = text_content.split(" ", 1)[0].strip()
             logger.debug(f"Extracted checksum from standard format: {checksum}")
             if is_valid_sha256(checksum):
@@ -148,7 +152,7 @@ def extract_checksum_from_file(checksum_path: Path) -> Optional[str]:
         # Method 3: Try finding all words and look for a 64-char hex string
         words = re.findall(r"\b\w+\b", text_content)
         for word in words:
-            if len(word) == 64 and is_valid_sha256(word):
+            if len(word) == SHA256_HASH_LENGTH and is_valid_sha256(word):
                 logger.debug(f"Extracted checksum from word list: {word}")
                 return word
 

@@ -601,9 +601,7 @@ class DataSourceManager:
             # STEP 1: Local Cache Retrieval
             # ----------------------------------------------------------------
             if (
-                self.use_cache
-                and enforce_source != DataSource.REST
-                and enforce_source != DataSource.VISION
+                self.use_cache and enforce_source not in (DataSource.REST, DataSource.VISION)
             ):
                 logger.info(f"[FCP] STEP 1: Checking local cache for {symbol}")
                 # Get data from cache

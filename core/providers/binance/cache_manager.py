@@ -10,6 +10,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.ipc
 
+from utils.config import MIN_CACHE_KEY_COMPONENTS
 from utils.logger_setup import logger
 
 
@@ -99,7 +100,7 @@ class UnifiedCacheManager:
                 # Log warning if JSON size is very large
                 if json_size > 10 * 1024 * 1024:  # 10MB
                     logger.warning(
-                        f"Metadata JSON is extremely large: {json_size / (1024*1024):.2f} MB"
+                        f"Metadata JSON is extremely large: {json_size / (1024 * 1024):.2f} MB"
                     )
             except Exception as json_err:
                 logger.error(f"JSON serialization failed: {json_err}")
@@ -208,7 +209,7 @@ class UnifiedCacheManager:
         # Format: PROVIDER_CHARTTYPE_MARKETTYPE_SYMBOL_INTERVAL_DATESTR
         try:
             components = cache_key.split("_")
-            if len(components) < 6:
+            if len(components) < MIN_CACHE_KEY_COMPONENTS:
                 raise ValueError(f"Invalid cache key format: {cache_key}")
 
             provider = components[0].lower()

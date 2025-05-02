@@ -167,6 +167,11 @@ DEFAULT_HTTP_TIMEOUT_SECONDS: Final[float] = (
     3.0  # Standardized timeout for all HTTP requests
 )
 
+# HTTP status codes
+HTTP_OK: Final = 200  # Standard HTTP OK status code
+HTTP_BAD_REQUEST: Final = 400  # HTTP Bad Request status code
+HTTP_NOT_FOUND: Final = 404  # HTTP Not Found status code
+
 # Chunk size constraints
 REST_CHUNK_SIZE: Final = 1000
 REST_MAX_CHUNKS: Final = 1000  # Increased from 5 to 1000 to effectively remove limit
@@ -359,3 +364,19 @@ MIN_CHECKSUM_SIZE: Final[int] = 10  # Minimum size in bytes for a valid checksum
 # Large request thresholds
 LARGE_REQUEST_DAYS: Final[int] = 90
 CONCURRENT_DOWNLOADS_LIMIT_1S: Final[int] = 10  # Limit for 1s interval downloads
+
+# Funding rate constraints
+MIN_FUNDING_RATE: Final = -0.1  # -10% funding rate lower bound
+MAX_FUNDING_RATE: Final = 0.1  # 10% funding rate upper bound
+
+# Cache key constraints
+MIN_CACHE_KEY_COMPONENTS: Final = 6  # Minimum number of components in a cache key
+
+# Text preview constants
+TEXT_PREVIEW_LENGTH: Final = 60  # Length for text previews in logs/console output
+
+# File system constants
+SMALL_FILE_SIZE: Final = 10000  # Size threshold for small files in bytes
+
+# Cryptographic constants
+SHA256_HASH_LENGTH: Final = 64  # Length of SHA-256 hash in hexadecimal format

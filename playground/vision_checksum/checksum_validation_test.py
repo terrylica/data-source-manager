@@ -18,6 +18,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from utils.config import HTTP_OK
 from utils.for_core.vision_checksum import verify_file_checksum
 from utils.for_core.vision_constraints import FileType, get_vision_url
 from utils.logger_setup import logger
@@ -78,7 +79,7 @@ async def download_file(url: str, output_path: Path) -> bool:
                 f'HTTP Request: GET {url} "{response.status_code} {response.reason_phrase}"'
             )
 
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 logger.warning(
                     f"Failed to download file: {response.status_code} {response.reason_phrase}"
                 )

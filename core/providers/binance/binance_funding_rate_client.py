@@ -12,6 +12,8 @@ from core.providers.binance.cache_manager import UnifiedCacheManager
 from core.providers.binance.data_client_interface import DataClientInterface
 from utils.config import (
     FUNDING_RATE_DTYPES,
+    MAX_FUNDING_RATE,
+    MIN_FUNDING_RATE,
     create_empty_funding_rate_dataframe,
 )
 from utils.logger_setup import logger
@@ -220,9 +222,9 @@ class BinanceFundingRateClient(DataClientInterface):
             if "funding_rate" in df.columns:
                 min_rate = df["funding_rate"].min()
                 max_rate = df["funding_rate"].max()
-                if min_rate < -0.1:
+                if min_rate < MIN_FUNDING_RATE:
                     logger.warning(f"Unusually low funding rate detected: {min_rate}")
-                if max_rate > 0.1:
+                if max_rate > MAX_FUNDING_RATE:
                     logger.warning(f"Unusually high funding rate detected: {max_rate}")
 
             return True, None
