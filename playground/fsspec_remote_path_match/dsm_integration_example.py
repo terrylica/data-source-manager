@@ -70,6 +70,9 @@ class DataSourceManagerExample:
             local_path = self.path_mapper.get_local_path(components)
             remote_url = self.path_mapper.get_remote_url(components)
 
+            # Log the path information for debugging
+            logger.debug(f"Local path: {local_path}, Remote URL: {remote_url}")
+
             # Try cache first, then remote
             if self.use_cache and self.fs_handler.exists(local_path):
                 logger.info(f"Cache hit for {current_date.format('YYYY-MM-DD')}")
