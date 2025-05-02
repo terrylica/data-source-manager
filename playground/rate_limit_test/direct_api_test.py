@@ -21,7 +21,7 @@ from rich.console import Console
 from utils.logger_setup import logger
 
 # Configure logging
-logger.setup_root(level="INFO", show_filename=True)
+logger.setup_root(level="INFO")
 console = Console()
 
 
@@ -251,7 +251,7 @@ async def run_test(symbols, duration=30, limit=1000):
         console.print(f"Initial weight: {initial_weight or 0}")
         console.print(f"Net weight increase: {net_weight}")
         console.print(
-            f"Weight per request: {net_weight/total_requests if total_requests > 0 else 0:.2f}"
+            f"Weight per request: {net_weight / total_requests if total_requests > 0 else 0:.2f}"
         )
         console.print(f"Total warnings: {stats['warnings']}")
 

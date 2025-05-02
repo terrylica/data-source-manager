@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Rate Limit Tester for Binance Data
 
@@ -28,8 +28,10 @@ from rich.progress import (
 
 # For API access
 from core.sync.data_source_manager import DataSourceManager
+from core.sync.rest_data_client import RestDataClient
 from utils.logger_setup import logger
 from utils.market_constraints import DataProvider, Interval, MarketType
+from utils.network_utils import create_httpx_client
 
 
 # Rate limit tracking
@@ -97,17 +99,25 @@ class RateLimitTester:
         self.total_requests = 0
         self.successful_requests = 0
         self.failed_requests = 0
+        self.http_client = None
 
         # Configure minimal logging
-        logger.setup_root(level="WARNING", show_filename=True)
+        logger.setup_root(level="WARNING")
 
     def setup(self):
-        """Set up the data source manager."""
+        """Set up the data source manager and REST client."""
         self.manager = DataSourceManager(
             market_type=MarketType.SPOT,
             provider=DataProvider.BINANCE,
             use_cache=False,
         )
+
+        # Create REST client directly
+        self.rest_client = RestDataClient(market_type=MarketType.SPOT, retry_count=3)
+
+        # Create httpx client
+        self.http_client = create_httpx_client(timeout=30.0)
+
         return self
 
     def fetch_data(self, symbol):
@@ -120,15 +130,6 @@ class RateLimitTester:
             Data frame with the fetched data
         """
         try:
-            # Direct approach: Get the most recent 1000 data points without specifying time range
-            # We'll call the REST client directly to bypass the DataSourceManager time validations
-            rest_client = self.manager._rest_client
-
-            # Ensure REST client is initialized
-            if not rest_client._client:
-                # Use synchronous HTTP client initialization
-                rest_client._client = rest_client._create_client()
-
             # Build parameters without start/end time
             params = {
                 "symbol": symbol,
@@ -136,11 +137,11 @@ class RateLimitTester:
                 "limit": 1000,
             }
 
-            # Call endpoint directly using synchronous requests
-            import requests
+            # Get endpoint URL
+            endpoint_url = self.rest_client._get_klines_endpoint()
 
-            endpoint_url = rest_client._get_klines_endpoint()
-            response = requests.get(endpoint_url, params=params)
+            # Call endpoint directly using the httpx client
+            response = self.http_client.get(endpoint_url, params=params)
 
             # Extract rate limit info from response headers
             if hasattr(response, "headers"):
@@ -253,8 +254,13 @@ class RateLimitTester:
         # Print final statistics
         self.print_final_stats()
 
-    def _handle_signal(self, _signum, frame):
-        """Handle termination signals."""
+    def _handle_signal(self, _signum, _frame):
+        """Handle termination signals.
+
+        Args:
+            _signum: Signal number (unused but required by signal handler interface)
+            _frame: Current stack frame (unused but required by signal handler interface)
+        """
         self.console.print(
             "\n[bold red]Received termination signal. Shutting down...[/bold red]"
         )
@@ -287,8 +293,17 @@ class RateLimitTester:
 
     def cleanup(self):
         """Clean up resources."""
+        # Clean up DataSourceManager
         if hasattr(self, "manager"):
             self.manager.__exit__(None, None, None)
+
+        # Clean up RestDataClient
+        if hasattr(self, "rest_client") and self.rest_client._client:
+            self.rest_client.close()
+
+        # Clean up httpx client
+        if hasattr(self, "http_client"):
+            self.http_client.close()
 
 
 # Helper functions
