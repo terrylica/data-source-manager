@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from core.sync.vision_constraints import FileType, get_vision_url
+from utils.for_core.vision_constraints import FileType, get_vision_url
 from utils.for_core.vision_checksum import verify_file_checksum
 from utils.logger_setup import logger
 from utils.validation import DataValidation
