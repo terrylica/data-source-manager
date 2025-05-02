@@ -35,13 +35,22 @@ def get_from_cache(
         cache_dir: Cache directory
         market_type: Market type (spot, um, cm)
         chart_type: Chart type (klines, funding_rate)
-        provider: Data provider
+        provider: Data provider - currently supports Binance only,
+                 retained for future multi-provider support
 
     Returns:
         Tuple of (DataFrame with data, List of missing time ranges)
     """
     # Initialize FSSpecVisionHandler for path mapping
     fs_handler = FSSpecVisionHandler(base_cache_dir=cache_dir)
+
+    # TODO: When adding support for multiple providers, update the cache
+    # path structure to include the provider information.
+    # Currently, only Binance is supported.
+    if provider != DataProvider.BINANCE:
+        logger.warning(
+            f"Provider {provider.name} cache retrieval not yet implemented, falling back to Binance format"
+        )
 
     # Calculate the days we need to query
     current_date = pendulum.instance(start_time).start_of("day")
@@ -177,7 +186,8 @@ def save_to_cache(
         market_type: Market type
         cache_dir: Cache directory
         chart_type: Chart type
-        provider: Data provider
+        provider: Data provider - currently supports Binance only,
+                 retained for future multi-provider support
 
     Returns:
         True if successful, False otherwise
@@ -189,6 +199,14 @@ def save_to_cache(
     try:
         # Initialize FSSpecVisionHandler for path mapping
         fs_handler = FSSpecVisionHandler(base_cache_dir=cache_dir)
+
+        # TODO: When adding support for multiple providers, update the cache
+        # path structure to include the provider information.
+        # Currently, only Binance is supported.
+        if provider != DataProvider.BINANCE:
+            logger.warning(
+                f"Provider {provider.name} cache save not yet implemented, using Binance format"
+            )
 
         # Group by day to save daily files
         df["date"] = pd.to_datetime(df["open_time"]).dt.date

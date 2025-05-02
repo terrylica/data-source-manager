@@ -27,7 +27,6 @@ from utils.market_constraints import Interval as MarketInterval
 # Re-export the get_interval_micros function at the module level for direct import
 __all__ = [
     "enforce_utc_timezone",
-    "validate_time_window",
     "get_interval_micros",
     "get_interval_seconds",
     "get_interval_timedelta",

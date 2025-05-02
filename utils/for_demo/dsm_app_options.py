@@ -23,11 +23,8 @@ from utils.for_demo.dsm_help_content import (
 )
 
 
-def create_typer_app(app_name="DSM Demo"):
+def create_typer_app():
     """Create a preconfigured Typer app with consistent styling and settings.
-
-    Args:
-        app_name: Name of the application
 
     Returns:
         typer.Typer: Configured Typer app

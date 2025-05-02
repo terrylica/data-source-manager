@@ -32,7 +32,7 @@ def display_results(
         symbol: Trading symbol (e.g., "BTCUSDT")
         market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN)
         interval: Time interval between data points
-        chart_type: Type of chart data
+        chart_type: Type of chart data (currently used only for file naming consistency)
         log_timestamp: Optional timestamp for log files
         session_name: Name of the session used for log files (default: "dsm_demo_cli")
 
@@ -44,6 +44,10 @@ def display_results(
         return
 
     print(f"\n[bold green]Successfully retrieved {len(df)} records[/bold green]")
+
+    # When adding chart-type specific display, this parameter will be used
+    # For now, we just log it for debugging
+    logger.debug(f"Display results for chart_type: {chart_type}")
 
     # Create a table for source breakdown
     if "_data_source" in df.columns:

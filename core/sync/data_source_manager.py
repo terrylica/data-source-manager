@@ -423,7 +423,7 @@ class DataSourceManager:
             df: DataFrame to cache
             symbol: Symbol the data is for
             interval: Time interval of the data
-            source: Data source (VISION, REST, etc.)
+            source: Data source (VISION, REST, etc.) - can be used for source-specific cache strategies
         """
         from utils.for_core.dsm_cache_utils import save_to_cache
 
@@ -435,6 +435,11 @@ class DataSourceManager:
             return
 
         logger.info(f"Saving {len(df)} records for {symbol} to cache")
+
+        # Track the source of the data for future source-specific optimizations
+        # Currently not used in the underlying implementation but preserved for telemetry
+        if source:
+            logger.debug(f"Data source for cache: {source}")
 
         # Use the new cache utils implementation with FSSpecVisionHandler
         save_to_cache(
@@ -659,7 +664,7 @@ class DataSourceManager:
                         vision_ranges_to_fetch
                     ):
                         logger.debug(
-                            f"[FCP] Fetching from Vision API range {range_idx+1}/{len(vision_ranges_to_fetch)}: {miss_start} to {miss_end}"
+                            f"[FCP] Fetching from Vision API range {range_idx + 1}/{len(vision_ranges_to_fetch)}: {miss_start} to {miss_end}"
                         )
 
                         range_df = self._fetch_from_vision(
@@ -734,7 +739,7 @@ class DataSourceManager:
 
                 for range_idx, (miss_start, miss_end) in enumerate(merged_rest_ranges):
                     logger.debug(
-                        f"[FCP] Fetching from REST API range {range_idx+1}/{len(merged_rest_ranges)}: {miss_start} to {miss_end}"
+                        f"[FCP] Fetching from REST API range {range_idx + 1}/{len(merged_rest_ranges)}: {miss_start} to {miss_end}"
                     )
 
                     rest_df = self._fetch_from_rest(

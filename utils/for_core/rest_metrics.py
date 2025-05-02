@@ -55,12 +55,15 @@ class RestMetricsTracker:
         # Track rate limiting
         self._rate_limit_windows = []
 
+        # Store the last set of parameters for debugging
+        self._last_params = {}
+
         logger.debug("Initialized REST metrics tracker")
 
     def record_api_call(
         self,
         endpoint: str,
-        params: Dict[str, Any],
+        params: Dict,
         start_time: float,
         end_time: float,
         success: bool,
@@ -87,6 +90,9 @@ class RestMetricsTracker:
 
             # Track by endpoint
             self._calls_by_endpoint[endpoint] += 1
+
+            # Store the last set of params for debugging/auditing
+            self._last_params = params
 
             if success:
                 self._successful_calls += 1

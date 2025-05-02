@@ -48,6 +48,31 @@ app = typer.Typer(
     context_settings={"help_option_names": ["--help", "-h"]},
 )
 
+# Define all commands using the decorator approach
+moves_argument = typer.Argument(
+    ...,
+    help="Pairs of source and destination paths in format 'source.py:destination.py'. Source must exist.",
+)
+project_option = typer.Option(
+    ".", "--project", "-p", help="Root of your Python project"
+)
+dry_run_option = typer.Option(
+    False, "--dry-run", "-d", help="Show what would happen without making changes"
+)
+verbose_option = typer.Option(
+    0,
+    "--verbose",
+    "-v",
+    count=True,
+    help="Increase verbosity: -v for INFO, -vv for DEBUG",
+)
+log_file_option = typer.Option(
+    None,
+    "--log-file",
+    "-l",
+    help="Custom log file name (default: refactor_YYYYMMDD_HHMMSS.log)",
+)
+
 
 @contextmanager
 def rope_project(project_path: Path):
@@ -81,28 +106,27 @@ def git_mv(old_path: Path, new_path: Path, dry_run: bool = False) -> bool:
         return False
 
 
-def run_command(
-    cmd: List[str], dry_run: bool = False, description: str = ""
-) -> subprocess.CompletedProcess:
+def run_command(cmd: List[str], dry_run: bool = False) -> subprocess.CompletedProcess:
     """Run a command with proper error handling and dry-run support."""
+    command_str = " ".join(cmd)
+    logger.debug(f"Run command: {command_str}")
+
     if dry_run:
-        logger.info(f"[DRY-RUN] Would run: {' '.join(cmd)}")
-        # Return a dummy CompletedProcess for dry runs
+        logger.info(f"[DRY-RUN] Would run: {command_str}")
+        # Return a dummy CompletedProcess for dry-run
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    logger.debug(f"Running: {' '.join(cmd)}")
     try:
-        return subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,  # We'll handle errors ourselves
-        )
-    except Exception as e:
-        logger.error(f"Command failed: {' '.join(cmd)}")
-        logger.error(f"Error: {e}")
-        # Re-raise as CalledProcessError with command info
-        raise subprocess.CalledProcessError(1, cmd, output="", stderr=str(e))
+        result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+        return result
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed: {command_str}")
+        logger.error(f"Return code: {e.returncode}")
+        if e.stdout:
+            logger.debug(f"Command stdout: {e.stdout}")
+        if e.stderr:
+            logger.debug(f"Command stderr: {e.stderr}")
+        raise
 
 
 def run_ruff(project_path: Path, dry_run: bool = False) -> bool:
@@ -122,14 +146,16 @@ def run_ruff(project_path: Path, dry_run: bool = False) -> bool:
             "--select",
             ",".join(RUFF_IMPORT_CHECKS),
         ]
-        result = run_command(cmd, dry_run, "Ruff check")
+        result = run_command(cmd, dry_run)
 
-        if result.stdout:
-            logger.warning(f"Ruff detected issues:\n{result.stdout}")
-            return False
-        else:
+        # If stdout contains "All checks passed!" or is empty, it's a success
+        if not result.stdout or "All checks passed!" in result.stdout:
             logger.info("Ruff found no import-related issues.")
             return True
+
+        # Otherwise, there are actual issues
+        logger.warning(f"Ruff detected issues:\n{result.stdout}")
+        return False
     except Exception as e:
         logger.error(f"Ruff check failed: {e}")
         return False
@@ -153,7 +179,7 @@ def fix_ruff_issues(project_path: Path, dry_run: bool = False) -> bool:
             ",".join(RUFF_IMPORT_CHECKS),
             "--fix",
         ]
-        result = run_command(cmd, dry_run, "Ruff fix")
+        result = run_command(cmd, dry_run)
 
         if "error:" in result.stderr.lower():
             logger.error(f"Ruff fix encountered errors:\n{result.stderr}")
@@ -188,18 +214,20 @@ def run_ruff_pre_check(project_path: Path, dry_run: bool = False) -> bool:
             "--select",
             ",".join(RUFF_IMPORT_CHECKS),
         ]
-        result = run_command(cmd, dry_run, "Ruff pre-check")
+        result = run_command(cmd, dry_run)
 
-        if result.stdout:
-            logger.warning(f"Ruff detected pre-existing issues:\n{result.stdout}")
-            logger.warning(
-                "These issues exist before refactoring. They may not be caused by the move operation."
-            )
-            # Use rich's Confirm for better UX
-            return Confirm.ask("Continue despite pre-existing issues?")
-        else:
+        # If stdout contains "All checks passed!" or is empty, it's a success
+        if not result.stdout or "All checks passed!" in result.stdout:
             logger.info("Ruff pre-check passed: no pre-existing import issues found.")
             return True
+
+        # Otherwise, there are actual issues
+        logger.warning(f"Ruff detected pre-existing issues:\n{result.stdout}")
+        logger.warning(
+            "These issues exist before refactoring. They may not be caused by the move operation."
+        )
+        # Use rich's Confirm for better UX
+        return Confirm.ask("Continue despite pre-existing issues?")
     except Exception as e:
         logger.error(f"Ruff pre-check failed: {e}")
         return False
@@ -271,29 +299,11 @@ def update_import_paths(
 
 @app.command()
 def move(
-    moves: List[str] = typer.Argument(
-        ...,
-        help="Pairs of source and destination paths in format 'source.py:destination.py'. Source must exist.",
-    ),
-    project: str = typer.Option(
-        ".", "--project", "-p", help="Root of your Python project"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-d", help="Show what would happen without making changes"
-    ),
-    verbose: int = typer.Option(
-        0,
-        "--verbose",
-        "-v",
-        count=True,
-        help="Increase verbosity: -v for INFO, -vv for DEBUG",
-    ),
-    log_file: Optional[str] = typer.Option(
-        None,
-        "--log-file",
-        "-l",
-        help="Custom log file name (default: refactor_YYYYMMDD_HHMMSS.log)",
-    ),
+    moves: List[str] = moves_argument,
+    project: str = project_option,
+    dry_run: bool = dry_run_option,
+    verbose: int = verbose_option,
+    log_file: Optional[str] = log_file_option,
     skip_validation: bool = typer.Option(
         False, "--skip-validation", "-s", help="Skip file existence validation"
     ),
@@ -320,6 +330,57 @@ def move(
     Example:
         ./refactor_move.py move "existing_file.py:new_location.py"
     """
+    # Set default values within the function body
+    if moves is None:
+        moves = typer.Argument(
+            ...,
+            help="Pairs of source and destination paths in format 'source.py:destination.py'. Source must exist.",
+        )
+    if project is None:
+        project = typer.Option(
+            ".", "--project", "-p", help="Root of your Python project"
+        )
+    if dry_run is None:
+        dry_run = typer.Option(
+            False,
+            "--dry-run",
+            "-d",
+            help="Show what would happen without making changes",
+        )
+    if verbose is None:
+        verbose = typer.Option(
+            0,
+            "--verbose",
+            "-v",
+            count=True,
+            help="Increase verbosity: -v for INFO, -vv for DEBUG",
+        )
+    if log_file is None:
+        log_file = typer.Option(
+            None,
+            "--log-file",
+            "-l",
+            help="Custom log file name (default: refactor_YYYYMMDD_HHMMSS.log)",
+        )
+    if skip_validation is None:
+        skip_validation = typer.Option(
+            False, "--skip-validation", "-s", help="Skip file existence validation"
+        )
+    if skip_pre_check is None:
+        skip_pre_check = typer.Option(
+            False,
+            "--skip-pre-check",
+            "-S",
+            help="Skip Ruff pre-check for existing import issues",
+        )
+    if auto_fix_imports is None:
+        auto_fix_imports = typer.Option(
+            False,
+            "--auto-fix",
+            "-a",
+            help="Auto-fix import issues with Ruff after refactoring",
+        )
+
     # Setup log file if not provided
     if not log_file:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -435,25 +496,10 @@ def move(
 
 @app.command(name="check")
 def check_ruff(
-    project: str = typer.Option(
-        ".", "--project", "-p", help="Root of your Python project"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-d", help="Show what would happen without making changes"
-    ),
-    verbose: int = typer.Option(
-        0,
-        "--verbose",
-        "-v",
-        count=True,
-        help="Increase verbosity: -v for INFO, -vv for DEBUG",
-    ),
-    log_file: Optional[str] = typer.Option(
-        None,
-        "--log-file",
-        "-l",
-        help="Custom log file name (default: refactor_YYYYMMDD_HHMMSS.log)",
-    ),
+    project: str = project_option,
+    dry_run: bool = dry_run_option,
+    verbose: int = verbose_option,
+    log_file: Optional[str] = log_file_option,
 ):
     """
     Run Ruff to check for import-related issues on the current codebase state.

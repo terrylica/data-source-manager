@@ -144,7 +144,9 @@ class RestDataClient(DataClientInterface):
         Args:
             endpoint: API endpoint URL
             params: Request parameters
-            retry_count: Current retry attempt (kept for backward compatibility)
+            retry_count: Current retry attempt - parameter preserved for backward compatibility
+                       with legacy code, no longer used as retry logic is now handled by tenacity
+                       decorators in the utility functions
 
         Returns:
             List of data points from the API
@@ -155,6 +157,10 @@ class RestDataClient(DataClientInterface):
         # Initialize client if not already done
         if self._client is None:
             self._client = create_optimized_client()
+
+        # Log retry attempt if non-zero (for debugging legacy code references)
+        if retry_count > 0:
+            logger.debug(f"Legacy retry_count parameter used: {retry_count} (ignored)")
 
         # Use the utility function to fetch the chunk
         return fetch_chunk(self._client, endpoint, params, self.fetch_timeout)
@@ -319,7 +325,7 @@ class RestDataClient(DataClientInterface):
         all_data = []
         for i, (chunk_start, chunk_end) in enumerate(chunks):
             logger.debug(
-                f"Fetching chunk {i+1}/{len(chunks)} for {symbol}: "
+                f"Fetching chunk {i + 1}/{len(chunks)} for {symbol}: "
                 f"{milliseconds_to_datetime(chunk_start).isoformat()} to "
                 f"{milliseconds_to_datetime(chunk_end).isoformat()}"
             )
@@ -333,9 +339,9 @@ class RestDataClient(DataClientInterface):
                 all_data.extend(chunk_data)
                 stats["successful_chunks"] += 1
                 stats["total_data_points"] += len(chunk_data)
-                logger.debug(f"Retrieved {len(chunk_data)} records for chunk {i+1}")
+                logger.debug(f"Retrieved {len(chunk_data)} records for chunk {i + 1}")
             else:
-                logger.warning(f"No data returned for chunk {i+1}")
+                logger.warning(f"No data returned for chunk {i + 1}")
 
         # If no data was retrieved, return empty DataFrame
         if not all_data:

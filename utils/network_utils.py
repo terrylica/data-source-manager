@@ -227,11 +227,10 @@ class DownloadProgressTracker:
             f"Download progress tracker initialized. Total size: {total_size or 'unknown'} bytes"
         )
 
-    def update(self, url: str, bytes_chunk: int) -> bool:
+    def update(self, bytes_chunk: int) -> bool:
         """Update progress with newly received bytes.
 
         Args:
-            url: URL of the download
             bytes_chunk: Number of bytes received in this update
 
         Returns:

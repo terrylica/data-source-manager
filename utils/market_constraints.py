@@ -602,6 +602,17 @@ def get_market_symbol_format(
     # Get the capabilities for the market type to access the expected format
     capabilities = get_market_capabilities(market_type, data_provider)
 
+    # Log the expected format from capabilities - will be used in future multi-provider extensions
+    # Currently the format is handled inline for each provider, but capabilities will be used
+    # for more sophisticated format detection in future versions
+    expected_format = capabilities.symbol_format
+
+    # Log the expected format to help with debugging
+    if data_provider.name == "OKX" and "-" not in expected_format:
+        logger.debug(
+            f"Expected format '{expected_format}' may not match OKX format requirements"
+        )
+
     # For OKX provider, handle hyphenated symbols
     if data_provider.name == "OKX":
         # Already has hyphens? Keep as is
@@ -693,6 +704,16 @@ def validate_symbol_for_market_type(
     capabilities = get_market_capabilities(market_type, data_provider)
     market_name = market_type.name
 
+    # Log market capabilities attributes to aid debugging
+    logger.debug(
+        f"Validating symbol '{symbol}' for {market_name} with {data_provider.name} provider"
+        f" (expected format: {capabilities.symbol_format})"
+    )
+
+    # The capabilities object provides full market information
+    # Future versions will dynamically construct endpoints from capabilities
+    # Currently using direct market_name based logic for clarity
+
     # OKX symbol validation
     if data_provider.name == "OKX":
         # OKX symbols should have hyphen format
@@ -709,7 +730,7 @@ def validate_symbol_for_market_type(
         # Special validation for FUTURES_USDT (SWAP) market
         if market_name == "FUTURES_USDT" and not symbol.endswith("-SWAP"):
             suggested_symbol = symbol if symbol.endswith("-SWAP") else f"{symbol}-SWAP"
-            if not "-USD-" in suggested_symbol:
+            if "-USD-" not in suggested_symbol:
                 base = suggested_symbol.split("-")[0]
                 suggested_symbol = f"{base}-USD-SWAP"
             raise ValueError(
@@ -783,6 +804,15 @@ def get_endpoint_url(
     """
     capabilities = get_market_capabilities(market_type, data_provider)
     base_url = capabilities.api_base_url
+
+    # Verify the chart type is compatible with the market capabilities
+    if isinstance(chart_type, ChartType) and not chart_type.is_supported_by_market(
+        market_type
+    ):
+        logger.warning(
+            f"Chart type {chart_type.name} may not be supported for {market_type.name} market. "
+            f"Supported intervals: {[i.value for i in capabilities.supported_intervals]}"
+        )
 
     # Extract endpoint string from ChartType enum if needed
     endpoint = None

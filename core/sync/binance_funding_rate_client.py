@@ -245,7 +245,8 @@ class BinanceFundingRateClient(DataClientInterface):
             interval: Time interval (uses provided value or falls back to instance interval)
             start_time: Start time for data retrieval
             end_time: End time for data retrieval
-            **kwargs: Additional parameters
+            **kwargs: Additional parameters, preserved for API compatibility with other clients
+                     (not used by this implementation but needed for interface consistency)
 
         Returns:
             DataFrame with funding rate data
@@ -253,6 +254,13 @@ class BinanceFundingRateClient(DataClientInterface):
         Raises:
             ValueError: If parameters are invalid
         """
+        # Extract any useful parameters from kwargs for future extensions
+        cache_mode = kwargs.get("cache_mode", None)
+        if cache_mode:
+            logger.debug(
+                f"Cache mode hint: {cache_mode} (ignored by funding rate client)"
+            )
+
         # Validate input parameters (keeping backward compatibility)
         if not isinstance(symbol, str) or not symbol:
             symbol = self._symbol

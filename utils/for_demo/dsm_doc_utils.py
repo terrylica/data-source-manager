@@ -32,19 +32,24 @@ def generate_markdown_docs_with_typer_cli(
     filename: str = "README.md",
     cli_name: str = None,
 ):
-    """Generate Markdown documentation using the typer-cli tool.
+    """Generate markdown documentation using typer-cli.
 
-    This uses the official Typer CLI tool for better GitHub-friendly docs.
+    This function uses the typer-cli utility to generate markdown docs
+    automatically from a Typer application's commands and options.
+
+    Note: The app parameter is required for API consistency with generate_markdown_docs,
+    but is not directly used as typer-cli inspects the installed package directly.
 
     Args:
-        app: The Typer app to generate documentation for
-        output_dir: Directory to save the generated documentation
-        filename: Name of the output file
-        cli_name: The name to use for the CLI app in the docs
-
-    Returns:
-        Path: Path to the generated documentation file
+        app: Typer application (required for API consistency but not used directly)
+        output_dir: Output directory path
+        filename: Output filename
+        cli_name: Name of the CLI command
     """
+    # Log which app we're documenting
+    module_name = app.__module__ if hasattr(app, "__module__") else "unknown_module"
+    logger.info(f"Generating docs for app in module: {module_name}")
+
     # Create output directory if it doesn't exist
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -70,11 +75,11 @@ def generate_markdown_docs_with_typer_cli(
     ]
 
     logger.info(f"Running typer-cli: {' '.join(cmd)}")
-    result = subprocess.run(
+    subprocess.run(
         cmd,
         capture_output=True,
         text=True,
-        check=True,  # Will raise CalledProcessError if command fails
+        check=True,
     )
 
     # Read the generated file
@@ -86,7 +91,7 @@ def generate_markdown_docs_with_typer_cli(
 
     # Format data sources as markdown list items with proper styling
     data_sources_md = "\n".join(
-        [f"{i+1}. **{source}**" for i, source in enumerate(DATA_SOURCES)]
+        [f"{i + 1}. **{source}**" for i, source in enumerate(DATA_SOURCES)]
     )
 
     # Create a new GitHub-friendly markdown file with APP_TITLE and formatted data sources
