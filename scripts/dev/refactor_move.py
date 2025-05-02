@@ -23,6 +23,8 @@ from rope.refactor.move import MoveModule
 
 from utils.logger_setup import logger
 
+logger.setLevel("DEBUG")
+
 console = Console()
 
 # Define the specific Ruff import-related codes to check

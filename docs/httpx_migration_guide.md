@@ -43,7 +43,7 @@ with manager:
 This parameter is also available on the `RestDataClient` class:
 
 ```python
-from core.sync.rest_data_client import RestDataClient
+from core.providers.binance.rest_data_client import RestDataClient
 from utils.market_constraints import MarketType
 
 # Create a RestDataClient with httpx
@@ -64,7 +64,7 @@ For more control, you can create a custom `httpx` client:
 
 ```python
 from utils.network_utils import create_httpx_client
-from core.sync.rest_data_client import RestDataClient
+from core.providers.binance.rest_data_client import RestDataClient
 from utils.market_constraints import MarketType
 
 # Create a custom httpx client

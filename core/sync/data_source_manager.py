@@ -9,10 +9,10 @@ from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
 import pandas as pd
 
-from core.sync.cache_manager import UnifiedCacheManager
-from core.sync.rest_data_client import RestDataClient
-from core.sync.vision_data_client import VisionDataClient
-from core.sync.vision_path_mapper import FSSpecVisionHandler
+from core.providers.binance.cache_manager import UnifiedCacheManager
+from core.providers.binance.rest_data_client import RestDataClient
+from core.providers.binance.vision_data_client import VisionDataClient
+from core.providers.binance.vision_path_mapper import FSSpecVisionHandler
 from utils.config import (
     FUNDING_RATE_DTYPES,
     OUTPUT_DTYPES,

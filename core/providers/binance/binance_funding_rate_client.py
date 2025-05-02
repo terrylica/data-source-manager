@@ -8,8 +8,8 @@ from typing import Optional, Tuple, Union
 
 import pandas as pd
 
-from core.sync.cache_manager import UnifiedCacheManager
-from core.sync.data_client_interface import DataClientInterface
+from core.providers.binance.cache_manager import UnifiedCacheManager
+from core.providers.binance.data_client_interface import DataClientInterface
 from utils.config import (
     FUNDING_RATE_DTYPES,
     create_empty_funding_rate_dataframe,

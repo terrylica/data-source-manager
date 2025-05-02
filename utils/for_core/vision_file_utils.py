@@ -11,6 +11,7 @@ from typing import List, Optional
 
 import pandas as pd
 
+from core.providers.binance.rest_data_client import RestDataClient
 from utils.gap_detector import Gap
 from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType
@@ -40,9 +41,6 @@ def fill_boundary_gaps_with_rest(
     """
     if not boundary_gaps:
         return df
-
-    # Import RestDataClient here to avoid circular import
-    from core.sync.rest_data_client import RestDataClient
 
     try:
         # Create a REST client with the same parameters

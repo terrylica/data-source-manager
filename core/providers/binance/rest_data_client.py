@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
-from core.sync.data_client_interface import DataClientInterface
+from core.providers.binance.data_client_interface import DataClientInterface
 from utils.config import (
     DEFAULT_HTTP_TIMEOUT_SECONDS,
     REST_MAX_CHUNKS,

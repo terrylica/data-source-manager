@@ -32,8 +32,8 @@ from tenacity import (
     wait_incrementing,
 )
 
-from core.sync.data_client_interface import DataClientInterface
-from core.sync.vision_path_mapper import (
+from core.providers.binance.data_client_interface import DataClientInterface
+from core.providers.binance.vision_path_mapper import (
     FSSpecVisionHandler,
 )
 from utils.config import (
@@ -1101,7 +1101,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                     symbol_result, df = future.result()
                     results[symbol_result] = df
                     logger.info(
-                        f"Completed download for {symbol} ({i+1}/{len(symbols)}): {len(df)} records"
+                        f"Completed download for {symbol} ({i + 1}/{len(symbols)}): {len(df)} records"
                     )
                 except Exception as e:
                     logger.error(f"Error processing result for {symbol}: {e}")

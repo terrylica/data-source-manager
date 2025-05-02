@@ -8,7 +8,7 @@ from typing import List, Tuple
 import pandas as pd
 import pendulum
 
-from core.sync.vision_path_mapper import (
+from core.providers.binance.vision_path_mapper import (
     FSSpecVisionHandler,
 )
 from utils.logger_setup import logger
