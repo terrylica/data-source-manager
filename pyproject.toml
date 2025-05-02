@@ -46,7 +46,8 @@ dev = [
     "pylint", # for linting
     "autoflake", # for cleaning up imports
     "vulture", # for dead code detection
-    "twine" # for uploading to PyPI
+    "twine", # for uploading to PyPI
+    "tomli" # for reading pyproject.toml
 ]
 
 # Command-line scripts defined here
@@ -65,7 +66,7 @@ python_functions = "test_*"
 
 [tool.ruff]
 # Enable Pyflakes, pycodestyle, import sorting, and more
-lint.select = ["E", "F401", "F841", "F601", "F631", "F632", "F634", "F821", "F822", "F823", "W", "I001"]
+lint.select = ["E", "F", "W", "I001", "ARG", "B006", "B008", "PLC0415", "TID", "PL"]
 lint.ignore = ["E501"]
 # Align with project.requires-python (>=3.11)
 # Ruff comment - this cannot be inherited automatically
