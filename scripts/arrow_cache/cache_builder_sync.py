@@ -173,8 +173,8 @@ def migrate_json_to_sqlite():
                             # Insert entry into database
                             cursor.execute(
                                 """
-                            INSERT OR REPLACE INTO cache_entries 
-                            (symbol, interval, date, file_size, num_records, last_updated, path) 
+                            INSERT OR REPLACE INTO cache_entries
+                            (symbol, interval, date, file_size, num_records, last_updated, path)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                             """,
                                 (
@@ -242,8 +242,8 @@ def update_cache_index(
         # Update or insert entry
         cursor.execute(
             """
-        INSERT OR REPLACE INTO cache_entries 
-        (symbol, interval, date, file_size, num_records, last_updated, path) 
+        INSERT OR REPLACE INTO cache_entries
+        (symbol, interval, date, file_size, num_records, last_updated, path)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
             (
@@ -348,8 +348,8 @@ def detect_cache_gaps(symbol, interval_str, start_date, end_date):
         # Get all dates in the range from the database
         cursor.execute(
             """
-        SELECT date FROM cache_entries 
-        WHERE symbol = ? AND interval = ? 
+        SELECT date FROM cache_entries
+        WHERE symbol = ? AND interval = ?
         AND date >= ? AND date <= ?
         """,
             (
@@ -410,8 +410,8 @@ def get_last_date_in_cache(symbol, interval_str):
         # Query for the latest date
         cursor.execute(
             """
-        SELECT date FROM cache_entries 
-        WHERE symbol = ? AND interval = ? 
+        SELECT date FROM cache_entries
+        WHERE symbol = ? AND interval = ?
         ORDER BY date DESC LIMIT 1
         """,
             (symbol, interval_str),
@@ -463,8 +463,8 @@ def get_first_date_in_cache(symbol, interval_str):
         # Query for the earliest date
         cursor.execute(
             """
-        SELECT date FROM cache_entries 
-        WHERE symbol = ? AND interval = ? 
+        SELECT date FROM cache_entries
+        WHERE symbol = ? AND interval = ?
         ORDER BY date ASC LIMIT 1
         """,
             (symbol, interval_str),
@@ -497,7 +497,14 @@ def setup_signal_handlers():
     """Set up signal handlers for graceful shutdown."""
     global SHUTDOWN_REQUESTED
 
-    def handle_interrupt(*args):
+    def handle_interrupt(*_args):
+        """
+        Signal handler for graceful shutdown.
+
+        Args:
+            *_args: Signal number and frame, required by the signal handler interface
+                  but not used in this implementation
+        """
         global SHUTDOWN_REQUESTED
         logger.warning("Received interrupt signal, initiating graceful shutdown...")
         SHUTDOWN_REQUESTED = True
@@ -571,7 +578,6 @@ def get_binance_vision_url(symbol, interval, date, market_type="spot"):
         Full URL to the ZIP file
     """
     date_str = date.strftime("%Y-%m-%d")
-    month_str = date.strftime("%Y-%m")
 
     # Determine path based on market type and interval
     if market_type == "spot":
@@ -596,21 +602,31 @@ def download_data_with_checksum(
     data_provider="BINANCE",
     chart_type="KLINES",
 ):
-    """Download data from Binance Vision API with checksum verification.
+    """Download data with checksum verification (if applicable).
 
     Args:
-        symbol: Symbol name
-        interval_str: Interval string
+        symbol: Trading symbol
+        interval_str: Interval string (e.g., "1m", "1h")
         date: Date to download
         skip_checksum: Whether to skip checksum verification
-        proceed_on_failure: Whether to proceed with caching even when checksum fails
-        market_type: Market type (spot, futures_usdt, futures_coin)
-        data_provider: Data provider name
-        chart_type: Chart type
+        proceed_on_failure: Whether to proceed on download failure
+        market_type: Market type (spot, futures, etc.)
+        data_provider: Data provider (e.g., "BINANCE")
+        chart_type: Chart type (e.g., "KLINES")
 
     Returns:
-        Tuple of (success, DataFrame, num_records)
+        Tuple of (success, df)
     """
+    # Log download attempt with provider information
+    logger.info(
+        f"Downloading {symbol} {interval_str} data for {date} "
+        f"from {data_provider} ({market_type} market, {chart_type})"
+    )
+
+    # Currently only Binance is fully supported, but log the provider for future extension
+    if data_provider != "BINANCE":
+        logger.warning(f"Provider {data_provider} support is experimental")
+
     date_str = date.strftime("%Y-%m-%d")
     # Check if date is a datetime object or already a date object
     if hasattr(date, "date"):
@@ -825,7 +841,6 @@ def parse_kline_csv(csv_content):
 
         # Detect timestamp unit from the first row
         timestamp_unit = "ms"  # Default milliseconds
-        timestamp_multiplier = 1  # Default no conversion
 
         if not df.empty:
             try:
