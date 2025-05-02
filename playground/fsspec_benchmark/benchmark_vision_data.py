@@ -10,6 +10,7 @@ import statistics
 import sys
 import tempfile
 import time
+import traceback
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -21,7 +22,6 @@ import psutil
 import typer
 from rich.console import Console
 from rich.table import Table
-import traceback
 
 # Ensure parent directory is in path
 sys.path.append(str(Path(__file__).parent.parent.parent))
