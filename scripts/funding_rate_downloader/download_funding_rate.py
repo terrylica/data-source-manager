@@ -33,7 +33,7 @@ def fetch_funding_rate_history(symbol="BTCUSDT", limit=1000):
         return None
 
 
-def convert_to_csv(data, symbol):
+def convert_to_csv(data):
     """Convert JSON funding rate data to CSV format"""
     if not data:
         logger.error("No data to convert to CSV")
@@ -97,7 +97,7 @@ def main():
 
     if data:
         # Convert to CSV format
-        df = convert_to_csv(data, symbol)
+        df = convert_to_csv(data)
 
         if df is not None:
             # Save to file
