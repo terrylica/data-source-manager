@@ -10,9 +10,8 @@ import pendulum
 
 from core.sync.data_source_manager import DataSourceManager
 from utils.config import FEATURE_FLAGS
-from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
-
 from utils.logger_setup import logger
+from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 logger.setup_root(level="DEBUG")
 
@@ -47,8 +46,8 @@ class TestDsmCacheUtils(unittest.TestCase):
         refetched when they already contain all data needed for the requested time range.
         """
         # Create a temporary directory for the test
-        import tempfile
         import shutil
+        import tempfile
         from pathlib import Path
 
         test_cache_dir = Path(tempfile.mkdtemp())
@@ -107,9 +106,9 @@ class TestDsmCacheUtils(unittest.TestCase):
             day2_df = pd.DataFrame(day2_records)
 
             # Initialize FSSpecVisionHandler for cache operations
-            from core.sync.vision_path_mapper import FSSpecVisionHandler
 
-            fs_handler = FSSpecVisionHandler(base_cache_dir=test_cache_dir)
+            # Import and initialize but don't use (commenting out unused variable)
+            # fs_handler = FSSpecVisionHandler(base_cache_dir=test_cache_dir)
 
             # Save the test data to cache files
             from utils.for_core.dsm_cache_utils import save_to_cache
