@@ -28,6 +28,9 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from rich import print
 
+from utils.config import (
+    HTTP_OK,
+)
 from utils.logger_setup import logger
 
 app = typer.Typer(
@@ -146,7 +149,7 @@ class BenchmarkRunner:
 
         # Download the file
         response = self.client.get(url)
-        if response.status_code != 200:
+        if response.status_code != HTTP_OK:
             raise Exception(f"HTTP error {response.status_code} while downloading file")
 
         # Save to temporary file
@@ -180,7 +183,7 @@ class BenchmarkRunner:
 
         # Download the file
         response = self.client.get(url)
-        if response.status_code != 200:
+        if response.status_code != HTTP_OK:
             raise Exception(
                 f"HTTP error {response.status_code} while downloading checksum"
             )

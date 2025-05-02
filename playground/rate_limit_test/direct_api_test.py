@@ -18,6 +18,7 @@ import pandas as pd
 from rich import print
 from rich.console import Console
 
+from utils.config import HTTP_OK
 from utils.logger_setup import logger
 
 # Configure logging
@@ -90,7 +91,7 @@ async def fetch_klines(symbol, interval="1s", limit=1000):
         weight = int(response.headers.get("x-mbx-used-weight-1m", "0"))
 
         # Process response data
-        if response.status_code == 200:
+        if response.status_code == HTTP_OK:
             data = response.json()
             return data, weight
         else:

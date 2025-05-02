@@ -19,6 +19,8 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
 
+from utils.config import HTTP_OK
+
 # Constants
 BASE_URL = "https://www.okx.com/cdn/okex/traderecords"
 DATA_TYPES = ["trades", "aggtrades"]
@@ -66,7 +68,7 @@ def build_url(data_type: str, symbol: str, date_obj: datetime.date) -> str:
 
 def check_url_exists(url: str, timeout: float = DEFAULT_TIMEOUT) -> bool:
     """
-    Check if a URL exists by making a HEAD request
+    Check if a URL exists by sending a HEAD request
 
     Args:
         url: URL to check
@@ -78,7 +80,7 @@ def check_url_exists(url: str, timeout: float = DEFAULT_TIMEOUT) -> bool:
     try:
         with httpx.Client() as client:
             response = client.head(url, timeout=timeout, follow_redirects=True)
-            return response.status_code == 200
+            return response.status_code == HTTP_OK
     except Exception as e:
         print(f"[red]Error checking URL {url}: {str(e)}[/red]")
         return False

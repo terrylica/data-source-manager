@@ -36,6 +36,8 @@ from utils.config import (
     API_RETRY_DELAY,
     API_TIMEOUT,
     DEFAULT_HTTP_TIMEOUT_SECONDS,
+    HTTP_NOT_FOUND,
+    HTTP_OK,
     MAXIMUM_CONCURRENT_DOWNLOADS,
 )
 from utils.logger_setup import logger
@@ -354,9 +356,9 @@ class DownloadHandler:
             response = self.client.get(url, timeout=timeout)
 
             # Check status code
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 # Use warning instead of error for 404 (Not Found) status
-                if response.status_code == 404:
+                if response.status_code == HTTP_NOT_FOUND:
                     # File doesn't exist - this is often expected when checking for file existence
                     # Extract filename from URL for more informative message
                     from urllib.parse import urlparse
@@ -823,7 +825,7 @@ def test_connectivity(
             try:
                 # Try to connect
                 response = client.get(url, timeout=timeout)
-                if response.status_code == 200:
+                if response.status_code == HTTP_OK:
                     logger.info(f"Successfully connected to {url}")
                     return True
                 else:
