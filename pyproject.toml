@@ -53,7 +53,7 @@ dev = [
 [project.scripts]
 dsm-demo-cli = "examples.sync.dsm_demo_cli:app"
 dsm-demo-module = "examples.lib_module.dsm_demo_module:main"
-ruff-check = "scripts.dev.refactor_move:app"
+recmove = "scripts.dev.refactor_move:app"
 
 [tool.setuptools]
 packages = ["core", "utils", "examples", "utils_for_debug", "scripts"]
