@@ -110,7 +110,7 @@ class BenchmarkRunner:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, _exc_type, _exc_val, _exc_tb):
         """Context manager exit."""
         if self.client:
             self.client.close()
@@ -447,7 +447,7 @@ def run_benchmark_case(
             # Run warmup (results discarded)
             print("\n[yellow]Running warmup iterations...[/yellow]")
             for i in range(warmup_runs):
-                print(f"  Warmup {i+1}/{warmup_runs}")
+                print(f"  Warmup {i + 1}/{warmup_runs}")
                 # Pass the pre-downloaded checksum to avoid network calls during timing
                 if validate_checksum:
                     # Create monkey-patched methods that use the pre-downloaded checksum
@@ -627,7 +627,7 @@ def run_benchmark_case(
             row_count = 0
 
             for i in range(runs):
-                print(f"[cyan]Run {i+1}/{runs}[/cyan]")
+                print(f"[cyan]Run {i + 1}/{runs}[/cyan]")
 
                 # Original method
                 try:
@@ -961,7 +961,7 @@ def benchmark_all(
     summary_data = []
 
     for i, case in enumerate(test_cases):
-        print(f"\n[bold]Test Case {i+1}/{len(test_cases)}[/bold]")
+        print(f"\n[bold]Test Case {i + 1}/{len(test_cases)}[/bold]")
 
         result, errors = run_benchmark_case(
             symbol=case["symbol"],
@@ -984,7 +984,7 @@ def benchmark_all(
 
             summary_data.append(
                 {
-                    "test_case": f"Case {i+1}",
+                    "test_case": f"Case {i + 1}",
                     "symbol": config["symbol"],
                     "interval": config["interval"],
                     "market_type": config["market_type"],
