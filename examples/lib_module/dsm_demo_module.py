@@ -106,8 +106,6 @@ def showcase_backward_retrieval(
         if not isinstance(df.index, pd.DatetimeIndex):
             # Create a DeprecationInterval instance from MarketInterval
             interval_obj = DeprecationInterval.from_market_interval(interval_enum)
-            # Convert to pandas Timedelta for frequency
-            pandas_timedelta = interval_obj.to_pandas_timedelta()
             # Create the frequency string using the non-deprecated format
             freq = f"{interval_obj.value}{interval_obj.unit.value}"
             # Use the proper frequency string for date_range
@@ -139,7 +137,7 @@ def main():
     # Configure logging with ERROR level
     current_time = pendulum.now()
     logger.info(f"Starting showcase at {current_time.isoformat()}")
-    configure_session_logging("dsm_showcase", "ERROR")
+    configure_session_logging("dsm_demo_module", "ERROR")
 
     # Set up environment
     if not setup_environment():
