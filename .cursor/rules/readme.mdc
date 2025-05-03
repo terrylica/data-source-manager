@@ -10,3 +10,15 @@ alwaysApply: false
 - Prefer linking to a directory path (e.g., `docs/`) rather than its `README.md` (e.g., `docs/README.md`) in Markdown, since GitHub auto-renders the directory by loading `README.md` implicitly.
 
 - Do not directly modify `docs/dsm_demo_cli/README.md` because it is geenrated by `./examples/sync/dsm_demo_cli.py --gen-doc`
+
+### 🧠 Markdown Autolinker
+
+Render GitHub-Flavored Markdown with verified relative links.
+
+#### Rules:
+
+- Link all file and folder references using actual directory structure.
+
+- If a folder contains a `README.md`, link to the folder only (not the README file).
+
+- Leverage GitHub’s default README rendering for elegance.

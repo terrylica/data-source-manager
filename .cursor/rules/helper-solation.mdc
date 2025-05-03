@@ -1,0 +1,13 @@
+---
+description: refactor
+globs: 
+alwaysApply: false
+---
+Before performing modularization and Before performing modularization and helper isolation, scan the existing codebase structure to infer naming conventions and separation patterns., scan the existing codebase structure to infer naming conventions and separation patterns. If debug-related functions are already isolated (e.g., in `debug/`, `testing/`, or `utils_debug/`), align with that structure. Otherwise, default to:
+
+- `utils/`: for general-purpose logic, data transformation, configuration, etc.
+- `utils_for_debug/`: for functions strictly used for logging, assertions, breakpoint controls, or test scaffolds.
+
+Maintain internal cohesion—do not split related functions across modules unnecessarily. If a new module is needed, name it based on existing file naming patterns (e.g., `*_helper.py`, `*_tools.py`).
+
+Clearly mark refactored logic with comments like `# extracted to utils/debug_helpers.py` to preserve traceability and simplify grepping.
