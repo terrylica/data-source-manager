@@ -43,8 +43,8 @@ dev = [
     "gitpython", # for git operations
     "rope", # for refactoring imports
     "ruff", # for linting and formatting
-    "pylint", # for linting
-    "autoflake", # for cleaning up imports
+    # "pylint", # Ruff covers many Pylint rules
+    # "autoflake", # Ruff handles unused imports
     "vulture", # for dead code detection
     "twine", # for uploading to PyPI
     "tomli" # for reading pyproject.toml
@@ -65,8 +65,13 @@ python_files = "test_*.py"
 python_functions = "test_*" 
 
 [tool.ruff]
-# Enable Pyflakes, pycodestyle, import sorting, and more
-lint.select = ["E", "F", "W", "I001", "ARG", "B006", "B008", "PLC0415", "TID", "PL"]
+# preview = true # Enable preview rules
+lint.select = [
+    # "PD",        # pandas-vet: Common pandas pitfalls
+    "RET",       # flake8-return: Improper return statements
+    "PL",        # Pylint: All Pylint rules - Ruff covers many, but PL includes Pylint-specific ones not fully redundant
+    "RUF",       # Ruff-specific rules (idiomatic suggestions) - Essential for Ruff's unique checks
+]
 lint.ignore = ["E501"]
 # Align with project.requires-python (>=3.11)
 # Ruff comment - this cannot be inherited automatically
@@ -87,7 +92,7 @@ known-third-party = ["pandas", "numpy", "polars", "pyarrow", "httpx", "tenacity"
 
 [tool.vulture]
 # Paths to scan for dead code
-paths = ["utils/", "core/", "scripts/"]  
+paths = ["utils/", "core/", "scripts/"]
 # Exclude test-related files
 exclude = ["tests/", "*/test_*.py", "*/conftest.py"]
 # Minimum confidence threshold (0-100)
@@ -97,4 +102,4 @@ sort_by_size = true
 # Ignore certain naming patterns that might be used for required interfaces
 ignore_names = ["__*__", "setup_*", "teardown_*"]
 # Ignore certain decorators that might create false positives
-ignore_decorators = ["@app.route", "@property", "@classmethod", "@staticmethod"] 
+ignore_decorators = ["@app.route", "@property", "@classmethod", "@staticmethod"]
