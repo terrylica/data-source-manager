@@ -22,6 +22,8 @@ from typing import (
     Tuple,
 )
 
+import attrs  # Add this import
+
 # Import httpx for HTTP client implementation
 import httpx
 from tenacity import (
@@ -199,37 +201,38 @@ def create_legacy_client(
 
 
 class DownloadException(Exception):
-    """Base class for download-related exceptions."""
+    """Base exception for download-related errors."""
+
 
 
 class DownloadStalledException(DownloadException):
-    """Raised when download progress stalls."""
+    """Raised when a download appears to have stalled."""
+
 
 
 class RateLimitException(DownloadException):
-    """Raised when rate limited by the server."""
+    """Raised when rate limits are hit during downloads."""
 
 
+
+@attrs.define
 class DownloadProgressTracker:
     """Tracks download progress and detects stalled downloads."""
 
-    def __init__(self, total_size: Optional[int] = None, check_interval: int = 5):
-        """Initialize progress tracker.
+    # Define attributes with default values
+    total_size: Optional[int] = attrs.field(default=None)
+    check_interval: int = attrs.field(default=5)
 
-        Args:
-            total_size: Expected total size in bytes, if known
-            check_interval: How often to check progress in seconds
-        """
-        self.start_time = time.monotonic()
-        self.last_progress_time = self.start_time
-        self.bytes_received = 0
-        self.total_size = total_size
-        self.last_bytes = 0
-        self.check_interval = check_interval
+    # Internal state attributes
+    bytes_received: int = attrs.field(init=False, default=0)
+    last_bytes: int = attrs.field(init=False, default=0)
+    start_time: float = attrs.field(init=False, factory=time.monotonic)
+    last_progress_time: float = attrs.field(init=False, factory=time.monotonic)
 
-        # Log initial state
+    def __attrs_post_init__(self):
+        """Log initial state after initialization."""
         logger.debug(
-            f"Download progress tracker initialized. Total size: {total_size or 'unknown'} bytes"
+            f"Download progress tracker initialized. Total size: {self.total_size or 'unknown'} bytes"
         )
 
     def update(self, bytes_chunk: int) -> bool:
@@ -278,23 +281,17 @@ class DownloadProgressTracker:
         return True
 
 
+@attrs.define
 class DownloadHandler:
     """Handles HTTP downloads with retry logic and progress tracking."""
 
-    def __init__(
-        self,
-        client=None,
-        timeout: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
-    ):
-        """Initialize download handler.
+    client: Any = attrs.field(default=None)
+    timeout: float = attrs.field(default=DEFAULT_HTTP_TIMEOUT_SECONDS)
+    _client_is_external: bool = attrs.field(init=False)
 
-        Args:
-            client: HTTP client
-            timeout: Download timeout in seconds
-        """
-        self.client = client
-        self.timeout = timeout
-        self._client_is_external = client is not None
+    def __attrs_post_init__(self):
+        """Initialize state after creation."""
+        self._client_is_external = self.client is not None
 
     def __enter__(self):
         """Enter context manager."""
@@ -592,32 +589,25 @@ def make_api_request(
     return status_code, response_data
 
 
+@attrs.define
 class VisionDownloadManager:
     """Handles downloading Vision data files with validation and processing."""
 
-    def __init__(
-        self,
-        client,
-        symbol: str,
-        interval: str,
-        market_type: str = "spot",
-    ):
-        """Initialize the Vision Download Manager.
+    client: Any = attrs.field()
+    symbol: str = attrs.field()
+    interval: str = attrs.field()
+    market_type: str = attrs.field(default="spot")
 
-        Args:
-            client: HTTP client
-            symbol: Trading pair symbol (e.g., "BTCUSDT")
-            interval: Time interval (e.g., "1m", "1h")
-            market_type: Market type (spot, futures_usdt, futures_coin)
-        """
-        self.client = client
-        self.symbol = symbol
-        self.interval = interval
-        self.market_type = market_type
-        self.download_handler = DownloadHandler(client, timeout=API_TIMEOUT)
-        self._external_client = client is not None
-        self._current_tasks = []
-        self._temp_files = []
+    # Non-init fields with default values
+    download_handler: DownloadHandler = attrs.field(init=False)
+    _external_client: bool = attrs.field(init=False)
+    _current_tasks: List = attrs.field(factory=list, init=False)
+    _temp_files: List[Path] = attrs.field(factory=list, init=False)
+
+    def __attrs_post_init__(self):
+        """Initialize state after creation."""
+        self.download_handler = DownloadHandler(self.client, timeout=API_TIMEOUT)
+        self._external_client = self.client is not None
 
     def _cleanup_resources(self):
         """Clean up resources used by the download manager.

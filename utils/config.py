@@ -11,6 +11,7 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Dict, Final, List
 
+import attrs
 import pandas as pd
 
 # Time-related constants
@@ -230,13 +231,14 @@ DEFAULT_LOG_DIR = Path.home() / ".binance_data_logs"
 
 
 # Feature flags
+@attrs.define
 class FeatureFlags:
     """System-wide feature flags for enabling/disabling functionality."""
 
-    ENABLE_CACHE: bool = True
-    VALIDATE_CACHE_ON_READ: bool = True
-    USE_VISION_FOR_LARGE_REQUESTS: bool = True
-    VALIDATE_DATA_ON_WRITE: bool = True
+    ENABLE_CACHE: bool = attrs.field(default=True)
+    VALIDATE_CACHE_ON_READ: bool = attrs.field(default=True)
+    USE_VISION_FOR_LARGE_REQUESTS: bool = attrs.field(default=True)
+    VALIDATE_DATA_ON_WRITE: bool = attrs.field(default=True)
 
     @classmethod
     def update(cls, **kwargs: Any) -> None:

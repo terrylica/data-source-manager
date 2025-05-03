@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 import re
-from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Optional
+
+import attrs  # Add this import
 
 from utils.config import (
     MIN_LONG_SYMBOL_LENGTH,
@@ -269,20 +270,20 @@ class Interval(Enum):
         return self.value
 
 
-@dataclass
+@attrs.define
 class MarketCapabilities:
     """Encapsulates the capabilities and constraints of a market type."""
 
-    primary_endpoint: str  # Primary API endpoint
-    backup_endpoints: List[str]  # List of backup endpoints
-    data_only_endpoint: Optional[str]  # Endpoint for market data only
-    api_version: str  # API version to use
-    supported_intervals: List[Interval]  # List of supported intervals
-    symbol_format: str  # Example format for symbols
-    description: str  # Detailed description of market capabilities
-    max_limit: int  # Maximum number of records per request
-    endpoint_reliability: str  # Description of endpoint reliability
-    default_symbol: str  # Default symbol for this market type
+    primary_endpoint: str = attrs.field()  # Primary API endpoint
+    backup_endpoints: List[str] = attrs.field()  # List of backup endpoints
+    data_only_endpoint: Optional[str] = attrs.field()  # Endpoint for market data only
+    api_version: str = attrs.field()  # API version to use
+    supported_intervals: List[Interval] = attrs.field()  # List of supported intervals
+    symbol_format: str = attrs.field()  # Example format for symbols
+    description: str = attrs.field()  # Detailed description of market capabilities
+    max_limit: int = attrs.field()  # Maximum number of records per request
+    endpoint_reliability: str = attrs.field()  # Description of endpoint reliability
+    default_symbol: str = attrs.field()  # Default symbol for this market type
 
     @property
     def api_base_url(self) -> str:
@@ -703,8 +704,11 @@ def validate_symbol_for_market_type(
     Raises:
         ValueError: If the symbol is not valid for the specified market type
     """
-    # If symbol is None or empty, use default symbol for validation
-    if not symbol:
+    # If symbol is None, use default symbol for validation
+    # But empty strings should raise an error
+    if symbol == "":
+        raise ValueError("Symbol cannot be empty")
+    if symbol is None:
         symbol = get_default_symbol(market_type)
 
     # Get the expected format from market capabilities

@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """Data Source Manager (DSM) that mediates between different data sources."""
 
-from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
+import attrs
 import pandas as pd
 
 from core.providers.binance.cache_manager import UnifiedCacheManager
@@ -30,10 +30,15 @@ from utils.for_core.dsm_date_range_utils import (
     calculate_date_range,
     get_date_range_description,
 )
+from utils.for_core.dsm_fcp_utils import (
+    handle_error,
+    process_cache_step,
+    process_rest_step,
+    process_vision_step,
+    validate_interval,
+    verify_final_data,
+)
 from utils.for_core.dsm_time_range_utils import (
-    identify_missing_segments,
-    merge_adjacent_ranges,
-    merge_dataframes,
     standardize_columns,
 )
 from utils.logger_setup import logger
@@ -52,7 +57,7 @@ class DataSource(Enum):
 T = TypeVar("T")
 
 
-@dataclass
+@attrs.define
 class DataSourceConfig:
     """Configuration for DataSourceManager.
 
@@ -75,16 +80,16 @@ class DataSourceConfig:
     """
 
     # Mandatory parameters
-    market_type: MarketType
-    provider: DataProvider
+    market_type: MarketType = attrs.field()
+    provider: DataProvider = attrs.field()
 
     # Optional parameters with defaults
-    chart_type: ChartType = ChartType.KLINES
-    cache_dir: Optional[Path] = None
-    use_cache: bool = True
-    retry_count: int = 5
+    chart_type: ChartType = attrs.field(default=ChartType.KLINES)
+    cache_dir: Optional[Path] = attrs.field(default=None)
+    use_cache: bool = attrs.field(default=True)
+    retry_count: int = attrs.field(default=5)
 
-    def __post_init__(self):
+    def __attrs_post_init__(self):
         """Validate parameters after initialization."""
         if not isinstance(self.market_type, MarketType):
             raise TypeError(
@@ -537,38 +542,14 @@ class DataSourceManager:
         Returns:
             DataFrame with aligned data from the selected sources
         """
-        # Import needed at function level to avoid circular imports
-        from utils.for_core.vision_exceptions import UnsupportedIntervalError
-        from utils.market_constraints import (
-            get_market_capabilities,
-            is_interval_supported,
-        )
-
-        # Validate that the interval is supported by the market type
-        if not is_interval_supported(self.market_type, interval):
-            capabilities = get_market_capabilities(self.market_type)
-            supported_intervals = [i.value for i in capabilities.supported_intervals]
-
-            # Find the minimum supported interval for suggestion
-            min_interval = min(
-                capabilities.supported_intervals, key=lambda x: x.to_seconds()
-            )
-
-            error_msg = (
-                f"Interval {interval.value} is not supported by {self.market_type.name} market. "
-                f"Supported intervals: {supported_intervals}. "
-                f"Consider using {min_interval.value} (minimum supported interval) "
-                f"or another interval from the list."
-            )
-
-            logger.error(error_msg)
-            raise UnsupportedIntervalError(error_msg)
-
         # Use chart_type from instance if None is provided
         if chart_type is None:
             chart_type = self.chart_type
 
         try:
+            # Validate interval against market type
+            validate_interval(self.market_type, interval)
+
             logger.debug(
                 f"[FCP] get_data called with use_cache={self.use_cache} for symbol={symbol}, interval={interval.value}, chart_type={chart_type.name}"
             )
@@ -600,41 +581,26 @@ class DataSourceManager:
 
             # Initialize result DataFrame to hold progressively merged data
             result_df = pd.DataFrame()
+            missing_ranges = []
 
             # ----------------------------------------------------------------
             # STEP 1: Local Cache Retrieval
             # ----------------------------------------------------------------
-            if self.use_cache and enforce_source not in (
+            skip_cache = not self.use_cache or enforce_source in (
                 DataSource.REST,
                 DataSource.VISION,
-            ):
-                logger.info(f"[FCP] STEP 1: Checking local cache for {symbol}")
-                # Get data from cache
-                cache_df, missing_ranges = self._get_from_cache(
-                    symbol, aligned_start, aligned_end, interval
+            )
+
+            if not skip_cache:
+                result_df, missing_ranges = process_cache_step(
+                    use_cache=self.use_cache,
+                    get_from_cache_func=self._get_from_cache,
+                    symbol=symbol,
+                    aligned_start=aligned_start,
+                    aligned_end=aligned_end,
+                    interval=interval,
+                    include_source_info=include_source_info,
                 )
-
-                if not cache_df.empty:
-                    # Add source info if requested
-                    if include_source_info and "_data_source" not in cache_df.columns:
-                        cache_df["_data_source"] = "CACHE"
-
-                    # Log the time range of the cache data
-                    min_time = cache_df["open_time"].min()
-                    max_time = cache_df["open_time"].max()
-                    logger.debug(
-                        f"[FCP] Cache data provides records from {min_time} to {max_time}"
-                    )
-
-                    # Set result_df to the cache data
-                    result_df = cache_df
-                    logger.info(f"[FCP] Cache contributed {len(cache_df)} records")
-                else:
-                    # If cache is empty, treat entire range as missing
-                    missing_ranges = [(aligned_start, aligned_end)]
-                    logger.debug(
-                        f"[FCP] No cache data available, entire range marked as missing: {aligned_start} to {aligned_end}"
-                    )
             else:
                 if enforce_source == DataSource.REST:
                     logger.info("[FCP] Cache check skipped due to enforce_source=REST")
@@ -652,163 +618,36 @@ class DataSourceManager:
             # STEP 2: Vision API Retrieval with Iterative Merge
             # ----------------------------------------------------------------
             if enforce_source != DataSource.REST and missing_ranges:
-                logger.info("[FCP] STEP 2: Checking Vision API for missing data")
-
-                # Process each missing range
-                vision_ranges_to_fetch = (
-                    missing_ranges.copy()
-                )  # All ranges will be processed by Vision API
-
-                # Process Vision API ranges
-                if vision_ranges_to_fetch and enforce_source != DataSource.REST:
-                    remaining_ranges = []
-
-                    for range_idx, (miss_start, miss_end) in enumerate(
-                        vision_ranges_to_fetch
-                    ):
-                        logger.debug(
-                            f"[FCP] Fetching from Vision API range {range_idx + 1}/{len(vision_ranges_to_fetch)}: {miss_start} to {miss_end}"
-                        )
-
-                        range_df = self._fetch_from_vision(
-                            symbol, miss_start, miss_end, interval
-                        )
-
-                        if not range_df.empty:
-                            # Add source info
-                            if (
-                                include_source_info
-                                and "_data_source" not in range_df.columns
-                            ):
-                                range_df["_data_source"] = "VISION"
-
-                            # If we already have data, merge with the new data
-                            if not result_df.empty:
-                                logger.debug(
-                                    f"[FCP] Merging {len(range_df)} Vision records with existing {len(result_df)} records"
-                                )
-                                result_df = merge_dataframes([result_df, range_df])
-                            else:
-                                # Otherwise just use the Vision data
-                                result_df = range_df
-
-                            # Save to cache if enabled (removed as it's now handled in _fetch_from_vision)
-                            # Note: Full day's data is now cached directly in _fetch_from_vision
-
-                            # Check if Vision API returned all expected records or if there are gaps
-                            if not result_df.empty:
-                                # Identify any remaining missing segments from Vision API
-                                missing_segments = identify_missing_segments(
-                                    result_df, miss_start, miss_end, interval
-                                )
-
-                                if missing_segments:
-                                    logger.debug(
-                                        f"[FCP] Vision API left {len(missing_segments)} missing segments"
-                                    )
-                                    remaining_ranges.extend(missing_segments)
-                                else:
-                                    logger.debug(
-                                        "[FCP] Vision API provided complete coverage for this range"
-                                    )
-                        else:
-                            # Vision API returned no data for this range
-                            logger.debug("[FCP] Vision API returned no data for range")
-                            remaining_ranges.append((miss_start, miss_end))
-
-                    # Update missing_ranges to only include what's still missing after Vision API
-                    if remaining_ranges:
-                        # Merge adjacent or overlapping ranges
-                        missing_ranges = merge_adjacent_ranges(
-                            remaining_ranges, interval
-                        )
-                        logger.debug(
-                            f"[FCP] After Vision API, still have {len(missing_ranges)} missing ranges"
-                        )
-                    else:
-                        missing_ranges = []
-                        logger.debug("[FCP] No missing ranges after Vision API")
+                result_df, missing_ranges = process_vision_step(
+                    fetch_from_vision_func=self._fetch_from_vision,
+                    symbol=symbol,
+                    missing_ranges=missing_ranges,
+                    interval=interval,
+                    include_source_info=include_source_info,
+                    result_df=result_df,
+                )
 
             # ----------------------------------------------------------------
             # STEP 3: REST API Fallback with Final Merge
             # ----------------------------------------------------------------
             if missing_ranges and enforce_source != DataSource.VISION:
-                logger.info(
-                    f"[FCP] STEP 3: Using REST API for {len(missing_ranges)} remaining missing ranges"
+                result_df = process_rest_step(
+                    fetch_from_rest_func=self._fetch_from_rest,
+                    symbol=symbol,
+                    missing_ranges=missing_ranges,
+                    interval=interval,
+                    include_source_info=include_source_info,
+                    result_df=result_df,
+                    save_to_cache_func=self._save_to_cache if self.use_cache else None,
                 )
-
-                # Merge adjacent ranges to minimize API calls
-                merged_rest_ranges = merge_adjacent_ranges(missing_ranges, interval)
-
-                for range_idx, (miss_start, miss_end) in enumerate(merged_rest_ranges):
-                    logger.debug(
-                        f"[FCP] Fetching from REST API range {range_idx + 1}/{len(merged_rest_ranges)}: {miss_start} to {miss_end}"
-                    )
-
-                    rest_df = self._fetch_from_rest(
-                        symbol, miss_start, miss_end, interval
-                    )
-
-                    if not rest_df.empty:
-                        # Add source info
-                        if (
-                            include_source_info
-                            and "_data_source" not in rest_df.columns
-                        ):
-                            rest_df["_data_source"] = "REST"
-
-                        # If we already have data, merge with the new data
-                        if not result_df.empty:
-                            logger.debug(
-                                f"[FCP] Merging {len(rest_df)} REST records with existing {len(result_df)} records"
-                            )
-                            result_df = merge_dataframes([result_df, rest_df])
-                        else:
-                            # Otherwise just use the REST data
-                            result_df = rest_df
-
-                        # Save to cache if enabled
-                        if self.use_cache:
-                            logger.debug("[FCP] Auto-saving REST data to cache")
-                            self._save_to_cache(
-                                rest_df, symbol, interval, source="REST"
-                            )
 
             # ----------------------------------------------------------------
             # Final check and standardization
             # ----------------------------------------------------------------
-            if result_df.empty:
-                logger.critical(
-                    "[FCP] CRITICAL ERROR: No data available from any source"
-                )
-                raise RuntimeError(
-                    "All data sources failed. Unable to retrieve data for the requested time range."
-                )
+            verify_final_data(result_df, aligned_start, aligned_end)
 
             # Standardize columns
             result_df = standardize_columns(result_df)
-
-            # Final verification of the result
-            min_time = result_df["open_time"].min()
-            max_time = result_df["open_time"].max()
-            logger.debug(
-                f"[FCP] Final result spans from {min_time} to {max_time} with {len(result_df)} records"
-            )
-
-            # Check if result covers the entire requested range
-            if min_time > aligned_start or max_time < aligned_end:
-                logger.warning(
-                    f"[FCP] Result does not cover full requested range. Missing start: {min_time > aligned_start}, Missing end: {max_time < aligned_end}"
-                )
-
-                if min_time > aligned_start:
-                    logger.warning(
-                        f"[FCP] Missing data at start: {aligned_start} to {min_time}"
-                    )
-                if max_time < aligned_end:
-                    logger.warning(
-                        f"[FCP] Missing data at end: {max_time} to {aligned_end}"
-                    )
 
             # Skip source info column if not requested
             if not include_source_info and "_data_source" in result_df.columns:
@@ -820,47 +659,8 @@ class DataSourceManager:
             return result_df
 
         except Exception as e:
-            # Improved error handling for any exception in the main get_data method
-            try:
-                # Sanitize error message to prevent binary data from causing rich formatting issues
-                error_message = str(e)
-                # Replace any non-printable characters
-                safe_error_message = "".join(
-                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message
-                )
-
-                logger.critical(f"Error in get_data: {safe_error_message}")
-                logger.critical(f"Error type: {type(e).__name__}")
-
-                # More controlled traceback handling
-                import traceback
-
-                tb_string = traceback.format_exc()
-                # Sanitize the traceback
-                safe_tb = "".join(
-                    c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string
-                )
-                tb_lines = safe_tb.splitlines()
-
-                logger.critical("Traceback summary:")
-                for line in tb_lines[:3]:
-                    logger.critical(line)
-                logger.critical("...")
-                for line in tb_lines[-3:]:
-                    logger.critical(line)
-            except Exception as nested_error:
-                # If even our error handling fails, log a simpler message
-                logger.critical(f"Critical error in get_data: {type(e).__name__}")
-                logger.critical(
-                    f"Error handling also failed: {type(nested_error).__name__}"
-                )
-
-            # Re-raise the exception to properly exit with error rather than returning an empty DataFrame
-            if "All data sources failed" in str(e):
-                raise
-            raise RuntimeError(
-                f"Failed to retrieve data from all sources: {safe_error_message}"
-            )
+            # Improved error handling using the dedicated error handler
+            handle_error(e)
 
     def __enter__(self):
         """Context manager entry."""
