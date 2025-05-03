@@ -72,7 +72,11 @@ lint.select = [
     "PL",        # Pylint: All Pylint rules - Ruff covers many, but PL includes Pylint-specific ones not fully redundant
     "RUF",       # Ruff-specific rules (idiomatic suggestions) - Essential for Ruff's unique checks
 ]
-lint.ignore = ["E501"]
+lint.ignore = [
+    "E501",      # Line too long - Allow longer lines for better readability in some cases
+    "PLR0913",   # Too many arguments - Allow functions with many args when necessary
+    "PLR0915",   # Too many class variables - Allow class variables when necessary
+]
 # Align with project.requires-python (>=3.11)
 # Ruff comment - this cannot be inherited automatically
 target-version = "py311"
