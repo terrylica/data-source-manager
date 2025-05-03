@@ -743,7 +743,7 @@ class DataValidation:
     @staticmethod
     def validate_file_with_checksum(
         file_path: Path,
-        expected_checksum: str = None,
+        expected_checksum: str | None = None,
         min_size: int = MIN_VALID_FILE_SIZE,
         max_age: timedelta = MAX_CACHE_AGE,
     ) -> bool:

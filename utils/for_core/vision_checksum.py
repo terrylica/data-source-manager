@@ -247,7 +247,7 @@ def calculate_checksums_multiple_methods(file_path: Path) -> Dict[str, str]:
         return {"sha256": ""}
 
 
-def verify_checksum_cli(file_path: str, checksum_path: str = None) -> None:
+def verify_checksum_cli(file_path: str, checksum_path: str | None = None) -> None:
     """
     CLI-friendly function to verify a file's checksum against a checksum file.
 

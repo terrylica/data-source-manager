@@ -242,7 +242,7 @@ def _setup_root_logger(level=None, use_rich=None):
     """
     Configure the root logger with specified level and colorized output.
     """
-    global _root_configured, _use_rich, FORMAT
+    global _root_configured, _use_rich
 
     # Determine whether to use rich
     if use_rich is None:
@@ -725,6 +725,7 @@ class LoggerProxy:
             from rich.progress import Progress
 
             return Progress(*args, **kwargs)
+
         # Return a no-op context manager when output should be suppressed
         class NoOpProgress:
             def __enter__(self):
@@ -736,19 +737,19 @@ class LoggerProxy:
             def add_task(self, *_args, **_kwargs):
                 """No-op implementation of add_task that simply returns a task ID of 0.
 
-                    Args:
-                        *_args: Positional arguments required for API compatibility with Progress.add_task
-                        **_kwargs: Keyword arguments required for API compatibility with Progress.add_task
-                    """
+                Args:
+                    *_args: Positional arguments required for API compatibility with Progress.add_task
+                    **_kwargs: Keyword arguments required for API compatibility with Progress.add_task
+                """
                 return 0
 
             def update(self, *_args, **_kwargs):
                 """No-op implementation of update that does nothing.
 
-                    Args:
-                        *_args: Positional arguments required for API compatibility with Progress.update
-                        **_kwargs: Keyword arguments required for API compatibility with Progress.update
-                    """
+                Args:
+                    *_args: Positional arguments required for API compatibility with Progress.update
+                    **_kwargs: Keyword arguments required for API compatibility with Progress.update
+                """
 
         return NoOpProgress()
 
@@ -945,12 +946,11 @@ if __name__ == "__main__":
 
 
 def _configure_timeout_logger():
-    """Configure the dedicated logger for timeout events.
-
-    This creates a separate file-based logger specifically for logging timeout events,
+    """
+    Configure the timeout logger for dedicated timeout logging,
     which can be used for analyzing performance issues.
     """
-    global _timeout_logger, _timeout_logger_configured, _timeout_log_file
+    global _timeout_logger, _timeout_logger_configured
 
     if _timeout_logger_configured:
         return _timeout_logger
@@ -985,24 +985,21 @@ def _configure_timeout_logger():
 
 
 def log_timeout(
-    operation: str, timeout_value: float, module_name: str = None, details: dict = None
+    operation: str,
+    timeout_value: float,
+    module_name: str | None = None,
+    details: dict | None = None,
 ):
     """Log a timeout event to the dedicated timeout log file.
-
-    This function provides a centralized way to log timeout events, making it easier
-    to analyze performance issues related to timeouts.
 
     Args:
         operation: Description of the operation that timed out
         timeout_value: The timeout value in seconds that was breached
-        module_name: Optional module name (detected automatically if not provided)
+        module_name: Optional name of the module where the timeout occurred
         details: Optional dictionary with additional details about the operation
     """
-    global _timeout_logger
-
     # Configure logger if needed
-    if not _timeout_logger_configured:
-        _configure_timeout_logger()
+    _configure_timeout_logger()
 
     # Auto-detect module name if not provided
     if module_name is None:
@@ -1052,12 +1049,11 @@ def set_timeout_log_file(path: str):
 
 # Function to configure and enable error logging
 def _configure_error_logger():
-    """Configure the dedicated logger for error, warning, and critical events.
-
-    This creates a separate file-based logger specifically for logging error level
+    """
+    Configure the error logger for dedicated error, warning, and critical logging,
     and above events, which can be used for monitoring and troubleshooting.
     """
-    global _error_logger, _error_logger_configured, _error_log_file
+    global _error_logger, _error_logger_configured
 
     if _error_logger_configured:
         return _error_logger

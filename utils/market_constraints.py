@@ -794,7 +794,7 @@ def validate_symbol_for_market_type(
 def get_endpoint_url(
     market_type: MarketType,
     chart_type: str | ChartType,
-    version: str = None,
+    version: str | None = None,
     data_provider: DataProvider = DataProvider.BINANCE,
 ) -> str:
     """Get the URL for a specific endpoint based on market type.

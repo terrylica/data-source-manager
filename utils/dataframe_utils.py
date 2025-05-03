@@ -357,7 +357,7 @@ def standardize_dataframe(
 
     # Add open_time to front of column list if we're keeping it as a column
     if keep_as_column:
-        standard_columns = [CANONICAL_INDEX_NAME] + standard_columns
+        standard_columns = [CANONICAL_INDEX_NAME, *standard_columns]
 
     # Add data source info if present
     if "_data_source" in df.columns:

@@ -30,7 +30,7 @@ def showcase_backward_retrieval(
     interval: str = "1m",
     days: int = 10,
     log_level: str = "INFO",
-    log_timestamp: str = None,
+    log_timestamp: str | None = None,
 ) -> None:
     """
     Demonstrate backward data retrieval from a specified end time.

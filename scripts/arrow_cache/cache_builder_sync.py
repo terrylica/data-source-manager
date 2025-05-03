@@ -495,7 +495,6 @@ def get_first_date_in_cache(symbol, interval_str):
 
 def setup_signal_handlers():
     """Set up signal handlers for graceful shutdown."""
-    global SHUTDOWN_REQUESTED
 
     def handle_interrupt(*_args):
         """
@@ -505,7 +504,6 @@ def setup_signal_handlers():
             *_args: Signal number and frame, required by the signal handler interface
                   but not used in this implementation
         """
-        global SHUTDOWN_REQUESTED
         logger.warning("Received interrupt signal, initiating graceful shutdown...")
         SHUTDOWN_REQUESTED = True
 

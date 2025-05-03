@@ -120,7 +120,7 @@ class SafeMemoryMap:
                     # Ensure index column is included
                     all_cols = reader.schema.names
                     if "open_time" in all_cols and "open_time" not in columns:
-                        cols_to_read = ["open_time"] + list(columns)
+                        cols_to_read = ["open_time", *list(columns)]
                     else:
                         cols_to_read = list(columns)
                     table = reader.read_all().select(cols_to_read)
@@ -192,8 +192,8 @@ class CacheValidator:
     def validate_cache_integrity(
         cls,
         cache_path: Path,
-        max_age: timedelta = None,
-        min_size: int = None,
+        max_age: timedelta | None = None,
+        min_size: int | None = None,
     ) -> Optional[CacheValidationError]:
         """Validate cache file existence, size, and age.
 
@@ -266,7 +266,7 @@ class CacheValidator:
     def validate_cache_metadata(
         cls,
         cache_info: Optional[Dict[str, Any]],
-        required_fields: list = None,
+        required_fields: list | None = None,
     ) -> bool:
         """Validate cache metadata contains required information.
 
@@ -306,12 +306,12 @@ class CacheValidator:
     async def validate_cache_data(
         self,
         df: pd.DataFrame,
-        options: ValidationOptions = None,
-        allow_empty: bool = None,
+        options: ValidationOptions | None = None,
+        allow_empty: bool | None = None,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
         interval: Optional[Interval] = None,
-        symbol: str = None,
+        symbol: str | None = None,
     ) -> Optional[CacheValidationError]:
         """Validate cached data DataFrame.
 
@@ -434,7 +434,7 @@ class CacheValidator:
                         # Ensure index column is included
                         all_cols = reader.schema.names
                         if "open_time" in all_cols and "open_time" not in columns:
-                            cols_to_read = ["open_time"] + list(columns)
+                            cols_to_read = ["open_time", *list(columns)]
                         else:
                             cols_to_read = list(columns)
                         table = reader.read_all().select(cols_to_read)
@@ -480,10 +480,10 @@ class CacheValidator:
     async def align_cached_data_to_api_boundaries(
         self,
         df: pd.DataFrame,
-        options_or_start_time: Union[AlignmentOptions, datetime] = None,
+        options_or_start_time: Union[AlignmentOptions, datetime] | None = None,
         end_time_or_interval: Optional[Union[datetime, Interval]] = None,
         interval_or_symbol: Optional[Union[Interval, str]] = None,
-        symbol: str = None,
+        symbol: str | None = None,
     ) -> pd.DataFrame:
         """Align cache data to match what would be returned by the Binance REST API.
 
@@ -606,11 +606,11 @@ class CacheKeyManager:
         symbol: str,
         interval: str,
         date: datetime,
-        options: CachePathOptions = None,
-        exchange: str = None,
-        market_type: str = None,
-        data_nature: str = None,
-        packaging_frequency: str = None,
+        options: CachePathOptions | None = None,
+        exchange: str | None = None,
+        market_type: str | None = None,
+        data_nature: str | None = None,
+        packaging_frequency: str | None = None,
     ) -> Path:
         """Generate standardized cache path.
 
@@ -783,8 +783,8 @@ class VisionCacheManager:
 
 def validate_cache_integrity(
     cache_path: Path,
-    max_age: timedelta = None,
-    min_size: int = None,
+    max_age: timedelta | None = None,
+    min_size: int | None = None,
 ) -> Optional[CacheValidationError]:
     """Standalone version of CacheValidator.validate_cache_integrity.
 
@@ -814,7 +814,7 @@ def validate_cache_checksum(cache_path: Path, stored_checksum: str) -> bool:
 
 def validate_cache_metadata(
     cache_info: Optional[Dict[str, Any]],
-    required_fields: list = None,
+    required_fields: list | None = None,
 ) -> bool:
     """Standalone version of CacheValidator.validate_cache_metadata.
 

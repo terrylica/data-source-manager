@@ -415,7 +415,11 @@ class DataSourceManager:
         )
 
     def _save_to_cache(
-        self, df: pd.DataFrame, symbol: str, interval: Interval, source: str = None
+        self,
+        df: pd.DataFrame,
+        symbol: str,
+        interval: Interval,
+        source: str | None = None,
     ) -> None:
         """Save data to cache.
 
@@ -600,8 +604,9 @@ class DataSourceManager:
             # ----------------------------------------------------------------
             # STEP 1: Local Cache Retrieval
             # ----------------------------------------------------------------
-            if (
-                self.use_cache and enforce_source not in (DataSource.REST, DataSource.VISION)
+            if self.use_cache and enforce_source not in (
+                DataSource.REST,
+                DataSource.VISION,
             ):
                 logger.info(f"[FCP] STEP 1: Checking local cache for {symbol}")
                 # Get data from cache

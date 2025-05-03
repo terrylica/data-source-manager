@@ -30,7 +30,7 @@ def generate_markdown_docs_with_typer_cli(
     app: typer.Typer,
     output_dir: str = "docs/dsm_demo_cli",
     filename: str = "README.md",
-    cli_name: str = None,
+    cli_name: str | None = None,
 ):
     """Generate markdown documentation using typer-cli.
 
@@ -127,12 +127,12 @@ This CLI tool {RETRIEVES_DATA}:
 
         for option, description in options_list:
             # Clean up the description
-            description = description.strip()
+            clean_description = description.strip()
             # Format with all on one line, no breaks
-            description = description.replace("\n", " ").strip()
+            clean_description = clean_description.replace("\n", " ").strip()
 
             # Format as bullet point with bold option
-            options_formatted.append(f"- **`{option}`**: {description}")
+            options_formatted.append(f"- **`{option}`**: {clean_description}")
 
         options_formatted.append("- **`-h, --help`**: Show this message and exit.")
 
@@ -200,14 +200,14 @@ def process_sample_commands(sample_commands_text):
     current_group = {"description": None, "commands": [], "section": None}
 
     for line in lines:
-        line = line.strip()
+        clean_line = line.strip()
 
         # Skip empty lines in initial processing
-        if not line:
+        if not clean_line:
             continue
 
         # Handle section headers
-        if line.startswith("### "):
+        if clean_line.startswith("### "):
             # Start new section
             if current_group["commands"]:
                 command_groups.append(current_group)
@@ -217,13 +217,13 @@ def process_sample_commands(sample_commands_text):
                     "section": None,
                 }
 
-            current_section = line
+            current_section = clean_line
             # Don't append section header yet - we'll only do this if it has content
             section_headers[current_section] = False  # Initialize section as empty
             current_group["section"] = current_section
 
         # Handle command descriptions with '>'
-        elif line.startswith(">"):
+        elif clean_line.startswith(">"):
             # If we have commands in the current group, save it and start a new one
             if current_group["commands"]:
                 command_groups.append(current_group)
@@ -234,14 +234,14 @@ def process_sample_commands(sample_commands_text):
                 }
 
             # Convert to heading and remove trailing colon if present
-            desc = line.replace(">", "").strip()
+            desc = clean_line.replace(">", "").strip()
             if desc.endswith(":"):
                 desc = desc[:-1]  # Remove trailing colon
             current_group["description"] = desc
 
         # Handle command lines
-        elif line.startswith("./"):
-            current_group["commands"].append(line)
+        elif clean_line.startswith("./"):
+            current_group["commands"].append(clean_line)
             if current_section:
                 section_headers[current_section] = (
                     True  # Mark section as having content
@@ -299,7 +299,7 @@ def generate_markdown_docs(
     output_dir: str = "docs/dsm_demo_cli",
     filename: str = "README.md",
     gen_lint_config: bool = False,
-    cli_name: str = None,
+    cli_name: str | None = None,
 ):
     """Generate Markdown documentation from a Typer app.
 

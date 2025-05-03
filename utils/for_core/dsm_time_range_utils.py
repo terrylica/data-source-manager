@@ -210,22 +210,21 @@ def merge_dataframes(dfs: List[pd.DataFrame]) -> pd.DataFrame:
         if "open_time" not in df.columns:
             logger.debug(f"Converting index to open_time column in DataFrame {i}")
             if df.index.name == "open_time":
-                df = df.reset_index()
+                df_reset = df.reset_index()
+                dfs[i] = df_reset  # Update the DataFrame in the list
             else:
                 logger.warning(f"DataFrame {i} has no open_time column or index")
+                continue  # Skip this DataFrame as we can't process it
 
         # Ensure open_time is a datetime column
-        if not pd.api.types.is_datetime64_any_dtype(df["open_time"]):
+        if not pd.api.types.is_datetime64_any_dtype(dfs[i]["open_time"]):
             logger.debug(f"Converting open_time to datetime in DataFrame {i}")
-            df["open_time"] = pd.to_datetime(df["open_time"], utc=True)
+            dfs[i]["open_time"] = pd.to_datetime(dfs[i]["open_time"], utc=True)
 
         # Add data source information if missing
-        if "_data_source" not in df.columns:
+        if "_data_source" not in dfs[i].columns:
             logger.debug(f"Adding unknown source tag to DataFrame {i}")
-            df["_data_source"] = "UNKNOWN"
-
-        # Replace the DataFrame in the list with the processed version
-        dfs[i] = df
+            dfs[i]["_data_source"] = "UNKNOWN"
 
     # Log source counts before merging
     for i, df in enumerate(dfs):

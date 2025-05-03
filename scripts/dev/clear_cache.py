@@ -137,7 +137,7 @@ def clear(
 def clear_directory(
     directory: str,
     protocol: str = "file",
-    storage_options: dict = None,
+    storage_options: dict | None = None,
     test_mode: bool = False,
     create_if_missing: bool = False,
 ):

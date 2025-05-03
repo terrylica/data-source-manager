@@ -170,7 +170,7 @@ class ArrowCacheReader:
                 WHERE symbol = ? AND interval = ? AND date IN ({placeholders})
                 AND path LIKE ?
                 """,
-                [symbol, interval_str] + all_dates + [path_pattern],
+                [symbol, interval_str, *all_dates, path_pattern],
             )
 
             results = cursor.fetchall()

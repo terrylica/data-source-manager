@@ -52,7 +52,9 @@ def fetch_data(inst_type: str) -> List[dict]:
     return []
 
 
-def load_and_filter_data(file_path: str, filter_criteria: str = None) -> List[dict]:
+def load_and_filter_data(
+    file_path: str, filter_criteria: str | None = None
+) -> List[dict]:
     """Load data from local file as fallback"""
     script_dir = Path(__file__).parent.absolute()
     full_path = script_dir / file_path
@@ -176,7 +178,7 @@ def analyze(
                 spot_item = pair["spot"]
                 swap_item = pair["swap"]
                 rprint(
-                    f"{i+1}. {spot_item.get('instId')}, Base: {spot_item.get('baseCcy')}, Quote: {spot_item.get('quoteCcy')}"
+                    f"{i + 1}. {spot_item.get('instId')}, Base: {spot_item.get('baseCcy')}, Quote: {spot_item.get('quoteCcy')}"
                 )
                 rprint(f"   └─ Swap: {swap_item.get('instId')}")
         else:
