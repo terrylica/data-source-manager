@@ -65,36 +65,6 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*" 
 
-[tool.pyright]
-include = ["core", "utils", "examples", "scripts"]
-exclude = [
-    "**/__pycache__",
-    "playground",
-    "venv",
-    ".git",
-    ".vscode",
-    ".ruff_cache",
-    ".ropeproject"
-]
-pythonVersion = "3.11"
-typeCheckingMode = "basic"
-useLibraryCodeForTypes = true
-reportMissingImports = true
-reportMissingTypeStubs = false
-reportPrivateImportUsage = false
-reportUnknownMemberType = false
-reportOptionalMemberAccess = false
-reportGeneralTypeIssues = false
-reportAttributeAccessIssue = false
-reportCallIssue = false
-reportArgumentType = false
-reportReturnType = false
-reportAssignmentType = false
-reportOperatorIssue = false
-reportInvalidTypeVarUse = false
-reportPropertyTypeMismatch = false
-reportUndefinedVariable = false
-
 [tool.ruff]
 # preview = true # Enable preview rules
 lint.select = [
