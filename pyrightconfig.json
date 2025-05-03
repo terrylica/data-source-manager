@@ -1,30 +1,32 @@
+// Pyright configuration file
 {
-  "include": ["core", "utils", "examples", "scripts"],
+  "include": ["core", "utils", "examples", "scripts"], // Specifies the directories that Pyright should include when analyzing code.
   "exclude": [
-    "**/__pycache__",
-    "playground",
-    "venv",
-    ".git",
-    ".vscode",
-    ".ruff_cache",
-    ".ropeproject"
+    // Specifies the directories and patterns that Pyright should exclude from analysis.
+    "**/__pycache__", // Exclude Python cache directories
+    "playground", // Exclude the playground directory
+    "venv", // Exclude virtual environment directories
+    ".git", // Exclude the .git directory
+    ".vscode", // Exclude the .vscode directory
+    ".ruff_cache", // Exclude the ruff cache directory
+    ".ropeproject" // Exclude the ropeproject directory
   ],
-  "pythonVersion": "3.11",
-  "typeCheckingMode": "basic",
-  "useLibraryCodeForTypes": true,
-  "reportMissingImports": true,
-  "reportMissingTypeStubs": false,
-  "reportPrivateImportUsage": false,
-  "reportUnknownMemberType": false,
-  "reportOptionalMemberAccess": false,
-  "reportGeneralTypeIssues": false,
-  "reportAttributeAccessIssue": false,
-  "reportCallIssue": false,
-  "reportArgumentType": false,
-  "reportReturnType": false,
-  "reportAssignmentType": false,
-  "reportOperatorIssue": false,
-  "reportInvalidTypeVarUse": false,
-  "reportPropertyTypeMismatch": false,
-  "reportUndefinedVariable": false
+  "pythonVersion": "3.11", // Specifies the target Python version for analysis.
+  "typeCheckingMode": "basic", // Sets the type checking mode to basic. "basic" is a good starting point, less strict than "strict".
+  "useLibraryCodeForTypes": true, // Uses type information from installed libraries even if they don't have separate stub files (.pyi).
+  "reportMissingImports": true, // Missing import statements (modules that cannot be found).
+  "reportUndefinedVariable": true, // For using variables that have not been defined.
+  "reportAssignmentType": true, // If the type of an assigned value doesn't match the variable's type annotation.
+  "reportCallIssue": false, // Related to function or method calls (e.g., wrong number/type of arguments).
+  "reportArgumentType": false, // Related to the types of arguments passed to functions.
+  "reportReturnType": false, // If a function's return type annotation doesn't match its actual return type.
+  "reportOperatorIssue": false, // Related to using operators on incompatible types.
+  "reportAttributeAccessIssue": false, // Related to accessing attributes that may not exist on an object.
+  "reportOptionalMemberAccess": false, // When accessing members of a type that could potentially be `None`.
+  "reportUnknownMemberType": false, // When the type of a member (attribute or method) is unknown.
+  "reportGeneralTypeIssues": false, // General type issues that don't fall into more specific categories.
+  "reportInvalidTypeVarUse": false, // For incorrect usage of type variables (used in generics).
+  "reportPropertyTypeMismatch": false, // If the type of a property setter doesn't match its getter.
+  "reportMissingTypeStubs": false, // Missing type stubs (.pyi files) for libraries without inline types.
+  "reportPrivateImportUsage": false // Importing names that start with a single underscore.
 }

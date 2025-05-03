@@ -45,8 +45,8 @@ dev = [
     "rope", # for refactoring imports
     "ruff", # for linting and formatting
     "pyright", # for static type checking (latest version)
-    # "pylint", # Ruff covers many Pylint rules
-    # "autoflake", # Ruff handles unused imports
+    "pylint", # Ruff covers many Pylint rules
+    "autoflake", # Ruff handles unused imports
     "vulture", # for dead code detection
     "twine", # for uploading to PyPI
     "tomli" # for reading pyproject.toml
@@ -75,6 +75,7 @@ lint.select = [
 ]
 lint.ignore = [
     "E501",      # Line too long - Allow longer lines for better readability in some cases
+    "PLR0912",   # Too many branches - Allow functions with many branches when necessary
     "PLR0913",   # Too many arguments - Allow functions with many args when necessary
     "PLR0915",   # Too many class variables - Allow class variables when necessary
 ]
