@@ -19,7 +19,12 @@ from typing import List, Literal, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from utils.config import CANONICAL_CLOSE_TIME, CANONICAL_INDEX_NAME, TIMESTAMP_PRECISION
+from utils.config import (
+    CANONICAL_CLOSE_TIME,
+    CANONICAL_INDEX_NAME,
+    MILLISECOND_DIGITS,
+    TIMESTAMP_PRECISION,
+)
 from utils.deprecation_rules import TimeUnit
 from utils.logger_setup import logger
 from utils.market_constraints import Interval as MarketInterval
@@ -47,7 +52,6 @@ __all__ = [
 ]
 
 # Constants for timestamp format detection
-MILLISECOND_DIGITS = 13
 MICROSECOND_DIGITS = 16
 TIMESTAMP_UNIT = "us"  # Default unit for timestamp parsing
 
@@ -127,7 +131,9 @@ def standardize_timestamp_precision(df: pd.DataFrame) -> pd.DataFrame:
 
         # Get a sample timestamp to determine current precision
         sample_ts = result_df.index[0].value
-        current_precision = "us" if len(str(abs(sample_ts))) > 13 else "ms"
+        current_precision = (
+            "us" if len(str(abs(sample_ts))) > MILLISECOND_DIGITS else "ms"
+        )
 
         # Only convert if current precision doesn't match target
         if current_precision != TIMESTAMP_PRECISION:
@@ -172,7 +178,9 @@ def standardize_timestamp_precision(df: pd.DataFrame) -> pd.DataFrame:
             # Get a sample to determine current precision
             if len(result_df) > 0:
                 sample_ts = result_df[col].iloc[0].value
-                current_precision = "us" if len(str(abs(sample_ts))) > 13 else "ms"
+                current_precision = (
+                    "us" if len(str(abs(sample_ts))) > MILLISECOND_DIGITS else "ms"
+                )
 
                 # Only convert if current precision doesn't match target
                 if current_precision != TIMESTAMP_PRECISION:

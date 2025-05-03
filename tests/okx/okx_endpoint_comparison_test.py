@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from utils.logger_setup import logger
+from utils.config import MIN_RECORDS_FOR_COMPARISON
 
 # API constants
 OKX_API_BASE_URL = "https://www.okx.com/api/v5"
@@ -33,7 +34,7 @@ def retry_request(url, params=None, max_retries=MAX_RETRIES):
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logger.error(f"Request failed (attempt {attempt+1}/{max_retries}): {e}")
+            logger.error(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 time.sleep(RETRY_DELAY * (attempt + 1))
             else:
@@ -267,9 +268,10 @@ def test_timestamp_handling(instrument="BTC-USDT", interval="1m", limit=5):
     ref_params = {"instId": instrument, "bar": interval, "limit": limit}
     ref_data = retry_request(CANDLES_ENDPOINT, ref_params)
 
-    if not ref_data.get("data") or len(ref_data["data"]) < 3:
+    if not ref_data.get("data") or len(ref_data["data"]) < MIN_RECORDS_FOR_COMPARISON:
         return {
             "test": "timestamp_handling",
+            "status": "fail",
             "status": "error",
             "message": "Failed to get enough reference data",
         }

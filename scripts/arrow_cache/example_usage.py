@@ -6,6 +6,7 @@ from datetime import datetime
 from rich import print
 
 from utils.arrow_cache_reader import ArrowCacheReader
+from utils.config import MAX_PREVIEW_ITEMS
 from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
@@ -68,10 +69,12 @@ def main():
 
     print(f"\n[bold cyan]Available dates for {symbol} {interval.name}:[/bold cyan]")
     if available_dates:
-        for date in available_dates[:5]:  # Show first 5 dates
+        for date in available_dates[
+            :MAX_PREVIEW_ITEMS
+        ]:  # Show first MAX_PREVIEW_ITEMS dates
             print(f"- {date}")
-        if len(available_dates) > 5:
-            print(f"... and {len(available_dates) - 5} more")
+        if len(available_dates) > MAX_PREVIEW_ITEMS:
+            print(f"... and {len(available_dates) - MAX_PREVIEW_ITEMS} more")
     else:
         print("[yellow]No dates available[/yellow]")
 

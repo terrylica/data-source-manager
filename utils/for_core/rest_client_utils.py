@@ -19,7 +19,7 @@ from tenacity import (
     wait_incrementing,
 )
 
-from utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS
+from utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS, HTTP_OK
 from utils.for_core.rest_exceptions import (
     APIError,
     HTTPError,
@@ -111,7 +111,7 @@ def fetch_chunk(
                 raise RateLimitError(retry_after=retry_after)
 
             # Check for HTTP error codes
-            if response.status_code != 200:
+            if response.status_code != HTTP_OK:
                 error_msg = f"HTTP error {response.status_code}: {response.text}"
                 logger.warning(f"Error response from {endpoint}: {error_msg}")
                 raise HTTPError(response.status_code, error_msg)

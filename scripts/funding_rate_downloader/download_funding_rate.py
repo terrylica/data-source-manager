@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pandas as pd
 
+from utils.config import HTTP_OK
 from utils.logger_setup import logger
 
 # No need to initialize logger with get_logger anymore
@@ -19,7 +20,7 @@ def fetch_funding_rate_history(symbol="BTCUSDT", limit=1000):
 
         logger.info(f"Fetching funding rate history for {symbol} with limit {limit}")
         response = httpx.get(url, params=params)
-        if response.status_code == 200:
+        if response.status_code == HTTP_OK:
             data = response.json()
             logger.info(f"Successfully fetched {len(data)} funding rate records")
             return data

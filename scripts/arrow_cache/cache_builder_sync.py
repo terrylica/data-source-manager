@@ -31,6 +31,7 @@ from pathlib import Path
 import pandas as pd
 import pyarrow as pa
 
+from utils.config import HTTP_NOT_FOUND, SMALL_FILE_SIZE
 from utils.logger_setup import logger
 from utils.market_constraints import Interval, MarketType
 
@@ -123,7 +124,8 @@ def initialize_cache_db():
 
         # If legacy JSON file exists and database is new, migrate data
         if (
-            CACHE_INDEX_FILE.exists() and CACHE_INDEX_DB.stat().st_size < 10000
+            CACHE_INDEX_FILE.exists()
+            and CACHE_INDEX_DB.stat().st_size < SMALL_FILE_SIZE
         ):  # Check if DB is small/new
             logger.info("Legacy JSON cache index found, attempting to migrate data")
             migrate_json_to_sqlite()
@@ -694,7 +696,7 @@ def download_data_with_checksum(
             try:
                 urllib.request.urlretrieve(data_url, data_file)
             except urllib.error.HTTPError as http_err:
-                if http_err.code == 404:
+                if http_err.code == HTTP_NOT_FOUND:
                     if is_current_day:
                         logger.warning(
                             f"Current-day data not available for {symbol} {interval_str} {date_str} (404 Not Found)"
@@ -723,7 +725,7 @@ def download_data_with_checksum(
                 try:
                     urllib.request.urlretrieve(checksum_url, checksum_file)
                 except urllib.error.HTTPError as http_err:
-                    if http_err.code == 404:
+                    if http_err.code == HTTP_NOT_FOUND:
                         logger.warning(
                             f"Checksum file not found for {symbol} {interval_str} {date_str} (404 Not Found)"
                         )

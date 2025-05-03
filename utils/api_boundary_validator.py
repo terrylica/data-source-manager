@@ -14,6 +14,11 @@ from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
+from utils.config import (
+    HTTP_ERROR_CODE_THRESHOLD,
+    HTTP_OK,
+    MILLISECOND_TOLERANCE,
+)
 from utils.logger_setup import logger
 from utils.market_constraints import ChartType, Interval, MarketType, get_endpoint_url
 from utils.network_utils import create_client, safely_close_client
@@ -175,7 +180,10 @@ class ApiBoundaryValidator:
             )
 
             # Check if API boundaries match requested boundaries (within millisecond precision)
-            start_matches = abs((api_start_time - start_time).total_seconds()) < 0.001
+            start_matches = (
+                abs((api_start_time - start_time).total_seconds())
+                < MILLISECOND_TOLERANCE
+            )
             end_within_range = api_end_time <= end_time
 
             result = {
@@ -280,8 +288,13 @@ class ApiBoundaryValidator:
         api_end_time = api_boundaries["api_end_time"]
 
         # Allow a small tolerance (1 millisecond) for timestamp comparisons
-        start_time_match = abs((df_start_time - api_start_time).total_seconds()) < 0.001
-        end_time_match = abs((df_end_time - api_end_time).total_seconds()) < 0.001
+        start_time_match = (
+            abs((df_start_time - api_start_time).total_seconds())
+            < MILLISECOND_TOLERANCE
+        )
+        end_time_match = (
+            abs((df_end_time - api_end_time).total_seconds()) < MILLISECOND_TOLERANCE
+        )
 
         # Also check record count
         df_record_count = len(df)
@@ -488,7 +501,7 @@ class ApiBoundaryValidator:
                     retries += 1
                     continue
 
-                if response.status_code >= 400:
+                if response.status_code >= HTTP_ERROR_CODE_THRESHOLD:
                     logger.error(f"API error {response.status_code}: {response.text}")
                     raise Exception(
                         f"API error {response.status_code}: {response.text}"
@@ -625,7 +638,10 @@ class ApiBoundaryValidator:
             )
 
             # Check if API boundaries match requested boundaries (within millisecond precision)
-            start_matches = abs((api_start_time - start_time).total_seconds()) < 0.001
+            start_matches = (
+                abs((api_start_time - start_time).total_seconds())
+                < MILLISECOND_TOLERANCE
+            )
             end_within_range = api_end_time <= end_time
 
             result = {
@@ -707,7 +723,7 @@ class ApiBoundaryValidator:
             try:
                 response = requests.get(endpoint, params=params, timeout=10.0)
 
-                if response.status_code == 200:
+                if response.status_code == HTTP_OK:
                     data = response.json()
                     logger.debug(f"Received {len(data)} records from API (sync)")
                     return data
@@ -715,21 +731,21 @@ class ApiBoundaryValidator:
                     # Rate limited, wait and retry
                     wait_time = RETRY_DELAY * (2**retries) * (0.5 + random.random())
                     logger.warning(
-                        f"Rate limited (sync), retrying in {wait_time:.2f}s (attempt {retries+1}/{MAX_RETRIES})"
+                        f"Rate limited (sync), retrying in {wait_time:.2f}s (attempt {retries + 1}/{MAX_RETRIES})"
                     )
                     time.sleep(wait_time)
                 else:
                     # Other error, log and retry
                     logger.warning(
                         f"API error (sync): {response.status_code} - {response.text}, "
-                        f"retrying in {RETRY_DELAY}s (attempt {retries+1}/{MAX_RETRIES})"
+                        f"retrying in {RETRY_DELAY}s (attempt {retries + 1}/{MAX_RETRIES})"
                     )
                     time.sleep(RETRY_DELAY)
             except Exception as e:
                 # Connection error or timeout, retry
                 logger.warning(
                     f"Connection error (sync): {str(e)}, "
-                    f"retrying in {RETRY_DELAY}s (attempt {retries+1}/{MAX_RETRIES})"
+                    f"retrying in {RETRY_DELAY}s (attempt {retries + 1}/{MAX_RETRIES})"
                 )
                 time.sleep(RETRY_DELAY)
 

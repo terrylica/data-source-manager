@@ -17,6 +17,7 @@ from typing import Optional, Tuple, Union
 import pendulum
 from pendulum import DateTime
 
+from utils.config import DATE_STRING_LENGTH
 from utils.logger_setup import logger
 from utils.market_constraints import Interval
 from utils.time_utils import align_time_boundaries
@@ -61,7 +62,7 @@ def parse_datetime_string(dt_str: Optional[str]) -> Optional[DateTime]:
                     f"Successfully parsed with from_format: {dt.format('YYYY-MM-DD HH:mm:ss.SSS')}"
                 )
                 return dt
-            elif len(dt_str) == 10 and "-" in dt_str:
+            elif len(dt_str) == DATE_STRING_LENGTH and "-" in dt_str:
                 # Try YYYY-MM-DD format
                 dt = pendulum.from_format(dt_str, "YYYY-MM-DD", tz="UTC")
                 logger.debug(

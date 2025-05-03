@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Optional
 
+from utils.config import (
+    MIN_LONG_SYMBOL_LENGTH,
+    MIN_SHORT_SYMBOL_LENGTH,
+    OPTIONS_SYMBOL_PARTS,
+)
 from utils.logger_setup import logger
 
 
@@ -622,17 +627,25 @@ def get_market_symbol_format(
         # Handle SPOT market (convert BTCUSDT to BTC-USDT)
         if market_type.name == "SPOT":
             # Try to find standard patterns of base/quote currency
-            if len(symbol) >= 6 and symbol.endswith(("USDT", "BUSD", "USDC")):
+            if len(symbol) >= MIN_LONG_SYMBOL_LENGTH and symbol.endswith(
+                ("USDT", "BUSD", "USDC")
+            ):
                 base = symbol[:-4]
                 quote = symbol[-4:]
                 return f"{base}-{quote}"
-            elif len(symbol) >= 4 and symbol.endswith(("BTC", "ETH", "USD")):
+            elif len(symbol) >= MIN_SHORT_SYMBOL_LENGTH and symbol.endswith(
+                ("BTC", "ETH", "USD")
+            ):
                 base = symbol[:-3]
                 quote = symbol[-3:]
                 return f"{base}-{quote}"
             # Default approach: assume last 4 characters are quote currency
             else:
-                return f"{symbol[:-4]}-{symbol[-4:]}" if len(symbol) > 4 else symbol
+                return (
+                    f"{symbol[:-4]}-{symbol[-4:]}"
+                    if len(symbol) > MIN_SHORT_SYMBOL_LENGTH
+                    else symbol
+                )
 
         # Handle FUTURES_USDT market (convert to BTC-USD-SWAP format)
         elif market_type.name == "FUTURES_USDT":
@@ -774,7 +787,7 @@ def validate_symbol_for_market_type(
         if not (
             "-" in symbol
             and (symbol.endswith("-C") or symbol.endswith("-P"))
-            and len(symbol.split("-")) == 4
+            and len(symbol.split("-")) == OPTIONS_SYMBOL_PARTS
         ):
             raise ValueError(
                 f"Invalid symbol format for {market_name} market: '{symbol}'. "

@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+1. Run: `ruff check . --select=PLR2004` in the terminal as-is without piping to `cat` to check for magic value used in comparison.
+
+2. Deep dive into the existing SoT files as follows before modifying them and to use them to reolve the `PLR2004` linter errors that should adhere to DRY Principle: 
+
+- `utils/config.py` is the single source of truth of for parameters and magic values.
+- interval eum in the `utils/market_constraints.py` must be used as the only interval in all codes.

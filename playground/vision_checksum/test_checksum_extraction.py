@@ -32,6 +32,7 @@ from rich.table import Table
 
 from utils.for_core.vision_checksum import extract_checksum_from_file
 from utils.logger_setup import logger
+from utils.config import HTTP_OK, TEXT_PREVIEW_LENGTH
 
 
 def setup_argparse() -> argparse.ArgumentParser:
@@ -176,7 +177,7 @@ def download_file(url: str, output_path: Path, verbose: bool = False) -> bool:
             )
 
             with httpx.stream("GET", url, follow_redirects=True) as response:
-                if response.status_code != 200:
+                if response.status_code != HTTP_OK:
                     logger.error(
                         f"Failed to download {url}: HTTP {response.status_code}"
                     )
@@ -246,9 +247,16 @@ def test_real_checksum_extraction(
 
                 try:
                     decoded = content.decode("utf-8", errors="replace")
-                    decoded_preview = decoded[:60] if len(decoded) > 60 else decoded
+                    decoded_preview = (
+                        decoded[:TEXT_PREVIEW_LENGTH]
+                        if len(decoded) > TEXT_PREVIEW_LENGTH
+                        else decoded
+                    )
                     rprint("\n[bold]Decoded content preview:[/bold]")
-                    rprint(f"{decoded_preview}" + ("..." if len(decoded) > 60 else ""))
+                    rprint(
+                        f"{decoded_preview}"
+                        + ("..." if len(decoded) > TEXT_PREVIEW_LENGTH else "")
+                    )
                 except Exception:
                     pass
 

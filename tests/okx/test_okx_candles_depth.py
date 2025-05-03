@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from utils.logger_setup import logger
+from utils.config import SHORT_HISTORY_DAYS, MEDIUM_HISTORY_DAYS
 
 # Set logger level to WARNING to reduce verbosity
 logger.setLevel("WARNING")
@@ -41,7 +42,7 @@ def retry_request(url, params=None, max_retries=MAX_RETRIES):
                 "raw_response": response,
             }
         except Exception as e:
-            logger.error(f"Request failed (attempt {attempt+1}/{max_retries}): {e}")
+            logger.error(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 time.sleep(RETRY_DELAY * (attempt + 1))
             else:
@@ -478,13 +479,12 @@ def main():
         if isinstance(data, dict):
             days_back = data.get("days_back", 0)
             availability = "✅ Available"
-            if days_back < 7:
+            if days_back < SHORT_HISTORY_DAYS:
                 availability += f" (last ~{days_back:.1f} days only)"
-            elif days_back < 90:
+            elif days_back < MEDIUM_HISTORY_DAYS:
                 availability += f" (from ~{days_back:.1f} days ago)"
             else:
-                from_date = data.get("oldest_date").strftime("%b %d, %Y")
-                availability += f" (from {from_date})"
+                availability += f" (historic data from ~{days_back:.1f} days ago)"
             print(f"- {interval}: {availability}")
         else:
             print(f"- {interval}: ❌ Not available historically")

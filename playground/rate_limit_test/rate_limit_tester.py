@@ -33,6 +33,7 @@ from core.sync.data_source_manager import DataSourceManager
 from utils.logger_setup import logger
 from utils.market_constraints import DataProvider, Interval, MarketType
 from utils.network_utils import create_httpx_client
+from utils.config import SECONDS_IN_MINUTE
 
 
 # Rate limit tracking
@@ -53,7 +54,7 @@ class RateLimitTracker:
         """Update current weight usage."""
         # Check if we're in a new minute
         current_time = time.time()
-        if current_time - self.last_reset >= 60:
+        if current_time - self.last_reset >= SECONDS_IN_MINUTE:
             # Reset for the new minute
             self.weight_history.append(self.current_weight)
             self.current_weight = weight

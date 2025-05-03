@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Tuple
 import pandas as pd
 from rich import print
 
+from utils.config import MIN_ROWS_FOR_GAP_DETECTION
 from utils.logger_setup import logger
 from utils.market_constraints import Interval
 
@@ -76,7 +77,7 @@ def detect_gaps(
         print(f"[bold red]{error_msg}[/bold red]")
         sys.exit(1)
 
-    if df.empty or len(df) < 2:
+    if df.empty or len(df) < MIN_ROWS_FOR_GAP_DETECTION:
         logger.warning("DataFrame has fewer than 2 rows, cannot detect gaps")
         return [], {"total_gaps": 0, "total_records": len(df)}
 

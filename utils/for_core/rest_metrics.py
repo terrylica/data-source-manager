@@ -11,6 +11,7 @@ from collections import defaultdict, deque
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from utils.config import SECONDS_IN_HOUR
 from utils.logger_setup import logger
 
 
@@ -109,7 +110,7 @@ class RestMetricsTracker:
                     self._rate_limit_windows = [
                         t
                         for t in self._rate_limit_windows
-                        if (datetime.now() - t).total_seconds() < 3600
+                        if (datetime.now() - t).total_seconds() < SECONDS_IN_HOUR
                     ]
 
     def get_metrics(self) -> Dict[str, Any]:

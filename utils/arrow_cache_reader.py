@@ -37,6 +37,7 @@ import pandas as pd
 import pyarrow as pa
 from rich import print
 
+from utils.config import MAX_PREVIEW_ITEMS, MIN_FILES_FOR_README
 from utils.logger_setup import logger
 from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
@@ -553,10 +554,10 @@ if __name__ == "__main__":
     symbols = cache_reader.list_available_symbols()
     if symbols:
         print(
-            f"\n[bold green]Available symbols:[/bold green] {', '.join(symbols[:10])}"
+            f"\n[bold green]Available symbols:[/bold green] {', '.join(symbols[:MAX_PREVIEW_ITEMS])}"
         )
-        if len(symbols) > 10:
-            print(f"...and {len(symbols) - 10} more")
+        if len(symbols) > MAX_PREVIEW_ITEMS:
+            print(f"...and {len(symbols) - MAX_PREVIEW_ITEMS} more")
 
         # Example with the first symbol
         symbol = symbols[0]
@@ -591,7 +592,7 @@ if __name__ == "__main__":
                 print(f"Total dates: {len(dates)}")
 
                 # Check availability for a date range
-                if len(dates) >= 2:
+                if len(dates) >= MIN_FILES_FOR_README:
                     start_date = dates[0]
                     end_date = dates[-1]
                     availability = cache_reader.check_availability(
@@ -608,7 +609,9 @@ if __name__ == "__main__":
                     print("\n[bold green]Loading sample data...[/bold green]")
                     sample_start = dates[0]
                     sample_end = (
-                        min(dates[10], dates[-1]) if len(dates) > 10 else dates[-1]
+                        min(dates[MAX_PREVIEW_ITEMS], dates[-1])
+                        if len(dates) > MAX_PREVIEW_ITEMS
+                        else dates[-1]
                     )
                     df = cache_reader.read_symbol_data(
                         symbol, interval_enum, sample_start, sample_end

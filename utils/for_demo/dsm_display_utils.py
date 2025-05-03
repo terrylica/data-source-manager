@@ -9,6 +9,7 @@ import pendulum
 from rich import print
 from rich.table import Table
 
+from utils.config import LOG_SEARCH_WINDOW_SECONDS
 from utils.logger_setup import logger
 from utils_for_debug.dataframe_output import (
     format_dataframe_for_display,
@@ -199,7 +200,7 @@ def display_results(
                                             expected_timestamp - file_timestamp
                                         ).total_seconds()
                                     )
-                                    < 30
+                                    < LOG_SEARCH_WINDOW_SECONDS
                                 ):
                                     found_log = True
                                     log_size = log_file.stat().st_size
@@ -232,7 +233,9 @@ def display_results(
 
                     # Run ls -la on the directory
                     ls_cmd = ["ls", "-la", str(log_dir)]
-                    ls_result = subprocess.run(ls_cmd, capture_output=True, text=True, check=False)
+                    ls_result = subprocess.run(
+                        ls_cmd, capture_output=True, text=True, check=False
+                    )
                     logger.debug(f"Directory listing:\n{ls_result.stdout}")
 
                     # Try to stat the file directly
@@ -321,7 +324,7 @@ def display_results(
                                             expected_timestamp - file_timestamp
                                         ).total_seconds()
                                     )
-                                    < 30
+                                    < LOG_SEARCH_WINDOW_SECONDS
                                 ):
                                     found_error_log = True
                                     error_size = error_file.stat().st_size
@@ -359,7 +362,9 @@ def display_results(
 
                     # Run ls -la on the directory
                     ls_cmd = ["ls", "-la", str(error_log_dir)]
-                    ls_result = subprocess.run(ls_cmd, capture_output=True, text=True, check=False)
+                    ls_result = subprocess.run(
+                        ls_cmd, capture_output=True, text=True, check=False
+                    )
                     logger.debug(f"Error directory listing:\n{ls_result.stdout}")
 
                     # Try to stat the file directly

@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import pandas as pd
 
+from utils.config import HTTP_OK
 from utils.logger_setup import logger
 
 DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
@@ -26,7 +27,7 @@ def fetch_funding_rate_history(
 
         logger.info(f"Fetching funding rate history for {symbol} with limit {limit}")
         response = httpx.get(url, params=params)
-        if response.status_code == 200:
+        if response.status_code == HTTP_OK:
             data = response.json()
             logger.info(
                 f"Successfully fetched {len(data)} funding rate records for {symbol}"
@@ -166,7 +167,7 @@ def main_loop(symbols: List[str], interval_minutes: int, output_dir: str):
         next_run_str = datetime.fromtimestamp(next_run).strftime("%Y-%m-%d %H:%M:%S")
 
         logger.info(
-            f"Next download scheduled at {next_run_str} (in {sleep_time/60:.1f} minutes)"
+            f"Next download scheduled at {next_run_str} (in {sleep_time / 60:.1f} minutes)"
         )
         time.sleep(sleep_time)
 

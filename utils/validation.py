@@ -13,6 +13,7 @@ from utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_TIMEZONE,
     MAX_CACHE_AGE,
+    MILLISECOND_DIGITS,
     MIN_VALID_FILE_SIZE,
     OUTPUT_DTYPES,
     TIMESTAMP_PRECISION,
@@ -922,7 +923,9 @@ class DataFrameValidator:
                 # If timestamps have microsecond precision (from Vision API 2025+ data)
                 # we need to truncate to millisecond precision
                 sample_ts = self.df.index[0].value
-                if len(str(abs(sample_ts))) > 13:  # More than millisecond precision
+                if (
+                    len(str(abs(sample_ts))) > MILLISECOND_DIGITS
+                ):  # More than millisecond precision
                     logger.debug(
                         "Converting timestamps from microsecond to millisecond precision"
                     )

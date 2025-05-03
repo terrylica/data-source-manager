@@ -38,6 +38,7 @@ from pathlib import Path
 
 import typer
 
+from utils.config import MIN_FILES_FOR_README
 from utils.logger_setup import logger
 
 app = typer.Typer()
@@ -50,7 +51,10 @@ def count_md_files(directory: Path) -> int:
 
 def needs_readme(directory: Path) -> bool:
     """Check if directory needs a README.md file."""
-    return count_md_files(directory) >= 2 and not (directory / "README.md").exists()
+    return (
+        count_md_files(directory) >= MIN_FILES_FOR_README
+        and not (directory / "README.md").exists()
+    )
 
 
 def process_directory(directory: Path, dry_run: bool = False) -> int:

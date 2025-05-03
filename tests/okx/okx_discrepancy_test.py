@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from utils.logger_setup import logger
+from utils.config import SECONDS_IN_HOUR
 
 # Set logger level to WARNING to reduce verbosity
 logger.setLevel("WARNING")
@@ -20,6 +21,9 @@ HISTORY_ENDPOINT = f"{OKX_API_BASE_URL}/market/history-candles"
 SPOT_INSTRUMENT = "BTC-USDT"
 MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
+
+MS_IN_HOUR = SECONDS_IN_HOUR * 1000  # Milliseconds in an hour
+MS_IN_MINUTE = 60000  # Milliseconds in a minute
 
 
 def retry_request(url, params=None, max_retries=MAX_RETRIES):
@@ -34,7 +38,7 @@ def retry_request(url, params=None, max_retries=MAX_RETRIES):
                 "raw_response": response,
             }
         except Exception as e:
-            logger.error(f"Request failed (attempt {attempt+1}/{max_retries}): {e}")
+            logger.error(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 time.sleep(RETRY_DELAY * (attempt + 1))
             else:
@@ -136,9 +140,9 @@ def test_bar_parameter_requirement():
                             timestamp2 = int(response["data"]["data"][1][0])
                             interval_ms = abs(timestamp2 - timestamp1)
                             interval = (
-                                f"{interval_ms / 60000:.1f}m"
-                                if interval_ms < 3600000
-                                else f"{interval_ms / 3600000:.1f}H"
+                                f"{interval_ms / MS_IN_MINUTE:.1f}m"
+                                if interval_ms < MS_IN_HOUR
+                                else f"{interval_ms / MS_IN_HOUR:.1f}H"
                             )
                         else:
                             interval = "Cannot infer (need 2+ points)"

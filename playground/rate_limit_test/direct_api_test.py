@@ -12,13 +12,14 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
 
 import httpx
 import pandas as pd
 from rich import print
 from rich.console import Console
 
-from utils.config import HTTP_OK
+from utils.config import HTTP_OK, SECONDS_IN_MINUTE
 from utils.logger_setup import logger
 
 # Configure logging
@@ -26,48 +27,105 @@ logger.setup_root(level="INFO")
 console = Console()
 
 
-# Rate limit tracking
-class RateLimitTracker:
-    """Track rate limit usage from API responses."""
+class DirectApiTester:
+    """Test class for simulating direct API rate limiting."""
 
-    def __init__(self):
-        """Initialize the rate limit tracker."""
-        self.current_weight = 0
-        self.max_weight = 6000
-        self.weight_per_request = 3  # Based on observed weight for klines request
+    def __init__(
+        self,
+        max_weight_per_minute: int = 1200,
+        max_requests_per_minute: int = 20,
+        initial_weight: int = 0,
+    ):
+        """Initialize the API tester with rate limit parameters.
+
+        Args:
+            max_weight_per_minute: Maximum request weight per minute
+            max_requests_per_minute: Maximum number of requests per minute
+            initial_weight: Initial request weight
+        """
+        self.max_weight_per_minute = max_weight_per_minute
+        self.max_requests_per_minute = max_requests_per_minute
+        self.current_weight = initial_weight
+        self.current_requests = 0
         self.last_reset = time.time()
-        self.warning_threshold = 0.8  # 80% of limit
-        self.weight_history = []
-        self.warnings = 0
+        self.weight_history: List[int] = []
+        self.request_history: List[int] = []
+        self.start_time = time.time()
 
-    def update(self, weight):
-        """Update current weight usage."""
+    def record_request(self, weight: int = 1) -> None:
+        """Record a new API request with a given weight.
+
+        Args:
+            weight: Weight of the request (default: 1)
+        """
         # Check if we're in a new minute
         current_time = time.time()
-        if current_time - self.last_reset >= 60:
+        if current_time - self.last_reset >= SECONDS_IN_MINUTE:
             # Reset for the new minute
             self.weight_history.append(self.current_weight)
-            self.current_weight = weight
+            self.request_history.append(self.current_requests)
+            self.current_weight = 0
+            self.current_requests = 0
             self.last_reset = current_time
-        else:
-            self.current_weight = weight
 
-        # Check for warnings
-        usage_percentage = self.current_weight / self.max_weight
-        if usage_percentage >= self.warning_threshold:
-            self.warnings += 1
-            return True
-        return False
+        # Record the request
+        self.current_weight += weight
+        self.current_requests += 1
 
-    def get_stats(self):
-        """Get current statistics."""
-        usage_percentage = (self.current_weight / self.max_weight) * 100
+        # Check if we would exceed rate limits
+        if self.current_weight > self.max_weight_per_minute:
+            logger.warning(
+                f"Weight limit exceeded: {self.current_weight}/{self.max_weight_per_minute}"
+            )
+
+        if self.current_requests > self.max_requests_per_minute:
+            logger.warning(
+                f"Request count limit exceeded: {self.current_requests}/{self.max_requests_per_minute}"
+            )
+
+    def get_average_weight_per_minute(self) -> float:
+        """Calculate the average weight per minute.
+
+        Returns:
+            Average weight per minute
+        """
+        total_weight = sum(self.weight_history) + self.current_weight
+        elapsed_minutes = (time.time() - self.start_time) / SECONDS_IN_MINUTE
+        return total_weight / max(1, elapsed_minutes)
+
+    def get_current_usage(self) -> dict:
+        """Get current usage statistics.
+
+        Returns:
+            Dictionary with current usage statistics
+        """
         return {
             "current_weight": self.current_weight,
-            "max_weight": self.max_weight,
-            "usage_percentage": usage_percentage,
-            "warnings": self.warnings,
-            "time_in_current_window": time.time() - self.last_reset,
+            "current_requests": self.current_requests,
+            "weight_history": self.weight_history,
+            "request_history": self.request_history,
+            "avg_weight_per_minute": self.get_average_weight_per_minute(),
+        }
+
+    def simulate_request(
+        self, endpoint: str, params: Optional[dict] = None, weight: int = 1
+    ) -> dict:
+        """Simulate an API request and record it.
+
+        Args:
+            endpoint: API endpoint to simulate
+            params: Request parameters
+            weight: Request weight
+
+        Returns:
+            Dictionary with request details and current usage
+        """
+        self.record_request(weight)
+        return {
+            "endpoint": endpoint,
+            "params": params or {},
+            "weight": weight,
+            "usage": self.get_current_usage(),
         }
 
 
@@ -135,7 +193,7 @@ def process_kline_data(data):
 
 async def run_test(symbols, duration=30, limit=1000):
     """Run the rate limit test using direct API calls."""
-    tracker = RateLimitTracker()
+    tracker = DirectApiTester()
     total_requests = 0
     successful_requests = 0
     failed_requests = 0
@@ -146,8 +204,8 @@ async def run_test(symbols, duration=30, limit=1000):
     )
     console.print(f"Test duration: {duration} seconds")
     console.print(f"Data points per request: {limit}")
-    console.print(f"Expected weight per request: {tracker.weight_per_request}")
-    console.print(f"Maximum weight per minute: {tracker.max_weight}")
+    console.print(f"Expected weight per request: {tracker.max_weight_per_minute}")
+    console.print(f"Maximum weight per minute: {tracker.max_weight_per_minute}")
 
     # Save test output details to file
     output_dir = Path(__file__).parent / "results"
@@ -206,27 +264,30 @@ async def run_test(symbols, duration=30, limit=1000):
                             console.print(df.head(3))
 
                     # Update rate limit
-                    tracker.update(weight)
+                    tracker.record_request(weight)
 
                     # Save request details
                     test_results["requests"].append(
-                        {
-                            "symbol": symbol,
-                            "timestamp": datetime.now().isoformat(),
-                            "weight": weight,
-                            "record_count": len(data) if data else 0,
-                        }
+                        tracker.simulate_request(
+                            "https://api.binance.com/api/v3/klines",
+                            params={
+                                "symbol": symbol.upper(),
+                                "interval": "1s",
+                                "limit": limit,
+                            },
+                            weight=weight,
+                        )
                     )
                 else:
                     failed_requests += 1
 
             # Display stats
-            stats = tracker.get_stats()
+            stats = tracker.get_current_usage()
             console.print(
                 f"Requests: {total_requests} | "
-                f"Weight: {stats['current_weight']}/{stats['max_weight']} "
-                f"({stats['usage_percentage']:.1f}%) | "
-                f"Warnings: {stats['warnings']}"
+                f"Weight: {stats['current_weight']}/{tracker.max_weight_per_minute} "
+                f"({stats['avg_weight_per_minute']:.1f}) | "
+                f"Requests: {stats['current_requests']}/{tracker.max_requests_per_minute}"
             )
 
             # Wait until 1 second has passed since the start of this iteration
@@ -244,17 +305,17 @@ async def run_test(symbols, duration=30, limit=1000):
         console.print(f"Successful requests: {successful_requests}")
         console.print(f"Failed requests: {failed_requests}")
 
-        stats = tracker.get_stats()
+        stats = tracker.get_current_usage()
         net_weight = stats["current_weight"] - (initial_weight or 0)
         console.print(
-            f"Final weight usage: {stats['current_weight']}/{stats['max_weight']} ({stats['usage_percentage']:.1f}%)"
+            f"Final weight usage: {stats['current_weight']}/{tracker.max_weight_per_minute} ({stats['avg_weight_per_minute']:.1f})"
         )
         console.print(f"Initial weight: {initial_weight or 0}")
         console.print(f"Net weight increase: {net_weight}")
         console.print(
             f"Weight per request: {net_weight / total_requests if total_requests > 0 else 0:.2f}"
         )
-        console.print(f"Total warnings: {stats['warnings']}")
+        console.print(f"Total requests: {stats['current_requests']}")
 
         # Save final results to file
         test_results["end_time"] = datetime.now().isoformat()
@@ -264,7 +325,6 @@ async def run_test(symbols, duration=30, limit=1000):
         test_results["initial_weight"] = initial_weight or 0
         test_results["final_weight"] = stats["current_weight"]
         test_results["net_weight"] = net_weight
-        test_results["warnings"] = stats["warnings"]
 
         with open(output_file, "w") as f:
             json.dump(test_results, f, indent=2)

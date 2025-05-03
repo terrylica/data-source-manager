@@ -35,6 +35,7 @@ from utils.for_core.vision_checksum import (
 )
 from utils.logger_setup import logger
 from utils.validation import DataValidation
+from utils.config import HTTP_OK
 
 
 def setup_argparse() -> argparse.ArgumentParser:
@@ -153,7 +154,7 @@ def download_file(
 
             # Use httpx for streaming download
             with httpx.stream("GET", url, follow_redirects=True) as response:
-                if response.status_code != 200:
+                if response.status_code != HTTP_OK:
                     logger.error(
                         f"Failed to download {url}: HTTP {response.status_code}"
                     )

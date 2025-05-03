@@ -36,9 +36,12 @@ from utils.config import (
     API_RETRY_DELAY,
     API_TIMEOUT,
     DEFAULT_HTTP_TIMEOUT_SECONDS,
+    HTTP_ERROR_CODE_THRESHOLD,
     HTTP_NOT_FOUND,
     HTTP_OK,
     MAXIMUM_CONCURRENT_DOWNLOADS,
+    MEDIUM_BATCH_SIZE,
+    SMALL_BATCH_SIZE,
 )
 from utils.logger_setup import logger
 
@@ -447,12 +450,12 @@ def download_files_concurrently(
     batch_size = len(urls)
     adjusted_concurrency = max_concurrent
 
-    if batch_size <= 10:
+    if batch_size <= SMALL_BATCH_SIZE:
         # Small batch optimization
-        adjusted_concurrency = min(10, max_concurrent)
-    elif batch_size <= 50:
+        adjusted_concurrency = min(SMALL_BATCH_SIZE, max_concurrent)
+    elif batch_size <= MEDIUM_BATCH_SIZE:
         # Medium batch optimization (optimal concurrency)
-        adjusted_concurrency = min(50, max_concurrent)
+        adjusted_concurrency = min(MEDIUM_BATCH_SIZE, max_concurrent)
     else:
         # Large batch optimization
         adjusted_concurrency = min(100, max_concurrent)
@@ -572,7 +575,7 @@ def make_api_request(
         # Re-raise to trigger tenacity retry
         raise TimeoutError(f"Rate limited (HTTP {status_code})")
 
-    if raise_for_status and status_code >= 400:
+    if raise_for_status and status_code >= HTTP_ERROR_CODE_THRESHOLD:
         raise Exception(f"HTTP error: {status_code} - {response.text}")
 
     try:

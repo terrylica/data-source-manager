@@ -19,6 +19,14 @@ CANONICAL_INDEX_NAME: Final = "open_time"
 TIMESTAMP_PRECISION: Final = (
     "ms"  # Millisecond precision to align with REST API standard
 )
+DATE_STRING_LENGTH: Final = 10  # Length of a YYYY-MM-DD date string
+LOG_SEARCH_WINDOW_SECONDS: Final = 30  # Window to search for logs in seconds
+
+# Time unit constants in seconds
+SECONDS_IN_MINUTE: Final = 60
+SECONDS_IN_HOUR: Final = 3600
+SECONDS_IN_DAY: Final = 86400
+SECONDS_IN_WEEK: Final = 604800
 
 # REST API standardization
 # We standardize to millisecond precision as this is what the REST API consistently uses
@@ -171,6 +179,8 @@ DEFAULT_HTTP_TIMEOUT_SECONDS: Final[float] = (
 HTTP_OK: Final = 200  # Standard HTTP OK status code
 HTTP_BAD_REQUEST: Final = 400  # HTTP Bad Request status code
 HTTP_NOT_FOUND: Final = 404  # HTTP Not Found status code
+HTTP_RATE_LIMITED: Final = 429  # HTTP Rate Limited status code
+HTTP_SERVER_ERROR: Final = 500  # HTTP Server Error status code
 
 # Chunk size constraints
 REST_CHUNK_SIZE: Final = 1000
@@ -351,13 +361,6 @@ def standardize_column_names(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# HTTP Status Codes
-HTTP_OK: Final[int] = 200
-HTTP_NOT_FOUND: Final[int] = 404
-HTTP_BAD_REQUEST: Final[int] = 400
-HTTP_RATE_LIMITED: Final[int] = 429
-HTTP_SERVER_ERROR: Final[int] = 500
-
 # File size thresholds for validation
 MIN_CHECKSUM_SIZE: Final[int] = 10  # Minimum size in bytes for a valid checksum file
 
@@ -375,8 +378,47 @@ MIN_CACHE_KEY_COMPONENTS: Final = 6  # Minimum number of components in a cache k
 # Text preview constants
 TEXT_PREVIEW_LENGTH: Final = 60  # Length for text previews in logs/console output
 
+# Timestamp precision constants
+MILLISECOND_DIGITS: Final = 13  # Number of digits in millisecond timestamp
+MICROSECOND_DIGITS: Final = 16  # Number of digits in microsecond timestamp
+MILLISECOND_TOLERANCE: Final = 0.001  # Tolerance for timestamp comparisons (1 ms)
+
 # File system constants
 SMALL_FILE_SIZE: Final = 10000  # Size threshold for small files in bytes
+MIN_FILES_FOR_README: Final = 2  # Minimum number of files to warrant a README
 
 # Cryptographic constants
 SHA256_HASH_LENGTH: Final = 64  # Length of SHA-256 hash in hexadecimal format
+
+# Network-related constants
+HTTP_ERROR_CODE_THRESHOLD: Final = 400  # HTTP status codes >= 400 are errors
+
+# Concurrency optimization thresholds
+SMALL_BATCH_SIZE: Final = 10  # Threshold for small batch optimization
+MEDIUM_BATCH_SIZE: Final = 50  # Threshold for medium batch optimization
+
+# Data preview constants
+MAX_PREVIEW_ITEMS: Final = (
+    5  # Maximum number of items to preview (e.g., dates, symbols)
+)
+
+# Data processing constants
+MIN_ROWS_FOR_GAP_DETECTION: Final = 2  # Minimum number of rows needed to detect gaps
+MIN_RECORDS_FOR_COMPARISON: Final = (
+    3  # Minimum number of records needed for a valid comparison
+)
+
+# Symbol format constants
+MIN_LONG_SYMBOL_LENGTH: Final = (
+    6  # Minimum length for symbols with 4-char quote currencies
+)
+MIN_SHORT_SYMBOL_LENGTH: Final = (
+    4  # Minimum length for symbols with 3-char quote currencies
+)
+OPTIONS_SYMBOL_PARTS: Final = (
+    4  # Number of parts in an options symbol (base-expiry-strike-type)
+)
+
+# Data availability constants
+SHORT_HISTORY_DAYS: Final = 7  # Threshold for "short history" in days
+MEDIUM_HISTORY_DAYS: Final = 90  # Threshold for "medium history" in days
