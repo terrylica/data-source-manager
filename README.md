@@ -59,9 +59,6 @@ The module demo provides a programmatic interface:
 ```bash
 # Run the DSM Demo Module to see examples
 dsm-demo-module
-
-# Get help and see all available options
-dsm-demo-module --help
 ```
 
 ## Data Source Manager (DSM) Demo
