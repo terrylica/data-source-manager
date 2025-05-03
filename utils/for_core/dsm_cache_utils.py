@@ -216,8 +216,10 @@ def save_to_cache(
 
         for date, day_df in grouped:
             try:
-                # Convert date to pendulum for path mapper
-                pdate = pendulum.date(date.year, date.month, date.day)
+                # Convert date to pendulum DateTime object with UTC timezone
+                # This ensures the object has the tzinfo attribute needed by FSSpecVisionHandler
+                year, month, day = date.year, date.month, date.day
+                pdate = pendulum.datetime(year, month, day, 0, 0, 0, tz="UTC")
 
                 # Get cache path for this day
                 cache_path = fs_handler.get_local_path_for_data(
