@@ -20,8 +20,6 @@ pip install -e ".[dev]"
 
 The installation process automatically registers the CLI commands (`dsm-demo-cli` and `dsm-demo-module`) as executable scripts in your Python environment. These commands will be available in your terminal after installation.
 
-> **Note**: If you encounter import errors related to `utils_for_debug` or other modules, ensure your `pyproject.toml` file includes all required packages in the `packages` list under `[tool.setuptools]`.
-
 ## Running the Demos
 
 Once installed, you can run the demos using the command-line tools:
