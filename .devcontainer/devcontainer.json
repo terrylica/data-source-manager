@@ -38,7 +38,8 @@
         "michelemelluso.gitignore",
         "ms-edgedevtools.vscode-edge-devtools",
         "charliermarsh.ruff",
-        "lirik.empty-folders-remover" // helps remove empty folders in FILE EXPLORER when SOURCE CONTROL discards changes but only deletes files, not folders
+        "lirik.empty-folders-remover", // helps remove empty folders in FILE EXPLORER when SOURCE CONTROL discards changes but only deletes files, not folders
+        "zack.markdown-editor" // markdown editor
       ],
       "settings": {
         "extensions.verifySignature": false
