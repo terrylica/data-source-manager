@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# pyupgrade and ruff fixes
+
+First, run the following triple backtick quoted block of bash commands As-IS **in one block** to resolve some of the linter errors that can be discovered by `pyupgrade` and `ruff`:
+
+```bash
+git ls-files --cached --others --exclude-standard '*.py' \
+  | xargs -t pyupgrade --py310-plus \
+  && ruff format .
+```
+
+This command sequence does the following:
+
+1. `pyupgrade` upgrades Python syntax to be Python 3.10+ compatible
+2. `ruff format` formats the code according to the project's style rules
+
+Next, run the following bash command to automatically fix linting issues:
+
+```bash
+ruff check --fix -v .
+```
+
+Thirdly, triage unresolved `ruff` diagnostics:
+
+- Run `ruff check --statistics` to see which rule violations are most common.
+- And then, rank by fix simplicity and minimal regression potential.
+
+Finally, without asking for user permission, you should immediately select the safest-ranked linter error, fix only that specific error, and iteratively verify the fix by running `ruff check` targeting that one single error code using `ruff check . --select [linter error code]` until all instances of the error code is resolved in the codebase. After resolving all instances of that specific error code, stop and report the fixes applied for that code.
+
+Remember: For selective formatting of specific files or directories, use:
+
+```bash
+ruff format path/to/file_or_directory
+```
+
+To check formatting without making changes:
+
+```bash
+ruff format --check .
+```
+
+To show differences without applying changes:
+
+```bash
+ruff format --diff .
+```

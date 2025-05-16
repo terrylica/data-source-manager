@@ -1,0 +1,76 @@
+# How to setup ruff: https://docs.astral.sh/ruff/settings/
+line-length = 140 # The maximum line length for code and comments
+target-version = "py311" # The target Python version for linting and formatting
+preview = false # Whether to enable preview features (e.g. ruff-lsp)
+respect-gitignore = true # Whether to respect .gitignore when linting and formatting
+
+# File patterns to exclude from linting and formatting (in addition to defaults)
+exclude = [".cursorignore", "playground/", "tests/", "__pycache__/"] # Default exclusions: [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]
+
+# Additional file patterns to exclude (extends the exclude list without overriding it)
+extend-exclude = [] # Useful for excluding tests or specific problematic files
+
+[lint]
+select = [ # Rules to select
+    "E",         # flake8-errors: Basic syntax, indentation, whitespace, and runtime errors (includes E4, E7, E9)
+    "F",         # flake8-errors: Pyflakes checks (unused imports, variables, etc.)
+    "B",         # flake8-bugbear: Bugbear checks (common potential bugs)
+    "Q",         # flake8-quotes: Quote consistency
+    "PD",        # pandas-vet: Common pandas pitfalls
+    "RET",       # flake8-return: Improper return statements
+    "PL",        # Pylint: All Pylint rules - Now covered by ruff
+    "RUF",       # Ruff-specific rules (idiomatic suggestions) - Essential for Ruff's unique checks
+    "C90",       # mccabe: McCabe complexity checker
+    "D",         # pydocstyle: Docstring style checking
+]
+ignore = [ # https://docs.astral.sh/ruff/rules/ for quick reference of rule codes and their descriptions
+    "PD901",     # Avoid using the generic variable name `df` for DataFrames https://docs.astral.sh/ruff/rules/pandas-df-variable-name/
+    "RUF002",    # Docstring ambiguous unicode characters - caused by `tests/test_exchange_pair.py` https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-docstring/
+    "RUF003",    # Comment contains ambiguous `，` (FULLWIDTH COMMA) - caused by `tests/test_exchange_pair.py` https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-comment/
+    "E741",      # Ambiguous variable name (e.g. 'l', 'O', 'I') - Allow when context is clear https://docs.astral.sh/ruff/rules/ambiguous-variable-name/
+    # Chinese characters related rules
+    "RUF001",    # Ambiguous unicode character - Allow when context is clear https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-string/
+    "RUF002",    # Ambiguous unicode character - Allow when context is clear https://docs.astral.sh/ruff/rules/ambiguous-unicode-character-docstring/
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+# Allow unused variables when underscored
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Comments starting with these tags will be ignored by commented-out code detection (ERA), and skipped by line-length rules (E501) if ignore-overlong-task-comments is set to true.
+task-tags = [ "TODO", "FIXME", "XXX", "HACK"]
+
+# Ignore overlong task comments
+[lint.pycodestyle]
+ignore-overlong-task-comments = true # Whether to ignore overlong task comments
+
+# Configure pydocstyle
+[lint.pydocstyle]
+# Convention options ranked by rigidity:
+# 1. "google" - Most rigid: requires specific section headers (Args, Returns, Raises), parameter type specifications
+# 2. "numpy" - Medium: structured but more flexible than Google, uses different headers (Parameters, Returns)
+# 3. "pep257" - Least rigid: basic guidelines without strict formatting rules
+convention = "google" # Use Google-style docstrings
+
+# Configure rule-specific options
+[lint.per-file-ignores]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+"__init__.py" = ["E402"]
+# Ignore `D` rules everywhere except for the `src/` directory.
+"!src/**.py" = ["D"]
+# Add any per-file ignore rules here if needed
+
+# Configure McCabe complexity checker
+[lint.mccabe]
+max-complexity = 48 # Flag errors (C901) whenever the complexity level exceeds this threshold
+
+# Configure Pyflakes rules
+[lint.pyflakes]
+
+# Configure Pylint rules
+[lint.pylint]
+max-args = 12 # The maximum number of arguments for a function or method. "PLR0913" see: https://docs.astral.sh/ruff/rules/too-many-arguments/
+max-branches = 24 # The maximum number of branches for a function or method. "PLR0912" see: https://docs.astral.sh/ruff/rules/too-many-branches/
+max-statements = 36 # The maximum number of statements for a function or method. "PLR0915" see: https://docs.astral.sh/ruff/rules/too-many-statements/
+allow-magic-value-types = ["int", "float", "str", "bytes", "complex"] # Whether to allow magic value types (e.g. `int`, `float`, `str`, `bytes`, `complex`, etc.) in the code. "PLR2004" see: https://docs.astral.sh/ruff/rules/magic-value-comparison/
