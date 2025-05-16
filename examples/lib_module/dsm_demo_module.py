@@ -4,7 +4,7 @@ DSM Demo Showcase: Example of end time backward retrieval with log control.
 This module demonstrates how to use the DSM library functions directly for
 fetching historical data from a specified end time, similar to the CLI usage:
 
-    ./examples/sync/dsm_demo_cli.py -s BTCUSDT -et 2025-04-14T15:59:59 -i 1m -d 10 -l E
+    dsm-demo-cli -s BTCUSDT -et 2025-04-14T15:59:59 -i 1m -d 10 -l E
 """
 
 import os
@@ -18,8 +18,9 @@ from core.sync.dsm_lib import (
     process_market_parameters,
     setup_environment,
 )
+from utils.app_paths import get_cache_dir, get_log_dir
 from utils.deprecation_rules import Interval as DeprecationInterval
-from utils.for_demo.dsm_cache_utils import get_cache_dir
+from utils.for_demo.dsm_cache_utils import print_cache_info
 from utils.for_demo.dsm_display_utils import display_results
 from utils.logger_setup import configure_session_logging, logger
 
@@ -155,10 +156,10 @@ def main():
     cwd = os.getcwd()
     logger.debug(f"Current working directory: {cwd}")
 
-    # No need to check for project root - we're using platformdirs
-
-    # Log cache directory location
+    # Log directories for reference
+    log_dir = get_log_dir()
     cache_dir = get_cache_dir()
+    logger.info(f"Using log directory: {log_dir}")
     logger.info(f"Using cache directory: {cache_dir}")
 
     # Configure logging with DEBUG level by default
@@ -172,6 +173,9 @@ def main():
     logger.debug(f"Main log file: {main_log}")
     logger.debug(f"Error log file: {error_log}")
     logger.debug(f"Log timestamp: {log_timestamp}")
+
+    # Display cache info once at startup
+    print_cache_info()
 
     # Set up environment
     logger.info("Setting up environment")

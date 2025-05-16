@@ -14,9 +14,7 @@ DATA_SOURCES = ["Cache (Local Arrow files)", "VISION API", "REST API"]
 
 # Additional atomic fragments needed by doc utils
 RETRIEVES_DATA = "retrieves data from multiple sources"
-APP_BEHAVIOR = (
-    "It displays real-time source information about where each data point comes from"
-)
+APP_BEHAVIOR = "It displays real-time source information about where each data point comes from"
 
 
 # String builder for data sources list
@@ -38,9 +36,7 @@ MECHANISM_DESC = f"""This script shows how DataSourceManager automatically retri
 
 {build_source_list()}"""
 
-SOURCE_INFO_DESC = (
-    "It displays real-time source information about where each data point comes from."
-)
+SOURCE_INFO_DESC = "It displays real-time source information about where each data point comes from."
 
 # App description used in multiple places
 APP_DESCRIPTION = MECHANISM_DESC_SHORT
@@ -199,63 +195,63 @@ CLI_OPTIONS = {
     "days": {
         "long_flag": "--days",
         "short_flag": "-d",
-        "help": "Number of days of data to fetch. If used with --end-time, fetches data backward from end time. If used with --start-time, fetches data forward from start time. If used alone, fetches data backward from current time",
+        "help": "Number of days to fetch (default: 3)",
         "default": 3,
     },
     # Data Source options
     "enforce_source": {
         "long_flag": "--enforce-source",
         "short_flag": "-es",
-        "help": "Force specific data source (default: AUTO)",
-        "default": "AUTO",  # DataSourceChoice.AUTO
+        "help": "Force specific data source (auto, REST, VISION)",
+        "default": "auto",  # DataSourceChoice.AUTO
     },
     "retries": {
         "long_flag": "--retries",
         "short_flag": "-r",
-        "help": "Maximum number of retry attempts",
+        "help": "Max retry attempts for network operations",
         "default": 3,
     },
     # Cache Control options
     "no_cache": {
         "long_flag": "--no-cache",
         "short_flag": "-nc",
-        "help": "Disable caching (cache is enabled by default)",
+        "help": "Disable cache usage",
         "default": False,
     },
     "clear_cache": {
         "long_flag": "--clear-cache",
         "short_flag": "-cc",
-        "help": "Clear the cache directory before running",
+        "help": "Clear cache before fetching data",
         "default": False,
     },
     # Documentation options
     "gen_doc": {
         "long_flag": "--gen-doc",
         "short_flag": "-gd",
-        "help": "Generate Markdown documentation from Typer help into docs/dsm_demo_cli/ directory",
+        "help": "Generate Markdown documentation",
         "default": False,
     },
     "gen_lint_config": {
         "long_flag": "--gen-lint-config",
         "short_flag": "-glc",
-        "help": "Generate markdown linting configuration files along with documentation (only used with --gen-doc)",
+        "help": "Generate markdownlint configuration",
         "default": False,
     },
     # Other options
     "log_level": {
         "long_flag": "--log-level",
         "short_flag": "-l",
-        "help": "Set the log level (default: I). D, I, W, E, C",
-        "default": "I",  # LogLevel.INFO
+        "help": "Log level (D=debug, I=info, W=warning, E=error, C=critical)",
+        "default": "info",  # LogLevel.INFO
     },
-    "help": {
-        "long_flag": "--help",
-        "short_flag": "-h",
-        "help": "Show this message and exit.",
+    # New options
+    "show_cache_info": {
+        "long_flag": "--show-cache-info",
+        "short_flag": "-sci",
+        "help": "Show cache directory information and exit",
+        "default": False,
     },
 }
 
 # Legacy help texts dictionary (kept for backward compatibility)
-OPTION_HELP_TEXTS = {
-    key: value["help"] for key, value in CLI_OPTIONS.items() if "help" in value
-}
+OPTION_HELP_TEXTS = {key: value["help"] for key, value in CLI_OPTIONS.items() if "help" in value}

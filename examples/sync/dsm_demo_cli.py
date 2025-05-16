@@ -20,12 +20,13 @@ from core.sync.dsm_lib import (
     process_market_parameters,
     setup_environment,
 )
+from utils.app_paths import get_cache_dir, get_log_dir
 from utils.for_demo.dsm_app_options import (
     create_typer_app,
     get_cmd_help_text,
     get_standard_options,
 )
-from utils.for_demo.dsm_cache_utils import get_cache_dir
+from utils.for_demo.dsm_cache_utils import print_cache_info
 from utils.for_demo.dsm_cli_utils import (
     ChartTypeChoice,
     DataProviderChoice,
@@ -82,6 +83,8 @@ def main(
     # Documentation options
     gen_doc: bool = options["gen_doc"],
     gen_lint_config: bool = options["gen_lint_config"],
+    # New options
+    show_cache_info: bool = False,
     # Other options
     log_level: LogLevel = options["log_level"],
 ):
@@ -94,8 +97,10 @@ def main(
 
     logger.info(f"Current time: {pendulum.now().isoformat()}")
 
-    # Log the cache directory location for reference
+    # Log directories for reference
+    log_dir = get_log_dir()
     cache_dir = get_cache_dir()
+    logger.info(f"Using log directory: {log_dir}")
     logger.info(f"Using cache directory: {cache_dir}")
 
     try:
@@ -119,6 +124,11 @@ def main(
             if typer_cli_available:
                 logger.info("Documentation was generated using typer-cli for optimal GitHub rendering")
 
+            return
+
+        # Check if we should show cache information and exit
+        if show_cache_info:
+            print_cache_info()
             return
 
         # Print introductory information

@@ -11,7 +11,11 @@ from typing import Any, Optional, Tuple
 from core.sync.data_source_manager import DataSource
 
 # Import utility modules
-from utils.for_demo.dsm_cache_utils import clear_cache_directory, ensure_cache_directory, verify_project_root
+from utils.for_demo.dsm_cache_utils import (
+    clear_all_cache_directories,
+    ensure_cache_directory,
+    verify_project_root,
+)
 from utils.for_demo.dsm_data_fetcher import fetch_data_with_fcp
 from utils.for_demo.dsm_validation_utils import calculate_date_range, validate_interval
 
@@ -48,7 +52,8 @@ def setup_environment(clear_cache: bool = False) -> bool:
 
         # Clear cache if requested
         if clear_cache:
-            clear_cache_directory()
+            # Clear all cache directories for a complete cleanup
+            clear_all_cache_directories()
 
         return True
     except Exception as e:

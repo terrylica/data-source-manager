@@ -125,6 +125,13 @@ def get_standard_options() -> Dict[str, Any]:
             CLI_OPTIONS["clear_cache"]["short_flag"],
             help=CLI_OPTIONS["clear_cache"]["help"],
         ),
+        # Show Cache Info option
+        "show_cache_info": typer.Option(
+            CLI_OPTIONS["show_cache_info"]["default"],
+            CLI_OPTIONS["show_cache_info"]["long_flag"],
+            CLI_OPTIONS["show_cache_info"]["short_flag"],
+            help=CLI_OPTIONS["show_cache_info"]["help"],
+        ),
         # Documentation options
         "gen_doc": typer.Option(
             CLI_OPTIONS["gen_doc"]["default"],
