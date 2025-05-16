@@ -31,7 +31,8 @@ dependencies = [
     "psutil", # for system monitoring
     "typer", # for CLI
     "rich", # for elegant logging and CLI output
-    "pendulum" # for date and time operations
+    "pendulum", # for date and time operations
+    "platformdirs" # for platform-specific directory paths
 ]
 
 [project.optional-dependencies]

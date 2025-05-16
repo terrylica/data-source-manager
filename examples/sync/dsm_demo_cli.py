@@ -9,7 +9,6 @@ from utils.for_demo.dsm_help_content import MAIN_DOCSTRING
 __doc__ = MAIN_DOCSTRING
 
 import sys
-from pathlib import Path
 from time import perf_counter
 from typing import Optional
 
@@ -26,6 +25,7 @@ from utils.for_demo.dsm_app_options import (
     get_cmd_help_text,
     get_standard_options,
 )
+from utils.for_demo.dsm_cache_utils import get_cache_dir
 from utils.for_demo.dsm_cli_utils import (
     ChartTypeChoice,
     DataProviderChoice,
@@ -53,9 +53,6 @@ from utils.logger_setup import configure_session_logging, logger
 
 # Start the performance timer at module initialization
 start_time_perf = perf_counter()
-
-# We'll use this cache dir for all demos
-CACHE_DIR = Path("./cache")
 
 # Create Typer app with custom rich formatting
 app = create_typer_app()
@@ -93,11 +90,13 @@ def main(
     level = resolve_log_level(log_level.value)
 
     # Set up session logging (delegated to logger_setup.py)
-    main_log, error_log, log_timestamp = configure_session_logging(
-        "dsm_demo_cli", level
-    )
+    main_log, error_log, log_timestamp = configure_session_logging("dsm_demo_cli", level)
 
     logger.info(f"Current time: {pendulum.now().isoformat()}")
+
+    # Log the cache directory location for reference
+    cache_dir = get_cache_dir()
+    logger.info(f"Using cache directory: {cache_dir}")
 
     try:
         # Check if we should generate documentation
@@ -118,9 +117,7 @@ def main(
 
             # If typer-cli was installed and used, provide additional information
             if typer_cli_available:
-                logger.info(
-                    "Documentation was generated using typer-cli for optimal GitHub rendering"
-                )
+                logger.info("Documentation was generated using typer-cli for optimal GitHub rendering")
 
             return
 

@@ -5,14 +5,13 @@ This module provides reusable functions for data fetching and processing,
 independent of any CLI or presentation logic.
 """
 
-from pathlib import Path
 from time import perf_counter
 from typing import Any, Optional, Tuple
 
 from core.sync.data_source_manager import DataSource
 
 # Import utility modules
-from utils.for_demo.dsm_cache_utils import clear_cache_directory, verify_project_root
+from utils.for_demo.dsm_cache_utils import clear_cache_directory, ensure_cache_directory, verify_project_root
 from utils.for_demo.dsm_data_fetcher import fetch_data_with_fcp
 from utils.for_demo.dsm_validation_utils import calculate_date_range, validate_interval
 
@@ -28,9 +27,6 @@ from utils.market_constraints import (
     get_default_symbol,
 )
 
-# Default cache directory - use project root for all installations for consistency
-CACHE_DIR = Path("./cache")
-
 
 def setup_environment(clear_cache: bool = False) -> bool:
     """
@@ -43,13 +39,16 @@ def setup_environment(clear_cache: bool = False) -> bool:
         bool: True if setup successful, False otherwise
     """
     try:
-        # Verify project root
-        if not verify_project_root():
-            return False
+        # Verify project root (always returns True now, kept for backward compatibility)
+        verify_project_root()
+
+        # Create cache directory if it doesn't exist
+        cache_dir = ensure_cache_directory()
+        logger.debug(f"Using cache directory: {cache_dir}")
 
         # Clear cache if requested
         if clear_cache:
-            clear_cache_directory(CACHE_DIR)
+            clear_cache_directory()
 
         return True
     except Exception as e:
@@ -86,13 +85,9 @@ def process_market_parameters(
     # For CM market, ensure symbol ends with _PERP and has USD (not USDT)
     if market_type == MarketType.FUTURES_COIN:
         if not symbol.endswith("_PERP"):
-            raise ValueError(
-                f"Symbol for coin-margined futures must end with '_PERP'. Invalid: '{symbol}'"
-            )
+            raise ValueError(f"Symbol for coin-margined futures must end with '_PERP'. Invalid: '{symbol}'")
         if "USDT" in symbol:
-            raise ValueError(
-                f"Symbol for coin-margined futures must use USD, not USDT. Invalid: '{symbol}'"
-            )
+            raise ValueError(f"Symbol for coin-margined futures must use USD, not USDT. Invalid: '{symbol}'")
 
     # If no symbol is provided, use default symbol for the market type
     if not symbol:
@@ -140,9 +135,7 @@ def fetch_market_data(
 
     try:
         # Calculate time range
-        start_datetime, end_datetime = calculate_date_range(
-            start_time, end_time, days, interval
-        )
+        start_datetime, end_datetime = calculate_date_range(start_time, end_time, days, interval)
 
         # Convert enforce_source string to enum
         enforce_source_enum = DataSource[enforce_source.upper()]

@@ -8,7 +8,6 @@ fetching historical data from a specified end time, similar to the CLI usage:
 """
 
 import os
-from pathlib import Path
 
 import pandas as pd
 import pendulum
@@ -20,6 +19,7 @@ from core.sync.dsm_lib import (
     setup_environment,
 )
 from utils.deprecation_rules import Interval as DeprecationInterval
+from utils.for_demo.dsm_cache_utils import get_cache_dir
 from utils.for_demo.dsm_display_utils import display_results
 from utils.logger_setup import configure_session_logging, logger
 
@@ -52,9 +52,7 @@ def showcase_backward_retrieval(
     # Set the log level from the parameter
     logger.setLevel(log_level)
 
-    logger.info(
-        f"Starting showcase_backward_retrieval with symbol={symbol}, interval={interval}, days={days}"
-    )
+    logger.info(f"Starting showcase_backward_retrieval with symbol={symbol}, interval={interval}, days={days}")
 
     print("\n[bold blue]Backward Data Retrieval Example[/bold blue]")
     print("[cyan]Configuration:[/cyan]")
@@ -66,18 +64,14 @@ def showcase_backward_retrieval(
 
     # Process market parameters
     logger.debug(f"Processing market parameters for {symbol}")
-    provider_enum, market_type, chart_type_enum, symbol, interval_enum = (
-        process_market_parameters(
-            provider="binance",
-            market="spot",
-            chart_type="klines",
-            symbol=symbol,
-            interval=interval,
-        )
+    provider_enum, market_type, chart_type_enum, symbol, interval_enum = process_market_parameters(
+        provider="binance",
+        market="spot",
+        chart_type="klines",
+        symbol=symbol,
+        interval=interval,
     )
-    logger.debug(
-        f"Market parameters processed: provider={provider_enum}, market_type={market_type}, chart_type={chart_type_enum}"
-    )
+    logger.debug(f"Market parameters processed: provider={provider_enum}, market_type={market_type}, chart_type={chart_type_enum}")
 
     # Calculate start time for display
     end_dt = pendulum.parse(end_time)
@@ -89,9 +83,7 @@ def showcase_backward_retrieval(
     print(f"To:   {end_dt.format('YYYY-MM-DD HH:mm:ss')}\n")
 
     # Fetch data with backward retrieval
-    logger.info(
-        f"Fetching market data for {symbol} from {start_dt.isoformat()} to {end_dt.isoformat()}"
-    )
+    logger.info(f"Fetching market data for {symbol} from {start_dt.isoformat()} to {end_dt.isoformat()}")
     df, elapsed_time, records = fetch_market_data(
         provider=provider_enum,
         market_type=market_type,
@@ -105,9 +97,7 @@ def showcase_backward_retrieval(
 
     # Display results
     if records > 0:
-        print(
-            f"[green]✓ Successfully fetched {records:,} records in {elapsed_time:.2f} seconds[/green]"
-        )
+        print(f"[green]✓ Successfully fetched {records:,} records in {elapsed_time:.2f} seconds[/green]")
 
         # Use the display_results function for consistent display with dsm_demo_cli.py
         timestamp = log_timestamp or pendulum.now().format("YYYYMMDD_HHmmss")
@@ -134,9 +124,7 @@ def showcase_backward_retrieval(
             # Create the frequency string using the non-deprecated format
             freq = f"{interval_obj.value}{interval_obj.unit.value}"
             # Use the proper frequency string for date_range
-            df.index = pd.date_range(
-                start=start_dt.isoformat(), periods=len(df), freq=freq, tz="UTC"
-            )
+            df.index = pd.date_range(start=start_dt.isoformat(), periods=len(df), freq=freq, tz="UTC")
 
         first_ts = df.index[0]
         last_ts = df.index[-1]
@@ -166,21 +154,19 @@ def main():
     # Show execution environment info
     cwd = os.getcwd()
     logger.debug(f"Current working directory: {cwd}")
-    if Path(cwd).name != "raw-data-services":
-        print(
-            f"[yellow]Warning: Not running from project root. Current directory: {cwd}[/yellow]"
-        )
-    else:
-        print("Running from project root directory")
+
+    # No need to check for project root - we're using platformdirs
+
+    # Log cache directory location
+    cache_dir = get_cache_dir()
+    logger.info(f"Using cache directory: {cache_dir}")
 
     # Configure logging with DEBUG level by default
     current_time = pendulum.now()
     logger.info(f"Starting showcase at {current_time.isoformat()}")
 
     # Configure logging and capture log file paths and timestamp
-    main_log, error_log, log_timestamp = configure_session_logging(
-        "dsm_demo_module", "INFO"
-    )
+    main_log, error_log, log_timestamp = configure_session_logging("dsm_demo_module", "INFO")
 
     # Log the paths to help with debugging
     logger.debug(f"Main log file: {main_log}")
