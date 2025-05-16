@@ -1,0 +1,1 @@
+"""DataSourceManager Demo CLI package."""
