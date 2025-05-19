@@ -1,6 +1,6 @@
 # How to setup ruff: https://docs.astral.sh/ruff/settings/
 line-length = 140 # The maximum line length for code and comments
-target-version = "py311" # The target Python version for linting and formatting
+target-version = "py310" # The target Python version for linting and formatting
 preview = false # Whether to enable preview features (e.g. ruff-lsp)
 respect-gitignore = true # Whether to respect .gitignore when linting and formatting
 
@@ -9,6 +9,9 @@ exclude = [".cursorignore", "playground/", "tests/", "__pycache__/"] # Default e
 
 # Additional file patterns to exclude (extends the exclude list without overriding it)
 extend-exclude = [] # Useful for excluding tests or specific problematic files
+
+# Enable unsafe fixes
+unsafe-fixes = true
 
 [lint]
 select = [ # Rules to select

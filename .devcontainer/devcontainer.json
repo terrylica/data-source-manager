@@ -10,40 +10,26 @@
   },
   // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
-    "ghcr.io/devcontainers/features/aws-cli:1": {},
-    "ghcr.io/devcontainers/features/node:1": {}
+    "ghcr.io/devcontainers/features/aws-cli:1": { }
   },
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "pip3 install -e . && pip3 install -e '.[dev]' && bash .devcontainer/make-scripts-executable.sh",
-  // Set environment variables
-  "remoteEnv": {
-    "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
-  },
+  "postCreateCommand": "pip3 install -e '.[dev]'",
   // Configure tool-specific properties.
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
-        // "ms-python.pylance", use ruff instead
-        "ms-python.black-formatter",
-        "esbenp.prettier-vscode",
         "ms-azuretools.vscode-docker",
         "eamodio.gitlens",
-        "ritwickdey.liveserver",
-        "mechatroner.rainbow-csv",
-        "davidanson.vscode-markdownlint",
-        "bierner.markdown-mermaid",
-        "rioj7.command-variable",
-        "michelemelluso.gitignore",
-        "ms-edgedevtools.vscode-edge-devtools",
-        "charliermarsh.ruff",
-        "lirik.empty-folders-remover", // helps remove empty folders in FILE EXPLORER when SOURCE CONTROL discards changes but only deletes files, not folders
-        "zack.markdown-editor" // markdown editor
+        "davidanson.vscode-markdownlint", // auto lint markdown files, keyboard shortcut: ctrl+shift+p -> Lint all Markdown files in the workspace with markdownlint
+        "tamasfe.even-better-toml", // Colorize and lint TOML files, especially for pyproject.toml and ruff.toml
+        "charliermarsh.ruff" // respect any Ruff configuration as defined in your project's pyproject.toml, ruff.toml, or .ruff.toml file
       ],
       "settings": {
-        "extensions.verifySignature": false
+        "extensions.verifySignature": false,
+        "cursor.features.cursorRules": true
       }
     }
   },
