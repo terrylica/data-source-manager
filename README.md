@@ -97,15 +97,16 @@ The core data fetching functionality of Raw Data Service is available for direct
 
 The main function for retrieving market data is `fetch_market_data`.
 
-Here's an example of how to use it:
+### Example 1: Fetching with Specific Date Range
 
 ```python
 from datetime import datetime
-from raw_data_services import fetch_market_data, MarketType, DataProvider, Interval
+from raw_data_services import fetch_market_data, MarketType, DataProvider, Interval, ChartType
 
 # Define parameters
 provider = DataProvider.BINANCE
 market_type = MarketType.SPOT
+chart_type = ChartType.KLINES
 symbol = "BTCUSDT"
 interval = Interval.MINUTE_1
 start_time = datetime(2023, 1, 1)
@@ -115,6 +116,7 @@ end_time = datetime(2023, 1, 10)
 df, elapsed_time, records_count = fetch_market_data(
     provider=provider,
     market_type=market_type,
+    chart_type=chart_type,
     symbol=symbol,
     interval=interval,
     start_time=start_time,
@@ -124,6 +126,45 @@ df, elapsed_time, records_count = fetch_market_data(
 
 # Process results
 print(f"Fetched {records_count} records in {elapsed_time:.2f} seconds")
+if df is not None:
+    print(df.head())
+```
+
+### Example 2: Fetching Backward from a Specific End Time
+
+This example demonstrates how to fetch data backward from a precise end time in May 2025:
+
+```python
+import pendulum
+from raw_data_services import fetch_market_data, MarketType, DataProvider, Interval, ChartType
+
+# Define parameters
+provider = DataProvider.BINANCE
+market_type = MarketType.SPOT
+chart_type = ChartType.KLINES
+symbol = "BTCUSDT"
+interval = Interval.MINUTE_1
+
+# Define a specific end time with precise minutes and seconds
+# Note: Using pendulum for better datetime handling as per project standards
+end_time = pendulum.datetime(2025, 5, 15, 13, 45, 30, tz="UTC")  # 2025-05-15 13:45:30 UTC
+days = 7  # Fetch 7 days backward from the end time
+
+# Fetch data (no need to specify start_time, it will be calculated)
+df, elapsed_time, records_count = fetch_market_data(
+    provider=provider,
+    market_type=market_type,
+    chart_type=chart_type,
+    symbol=symbol,
+    interval=interval,
+    end_time=end_time,
+    days=days,
+    use_cache=True,
+)
+
+# Process results
+print(f"Fetched {records_count} records in {elapsed_time:.2f} seconds")
+print(f"Date range: {end_time.subtract(days=days).format('YYYY-MM-DD HH:mm:ss.SSS')} to {end_time.format('YYYY-MM-DD HH:mm:ss.SSS')}")
 if df is not None:
     print(df.head())
 ```
