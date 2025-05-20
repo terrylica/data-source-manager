@@ -16,5 +16,18 @@ Key Features:
 
 from core.providers.binance.vision_data_client import VisionDataClient
 from utils.dataframe_types import TimestampedDataFrame
+from core.sync.dsm_lib import fetch_market_data
+from core.sync.data_source_manager import DataSourceConfig, DataSource
+from utils.market_constraints import MarketType, DataProvider, ChartType, Interval
 
-__all__ = ["TimestampedDataFrame", "VisionDataClient"]
+__all__ = [
+    "TimestampedDataFrame",
+    "VisionDataClient",
+    "fetch_market_data",
+    "DataSourceConfig",
+    "MarketType",
+    "DataProvider",
+    "ChartType",
+    "Interval",
+    "DataSource",
+]

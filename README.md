@@ -8,21 +8,25 @@ There are two main ways to install Raw Data Service, depending on your needs:
 
 ### 1. For Development or Running Demos Directly
 
-If you want to contribute to the development of Raw Data Service, modify its source code, or run the provided demos directly from the cloned repository, follow these steps:
+If you want to run the provided demos directly from the cloned repository or use the core library while having the source files available in your workspace, follow these steps:
 
 ```bash
 # Clone the repository
 git clone https://github.com/Eon-Labs/raw-data-services.git
 cd raw-data-services
 
-# Install the package in editable mode
+# Install the core package in editable mode
 pip install -e .
+```
 
-# To include development dependencies (e.g., for running tests, linting)
+If you plan to contribute to the development, modify the source code, or run tests/linting, include the development dependencies:
+
+```bash
+# After cloning and changing directory, install the package with development dependencies
 pip install -e ".[dev]"
 ```
 
-This method keeps all the source files in your workspace.
+This method keeps all the source files in your workspace and includes necessary tools for development workflows.
 
 ### 2. As a Dependency in Your Project (`pyproject.toml`)
 
@@ -86,6 +90,47 @@ The module demo provides a programmatic interface:
 # Run the DSM Demo Module to see examples
 dsm-demo-module
 ```
+
+## Using as a Library
+
+The core data fetching functionality of Raw Data Service is available for direct import and use in your Python projects after installation.
+
+The main function for retrieving market data is `fetch_market_data`.
+
+Here's an example of how to use it:
+
+```python
+from datetime import datetime
+from raw_data_services import fetch_market_data, MarketType, DataProvider, Interval
+
+# Define parameters
+provider = DataProvider.BINANCE
+market_type = MarketType.SPOT
+symbol = "BTCUSDT"
+interval = Interval.MINUTE_1
+start_time = datetime(2023, 1, 1)
+end_time = datetime(2023, 1, 10)
+
+# Fetch data
+df, elapsed_time, records_count = fetch_market_data(
+    provider=provider,
+    market_type=market_type,
+    symbol=symbol,
+    interval=interval,
+    start_time=start_time,
+    end_time=end_time,
+    use_cache=True,
+)
+
+# Process results
+print(f"Fetched {records_count} records in {elapsed_time:.2f} seconds")
+if df is not None:
+    print(df.head())
+```
+
+You can import `fetch_market_data` directly from the `raw_data_services` package. The necessary enums (`MarketType`, `DataProvider`, `ChartType`, `Interval`, `DataSource`) and `DataSourceConfig` are also exposed at the top level for easy access.
+
+Refer to the source code of `raw_data_services.core.sync.dsm_lib.fetch_market_data` and `raw_data_services.core.sync.data_source_manager.DataSourceConfig` for detailed parameter information and usage.
 
 ## Data Source Manager (DSM) Demo
 
