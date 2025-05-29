@@ -850,6 +850,8 @@ def main(
     )  # Explicitly print absolute path # Keep console.print for user-facing message
     logging.info("Script finished.")
 
+    console.print(f"[bold green]Logging output saved to:[/bold green] {log_file}")
+
 
 def fill_gaps_in_dataframe(df: pl.DataFrame, interval_ms: int) -> pl.DataFrame:
     """
