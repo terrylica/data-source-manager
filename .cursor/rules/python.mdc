@@ -1,8 +1,9 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
+
 # Python Preference
 
 - Python 3.11 compatible functionality.
@@ -27,9 +28,3 @@ alwaysApply: true
 ### Http client
 
 - Prefer `httpx` to `requests` as http client.
-
-## Logger
-
-- You must not be allowed to  use `import logging` any where in the code.
-- Apply `from utils.logger_setup import logger; from rich import print` as header imports for all Python scripts.
-- Rich's `cosole.print()` is monkey patched to `print` via `utils/logger_setup.py` already.
