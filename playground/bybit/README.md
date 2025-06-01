@@ -7,8 +7,16 @@ This directory contains tools for downloading and analyzing historical price dat
 Before using these tools, you need to install the required Python packages:
 
 ```bash
-pip install httpx typer platformdirs rich polars
+pip install httpx typer platformdirs rich polars loguru
 ```
+
+### Dependency Explanation
+- **httpx**: Modern HTTP client with sync and async APIs
+- **typer**: Command-line interface creation (built on Click)
+- **platformdirs**: Platform-specific directories for data and logs
+- **rich**: Terminal formatting and progress displays
+- **polars**: Fast DataFrame manipulation
+- **loguru**: Advanced logging with automatic rotation and formatting
 
 ## Main Tool: Download Spot Klines
 
@@ -22,6 +30,7 @@ The primary tool in this directory is [`download_spot_klines.py`](./download_spo
 - Fill missing timestamps with NaN values
 - Perform data integrity checks including duplicate detection
 - Format data in standard OHLCV format
+- Advanced logging with loguru (including log rotation and compression)
 
 ### Usage
 
@@ -106,7 +115,15 @@ Key files in this directory:
 
 ## Logging
 
-The tool logs all operations to platform-specific locations determined by the `platformdirs` module:
+The tool uses loguru for enhanced logging with the following features:
+
+- **Automatic rotation**: Log files are automatically rotated when they reach 10MB
+- **Retention policy**: Old logs are kept for 1 week then automatically deleted
+- **Compression**: Rotated logs are compressed to save disk space
+- **Better formatting**: Timestamp, log level, and message are clearly formatted
+- **Enhanced exceptions**: Detailed traceback information for exceptions
+
+The log files are stored in platform-specific locations determined by the `platformdirs` module:
 
 ```shell
 # Platform-specific log locations
@@ -115,4 +132,4 @@ Linux:     ~/.local/state/data_source_manager/bybit_download.log
 Windows:   C:\Users\<username>\AppData\Local\data_source_manager\data_source_manager\Logs\bybit_download.log
 ```
 
-This log can be useful for debugging or tracking the historical execution of data downloads.
+Rotated logs follow the naming convention `bybit_download.{timestamp}.log.zip` and are stored in the same directory.

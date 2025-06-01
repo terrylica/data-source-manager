@@ -11,7 +11,7 @@ import polars as pl
 import time
 from rich.console import Console
 from rich.table import Table
-import logging
+from loguru import logger
 
 # Determine log file path using platformdirs
 log_dir = platformdirs.user_log_dir(
@@ -20,20 +20,25 @@ log_dir = platformdirs.user_log_dir(
 log_file = Path(log_dir) / "bybit_download.log"
 log_file.parent.mkdir(parents=True, exist_ok=True)  # Ensure log directory exists
 
-# Configure logging to write to a file
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename=log_file,  # Direct logging output to the file
-    filemode="a",  # Append to the log file
+# Configure loguru to write to a file with rotation
+logger.remove()  # Remove default handlers
+logger.add(
+    str(log_file),
+    rotation="10 MB",  # Rotate when the file reaches 10MB
+    retention="1 week",  # Keep logs for 1 week
+    compression="zip",  # Compress rotated logs
+    level="INFO",  # Log info messages and above
+    format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
 )
 
-# If you also want debug messages in the log file, you can change level to logging.DEBUG
-# logging.basicConfig(
-#     level=logging.DEBUG, # Log debug messages and above
-#     format='%(asctime)s - %(levelname)s - %(message)s',
-#     filename=log_file,
-#     filemode='a'
+# Uncomment to enable debug logging
+# logger.add(
+#     str(log_file),
+#     level="DEBUG",  # Log debug messages and above
+#     rotation="10 MB",
+#     retention="1 week",
+#     compression="zip",
+#     format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
 # )
 
 app = typer.Typer()
@@ -53,7 +58,7 @@ LIMIT = 5  # Set the API limit to 5 for testing overlap with a larger batch size
 
 def check_for_duplicates(klines: List[List[str]]) -> tuple[bool, int]:
     """Checks a list of klines for duplicates based on timestamp."""
-    logging.debug("Checking for duplicates.")  # Use logging
+    logger.debug("Checking for duplicates.")
     if not klines:
         return False, 0
     # Ensure timestamps are integers for set comparison
@@ -62,24 +67,24 @@ def check_for_duplicates(klines: List[List[str]]) -> tuple[bool, int]:
     unique_timestamps = set(timestamps)
     has_duplicates = len(timestamps) != len(unique_timestamps)
     num_duplicates = len(timestamps) - len(unique_timestamps)
-    logging.debug(f"Duplicate check results: has_duplicates={has_duplicates}, num_duplicates={num_duplicates}")
+    logger.debug(f"Duplicate check results: has_duplicates={has_duplicates}, num_duplicates={num_duplicates}")
     return has_duplicates, num_duplicates
 
 
 def interval_to_ms(interval: str) -> int:
     """Converts interval string (5, 15) to milliseconds."""
-    logging.debug(f"Converting interval '{interval}' to milliseconds.")
+    logger.debug(f"Converting interval '{interval}' to milliseconds.")
     if interval == "5":
         return 5 * 60 * 1000
     if interval == "15":
         return 15 * 60 * 1000
-    logging.error(f"Unsupported interval: {interval}")
+    logger.error(f"Unsupported interval: {interval}")
     raise ValueError("Unsupported interval")
 
 
 def round_down_timestamp_to_interval(timestamp_ms: int, interval_ms: int) -> int:
     """Rounds a timestamp down to the nearest interval boundary."""
-    logging.debug(f"Rounding down timestamp {timestamp_ms} to interval {interval_ms}.")
+    logger.debug(f"Rounding down timestamp {timestamp_ms} to interval {interval_ms}.")
     return (timestamp_ms // interval_ms) * interval_ms
 
 
@@ -105,8 +110,8 @@ def fetch_klines(
     if end_time_ms is not None:
         params["end"] = end_time_ms
 
-    # Use logging.debug for debugging API call parameters
-    logging.debug(f"API Call Params: {params}")
+    # Use logger.debug for debugging API call parameters
+    logger.debug(f"API Call Params: {params}")
 
     # Use a small delay to avoid hitting rate limits quickly
     time.sleep(0.1)  # Use synchronous sleep
@@ -114,11 +119,11 @@ def fetch_klines(
     try:
         response = client.get(BYBIT_API_URL, params=params)
 
-        # Use logging.debug for debugging response details
-        logging.debug(f"Response Status Code: {response.status_code}")
+        # Use logger for debugging response details
+        logger.debug(f"Response Status Code: {response.status_code}")
         # Log response headers for rate limit info etc.
-        logging.debug(f"Response Headers: {response.headers}")
-        logging.debug(f"Response Body Snippet: {response.text[:500]}...")  # Log first 500 chars of body
+        logger.debug(f"Response Headers: {response.headers}")
+        logger.debug(f"Response Body Snippet: {response.text[:500]}...")  # Log first 500 chars of body
 
         response.raise_for_status()
 
@@ -126,23 +131,23 @@ def fetch_klines(
 
         if data["retCode"] != 0:
             console.print(f"\n[bold red]API Error:[/bold red] {data['retMsg']}")  # Keep console.print for user-facing error
-            # Use logging.error for error response body
-            logging.error(f"API returned error retCode={data['retCode']}, retMsg={data['retMsg']}")
-            logging.error(f"Error Response Body: {response.text}")
+            # Use logger.error for error response body
+            logger.error(f"API returned error retCode={data['retCode']}, retMsg={data['retMsg']}")
+            logger.error(f"Error Response Body: {response.text}")
             raise Exception(f"Bybit API returned error: {data['retMsg']}")
 
         klines = data["result"]["list"]
-        logging.debug(f"Received {len(klines)} klines in this response.")
+        logger.debug(f"Received {len(klines)} klines in this response.")
         return klines
 
     except httpx.HTTPStatusError as e:
-        logging.error(f"HTTP error occurred: {e}")  # Use logging for error
+        logger.error(f"HTTP error occurred: {e}")
         raise  # Re-raise the exception
     except httpx.RequestError as e:
-        logging.error(f"An error occurred while requesting {e.request.url!r}: {e}")  # Use logging for error
+        logger.error(f"An error occurred while requesting {e.request.url!r}: {e}")
         raise  # Re-raise the exception
-    except Exception:
-        logging.exception("An unexpected error occurred during fetch_klines:")  # Use logging.exception for traceback
+    except Exception as ex:
+        logger.exception(f"An unexpected error occurred during fetch_klines: {ex}")
         raise  # Re-raise the exception
 
 
@@ -159,8 +164,8 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
     very_early_timestamp = 1500000000000  # Example: July 2017
 
     try:
-        # Use logging.debug for debugging Genesis Step 1
-        logging.debug(f"Genesis Step 1: Querying with start={very_early_timestamp} and limit=1 to find potential earliest.")
+        # Use logger.debug for debugging Genesis Step 1
+        logger.debug(f"Genesis Step 1: Querying with start={very_early_timestamp} and limit=1 to find potential earliest.")
         # Use synchronous fetch_klines
         klines_initial = fetch_klines(client, category, symbol, str(interval_ms // 60000), start_time_ms=very_early_timestamp, limit=1)
 
@@ -168,7 +173,7 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
             console.print(
                 "[bold red]Error:[/bold red] Could not find any data even from a very early timestamp."
             )  # Keep console.print for user-facing error
-            logging.error("Could not find any data from very early timestamp. Exiting.")
+            logger.error("Could not find any data from very early timestamp. Exiting.")
             raise typer.Exit(code=1)
 
         potential_earliest_ts = int(klines_initial[0][0])
@@ -176,12 +181,12 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
             f"  Potential earliest timestamp found: {potential_earliest_ts} ("
             f"{datetime.datetime.fromtimestamp(potential_earliest_ts/1000, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')})"
         ) # Keep console.print for user-facing message
-        logging.debug(f"Potential earliest timestamp: {potential_earliest_ts}")
+        logger.debug(f"Potential earliest timestamp: {potential_earliest_ts}")
 
         # Step 2: Verify by querying one interval before
         verification_start_ts = potential_earliest_ts - interval_ms
-        # Use logging.debug for debugging Genesis Step 2
-        logging.debug(f"Genesis Step 2: Verifying by querying one interval before: start={verification_start_ts} and limit=1.")
+        # Use logger.debug for debugging Genesis Step 2
+        logger.debug(f"Genesis Step 2: Verifying by querying one interval before: start={verification_start_ts} and limit=1.")
 
         # Use synchronous fetch_klines
         klines_verification = fetch_klines(
@@ -193,7 +198,7 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
             console.print(
                 "  Verification successful: Querying one interval before returned no klines."
             )  # Keep console.print for user-facing message
-            logging.debug("Verification query returned empty list. Verification successful.")
+            logger.debug("Verification query returned empty list. Verification successful.")
             true_genesis_ts = potential_earliest_ts
         else:
             # Bybit API behavior: When querying before the earliest available data,
@@ -204,7 +209,7 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
                 console.print(
                     f"  Verification matches expected Bybit API behavior: Querying before earliest data returns the earliest point."
                 )  # Keep console.print for user-facing message
-                logging.info("Verification confirmed earliest timestamp - Bybit API returns earliest point when querying before it.")
+                logger.info("Verification confirmed earliest timestamp - Bybit API returns earliest point when querying before it.")
                 true_genesis_ts = potential_earliest_ts
                 console.print(
                     f"  Confirmed earliest timestamp: {true_genesis_ts}"
@@ -215,7 +220,7 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
                     "[bold yellow]Unexpected verification result:[/bold yellow] Querying one interval before returned different data."
                 ) # Keep console.print for user-facing message
                 # Log the timestamp returned in verification for debugging
-                logging.warning(
+                logger.warning(
                     f"Verification query returned unexpected data. First kline timestamp in verification: "
                     f"{int(klines_verification[0][0]) if klines_verification else 'N/A'}"
                 )
@@ -238,12 +243,12 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
             f"[bold green]True genesis timestamp discovered:[/bold green] {true_genesis_ts} ("
             f"{datetime.datetime.fromtimestamp(true_genesis_ts/1000, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')})"
         ) # Keep console.print for user-facing message
-        logging.debug(f"True genesis timestamp determined: {true_genesis_ts}")
+        logger.debug(f"True genesis timestamp determined: {true_genesis_ts}")
         return true_genesis_ts
 
     except Exception as e:
         console.print(f"\n[bold red]Error during genesis timestamp discovery:[/bold red] {e}")  # Keep console.print for user-facing error
-        logging.exception("Exception during genesis timestamp discovery:")  # Log the full exception traceback
+        logger.exception(f"Exception during genesis timestamp discovery: {e}")  # Log the full exception traceback
         raise typer.Exit(code=1)
 
 
@@ -278,6 +283,7 @@ def main(
     * Fill missing timestamps with NaN values
     * Perform data integrity checks including duplicate detection
     * Format data in standard OHLCV format
+    * Advanced logging with loguru (including log rotation and compression)
 
     Example usage:
 
@@ -290,17 +296,17 @@ def main(
     """
     if interval not in ["5", "15"]:
         console.print("[bold red]Error:[/bold red] Only 5 and 15 minute intervals are supported for this test.")
-        logging.error(f"Unsupported interval: {interval}")
+        logger.error(f"Unsupported interval: {interval}")
         raise typer.Exit(code=1)
 
     if not 1 <= limit <= 1000:
         console.print("[bold red]Error:[/bold red] Limit must be between 1 and 1000.")
-        logging.error(f"Invalid limit: {limit}")
+        logger.error(f"Invalid limit: {limit}")
         raise typer.Exit(code=1)
 
     if fetch_all and gap_search_limit < 0:
         console.print("[bold red]Error:[/bold red] Gap search limit cannot be negative when --fetch-all is used.")
-        logging.error(f"Invalid gap_search_limit: {gap_search_limit}")
+        logger.error(f"Invalid gap_search_limit: {gap_search_limit}")
         raise typer.Exit(code=1)
 
     interval_ms = interval_to_ms(interval)
@@ -319,7 +325,7 @@ def main(
     output_file = output_subdir / output_filename
 
     console.print(f"Saving test data to: {output_file}")  # Keep console.print for user-facing message
-    logging.debug(f"Output file path: {output_file}")
+    logger.debug(f"Output file path: {output_file}")
 
     # --- Data Download ---
     all_klines_in_memory: List[List[str]] = []
@@ -332,7 +338,7 @@ def main(
                 f"Attempting to download {interval}-minute {category.upper()} {symbol.upper()} klines from genesis ("
                 f"{datetime.datetime.fromtimestamp(start_time_ms/1000, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')})..."
             ) # Keep console.print for user-facing message
-            logging.info(
+            logger.info(
                 f"Starting limited data download from genesis: "
                 f"{datetime.datetime.fromtimestamp(start_time_ms / 1000, datetime.timezone.utc)}"
             )
@@ -345,7 +351,7 @@ def main(
             end_time_ms = current_time_ms - end_time_buffer_ms
             end_time_utc = datetime.datetime.fromtimestamp(end_time_ms / 1000, datetime.timezone.utc)
             console.print(f"Setting end time to: {end_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')} (current time minus 30-minute buffer)")
-            logging.info(f"Fixed end time set to: {end_time_utc}")
+            logger.info(f"Fixed end time set to: {end_time_utc}")
 
             next_batch_start_time_ms = start_time_ms
             batch_num = 0
@@ -388,9 +394,9 @@ def main(
                         progress.start()
                         break
 
-                    logging.debug(f"--- Starting Batch {batch_num} ---")
+                    logger.debug(f"--- Starting Batch {batch_num} ---")
                     # Use the API limit for each request
-                    logging.debug(f"Attempting to fetch from start={current_batch_request_start_time_ms} with limit={limit}")
+                    logger.debug(f"Attempting to fetch from start={current_batch_request_start_time_ms} with limit={limit}")
 
                     # Removed remaining_klines and batch_limit logic that capped total rows
                     # Calculate how many more klines we need
@@ -412,10 +418,10 @@ def main(
                             limit=limit,
                         )
 
-                        logging.debug(f"Received {len(klines)} klines for Batch {batch_num}.")
+                        logger.debug(f"Received {len(klines)} klines for Batch {batch_num}.")
 
                         if not klines:
-                            logging.debug(f"Empty klines list received for start={current_batch_request_start_time_ms}.")
+                            logger.debug(f"Empty klines list received for start={current_batch_request_start_time_ms}.")
 
                             # Update progress task to indicate we're handling a gap
                             progress.update(
@@ -478,14 +484,14 @@ def main(
                                     progress.start()
                                     break
 
-                                logging.debug(f"Searching {i} intervals forward: trying start={search_timestamp_ms}")
+                                logger.debug(f"Searching {i} intervals forward: trying start={search_timestamp_ms}")
                                 try:
                                     # Fetch only one kline to see if data exists
                                     search_klines = fetch_klines(
                                         client, category, symbol, str(interval_ms // 60000), start_time_ms=search_timestamp_ms, limit=1
                                     )
                                     if search_klines:
-                                        logging.debug(f"Found data at {search_timestamp_ms}")
+                                        logger.debug(f"Found data at {search_timestamp_ms}")
                                         # Use progress.stop() and progress.start() to manage display
                                         progress.stop()
                                         console.print(
@@ -496,7 +502,7 @@ def main(
                                         found_data_after_gap = True
                                         break  # Exit the gap search loop
                                 except Exception as search_e:
-                                    logging.debug(f"Error during gap search at {search_timestamp_ms}: {search_e}")
+                                    logger.debug(f"Error during gap search at {search_timestamp_ms}: {search_e}")
                                     # Continue searching even if there's an error on a search request
 
                             if found_data_after_gap:
@@ -533,7 +539,7 @@ def main(
                                 f"\n[yellow]Jumping ahead 24 hours to {datetime.datetime.fromtimestamp(next_batch_start_time_ms / 1000, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} to continue download.[/yellow]"
                             )
                             progress.start()
-                            logging.info(
+                            logger.info(
                                 f"Jumping ahead 24 hours from {current_batch_request_start_time_ms} to {next_batch_start_time_ms} after finding no data in gap search"
                             )
 
@@ -572,13 +578,13 @@ def main(
                         # Set the start_time for the next request to be one interval AFTER the newest timestamp
                         # of the current batch to continue fetching forward.
                         next_batch_start_time_ms = newest_timestamp_in_batch + interval_ms
-                        logging.debug(
+                        logger.debug(
                             f"Batch {batch_num} finished. Oldest TS: {earliest_timestamp_in_batch}, Newest TS: {newest_timestamp_in_batch}. Next batch start calculated as: {next_batch_start_time_ms}"
                         )
 
                     except Exception as e:
                         console.print(f"\n[bold red]Error during download:[/bold red] {e}")
-                        logging.exception(f"An unexpected error occurred in Batch {batch_num}:")  # Log the full exception traceback
+                        logger.exception(f"An unexpected error occurred in Batch {batch_num}:")  # Log the full exception traceback
                         break  # Break loop on error
 
         else:  # Default behavior: fetch recent batches backwards
@@ -586,7 +592,7 @@ def main(
             console.print(
                 f"[bold blue]Starting download and data integrity test for {category.upper()} {symbol.upper()} {interval}-minute data (fetching {num_batches} recent batches backwards).[/bold blue]"
             )  # Keep console.print for user-facing message
-            logging.info(f"Starting recent data download ({num_batches} batches backwards).")
+            logger.info(f"Starting recent data download ({num_batches} batches backwards).")
             # Start fetching from near the current time, rounded down to the nearest interval
             current_time_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
             start_time_ms = round_down_timestamp_to_interval(current_time_ms, interval_ms)  # This is the 'end' for the first batch
@@ -619,8 +625,8 @@ def main(
                     batch_num += 1
                     current_batch_request_end_time_ms = next_batch_end_time_ms
 
-                    logging.debug(f"--- Starting Batch {batch_num} (Backward) ---")
-                    logging.debug(f"Attempting to fetch up to end={current_batch_request_end_time_ms} with limit={limit}")
+                    logger.debug(f"--- Starting Batch {batch_num} (Backward) ---")
+                    logger.debug(f"Attempting to fetch up to end={current_batch_request_end_time_ms} with limit={limit}")
 
                     try:
                         # Use 'end' parameter to fetch data historically UP TO this point
@@ -628,13 +634,13 @@ def main(
                             client, category, symbol, str(interval_ms // 60000), end_time_ms=current_batch_request_end_time_ms, limit=limit
                         )
 
-                        logging.debug(f"Received {len(klines)} klines for Batch {batch_num}.")
+                        logger.debug(f"Received {len(klines)} klines for Batch {batch_num}.")
 
                         if not klines:
                             console.print(
                                 "\n[green]Download complete: No more klines received in batch.[/green]"
                             )  # Keep console.print for user-facing message
-                            logging.info(f"Empty klines list received for end={current_batch_request_end_time_ms}. Breaking download loop.")
+                            logger.info(f"Empty klines list received for end={current_batch_request_end_time_ms}. Breaking download loop.")
                             break  # Stop if no klines is received
 
                         all_klines_in_memory.extend(klines)
@@ -660,32 +666,32 @@ def main(
                         # Set the end_time for the next request to be one interval BEFORE the earliest timestamp
                         # of the current batch to avoid duplication when fetching historically with 'end'.
                         next_batch_end_time_ms = earliest_timestamp_in_batch - interval_ms
-                        logging.debug(
+                        logger.debug(
                             f"Batch {batch_num} finished. Newest TS: {newest_timestamp_in_batch}, Oldest TS: {earliest_timestamp_in_batch}. Next batch end calculated as: {next_batch_end_time_ms}"
                         )
 
                     except httpx.HTTPStatusError as e:
                         console.print(f"\n[bold red]HTTP error occurred:[/bold red] {e}")  # Keep console.print for user-facing error
-                        logging.error(f"HTTP error occurred: {e}")  # Use logging for error
+                        logger.error(f"HTTP error occurred: {e}")  # Use logger for error
                         break
                     except httpx.RequestError as e:
                         console.print(
                             f"\n[bold red]An error occurred while requesting {e.request.url!r}:[/bold red] {e}"
                         )  # Keep console.print for user-facing error
-                        logging.error(f"An error occurred while requesting {e.request.url!r}: {e}")  # Use logging for error
+                        logger.error(f"An error occurred while requesting {e.request.url!r}: {e}")  # Use logger for error
                         break
                     except Exception as e:
                         console.print(
                             f"\n[bold red]An unexpected error occurred:[/bold red] {e}"
                         )  # Keep console.print for user-facing error
-                        logging.exception(f"An unexpected error occurred in Batch {batch_num}:")  # Log the full exception traceback
+                        logger.exception(f"An unexpected error occurred in Batch {batch_num}:")  # Log the full exception traceback
                         break  # Break loop on error
 
     # --- Data Processing and Saving to CSV ---
     console.print(
         f"\n[bold green]Download finished. Processing and saving data to {output_file}...[/bold green]"
     )  # Keep console.print for user-facing message
-    logging.info("Processing and saving data.")
+    logger.info("Processing and saving data.")
 
     # Define Polars schema based on the preferred output columns and order
     schema = {
@@ -724,23 +730,23 @@ def main(
         console.print(
             f"[green]Successfully created Polars DataFrame with {df.shape[0]} rows and {df.shape[1]} columns.[/green]"
         )  # Keep console.print for user-facing message
-        logging.info(f"Created Polars DataFrame with {df.shape[0]} rows.")
+        logger.info(f"Created Polars DataFrame with {df.shape[0]} rows.")
 
         # Write DataFrame to CSV with explicit column order
         df.select(["low", "open", "volume", "high", "close", "timeStamp"]).write_csv(output_file)
         console.print(f"[green]Data successfully saved to[/green] {output_file}")  # Keep console.print for user-facing message
-        logging.info(f"Data saved to {output_file}")
+        logger.info(f"Data saved to {output_file}")
 
     except Exception as e:
         console.print(f"[bold red]Error during Polars processing or saving:[/bold red] {e}")  # Keep console.print for user-facing error
-        logging.exception("Error during Polars processing or saving:")  # Log the full exception
+        logger.exception("Error during Polars processing or saving:")  # Log the full exception
 
     # --- Data Validation (Duplicate and Gap Check) ---
     # Re-read the saved file for validation to ensure the saved data is correct
     console.print(
         f"\n[bold green]Performing data integrity checks on saved file:[/bold green] {output_file}"
     )  # Keep console.print for user-facing message
-    logging.info("Performing data integrity checks.")
+    logger.info("Performing data integrity checks.")
 
     try:
         # Read the CSV file with more options for reliability
@@ -768,11 +774,11 @@ def main(
             console.print(
                 f"[yellow]Warning: Error during column type conversion: {cast_error}. Proceeding with validation using original column types.[/yellow]"
             )
-            logging.warning(f"Error during column type conversion: {cast_error}")
+            logger.warning(f"Error during column type conversion: {cast_error}")
 
         num_klines_in_file = df_validation.shape[0]
         console.print(f"Total klines found in file: {num_klines_in_file}")  # Keep console.print for user-facing message
-        logging.info(f"Total klines in saved file: {num_klines_in_file}")
+        logger.info(f"Total klines in saved file: {num_klines_in_file}")
 
         if num_klines_in_file > 0:
             try:
@@ -802,14 +808,14 @@ def main(
                     str(num_duplicates),
                 )
                 console.print(duplicate_table)  # Keep console.print for user-facing message
-                logging.info(f"Duplicate check: Has Duplicates={has_duplicates}, Number of Duplicates={num_duplicates}")
+                logger.info(f"Duplicate check: Has Duplicates={has_duplicates}, Number of Duplicates={num_duplicates}")
 
                 # 2. Gap Check using Polars on the saved DataFrame
                 try:
                     check_timestamp_continuity(df_validation, interval_ms)
                 except Exception as cont_error:
                     console.print(f"[yellow]Warning: Could not perform continuity check due to an error: {cont_error}[/yellow]")
-                    logging.warning(f"Could not perform continuity check: {cont_error}")
+                    logger.warning(f"Could not perform continuity check: {cont_error}")
 
                 # Add this section to report the last timestamp
                 try:
@@ -818,28 +824,28 @@ def main(
                     console.print(
                         f"\n[bold green]Last kline timestamp in saved file:[/bold green] {last_timestamp_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}"
                     )
-                    logging.info(f"Last kline timestamp in saved file: {last_timestamp_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+                    logger.info(f"Last kline timestamp in saved file: {last_timestamp_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}")
                 except Exception as ts_error:
                     console.print(f"[yellow]Warning: Could not display last timestamp due to an error: {ts_error}[/yellow]")
-                    logging.warning(f"Could not display last timestamp: {ts_error}")
+                    logger.warning(f"Could not display last timestamp: {ts_error}")
 
             except Exception as validation_error:
                 console.print(
                     f"[yellow]Warning: Error during data validation checks: {validation_error}. Skipping detailed validation.[/yellow]"
                 )  # Keep console.print for user-facing error
-                logging.warning(f"Error during data validation checks: {validation_error}")
+                logger.warning(f"Error during data validation checks: {validation_error}")
         else:
             console.print("[red]Validation skipped: No data rows found in the file.[/red]")  # Keep console.print for user-facing message
-            logging.warning("Validation skipped: No data rows found in file.")
+            logger.warning("Validation skipped: No data rows found in file.")
 
     except FileNotFoundError:
         console.print(
             f"[bold red]Validation failed:[/bold red] File not found at {output_file}"
         )  # Keep console.print for user-facing error
-        logging.error(f"Validation failed: File not found at {output_file}")
+        logger.error(f"Validation failed: File not found at {output_file}")
     except Exception as e:
         console.print(f"[bold red]Validation failed due to an error:[/bold red] {e}")  # Keep console.print for user-facing error
-        logging.exception("Validation failed due to an error:")  # Log the full exception
+        logger.exception("Validation failed due to an error:")  # Log the full exception
 
     console.print(
         "\n[bold blue]Download, save, and data integrity test finished.[/bold blue]"
@@ -847,7 +853,7 @@ def main(
     console.print(
         f"[bold green]Output CSV file saved to:[/bold green] {output_file.resolve()}"
     )  # Explicitly print absolute path # Keep console.print for user-facing message
-    logging.info("Script finished.")
+    logger.info("Script finished.")
 
     console.print(f"[bold green]Logging output saved to:[/bold green] {log_file}")
 
@@ -884,7 +890,7 @@ def fill_gaps_in_dataframe(df: pl.DataFrame, interval_ms: int) -> pl.DataFrame:
 
     if gap_count > 0:
         console.print(f"\n[yellow]Found {gap_count} gaps in the time series. Filling with NaN values.[/yellow]")
-        logging.info(f"Found {gap_count} gaps in the time series data. Filling with NaN values.")
+        logger.info(f"Found {gap_count} gaps in the time series data. Filling with NaN values.")
 
     return merged_df
 
@@ -897,17 +903,17 @@ def check_timestamp_continuity(df: pl.DataFrame, interval_ms: int):
     console.print(
         "\n[bold yellow]Checking Timestamp Continuity and Data Quality:[/bold yellow]"
     )  # Keep console.print for user-facing message
-    logging.debug("Starting timestamp continuity check.")
+    logger.debug("Starting timestamp continuity check.")
     if df.shape[0] < 2:
         console.print(
             "  [yellow]Skipping continuity check: Not enough data points (requires at least 2).[/yellow]"
         )  # Keep console.print for user-facing message
-        logging.debug("Skipping continuity check: Not enough data points.")
+        logger.debug("Skipping continuity check: Not enough data points.")
         return True  # Consider it continuous if less than 2 points
 
     # Sort by timeStamp to ensure correct order for continuity check
     df_sorted = df.sort("timeStamp")
-    logging.debug("DataFrame sorted by timeStamp for continuity check.")
+    logger.debug("DataFrame sorted by timeStamp for continuity check.")
 
     # Calculate the difference between consecutive timestamps
     time_diff = df_sorted["timeStamp"].diff()
@@ -931,7 +937,7 @@ def check_timestamp_continuity(df: pl.DataFrame, interval_ms: int):
 
     if missing_data_count > 0:
         console.print(f"  [bold red]Found {missing_data_count} rows with missing price data (empty values).[/bold red]")
-        logging.warning(f"Found {missing_data_count} rows with missing price data")
+        logger.warning(f"Found {missing_data_count} rows with missing price data")
 
         # Show a sample of the missing data rows
         sample_size = min(5, missing_data_count)
@@ -960,7 +966,7 @@ def check_timestamp_continuity(df: pl.DataFrame, interval_ms: int):
         console.print(
             f"  [bold red]Found {issue_indices_relative.shape[0]} timestamp sequence issues.[/bold red]"
         )  # Keep console.print for user-facing message
-        logging.warning(f"Found {issue_indices_relative.shape[0]} timestamp sequence issues.")
+        logger.warning(f"Found {issue_indices_relative.shape[0]} timestamp sequence issues.")
         is_continuous = False
         # Iterate through indices where the difference is not the expected interval
         for i_relative in issue_indices_relative:
@@ -982,13 +988,13 @@ def check_timestamp_continuity(df: pl.DataFrame, interval_ms: int):
                 console.print(
                     f"    [yellow]Warning:[/yellow] Zero difference found between timestamps {current_timestamp_str} and {next_timestamp_str} (potential duplicate/issue already flagged)."
                 )  # Keep console.print for user-facing message
-                logging.warning(f"Zero timestamp difference found at {current_timestamp_str}")
+                logger.warning(f"Zero timestamp difference found at {current_timestamp_str}")
             elif difference > interval_ms:
                 next_expected_timestamp_ms = ts_current + interval_ms
                 console.print(
                     f"    [red]Gap found[/red] after timestamp: {current_timestamp_str}. Expected next timestamp at {datetime.datetime.fromtimestamp(next_expected_timestamp_ms / 1000, datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}, but found timestamp {next_timestamp_str} (difference {difference} ms)."
                 )  # Keep console.print for user-facing message
-                logging.error(
+                logger.error(
                     f"Gap found after {current_timestamp_str}. Expected {next_expected_timestamp_ms}, found {ts_next} (difference {difference} ms)."
                 )
 
@@ -1002,7 +1008,7 @@ def check_timestamp_continuity(df: pl.DataFrame, interval_ms: int):
             console.print(
                 "  [bold green]Timestamp continuity and data quality check passed: No gaps or missing data found.[/bold green]"
             )  # Keep console.print for user-facing message
-        logging.debug("Timestamp continuity check passed.")
+        logger.debug("Timestamp continuity check passed.")
         is_continuous = True
 
     return is_continuous  # Return True only if no gaps and no missing data
@@ -1043,7 +1049,7 @@ def find_next_available_data(
     # Track the last timestamp where data was not found
     last_empty_timestamp = start_timestamp_ms
 
-    logging.info(f"Starting exponential search from {start_timestamp_ms}")
+    logger.info(f"Starting exponential search from {start_timestamp_ms}")
 
     # First, we expand until we find data
     while steps_taken < max_steps:
@@ -1059,7 +1065,7 @@ def find_next_available_data(
 
         # If we've exceeded the end time, return None
         if end_time_ms and current_timestamp >= end_time_ms:
-            logging.info(f"Exponential search reached end time limit ({end_time_ms})")
+            logger.info(f"Exponential search reached end time limit ({end_time_ms})")
             return None
 
         try:
@@ -1067,7 +1073,7 @@ def find_next_available_data(
 
             if klines:
                 # We found data, break out of the exponential search
-                logging.info(f"Found data at {current_timestamp} after {steps_taken} steps")
+                logger.info(f"Found data at {current_timestamp} after {steps_taken} steps")
                 break
 
             # No data found, continue expanding
@@ -1077,14 +1083,14 @@ def find_next_available_data(
             steps_taken += 1
 
         except Exception as e:
-            logging.error(f"Error during exponential search: {e}")
+            logger.error(f"Error during exponential search: {e}")
             steps_taken += 1
             # Still increase the step to avoid getting stuck
             current_timestamp += step_size
             step_size *= 2
 
     if steps_taken >= max_steps:
-        logging.warning(f"Exponential search reached max steps ({max_steps}) without finding data")
+        logger.warning(f"Exponential search reached max steps ({max_steps}) without finding data")
         return None
 
     # If we get here, we found data at current_timestamp
@@ -1096,7 +1102,7 @@ def find_next_available_data(
     if end_time_ms and upper_bound > end_time_ms:
         upper_bound = end_time_ms
 
-    logging.info(f"Starting binary search between {lower_bound} and {upper_bound}")
+    logger.info(f"Starting binary search between {lower_bound} and {upper_bound}")
 
     # Step 2: Binary search to find the exact first available timestamp
     binary_steps = 0
@@ -1128,13 +1134,13 @@ def find_next_available_data(
             binary_steps += 1
 
         except Exception as e:
-            logging.error(f"Error during binary search: {e}")
+            logger.error(f"Error during binary search: {e}")
             # Assume no data in case of error
             lower_bound = mid
             binary_steps += 1
 
     # The upper_bound should now be the first timestamp with available data
-    logging.info(f"Binary search completed. First available data at approximately {upper_bound}")
+    logger.info(f"Binary search completed. First available data at approximately {upper_bound}")
 
     # Verify the result with one final API call
     try:
@@ -1142,7 +1148,7 @@ def find_next_available_data(
 
         if verification_klines:
             earliest_timestamp = int(verification_klines[0][0])
-            logging.info(f"Confirmed data available at {earliest_timestamp}")
+            logger.info(f"Confirmed data available at {earliest_timestamp}")
 
             if progress and download_task:
                 progress.update(
@@ -1156,7 +1162,7 @@ def find_next_available_data(
 
             return earliest_timestamp
     except Exception as e:
-        logging.error(f"Error during verification: {e}")
+        logger.error(f"Error during verification: {e}")
 
     return None
 
