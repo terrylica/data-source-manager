@@ -52,6 +52,48 @@ BYBIT_API_URL = "https://api.bybit.com/v5/market/kline"
 # INTERVAL_SECONDS = INTERVAL_MINUTES * 60 # Redundant
 LIMIT = 5  # Set the API limit to 5 for testing overlap with a larger batch size # This seems to be set by the limit option now
 
+# Symbol validation patterns for different market categories
+SYMBOL_PATTERNS = {
+    "spot": {"suffix": "", "examples": "BTCUSDT, ETHUSDC"},
+    "linear": {"suffix": "USDT", "examples": "BTCUSDT, ETHUSDT"},
+    "inverse": {"suffix": "USD", "examples": "BTCUSD, ETHUSD"}
+}
+
+def validate_symbol_for_category(symbol: str, category: str) -> bool:
+    """
+    Validates that the symbol follows the correct naming pattern for the specified category.
+    
+    Args:
+        symbol: The trading pair symbol
+        category: The market category (spot, linear, inverse)
+        
+    Returns:
+        True if the symbol is valid for the category, False otherwise
+    """
+    logger.debug(f"Validating symbol '{symbol}' for category '{category}'")
+    
+    if category not in SYMBOL_PATTERNS:
+        logger.error(f"Unknown category: {category}")
+        return False
+        
+    pattern = SYMBOL_PATTERNS[category]
+    
+    # For spot market, we don't enforce specific suffix patterns
+    if category == "spot":
+        return True
+        
+    # For linear, symbols should end with USDT
+    if category == "linear" and not symbol.endswith(pattern["suffix"]):
+        logger.warning(f"Symbol '{symbol}' doesn't follow the naming convention for {category} market (should end with '{pattern['suffix']}')")
+        return False
+        
+    # For inverse, symbols should end with USD
+    if category == "inverse" and not symbol.endswith(pattern["suffix"]):
+        logger.warning(f"Symbol '{symbol}' doesn't follow the naming convention for {category} market (should end with '{pattern['suffix']}')")
+        return False
+    
+    return True
+
 # KLINES_PER_BATCH = 3 # Define the number of klines to fetch per batch # This is not used anymore with limit
 # NUM_BATCHES_TO_FETCH = 10 # Define the number of batches to download for testing # This is set by the num_batches option now
 
@@ -138,6 +180,24 @@ def fetch_klines(
 
         klines = data["result"]["list"]
         logger.debug(f"Received {len(klines)} klines in this response.")
+        
+        # Validate that the response contains the expected category and symbol
+        if "symbol" in data["result"] and "category" in data["result"]:
+            response_symbol = data["result"]["symbol"]
+            response_category = data["result"]["category"]
+            
+            # If response data doesn't match what we requested, log a warning
+            if response_symbol != symbol or response_category != category:
+                warning_msg = f"API response mismatch: Requested {category}/{symbol}, but received {response_category}/{response_symbol}"
+                logger.warning(warning_msg)
+                # Only print warning to console if the mismatch is severe (different category)
+                if response_category != category:
+                    console.print(f"[bold yellow]Warning:[/bold yellow] {warning_msg}")
+                    console.print("[yellow]The data may not be from the expected market type. Use --force to continue.[/yellow]")
+                    # Check if --force flag is set before raising an exception
+                    if not getattr(typer.Context.get_current(), "params", {}).get("force", False):
+                        raise Exception(f"API returned data from unexpected category: {response_category} (expected {category})")
+        
         return klines
 
     except httpx.HTTPStatusError as e:
@@ -252,6 +312,58 @@ def find_true_genesis_timestamp_ms(client: httpx.Client, category: str, symbol: 
         raise typer.Exit(code=1)
 
 
+def validate_symbol_exists(client: httpx.Client, category: str, symbol: str) -> bool:
+    """
+    Validates that the symbol exists in the given category by making a test API call.
+    
+    Args:
+        client: The httpx Client to use for API requests
+        category: The market category (spot, linear, inverse)
+        symbol: The trading pair symbol
+        
+    Returns:
+        True if the symbol exists in the category, False otherwise
+    """
+    logger.debug(f"Validating that symbol '{symbol}' exists in category '{category}'")
+    
+    try:
+        # Make a minimal request to check if the symbol exists
+        params = {
+            "category": category,
+            "symbol": symbol,
+            "interval": "5",  # Use a common interval
+            "limit": 1,       # Just need one record to verify
+        }
+        
+        response = client.get(BYBIT_API_URL, params=params)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Check if the API returned a valid response
+        if data["retCode"] != 0:
+            logger.warning(f"API returned error when validating symbol: {data['retMsg']}")
+            return False
+            
+        # Check if we got any data back
+        klines = data["result"]["list"]
+        if not klines:
+            logger.warning(f"No data returned for symbol '{symbol}' in category '{category}'")
+            return False
+            
+        # Check if the response symbol matches the requested symbol
+        if data["result"]["symbol"] != symbol or data["result"]["category"] != category:
+            logger.warning(f"API returned mismatched data: {data['result']['category']}/{data['result']['symbol']}")
+            return False
+            
+        logger.debug(f"Symbol '{symbol}' exists in category '{category}'")
+        return True
+        
+    except Exception as e:
+        logger.warning(f"Error validating symbol: {e}")
+        return False
+
+
 @app.command()
 def main(
     symbol: str = typer.Option("BTCUSDT", "-s", "--symbol", help="Trading pair symbol (e.g. BTCUSDT, ETHUSDT)."),
@@ -267,6 +379,12 @@ def main(
     ),
     gap_search_limit: int = typer.Option(
         100, "--gap-search-limit", "-g", help="Maximum number of intervals to search forward for data after a gap."
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force download even if symbol doesn't match the expected pattern for the category."
     ),
 ):
     """
@@ -293,6 +411,10 @@ def main(
     Data is saved to a directory in your user documents folder: ~/Documents/data_source_manager/data/bybit/{category}/{symbol}/{interval}m/
 
     The output file follows the format: bybit-{symbol}-{interval}m.csv
+    
+    Symbol naming conventions:
+    * For inverse markets: Use USD suffix (e.g. BTCUSD, ETHUSD)
+    * For linear markets: Use USDT suffix (e.g. BTCUSDT, ETHUSDT)
     """
     if interval not in ["5", "15"]:
         console.print("[bold red]Error:[/bold red] Only 5 and 15 minute intervals are supported for this test.")
@@ -308,6 +430,33 @@ def main(
         console.print("[bold red]Error:[/bold red] Gap search limit cannot be negative when --fetch-all is used.")
         logger.error(f"Invalid gap_search_limit: {gap_search_limit}")
         raise typer.Exit(code=1)
+        
+    # Validate that the category is supported
+    if category not in SYMBOL_PATTERNS:
+        console.print(f"[bold red]Error:[/bold red] Unsupported market category: {category}. Supported categories are: {', '.join(SYMBOL_PATTERNS.keys())}")
+        logger.error(f"Unsupported market category: {category}")
+        raise typer.Exit(code=1)
+    
+    # Validate symbol format based on market category
+    if not validate_symbol_for_category(symbol, category) and not force:
+        pattern = SYMBOL_PATTERNS[category]
+        console.print(f"[bold red]Error:[/bold red] Symbol '{symbol}' doesn't follow the expected naming convention for {category} market.")
+        console.print(f"[yellow]Expected format for {category}:[/yellow] {pattern['examples']}")
+        
+        if category == "inverse" and symbol.endswith("USDT"):
+            suggested_symbol = symbol.replace("USDT", "USD")
+            console.print(f"[bold green]Suggestion:[/bold green] For inverse market, use '{suggested_symbol}' instead of '{symbol}'")
+        elif category == "linear" and symbol.endswith("USD"):
+            suggested_symbol = symbol + "T"
+            console.print(f"[bold green]Suggestion:[/bold green] For linear market, use '{suggested_symbol}' instead of '{symbol}'")
+            
+        console.print("[yellow]You can override this check with the --force flag if you're sure about the symbol.[/yellow]")
+        logger.error(f"Symbol '{symbol}' validation failed for category '{category}'")
+        raise typer.Exit(code=1)
+        
+    if force:
+        console.print(f"[bold yellow]Warning:[/bold yellow] Forcing download with symbol '{symbol}' for {category} market despite potential naming mismatch.")
+        logger.warning(f"Forcing download with symbol '{symbol}' for {category} market despite potential naming mismatch")
 
     interval_ms = interval_to_ms(interval)
 
@@ -331,6 +480,17 @@ def main(
     all_klines_in_memory: List[List[str]] = []
 
     with httpx.Client() as client:
+        # Verify that the symbol exists in the given category
+        if not validate_symbol_exists(client, category, symbol) and not force:
+            console.print(f"[bold red]Error:[/bold red] Symbol '{symbol}' does not appear to exist in the {category} market category.")
+            console.print("[yellow]This could mean:[/yellow]")
+            console.print("  1. The symbol name is incorrect")
+            console.print("  2. The symbol exists but in a different market category")
+            console.print("  3. The Bybit API is experiencing issues")
+            console.print("[yellow]You can override this check with the --force flag if you're sure about the symbol.[/yellow]")
+            logger.error(f"Symbol '{symbol}' validation failed - does not exist in category '{category}'")
+            raise typer.Exit(code=1)
+            
         if fetch_all:
             # --- Fetch All from Genesis ---
             start_time_ms = find_true_genesis_timestamp_ms(client, category, symbol, interval_ms)  # Call synchronous genesis finder

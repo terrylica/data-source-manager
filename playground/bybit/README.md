@@ -31,6 +31,8 @@ The primary tool in this directory is [`download_spot_klines.py`](./download_spo
 - Perform data integrity checks including duplicate detection
 - Format data in standard OHLCV format
 - Advanced logging with loguru (including log rotation and compression)
+- Strict symbol validation for market categories (inverse vs linear contracts)
+- API response verification to ensure data integrity
 
 ### Usage
 
@@ -58,7 +60,46 @@ chmod +x playground/bybit/download_spot_klines.py
 
 # Download with specific batch size (must be between 1 and 1000)
 ./playground/bybit/download_spot_klines.py -s BTCUSDT -i 15 -l 500
+
+# Download BTCUSD inverse perpetual data (note the USD suffix for inverse)
+./playground/bybit/download_spot_klines.py -s BTCUSD -c inverse -i 5
+
+# Download BTCUSDT linear perpetual data (note the USDT suffix for linear)
+./playground/bybit/download_spot_klines.py -s BTCUSDT -c linear -i 5
 ```
+
+### Market Category and Symbol Naming Conventions
+
+Bybit's API requires specific symbol naming conventions for different market categories:
+
+| Market Type | Category Parameter | Symbol Naming Convention                          | Example    |
+|-------------|-------------------|---------------------------------------------------|------------|
+| Spot        | `spot`            | Base currency + Quote currency                     | `BTCUSDT`  |
+| Linear      | `linear`          | Base currency + `USDT` suffix                      | `BTCUSDT`  |
+| Inverse     | `inverse`         | Base currency + `USD` suffix                       | `BTCUSD`   |
+
+The script validates that the provided symbol follows the correct naming convention for the specified market category:
+- For inverse markets, symbols must end with `USD` (e.g., `BTCUSD`, `ETHUSD`)
+- For linear markets, symbols must end with `USDT` (e.g., `BTCUSDT`, `ETHUSDT`)
+
+If an incorrect symbol format is provided, the script will suggest the correct format and exit with an error message.
+
+You can override this validation with the `--force` flag if necessary:
+
+```bash
+# Force download with a non-standard symbol name
+./playground/bybit/download_spot_klines.py -s BTCUSDT -c inverse -i 5 --force
+```
+
+### Earliest Data Availability (Based on Empirical Testing)
+
+Based on our empirical testing, here's when data becomes available for different markets:
+
+| Market Type       | Symbol  | Earliest Available Timestamp (UTC) |
+|-------------------|---------|-----------------------------------|
+| Spot              | BTCUSDT | 2021-07-05 12:00:00               |
+| Linear Perpetual  | BTCUSDT | 2020-03-25 10:35:00               |
+| Inverse Perpetual | BTCUSD  | 2018-11-14 16:00:00               |
 
 ### Important API Limits
 

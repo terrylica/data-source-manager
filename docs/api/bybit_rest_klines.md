@@ -10,12 +10,23 @@ Bybit offers REST API endpoints for accessing market data including candlestick 
 
 Bybit offers several market types with a unified REST API structure:
 
-| Market Type | Category Parameter | Description                             |
-| ----------- | ------------------ | --------------------------------------- |
-| Spot        | `spot`             | Spot trading pairs                      |
-| Linear      | `linear`           | Perpetual contracts settled in USDT     |
-| Inverse     | `inverse`          | Perpetual contracts settled in the coin |
-| Option      | `option`           | Options trading                         |
+| Market Type | Category Parameter | Description                             | Symbol Naming Convention                           |
+| ----------- | ------------------ | --------------------------------------- | -------------------------------------------------- |
+| Spot        | `spot`             | Spot trading pairs                      | Base currency + Quote currency (e.g., `BTCUSDT`)   |
+| Linear      | `linear`           | Perpetual contracts settled in USDT     | Base currency + `USDT` (e.g., `BTCUSDT`)          |
+| Inverse     | `inverse`          | Perpetual contracts settled in the coin | Base currency + `USD` (e.g., `BTCUSD`)            |
+| Option      | `option`           | Options trading                         | Various formats based on expiry and strike price   |
+
+**Important Note on Naming Conventions:**
+- **Inverse Perpetual Contracts**: Use `USD` suffix (not `USDT`), such as `BTCUSD`, `ETHUSD`, `XRPUSD`
+- **Linear Perpetual Contracts**: Use `USDT` suffix, such as `BTCUSDT`, `ETHUSDT`, `XRPUSDT`
+- Each market type has its own distinct symbol format which must be adhered to when making API requests
+
+**Common Symbols by Category (Based on Empirical Testing):**
+- **Inverse (`category=inverse`)**: `BTCUSD`, `ETHUSD`, `XRPUSD`, `BTCUSDM25` (monthly futures), `BTCUSDU25` (quarterly futures)
+- **Linear (`category=linear`)**: `BTCUSDT`, `ETHUSDT`, `XRPUSDT`, `BTCPERP` (perpetual), `BTCUSDT-26DEC25` (dated futures)
+
+Note that naming conventions must be strictly followed when making API requests, as using an incorrect symbol format (e.g., requesting `BTCUSDT` in the inverse category) will result in empty responses.
 
 ### 1.2 API URL Structure
 
@@ -30,6 +41,17 @@ Path: `/v5/market/kline`
 Complete URL pattern: `https://api.bybit.com/v5/market/kline?category={category}&symbol={symbol}&interval={interval}&start={startTime}&end={endTime}&limit={limit}`
 
 Example: `https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=5&start=1715000000000&end=1715100000000&limit=10`
+
+**Examples by Market Type:**
+
+1. **Linear Perpetual (USDT-settled)**:  
+   `https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=5&start=1715000000000&end=1715100000000&limit=10`
+
+2. **Inverse Perpetual (Coin-settled)**:  
+   `https://api.bybit.com/v5/market/kline?category=inverse&symbol=BTCUSD&interval=5&start=1715000000000&end=1715100000000&limit=10`
+
+3. **Spot Market**:  
+   `https://api.bybit.com/v5/market/kline?category=spot&symbol=BTCUSDT&interval=5&start=1715000000000&end=1715100000000&limit=10`
 
 #### 1.2.2 Key Observations
 
@@ -143,19 +165,21 @@ Based on empirical testing using the Bybit REST API, historical data availabilit
 
 ### 4.1 Earliest Data by Market and Interval (Empirical Findings)
 
-| Market Type       | Symbol  | Interval   | Earliest Available Timestamp (UTC)                                                                                                                                                                                               |
-| ----------------- | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spot              | BTCUSDT | 1 minute   | 2021-07-05 12:00:00                                                                                                                                                                                                              |
-| Spot              | BTCUSDT | 5 minutes  | 2021-07-05 12:00:00                                                                                                                                                                                                              |
-| Spot              | BTCUSDT | 15 minutes | 2021-07-05 12:00:00                                                                                                                                                                                                              |
-| Linear Perpetual  | BTCUSDT | 1 minute   | 2020-03-25 10:36:00                                                                                                                                                                                                              |
-| Linear Perpetual  | BTCUSDT | 5 minutes  | 2020-03-25 10:35:00                                                                                                                                                                                                              |
-| Linear Perpetual  | BTCUSDT | 15 minutes | 2020-03-25 10:30:00                                                                                                                                                                                                              |
-| Inverse Perpetual | BTCUSD  | 1 minute   | 2018-11-14 16:00:00 I want you to validate this portions of data to see the ensuing interval of data points at least 10 or at least 2 to 3 ensuing data points. After the genesis earliest available timestamps do exist or not. |
-| Inverse Perpetual | BTCUSD  | 5 minutes  | 2018-11-14 16:00:00                                                                                                                                                                                                              |
-| Inverse Perpetual | BTCUSD  | 15 minutes | 2018-11-14 16:00:00                                                                                                                                                                                                              |
+| Market Type       | Symbol  | Interval   | Earliest Available Timestamp (UTC)                   | Notes                                                |
+| ----------------- | ------- | ---------- | --------------------------------------------------- | ---------------------------------------------------- |
+| Spot              | BTCUSDT | 1 minute   | 2021-07-05 12:00:00                                 |                                                      |
+| Spot              | BTCUSDT | 5 minutes  | 2021-07-05 12:00:00                                 |                                                      |
+| Spot              | BTCUSDT | 15 minutes | 2021-07-05 12:00:00                                 |                                                      |
+| Linear Perpetual  | BTCUSDT | 1 minute   | 2020-03-25 10:36:00                                 | Verified first active data at 2020-03-25 10:36:00    |
+| Linear Perpetual  | BTCUSDT | 5 minutes  | 2020-03-25 10:35:00                                 |                                                      |
+| Linear Perpetual  | BTCUSDT | 15 minutes | 2020-03-25 10:30:00                                 |                                                      |
+| Inverse Perpetual | BTCUSD  | 1 minute   | 2018-11-14 16:00:00                                 | Initial record with zero volume, active trading      |
+|                   |         |            |                                                     | begins at 2018-11-14 22:00:00 with volume data       |
+| Inverse Perpetual | BTCUSD  | 5 minutes  | 2018-11-14 16:00:00                                 | Similar pattern to 1-minute data                     |
+| Inverse Perpetual | BTCUSD  | 15 minutes | 2018-11-14 16:00:00                                 | Similar pattern to 1-minute data                     |
+| Inverse Perpetual | ETHUSD  | 1 minute   | 2019-01-25 00:00:00                                 | Added based on empirical testing                     |
 
-**Note:** While our testing provides precise earliest times based on API responses, the official listing dates announced by Bybit may slightly predate the availability of granular kline data in the API.
+**Note:** While our testing provides precise earliest times based on API responses, the official listing dates announced by Bybit may slightly predate the availability of granular kline data in the API. Initial records may have zero volume before active trading begins.
 
 ### 4.2 Methodology for Determining Earliest Data
 
@@ -202,13 +226,22 @@ When rate limits are exceeded, the API returns an error response with:
 2. For large date ranges, consider paginating requests with appropriate `limit` values
 3. Handle empty responses gracefully, as they indicate no data is available for the requested range
 
-### 6.2 Rate Limit Management
+### 6.2 Market-Specific Symbol Handling
+
+1. Always use the correct symbol format for the specific market category:
+   - Use `BTCUSD` (not `BTCUSDT`) for inverse perpetual contracts
+   - Use `BTCUSDT` (not `BTCUSD`) for linear perpetual contracts
+2. When switching between market types, ensure that symbol names are adjusted accordingly
+3. When building a comprehensive data retrieval system, implement validation to prevent requesting invalid symbol-category combinations
+4. Test symbol availability with small queries before initiating large-scale data retrieval operations
+
+### 6.3 Rate Limit Management
 
 1. Monitor rate limit headers in responses to track usage
 2. Implement backoff strategies when approaching rate limits
 3. Consider implementing request queuing for high-volume applications
 
-### 6.3 Error Handling
+### 6.4 Error Handling
 
 1. Always check the `retCode` field in responses to verify success
 2. Implement retry logic with exponential backoff for rate limit errors
