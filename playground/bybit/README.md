@@ -91,6 +91,16 @@ You can override this validation with the `--force` flag if necessary:
 ./playground/bybit/download_spot_klines.py -s BTCUSDT -c inverse -i 5 --force
 ```
 
+**⚠️ Important API Behavior Warning:**
+
+Our empirical testing revealed a critical issue with Bybit's API when using incorrect symbol formats:
+- When using `category=inverse` with a USDT-suffixed symbol (e.g., BTCUSDT), the API returns data from the linear market
+- The API response incorrectly labels this data as "category": "inverse" while actually providing linear market data
+- The timestamps and values are identical to those returned by linear market queries
+- Without our validation, users could unknowingly analyze linear market data thinking it's inverse market data
+
+This discovery validates the importance of our symbol validation feature and why strict adherence to proper naming conventions is essential.
+
 ### Earliest Data Availability (Based on Empirical Testing)
 
 Based on our empirical testing, here's when data becomes available for different markets:

@@ -28,6 +28,16 @@ Bybit offers several market types with a unified REST API structure:
 
 Note that naming conventions must be strictly followed when making API requests, as using an incorrect symbol format (e.g., requesting `BTCUSDT` in the inverse category) will result in empty responses.
 
+**⚠️ Critical API Behavior Warning:**
+
+Our empirical testing has revealed a potentially misleading behavior in the Bybit API:
+- When using `category=inverse` with a USDT-suffixed symbol (e.g., BTCUSDT), the API **does not return an error**
+- Instead, it returns data from the linear market while incorrectly labeling it as "category": "inverse" in the response
+- The data returned is identical to what would be returned from a `category=linear` request with the same symbol
+- This behavior creates a risk of unintentionally analyzing linear market data when inverse market data was intended
+
+Always validate that you're using the correct symbol format for each market category to ensure data integrity.
+
 ### 1.2 API URL Structure
 
 The Bybit REST API uses a unified URL pattern for all market types, with the market type specified in the `category` parameter.
@@ -234,6 +244,8 @@ When rate limits are exceeded, the API returns an error response with:
 2. When switching between market types, ensure that symbol names are adjusted accordingly
 3. When building a comprehensive data retrieval system, implement validation to prevent requesting invalid symbol-category combinations
 4. Test symbol availability with small queries before initiating large-scale data retrieval operations
+5. **Be aware of misleading API responses**: Our empirical testing showed that querying `category=inverse` with USDT-suffixed symbols returns linear market data incorrectly labeled as "inverse"
+6. **Implement validation checks**: Applications should verify both the requested and returned category/symbol combinations to prevent data integrity issues
 
 ### 6.3 Rate Limit Management
 
