@@ -169,8 +169,8 @@ def example_reindexing(df, start_time, end_time):
             from rich.chart import Chart
 
             chart = Chart()
-            chart.add_item("Original", [x for x in subset_df["close"].values if not pd.isna(x)])
-            chart.add_item("Reindexed", [x for x in complete_df["close"].values if not pd.isna(x)])
+            chart.add_item("Original", [x for x in subset_df["close"].to_numpy() if not pd.isna(x)])
+            chart.add_item("Reindexed", [x for x in complete_df["close"].to_numpy() if not pd.isna(x)])
 
             console.print(chart)
         except ImportError:

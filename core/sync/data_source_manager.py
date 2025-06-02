@@ -34,7 +34,7 @@ Example:
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 import attr
 import pandas as pd
@@ -146,7 +146,7 @@ class DataSourceConfig:
 
     # Optional parameters with defaults and validators
     chart_type: ChartType = attr.field(default=ChartType.KLINES, validator=attr.validators.instance_of(ChartType))
-    cache_dir: Optional[Path] = attr.field(
+    cache_dir: Path | None = attr.field(
         default=None,
         validator=attr.validators.optional(attr.validators.instance_of((str, Path))),
         converter=lambda p: Path(p) if p is not None and not isinstance(p, Path) else p,

@@ -18,7 +18,6 @@ Key components:
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Union
 
 import attr
 import pendulum
@@ -101,7 +100,7 @@ class ExampleConfig:
     )
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Union[str, int, bool]]) -> "ExampleConfig":
+    def from_dict(cls, config_dict: dict[str, str | int | bool]) -> "ExampleConfig":
         """Create a configuration object from a dictionary.
 
         Args:
@@ -128,10 +127,10 @@ class ExampleConfig:
 
 def validate_example_input(
     identifier: str,
-    start_time: Optional[datetime] = None,
-    end_time: Optional[datetime] = None,
-    days: Optional[int] = None,
-) -> Tuple[datetime, datetime]:
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    days: int | None = None,
+) -> tuple[datetime, datetime]:
     """Validate and normalize time range parameters.
 
     This function demonstrates proper parameter validation and normalization,
@@ -190,12 +189,12 @@ def validate_example_input(
 def fetch_example_data(
     identifier: str,
     example_type: str = ExampleType.TYPE_A,
-    start_time: Optional[datetime] = None,
-    end_time: Optional[datetime] = None,
-    days: Optional[int] = None,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    days: int | None = None,
     use_cache: bool = True,
-    config: Optional[ExampleConfig] = None,
-) -> Tuple[Optional[List[Dict]], float, int]:
+    config: ExampleConfig | None = None,
+) -> tuple[list[dict] | None, float, int]:
     """Fetch example data for the specified parameters.
 
     This function demonstrates a well-documented main interface function

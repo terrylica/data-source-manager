@@ -1,7 +1,6 @@
 # /usr/bin/env python3
 import time
 from pathlib import Path
-from typing import List
 
 import httpx
 import typer
@@ -17,7 +16,7 @@ console = Console()
 
 BASE_URL = "https://api.bybit.com/v5/market/kline"
 
-def check_for_duplicates(klines: List[List[str]]) -> tuple[bool, int]:
+def check_for_duplicates(klines: list[list[str]]) -> tuple[bool, int]:
     """Checks a list of klines for duplicates based on timestamp."""
     if not klines:
         return False, 0
@@ -44,7 +43,7 @@ def main(
     symbol: str = typer.Option(..., "--symbol", "-s", help="Trading pair symbol (e.g., BTCUSD, BTCUSDT)."),
     interval: str = typer.Option(..., "--interval", "-i", help="Kline interval (must be 5 or 15)."),
     num_batches: int = typer.Option(10, "--num-batches", "-n", help="Number of batches to fetch for each limit size."),
-    limits: List[int] = typer.Option([3, 5, 7], "--limit", "-l", help="List of limit sizes to test."),
+    limits: list[int] = typer.Option([3, 5, 7], "--limit", "-l", help="List of limit sizes to test."),
 ):
     """
     Fetches Bybit kline data in small batches and checks for duplicates
@@ -60,7 +59,7 @@ def main(
 
     for limit in limits:
         console.print(f"\n[bold yellow]Testing with limit={limit}[/bold yellow]")
-        all_klines_for_limit: List[List[str]] = []
+        all_klines_for_limit: list[list[str]] = []
         end_time_ms: int | None = None # Use the timestamp of the first kline in the previous batch as the end time
 
         for batch_num in range(num_batches):
@@ -136,4 +135,4 @@ if __name__ == "__main__":
     script_dir.mkdir(parents=True, exist_ok=True)
     # No need to manually chmod +x here, typer run handles this.
     # If running directly, remember to make it executable: chmod +x fetch_data_batch_test.py
-    app() 
+    app()

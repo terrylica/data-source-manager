@@ -77,14 +77,14 @@ def test_rest_enforcement():
         # Check if data was retrieved successfully
         if df is None or df.empty:
             print("[bold red]Error: No data retrieved[/bold red]")
-            return False
+            assert False, "No data retrieved"
 
         # Verify source information
         if "_data_source" not in df.columns:
             print(
                 "[bold red]Error: Source information not included in the result[/bold red]"
             )
-            return False
+            assert False, "Source information not included in the result"
 
         # Check that all data came from REST API
         source_counts = df["_data_source"].value_counts()
@@ -114,18 +114,19 @@ def test_rest_enforcement():
             print(
                 "\n[bold green]✓ SUCCESS: All data came from REST API as expected[/bold green]"
             )
-            return True
-        print(
-            "\n[bold red]✗ FAILURE: Some data did not come from REST API[/bold red]"
-        )
-        return False
+            assert True
+        else:
+            print(
+                "\n[bold red]✗ FAILURE: Some data did not come from REST API[/bold red]"
+            )
+            assert False, "Some data did not come from REST API"
 
     except Exception as e:
         print(f"[bold red]Error during test: {e}[/bold red]")
         import traceback
 
         traceback.print_exc()
-        return False
+        assert False, f"Error during test: {e}"
 
 
 def main():

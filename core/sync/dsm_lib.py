@@ -35,7 +35,6 @@ Example:
 
 from datetime import datetime
 from time import perf_counter
-from typing import Optional, Tuple, Union
 
 from core.sync.data_source_manager import DataSource
 from utils.dataframe_types import TimestampedDataFrame
@@ -106,7 +105,7 @@ def setup_environment(clear_cache: bool = False) -> bool:
 
 def process_market_parameters(
     provider: str, market: str, chart_type: str, symbol: str, interval: str
-) -> Tuple[DataProvider, MarketType, ChartType, str, Interval]:
+) -> tuple[DataProvider, MarketType, ChartType, str, Interval]:
     """Process and validate market-related parameters.
 
     This function converts string parameters to their appropriate enum types,
@@ -168,13 +167,13 @@ def fetch_market_data(
     chart_type: ChartType,
     symbol: str,
     interval: Interval,
-    start_time: Optional[Union[datetime, str]] = None,
-    end_time: Optional[Union[datetime, str]] = None,
+    start_time: datetime | str | None = None,
+    end_time: datetime | str | None = None,
     days: int = 3,
     use_cache: bool = True,
     enforce_source: str = "AUTO",
     max_retries: int = 3,
-) -> Tuple[Optional[TimestampedDataFrame], float, int]:
+) -> tuple[TimestampedDataFrame | None, float, int]:
     """Fetch market data using the Failover Control Protocol.
 
     This function retrieves market data from multiple sources using a progressive

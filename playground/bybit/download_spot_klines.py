@@ -3,7 +3,6 @@
 import httpx
 import datetime
 import typer
-from typing import Optional, List
 import platformdirs
 from pathlib import Path
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -98,7 +97,7 @@ def validate_symbol_for_category(symbol: str, category: str) -> bool:
 # NUM_BATCHES_TO_FETCH = 10 # Define the number of batches to download for testing # This is set by the num_batches option now
 
 
-def check_for_duplicates(klines: List[List[str]]) -> tuple[bool, int]:
+def check_for_duplicates(klines: list[list[str]]) -> tuple[bool, int]:
     """Checks a list of klines for duplicates based on timestamp."""
     logger.debug("Checking for duplicates.")
     if not klines:
@@ -136,10 +135,10 @@ def fetch_klines(
     category: str,
     symbol: str,
     interval: str,
-    start_time_ms: Optional[int] = None,
-    end_time_ms: Optional[int] = None,
+    start_time_ms: int | None = None,
+    end_time_ms: int | None = None,
     limit: int = 1000,
-) -> List[List[str]]:
+) -> list[list[str]]:
     """Fetches klines from Bybit API with logging (Synchronous)."""
     params = {
         "category": category,
@@ -490,7 +489,7 @@ def main(
     logger.debug(f"Output file path: {output_file}")
 
     # --- Data Download ---
-    all_klines_in_memory: List[List[str]] = []
+    all_klines_in_memory: list[list[str]] = []
 
     with httpx.Client() as client:
         # Verify that the symbol exists in the given category
@@ -1193,10 +1192,10 @@ def find_next_available_data(
     symbol: str,
     interval_ms: int,
     start_timestamp_ms: int,
-    end_time_ms: Optional[int] = None,
+    end_time_ms: int | None = None,
     progress=None,
     download_task=None,
-) -> Optional[int]:
+) -> int | None:
     """
     Uses an adaptive binary search to find the next available data point after a gap.
 

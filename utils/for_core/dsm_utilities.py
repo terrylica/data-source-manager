@@ -38,36 +38,25 @@ def safely_reindex_dataframe(
         df: DataFrame to reindex
         start_time: Start time of the range (can be datetime, string, or Timestamp)
         end_time: End time of the range (can be datetime, string, or Timestamp)
-        interval: Time interval (can be Interval enum or string like "1m")
-        fill_method: Method to fill missing values (None, 'ffill', 'bfill', etc.)
+        interval: Interval specification (e.g., "1m", "1h", Interval.MINUTE_1)
+        fill_method: Method to fill missing values (e.g., "ffill", "bfill")
 
     Returns:
-        Reindexed DataFrame with complete time index
-
-    Example:
-        >>> import pandas as pd
-        >>> from datetime import datetime, timezone
-        >>> from utils.market_constraints import Interval
-        >>>
-        >>> # Create a DataFrame with some missing data
-        >>> df = pd.DataFrame({
-        ...     'close': [100.0, 101.0, 103.0]
-        ... }, index=pd.DatetimeIndex([
-        ...     datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
-        ...     datetime(2023, 1, 1, 0, 1, tzinfo=timezone.utc),
-        ...     datetime(2023, 1, 1, 0, 3, tzinfo=timezone.utc)
-        ... ], name='open_time'))
-        >>>
-        >>> # Reindex to include the missing timestamps
-        >>> start = datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc)
-        >>> end = datetime(2023, 1, 1, 0, 5, tzinfo=timezone.utc)
-        >>> complete_df = safely_reindex_dataframe(df, start, end, "1m")
-        >>>
-        >>> # The result will have 5 rows with NaN values for the missing timestamps
-        >>> print(len(complete_df))
-        5
+        DataFrame reindexed to the complete time range
     """
-    # Ensure we have datetime objects
+    if df.empty:
+        logger.debug("Empty DataFrame passed to safely_reindex_dataframe")
+        # For empty DataFrames, just create a complete range and return an empty DataFrame with that index
+        complete_index = pd.date_range(
+            start=start_time,
+            end=end_time,
+            freq="1min",  # Default to 1-minute intervals
+            inclusive="left",
+            name=CANONICAL_INDEX_NAME,
+        )
+        return pd.DataFrame(index=complete_index)
+
+    # Handle string timestamps
     if isinstance(start_time, str):
         start_time = pd.to_datetime(start_time, utc=True)
     if isinstance(end_time, str):
@@ -79,11 +68,11 @@ def safely_reindex_dataframe(
     # Determine pandas frequency string based on interval
     freq = None
     if interval_str.endswith("s"):
-        freq = f"{interval_str[:-1]}S"  # seconds
+        freq = f"{interval_str[:-1]}s"  # seconds - use lowercase 's' for seconds
     elif interval_str.endswith("m"):
         freq = f"{interval_str[:-1]}min"  # minutes (updated from 'T' to 'min')
     elif interval_str.endswith("h"):
-        freq = f"{interval_str[:-1]}H"  # hours
+        freq = f"{interval_str[:-1]}h"  # hours - use lowercase 'h' instead of 'H'
     elif interval_str.endswith("d"):
         freq = f"{interval_str[:-1]}D"  # days
     elif interval_str.endswith("w"):

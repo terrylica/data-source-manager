@@ -70,14 +70,14 @@ def test_fcp_mechanism():
                 provider=DataProvider.BINANCE,
                 market_type=market_type,
                 chart_type=chart_type,
-                symbol=symbol,
-                interval=interval,
                 use_cache=False,
             ) as manager:
                 print("[bold yellow]Fetching data with FCP...[/bold yellow]")
 
                 # Use AUTO mode to enable the FCP mechanism
                 df = manager.get_data(
+                    symbol=symbol,
+                    interval=interval,
                     start_time=start_time,
                     end_time=end_time,
                     enforce_source=DataSource.AUTO,  # Use AUTO to enable FCP
@@ -90,7 +90,7 @@ def test_fcp_mechanism():
         # Check if data was retrieved successfully
         if df is None or df.empty:
             print("[bold red]Error: No data retrieved[/bold red]")
-            return False
+            assert False, "No data retrieved"
 
         # Calculate data integrity
         expected_seconds = int((end_time - start_time).total_seconds())
@@ -137,7 +137,7 @@ def test_fcp_mechanism():
             print(
                 "[bold red]Error: Source information not included in the result[/bold red]"
             )
-            return False
+            assert False, "Source information not included in the result"
 
         # Check source breakdown
         source_counts = df["_data_source"].value_counts()
@@ -153,6 +153,10 @@ def test_fcp_mechanism():
             source_table.add_row(source, f"{count:,}", f"{percentage:.1f}%")
 
         print(source_table)
+
+        # Reset index if open_time is in the index
+        if df.index.name == "open_time":
+            df = df.reset_index()
 
         # Show timeline of data sources
         df["date"] = pd.to_datetime(df["open_time"]).dt.date
@@ -202,8 +206,8 @@ def test_fcp_mechanism():
             print(
                 "The system retrieved data from Vision API and used REST API to fill in missing segments."
             )
-            return True
-        if (
+            assert True
+        elif (
             has_vision_data and actual_records >= expected_records * 0.95
         ):  # Allow for minor missing data
             print(
@@ -212,17 +216,18 @@ def test_fcp_mechanism():
             print(
                 "Vision API returned complete data, so REST API fallback wasn't needed."
             )
-            return True
-        print("\n[bold red]✗ FAILURE: FCP mechanism failed[/bold red]")
-        print("The system failed to merge data from multiple sources correctly.")
-        return False
+            assert True
+        else:
+            print("\n[bold red]✗ FAILURE: FCP mechanism failed[/bold red]")
+            print("The system failed to merge data from multiple sources correctly.")
+            assert False, "FCP mechanism failed to merge data from multiple sources correctly"
 
     except Exception as e:
         print(f"[bold red]Error during test: {e}[/bold red]")
         import traceback
 
         traceback.print_exc()
-        return False
+        assert False, f"Error during test: {e}"
 
 
 def main():

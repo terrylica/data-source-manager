@@ -301,11 +301,11 @@ def verify_data_completeness(
     # Parse the interval string to create a proper frequency string for pandas
     freq = None
     if interval.endswith("s"):
-        freq = f"{interval[:-1]}S"  # seconds
+        freq = f"{interval[:-1]}s"  # seconds - use lowercase 's' for seconds
     elif interval.endswith("m"):
         freq = f"{interval[:-1]}min"  # minutes (updated from 'T' to 'min')
     elif interval.endswith("h"):
-        freq = f"{interval[:-1]}H"  # hours
+        freq = f"{interval[:-1]}h"  # hours - use lowercase 'h' instead of 'H'
     elif interval.endswith("d"):
         freq = f"{interval[:-1]}D"  # days
     elif interval.endswith("w"):
