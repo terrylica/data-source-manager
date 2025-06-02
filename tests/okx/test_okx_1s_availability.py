@@ -134,6 +134,9 @@ def test_recent_availability(instrument, interval):
                 data_item = response["data"]["data"][0]
                 print(f"  Sample data: {data_item}")
 
+    # Use assertion to make sure we got at least some results for pytest
+    assert len(results) > 0, "No results collected during test"
+    # Return results for direct script execution
     return results
 
 
@@ -190,6 +193,9 @@ def test_historical_timepoints(instrument, interval):
                 f"{name} ({test_date.strftime('%Y-%m-%d')}) - {endpoint_name}: {status}"
             )
 
+    # Use assertion to make sure we got at least some results for pytest
+    assert len(results) > 0, "No results collected during test"
+    # Return results for direct script execution
     return results
 
 
@@ -239,6 +245,9 @@ def test_hourly_availability_today(instrument, interval):
             status = "✅ Available" if has_data_result else "❌ Not available"
             print(f"Hour {hour:02d}:00 ({test_time}) - {endpoint_name}: {status}")
 
+    # Use assertion to make sure we got at least some results for pytest
+    assert len(results) > 0, "No results collected during test"
+    # Return results for direct script execution
     return results
 
 
@@ -251,43 +260,47 @@ def test_rapid_consecutive_calls(instrument, interval, num_calls=5):
         f"\n[bold blue]Testing Rapid Consecutive Calls for {interval} Data[/bold blue]"
     )
 
-    current_time = datetime.now()
-    test_timestamp = int((current_time - timedelta(minutes=5)).timestamp() * 1000)
-
     results = []
+    current_time = datetime.now()
+    test_timestamp = int(current_time.timestamp() * 1000)
 
     # Test both endpoints
     for endpoint_name, endpoint_url in [
         ("candles", CANDLES_ENDPOINT),
         ("history-candles", HISTORY_ENDPOINT),
     ]:
-        print(f"\nTesting {endpoint_name} endpoint with {num_calls} consecutive calls")
+        print(f"Testing {endpoint_name} endpoint with {num_calls} consecutive calls...")
 
-        for i in range(num_calls):
+        for i in range(1, num_calls + 1):
             start_time = time.time()
             has_data_result, response = has_data(
                 endpoint_url, instrument, interval, test_timestamp
             )
-            elapsed = time.time() - start_time
+            end_time = time.time()
+            response_time = end_time - start_time
 
-            status = "✅ Available" if has_data_result else "❌ Not available"
-            print(f"Call {i+1}: {status} (took {elapsed:.2f}s)")
+            data_points = (
+                len(response["data"].get("data", [])) if has_data_result else 0
+            )
 
             results.append(
                 {
-                    "call_number": i + 1,
+                    "call_number": i,
                     "endpoint": endpoint_name,
                     "has_data": has_data_result,
-                    "response_time": elapsed,
-                    "data_points": (
-                        len(response["data"].get("data", [])) if has_data_result else 0
-                    ),
+                    "response_time": response_time,
+                    "data_points": data_points,
                 }
             )
 
-            # Small delay to avoid hammering the API
-            time.sleep(0.5)
+            status = "✅ Success" if has_data_result else "❌ Failed"
+            print(
+                f"Call {i}: {status} - Response time: {response_time:.2f}s - Data points: {data_points}"
+            )
 
+    # Use assertion to make sure we got at least some results for pytest
+    assert len(results) > 0, "No results collected during test"
+    # Return results for direct script execution
     return results
 
 
