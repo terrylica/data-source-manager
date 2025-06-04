@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "data-source-manager"
-version = "0.1.45"
+version = "0.1.46"
 description = "Binance OHLCV data from Vision API (on AWS S3) and their REST API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,7 +19,7 @@ classifiers = [
 ]
 dependencies = [
     "attrs>=25.3.0,<25.4.0", # allow patch version changes
-    "pyarrow>=20.0.0,<21.0.0", # for local cache files in MMAP Array format
+    "pyarrow>=19.0.0,<21.0.0", # for local cache files in MMAP Array format
     "polars>=1.30.0,<1.31.0", # resample and aggregate data faster than pandas
     "pandas>=2.2.3,<2.3.0", # allow patch version changes; compatibility with existing code
     "numpy==1.24.4", # most sensitive to version changes so locked on 1.24.4 unless there is a good reason to upgrade
@@ -31,7 +31,7 @@ dependencies = [
     "colorlog>=6.9.0,<6.10.0", # for colored logging
     "psutil>=7.0.0,<7.1.0", # for system monitoring
     "typer>=0.16.0,<0.17.0", # for CLI
-    "rich>=14.0.0,<15.0.0", # for elegant logging and CLI output
+    "rich>=13.9.0,<15.0.0", # for elegant logging and CLI output
     "pendulum>=3.1.0,<3.2.0", # for date and time operations
     "platformdirs>=4.3.8,<4.4.0", # for platform-specific directory paths
     "loguru>=0.7.3,<0.8.0", # for logging
