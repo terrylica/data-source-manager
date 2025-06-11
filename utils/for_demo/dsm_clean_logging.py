@@ -32,7 +32,7 @@ Example Usage:
 
 import contextlib
 import logging
-from typing import Iterator
+from collections.abc import Iterator
 
 from core.sync.data_source_manager import DataSourceManager
 from utils.market_constraints import DataProvider, MarketType
@@ -76,9 +76,9 @@ def get_clean_market_data(
     """
     # Set default clean logging parameters if not specified
     clean_defaults = {
-        'log_level': 'WARNING',
-        'suppress_http_debug': True,
-        'quiet_mode': False,
+        "log_level": "WARNING",
+        "suppress_http_debug": True,
+        "quiet_mode": False,
     }
     
     # Merge user kwargs with clean defaults (user kwargs take precedence)
@@ -132,8 +132,8 @@ def get_quiet_market_data(
     """
     # Set quiet mode parameters
     quiet_config = {
-        'quiet_mode': True,
-        'suppress_http_debug': True,
+        "quiet_mode": True,
+        "suppress_http_debug": True,
     }
     
     # Merge user kwargs with quiet defaults (user kwargs take precedence)
@@ -184,9 +184,9 @@ def get_debug_market_data(
     """
     # Set debug mode parameters
     debug_config = {
-        'log_level': 'DEBUG',
-        'suppress_http_debug': False,
-        'quiet_mode': False,
+        "log_level": "DEBUG",
+        "suppress_http_debug": False,
+        "quiet_mode": False,
     }
     
     # Merge user kwargs with debug defaults (user kwargs take precedence)
@@ -223,13 +223,13 @@ def suppress_http_logging() -> None:
         >>> # ... use dsm normally with clean output
     """
     # Suppress noisy HTTP logging globally
-    logging.getLogger('httpcore').setLevel(logging.WARNING)
-    logging.getLogger('httpx').setLevel(logging.WARNING)
-    logging.getLogger('urllib3').setLevel(logging.WARNING)
-    logging.getLogger('requests').setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
 
 
-def configure_clean_logging(log_level: str = 'WARNING') -> None:
+def configure_clean_logging(log_level: str = "WARNING") -> None:
     """Configure clean logging for DSM usage.
     
     This function provides a simple way to configure clean logging
@@ -299,7 +299,7 @@ if __name__ == "__main__":
     end_time = start_time.add(seconds=60)
     
     with get_quiet_market_data() as dsm:
-        console.print(f"Fetching SOLUSDT microstructure data...")
+        console.print("Fetching SOLUSDT microstructure data...")
         
         data = dsm.get_data(
             symbol="SOLUSDT",
@@ -310,8 +310,8 @@ if __name__ == "__main__":
         
         if len(data) > 0:
             # Calculate sample microstructure features
-            realized_variance = data['close'].diff().pow(2).sum()
-            buy_pressure = (data['close'] > data['open']).mean()
+            realized_variance = data["close"].diff().pow(2).sum()
+            buy_pressure = (data["close"] > data["open"]).mean()
             
             console.print(f"🧮 Sample features from {len(data)} 1-second bars:")
             console.print(f"   realized_variance: {realized_variance:.6f}")
@@ -321,4 +321,4 @@ if __name__ == "__main__":
         
         console.print()
     
-    console.print("✨ [bold green]Demo completed - notice the clean output![/bold green]") 
+    console.print("✨ [bold green]Demo completed - notice the clean output![/bold green]")

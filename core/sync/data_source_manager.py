@@ -171,10 +171,10 @@ class DataSourceConfig:
     
     # New logging control parameters
     log_level: str = attr.field(
-        default='WARNING',
+        default="WARNING",
         validator=[
             attr.validators.instance_of(str),
-            attr.validators.in_(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
+            attr.validators.in_(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
         ],
         converter=str.upper
     )
@@ -502,7 +502,7 @@ class DataSourceManager:
         use_cache: bool = True,
         cache_dir: Path | None = None,
         retry_count: int = 3,
-        log_level: str = 'WARNING',
+        log_level: str = "WARNING",
         suppress_http_debug: bool = True,
         quiet_mode: bool = False,
     ):
@@ -577,7 +577,7 @@ class DataSourceManager:
         # Configure DSM's own logging level
         if self.quiet_mode:
             # In quiet mode, only show errors and critical messages
-            effective_level = 'ERROR'
+            effective_level = "ERROR"
         else:
             effective_level = self.log_level
             
@@ -588,22 +588,27 @@ class DataSourceManager:
         if self.suppress_http_debug:
             # Suppress noisy HTTP debugging by default
             # This addresses the main user complaint about log clutter
-            logging.getLogger('httpcore').setLevel(logging.WARNING)
-            logging.getLogger('httpx').setLevel(logging.WARNING)
-            logging.getLogger('urllib3').setLevel(logging.WARNING)
-            logging.getLogger('requests').setLevel(logging.WARNING)
+            logging.getLogger("httpcore").setLevel(logging.WARNING)
+            logging.getLogger("httpx").setLevel(logging.WARNING)
+            logging.getLogger("urllib3").setLevel(logging.WARNING)
+            logging.getLogger("requests").setLevel(logging.WARNING)
         else:
             # User wants to see HTTP debugging (for troubleshooting)
-            logging.getLogger('httpcore').setLevel(logging.DEBUG)
-            logging.getLogger('httpx').setLevel(logging.DEBUG)
-            logging.getLogger('urllib3').setLevel(logging.DEBUG)
-            logging.getLogger('requests').setLevel(logging.DEBUG)
+            logging.getLogger("httpcore").setLevel(logging.DEBUG)
+            logging.getLogger("httpx").setLevel(logging.DEBUG)
+            logging.getLogger("urllib3").setLevel(logging.DEBUG)
+            logging.getLogger("requests").setLevel(logging.DEBUG)
             
         # Log the configuration for debugging
         if not self.quiet_mode:
             logger.debug(f"DSM logging configured: level={effective_level}, suppress_http_debug={self.suppress_http_debug}")
         
-    def reconfigure_logging(self, log_level: str | None = None, suppress_http_debug: bool | None = None, quiet_mode: bool | None = None) -> None:
+    def reconfigure_logging(
+        self, 
+        log_level: str | None = None, 
+        suppress_http_debug: bool | None = None, 
+        quiet_mode: bool | None = None
+    ) -> None:
         """Reconfigure logging settings after initialization.
         
         This method allows users to change logging behavior dynamically,
@@ -924,7 +929,7 @@ class DataSourceManager:
             validate_interval(self.market_type, interval)
 
             logger.debug(
-                f"[FCP] get_data called with use_cache={self.use_cache} for "
+                f"[FCP] get_data called with use_cache={self.use_cache}, auto_reindex={auto_reindex} for "
                 f"symbol={symbol}, interval={interval.value}, chart_type={chart_type.name}"
             )
             logger.debug(f"[FCP] Time range: {start_time.isoformat()} to {end_time.isoformat()}")
@@ -939,9 +944,15 @@ class DataSourceManager:
             # Log key parameters
             logger.info(f"Retrieving {interval.value} data for {symbol} from {start_time} to {end_time}")
 
-            # Record the aligned boundaries for consistent reference
-            aligned_start, aligned_end = align_time_boundaries(start_time, end_time, interval)
-            logger.debug(f"[FCP] Aligned boundaries for retrieval: {aligned_start} to {aligned_end}")
+            # CRITICAL FIX: Use different alignment strategies based on auto_reindex
+            if auto_reindex:
+                # When auto_reindex=True, align boundaries to ensure complete time series
+                aligned_start, aligned_end = align_time_boundaries(start_time, end_time, interval)
+                logger.debug(f"[FCP] Aligned boundaries for complete time series: {aligned_start} to {aligned_end}")
+            else:
+                # When auto_reindex=False, use exact user boundaries to prevent artificial gaps
+                aligned_start, aligned_end = start_time, end_time
+                logger.debug(f"[FCP] Using exact user boundaries (auto_reindex=False): {aligned_start} to {aligned_end}")
 
             # Initialize result DataFrame to hold progressively merged data
             result_df = pd.DataFrame()
@@ -975,6 +986,11 @@ class DataSourceManager:
 
                 # If cache is disabled, treat entire range as missing
                 missing_ranges = [(aligned_start, aligned_end)]
+
+            # CRITICAL FIX: When auto_reindex=False and we have some data, don't fetch missing ranges
+            if not auto_reindex and not result_df.empty:
+                logger.info(f"[FCP] auto_reindex=False: Found {len(result_df)} cached records, skipping API calls to prevent NaN creation")
+                missing_ranges = []  # Clear missing ranges to prevent API calls
 
             # ----------------------------------------------------------------
             # STEP 2: Vision API Retrieval with Iterative Merge
@@ -1010,6 +1026,14 @@ class DataSourceManager:
 
             # First standardize columns to ensure consistent data types and format
             result_df = standardize_columns(result_df)
+
+            # CRITICAL FIX: Filter to user's exact time range when auto_reindex=False
+            if not auto_reindex and not result_df.empty:
+                # Filter the result to the user's exact requested time range
+                from utils.time_utils import filter_dataframe_by_time
+                original_length = len(result_df)
+                result_df = filter_dataframe_by_time(result_df, start_time, end_time, "open_time")
+                logger.info(f"[FCP] auto_reindex=False: Filtered to user's exact range: {original_length} -> {len(result_df)} records")
 
             # ----------------------------------------------------------------
             # Intelligent Reindexing Logic
@@ -1049,16 +1073,29 @@ class DataSourceManager:
             if not include_source_info and "_data_source" in result_df.columns:
                 result_df = result_df.drop(columns=["_data_source"])
 
-            # Final consistency check and logging
-            from utils.dataframe_utils import verify_data_completeness
+            # CRITICAL FIX: Different completeness checks based on auto_reindex
+            if auto_reindex:
+                # Original completeness check for reindexed data
+                from utils.dataframe_utils import verify_data_completeness
 
-            is_complete, gaps = verify_data_completeness(result_df, aligned_start, aligned_end, interval.value)
+                is_complete, gaps = verify_data_completeness(result_df, aligned_start, aligned_end, interval.value)
 
-            if not is_complete:
-                logger.warning(
-                    f"Data retrieval for {symbol} has {len(gaps)} gaps in the time series. "
-                    f"The DataFrame contains NaN values for missing timestamps."
-                )
+                if not is_complete:
+                    logger.warning(
+                        f"Data retrieval for {symbol} has {len(gaps)} gaps in the time series. "
+                        f"The DataFrame contains NaN values for missing timestamps."
+                    )
+            else:
+                # For auto_reindex=False, just report actual data coverage
+                if not result_df.empty and "open_time" in result_df.columns:
+                    actual_start = result_df["open_time"].min()
+                    actual_end = result_df["open_time"].max()
+                    logger.info(f"[FCP] auto_reindex=False: Data covers {actual_start} to {actual_end} ({len(result_df)} records)")
+                    
+                    # Check if we have NaN values (which shouldn't happen with auto_reindex=False)
+                    nan_count = result_df.isnull().sum().sum()
+                    if nan_count > 0:
+                        logger.error(f"[FCP] BUG: auto_reindex=False should not create {nan_count} NaN values!")
 
             logger.info(f"[FCP] Successfully retrieved {len(result_df)} records for {symbol}")
             return result_df
