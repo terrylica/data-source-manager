@@ -61,6 +61,11 @@ cover/
 ._*
 
 # Logs
+logs/
+examples/logs/
+examples/sync/logs/
+backup_*/
+uv.lock
 
 # Local development settings
 local_settings.py
