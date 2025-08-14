@@ -1007,3 +1007,182 @@ def get_endpoint_url(
             path = f"/api/{version}/{endpoint}"  # Fallback for unknown markets
 
     return f"{base_url}{path}"
+
+
+def detect_market_type_from_symbol(symbol: str) -> tuple[MarketType, float]:
+    """
+    Detect likely market type from symbol pattern analysis.
+    
+    This function analyzes symbol patterns to suggest the most appropriate market type.
+    It provides confidence scores to help users make informed decisions about market
+    type selection when symbols could apply to multiple markets.
+    
+    Args:
+        symbol: Trading symbol to analyze (e.g., "BTCUSDT", "BTCUSD_PERP")
+        
+    Returns:
+        tuple[MarketType, float]: (detected_market_type, confidence_score)
+        - confidence_score ranges from 0.0 to 1.0
+        - Values > 0.8 indicate high confidence
+        - Values < 0.5 indicate ambiguous symbols
+        
+    Examples:
+        >>> detect_market_type_from_symbol("BTCUSDT")
+        (MarketType.FUTURES_USDT, 0.6)  # Could be SPOT or UM futures
+        
+        >>> detect_market_type_from_symbol("BTCUSD_PERP") 
+        (MarketType.FUTURES_COIN, 0.95)  # Definitely coin-margined futures
+        
+        >>> detect_market_type_from_symbol("BTC-230630-25000-C")
+        (MarketType.OPTIONS, 0.90)  # Clearly an options contract
+        
+        >>> detect_market_type_from_symbol("ETHBTC")
+        (MarketType.SPOT, 0.7)  # Likely spot trading pair
+    """
+    symbol = symbol.upper().strip()
+    
+    # High confidence patterns (>= 0.85)
+    if symbol.endswith("_PERP"):
+        return MarketType.FUTURES_COIN, 0.95
+    
+    # Options pattern: BTC-YYMMDD-STRIKE-C/P
+    if "-" in symbol and len(symbol.split("-")) >= 4:
+        parts = symbol.split("-")
+        if len(parts) >= 4 and parts[-1] in ["C", "P"]:
+            return MarketType.OPTIONS, 0.90
+    
+    # Medium-high confidence patterns (0.7-0.85)  
+    if symbol.endswith(("USD", "BTC", "ETH")) and not symbol.endswith("USDT"):
+        # Coin-margined symbols typically end with base crypto
+        return MarketType.FUTURES_COIN, 0.75
+    
+    # Medium confidence patterns (0.5-0.7)
+    if symbol.endswith(("USDT", "BUSD", "USDC")):
+        # Could be SPOT or USDT-margined futures
+        # Slight preference for UM futures as they're more common in trading
+        return MarketType.FUTURES_USDT, 0.6
+    
+    # Lower confidence patterns (0.3-0.5)
+    if len(symbol) >= 6 and not any(char in symbol for char in ["-", "_"]):
+        # Simple concatenated symbols often indicate SPOT markets
+        return MarketType.SPOT, 0.5
+    
+    # Default fallback for ambiguous cases
+    return MarketType.SPOT, 0.3
+
+
+def validate_symbol_market_consistency(symbol: str, specified_market: MarketType) -> dict[str, any]:
+    """
+    Validate that a symbol is consistent with the specified market type.
+    
+    This function helps prevent common configuration errors by analyzing symbol
+    patterns and comparing them against the specified market type. It provides
+    detailed feedback to help users choose the correct market type.
+    
+    Args:
+        symbol: Trading symbol to validate
+        specified_market: MarketType that user specified
+        
+    Returns:
+        dict containing validation results:
+        - 'is_consistent': bool - Whether symbol matches specified market
+        - 'detected_market': MarketType - What the symbol suggests
+        - 'confidence': float - Confidence in the detection (0.0-1.0)
+        - 'suggestion': str|None - Helpful suggestion if inconsistent
+        - 'warning_level': str - 'none', 'low', 'medium', 'high'
+        
+    Examples:
+        >>> validate_symbol_market_consistency("BTCUSD_PERP", MarketType.FUTURES_COIN)
+        {
+            'is_consistent': True,
+            'detected_market': MarketType.FUTURES_COIN,
+            'confidence': 0.95,
+            'suggestion': None,
+            'warning_level': 'none'
+        }
+        
+        >>> validate_symbol_market_consistency("BTCUSD_PERP", MarketType.SPOT)
+        {
+            'is_consistent': False,
+            'detected_market': MarketType.FUTURES_COIN,
+            'confidence': 0.95,
+            'suggestion': "Symbol 'BTCUSD_PERP' suggests FUTURES_COIN market (coin-margined futures)",
+            'warning_level': 'high'
+        }
+    """
+    detected_market, confidence = detect_market_type_from_symbol(symbol)
+    
+    # Determine consistency
+    is_consistent = (detected_market == specified_market) or (confidence < 0.5)
+    
+    # Generate helpful suggestion if inconsistent
+    suggestion = None
+    warning_level = 'none'
+    
+    if not is_consistent:
+        market_descriptions = {
+            MarketType.SPOT: "spot trading",
+            MarketType.FUTURES_USDT: "USDT-margined futures (UM)",
+            MarketType.FUTURES_COIN: "coin-margined futures (CM)",
+            MarketType.FUTURES: "futures trading",
+            MarketType.OPTIONS: "options trading"
+        }
+        
+        detected_desc = market_descriptions.get(detected_market, detected_market.name)
+        suggestion = f"Symbol '{symbol}' suggests {detected_market.name} market ({detected_desc})"
+        
+        # Set warning level based on confidence
+        if confidence >= 0.85:
+            warning_level = 'high'
+        elif confidence >= 0.7:
+            warning_level = 'medium'
+        else:
+            warning_level = 'low'
+    
+    return {
+        'is_consistent': is_consistent,
+        'detected_market': detected_market,
+        'confidence': confidence,
+        'suggestion': suggestion,
+        'warning_level': warning_level
+    }
+
+
+def get_market_type_description(market_type: MarketType, include_technical_details: bool = False) -> str:
+    """
+    Get a human-readable description of a market type.
+    
+    Args:
+        market_type: MarketType to describe
+        include_technical_details: Whether to include API endpoints and technical info
+        
+    Returns:
+        str: Descriptive explanation of the market type
+        
+    Examples:
+        >>> get_market_type_description(MarketType.FUTURES_USDT)
+        "USDT-margined futures (UM) - Perpetual contracts settled in USDT"
+        
+        >>> get_market_type_description(MarketType.SPOT, include_technical_details=True)
+        "Spot trading - Direct buy/sell of assets (API: /api/v3/, Vision: spot/)"
+    """
+    descriptions = {
+        MarketType.SPOT: "Spot trading - Direct buy/sell of assets",
+        MarketType.FUTURES_USDT: "USDT-margined futures (UM) - Perpetual contracts settled in USDT", 
+        MarketType.FUTURES_COIN: "Coin-margined futures (CM) - Perpetual contracts settled in base cryptocurrency",
+        MarketType.FUTURES: "Futures trading - Generic futures contracts",
+        MarketType.OPTIONS: "Options trading - Call and put options on underlying assets"
+    }
+    
+    base_description = descriptions.get(market_type, f"Unknown market type: {market_type.name}")
+    
+    if include_technical_details:
+        try:
+            capabilities = get_market_capabilities(market_type)
+            api_info = f"API: {capabilities.primary_endpoint}, Vision: {market_type.vision_api_path}/"
+            return f"{base_description} ({api_info})"
+        except Exception:
+            # Fallback if capabilities lookup fails
+            return f"{base_description} (Vision: {market_type.vision_api_path}/)"
+    
+    return base_description
