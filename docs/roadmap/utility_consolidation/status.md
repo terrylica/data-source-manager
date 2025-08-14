@@ -12,7 +12,7 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 
 ✅ **Status: Complete**
 
-- Created `utils/time_utils.py` module
+- Created `src/data_source_manager/utils/time_utils.py` module
 - Consolidated time-related functions from:
   - `time_alignment.py`
   - `api_boundary_validator.py`
@@ -24,7 +24,7 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 
 ✅ **Status: Complete**
 
-- Created `utils/validation_utils.py` module
+- Created `src/data_source_manager/utils/validation_utils.py` module
 - Consolidated validation functions from:
   - `cache_validator.py`
   - `validation.py`
@@ -36,7 +36,7 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 
 ✅ **Status: Complete**
 
-- Created `utils/network_utils.py` module
+- Created `src/data_source_manager/utils/network_utils.py` module
 - Consolidated network-related functions from:
   - `http_client_factory.py`
   - `download_handler.py`
@@ -55,12 +55,12 @@ The following core modules have been updated to use consolidated utility modules
 
 1. **Core Modules**
 
-   - `core/vision_data_client.py` - Now uses consolidated utility modules directly
-   - `core/data_source_manager.py` - Now uses consolidated utility modules directly
-   - `core/cache_manager.py` - Now uses consolidated utility modules directly
-   - `utils/download_handler.py` - Now uses consolidated utility modules directly
-   - `core/vision_constraints.py` - Now uses consolidated utility modules directly
-   - `core/rest_data_client.py` - Now uses consolidated utility modules directly
+   - `src/data_source_manager/core/vision_data_client.py` - Now uses consolidated utility modules directly
+   - `src/data_source_manager/core/data_source_manager.py` - Now uses consolidated utility modules directly
+   - `src/data_source_manager/core/cache_manager.py` - Now uses consolidated utility modules directly
+   - `src/data_source_manager/utils/download_handler.py` - Now uses consolidated utility modules directly
+   - `src/data_source_manager/core/vision_constraints.py` - Now uses consolidated utility modules directly
+   - `src/data_source_manager/core/rest_data_client.py` - Now uses consolidated utility modules directly
 
 2. **Test Modules**
    - `tests/time_boundary/test_dsm_time_boundary_comprehensive.py` - Now uses consolidated utility modules directly

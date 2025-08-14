@@ -25,8 +25,8 @@ Switching to `httpx` provides a more reliable alternative that:
 The simplest way to switch is to use the `use_httpx` parameter when creating a `DataSourceManager`:
 
 ```python
-from core.sync.data_source_manager import DataSourceManager
-from utils.market_constraints import MarketType
+from data_source_manager.core.sync.data_source_manager import DataSourceManager
+from data_source_manager.utils.market_constraints import MarketType
 
 # Create a DataSourceManager with httpx
 manager = DataSourceManager(
@@ -43,8 +43,8 @@ with manager:
 This parameter is also available on the `RestDataClient` class:
 
 ```python
-from core.providers.binance.rest_data_client import RestDataClient
-from utils.market_constraints import MarketType
+from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
+from data_source_manager.utils.market_constraints import MarketType
 
 # Create a RestDataClient with httpx
 client = RestDataClient(
@@ -63,9 +63,9 @@ with client:
 For more control, you can create a custom `httpx` client:
 
 ```python
-from utils.network_utils import create_httpx_client
-from core.providers.binance.rest_data_client import RestDataClient
-from utils.market_constraints import MarketType
+from data_source_manager.utils.network_utils import create_httpx_client
+from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
+from data_source_manager.utils.market_constraints import MarketType
 
 # Create a custom httpx client
 custom_client = create_httpx_client(

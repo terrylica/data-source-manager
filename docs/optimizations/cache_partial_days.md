@@ -26,11 +26,11 @@ The optimization implements a smarter check that:
 
 ### Implementation
 
-The optimization is implemented in `utils/for_core/dsm_cache_utils.py` in the `get_from_cache` function. The critical code block is marked with `@critical_optimization: TEST_CASE_ID:CACHE-OPT-001`.
+The optimization is implemented in `src/data_source_manager/utils/for_core/dsm_cache_utils.py` in the `get_from_cache` function. The critical code block is marked with `@critical_optimization: TEST_CASE_ID:CACHE-OPT-001`.
 
 ### Configuration
 
-This optimization can be enabled or disabled via the `OPTIMIZE_CACHE_PARTIAL_DAYS` feature flag in `utils/config.py`.
+This optimization can be enabled or disabled via the `OPTIMIZE_CACHE_PARTIAL_DAYS` feature flag in `src/data_source_manager/utils/config.py`.
 
 ```python
 # Feature flags for critical optimizations
@@ -69,7 +69,7 @@ When working with this code:
 
 ## Related Components
 
-- `utils/for_core/dsm_cache_utils.py`: Contains the optimization implementation
-- `utils/config.py`: Contains the feature flag
+- `src/data_source_manager/utils/for_core/dsm_cache_utils.py`: Contains the optimization implementation
+- `src/data_source_manager/utils/config.py`: Contains the feature flag
 - `tests/test_dsm_cache_utils.py`: Contains unit tests
 - `tests/integration/test_dsm_cache_optimization.py`: Contains integration tests

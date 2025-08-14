@@ -22,7 +22,7 @@ The utilities implement practices categorized into importance tiers:
 ### Event-Based Task Waiting
 
 ```python
-from utils.task_management import wait_with_cancellation
+from data_source_manager.utils.task_management import wait_with_cancellation
 
 # Create a task
 task = asyncio.create_task(my_coroutine())
@@ -48,7 +48,7 @@ else:
 ### Task Tracking
 
 ```python
-from utils.task_management import TaskTracker
+from data_source_manager.utils.task_management import TaskTracker
 
 # Create a tracker
 tracker = TaskTracker()
@@ -65,7 +65,7 @@ print(f"Cancelled {success_count} tasks, {error_count} failures")
 ### Cancellation Propagation
 
 ```python
-from utils.task_management import propagate_cancellation
+from data_source_manager.utils.task_management import propagate_cancellation
 
 # Create parent and child cancellation events
 parent_cancel = asyncio.Event()
@@ -83,7 +83,7 @@ parent_cancel.set()  # This will trigger all child cancellations
 ### Lingering Task Cleanup
 
 ```python
-from utils.task_management import cleanup_lingering_tasks
+from data_source_manager.utils.task_management import cleanup_lingering_tasks
 
 # After your main operation, clean up any lingering tasks
 await cleanup_lingering_tasks()

@@ -10,13 +10,13 @@ Start by prioritizing modules for documentation enhancement:
 
 1. **Core API Modules**: Focus first on modules directly exposed to users
 
-   - `core/sync/dsm_lib.py` (contains `fetch_market_data`)
-   - `core/sync/data_source_manager.py` (core implementation)
+   - `src/data_source_manager/core/sync/dsm_lib.py` (contains `fetch_market_data`)
+   - `src/data_source_manager/core/sync/data_source_manager.py` (core implementation)
 
 2. **Public Interface Modules**: Modules that define public interfaces
 
-   - `utils/market_constraints.py` (defines enums used in the API)
-   - `utils/dataframe_types.py` (defines data types)
+   - `src/data_source_manager/utils/market_constraints.py` (defines enums used in the API)
+   - `src/data_source_manager/utils/dataframe_types.py` (defines data types)
 
 3. **Example Modules**: Modules that demonstrate usage
    - `examples/sync/dsm_demo_cli.py`
@@ -57,11 +57,11 @@ Example:
 """
 
 # Import and expose public API
-from core.providers.binance.vision_data_client import VisionDataClient
-from core.sync.data_source_manager import DataSource, DataSourceConfig
-from core.sync.dsm_lib import fetch_market_data
-from utils.dataframe_types import TimestampedDataFrame
-from utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from data_source_manager.core.providers.binance.vision_data_client import VisionDataClient
+from data_source_manager.core.sync.data_source_manager import DataSource, DataSourceConfig
+from data_source_manager.core.sync.dsm_lib import fetch_market_data
+from data_source_manager.utils.dataframe_types import TimestampedDataFrame
+from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 __all__ = [
     "ChartType",

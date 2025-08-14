@@ -138,11 +138,11 @@ Our final approach is a direct cleanup pattern that avoids relying on background
 3. **Timeout-Protected Cleanup**: Use `asyncio.shield` and `wait_for` with short timeouts to prevent hanging
 4. **Error Handling**: Gracefully handle all exceptions during cleanup without propagating them
 5. **Synchronous Cleanup First**: Perform any synchronous cleanup first (like closing file handles)
-6. **Centralized Configuration**: All timeout values and cleanup settings are defined in `utils/config.py`
+6. **Centralized Configuration**: All timeout values and cleanup settings are defined in `src/data_source_manager/utils/config.py`
 
 ### Centralized Configuration
 
-We've centralized all timeout values and cleanup settings in `utils/config.py` to ensure consistency across the codebase:
+We've centralized all timeout values and cleanup settings in `src/data_source_manager/utils/config.py` to ensure consistency across the codebase:
 
 ```python
 # Resource cleanup timeouts
@@ -154,10 +154,10 @@ ENABLE_FORCED_GC: Final = True  # Whether to force garbage collection after clea
 
 ### Centralized Implementation
 
-We've centralized this pattern in `utils/async_cleanup.py` to follow the DRY principle and provide a standardized way to handle resource cleanup. The key functions are:
+We've centralized this pattern in `src/data_source_manager/utils/async_cleanup.py` to follow the DRY principle and provide a standardized way to handle resource cleanup. The key functions are:
 
 ```python
-from utils.async_cleanup import direct_resource_cleanup, close_resource_with_timeout, cleanup_client, cleanup_file_handle
+from data_source_manager.utils.async_cleanup import direct_resource_cleanup, close_resource_with_timeout, cleanup_client, cleanup_file_handle
 ```
 
 - `direct_resource_cleanup`: Main utility for comprehensive cleanup of multiple resources
@@ -230,7 +230,7 @@ This pattern was successfully implemented in:
 2. `VisionDataClient.__aexit__`
 3. `DataSourceManager.__aexit__`
 
-All implementations now use the centralized utilities from `utils/async_cleanup.py` with timeout values from `utils/config.py`.
+All implementations now use the centralized utilities from `src/data_source_manager/utils/async_cleanup.py` with timeout values from `src/data_source_manager/utils/config.py`.
 
 ## Testing Strategy
 

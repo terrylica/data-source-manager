@@ -19,7 +19,7 @@ A **critical bug** in the time alignment logic was causing complete system failu
 
 ### 🔍 Root Cause
 
-The bug was in the `align_time_boundaries` function in `utils/time_utils.py`. The faulty logic was:
+The bug was in the `align_time_boundaries` function in `src/data_source_manager/utils/time_utils.py`. The faulty logic was:
 
 ```python
 # BUGGY CODE (v0.1.43)
@@ -153,7 +153,7 @@ data = dsm.get_data(
 
 ### 🔧 Files Modified
 
-1. **`utils/time_utils.py`**:
+1. **`src/data_source_manager/utils/time_utils.py`**:
 
    - Fixed `align_time_boundaries` function
    - Improved boundary alignment logic

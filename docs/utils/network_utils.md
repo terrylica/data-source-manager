@@ -52,7 +52,7 @@ Specialized download management for Binance Vision data:
 ### Creating HTTP Clients
 
 ```python
-from utils.network_utils import create_client
+from data_source_manager.utils.network_utils import create_client
 
 # Create default aiohttp client
 client = create_client()
@@ -68,7 +68,7 @@ httpx_client = create_client(
 ### Downloading Files
 
 ```python
-from utils.network_utils import DownloadHandler, create_client
+from data_source_manager.utils.network_utils import DownloadHandler, create_client
 from pathlib import Path
 
 async def download_example():
@@ -87,7 +87,7 @@ async def download_example():
 ### Making API Requests
 
 ```python
-from utils.network_utils import make_api_request, create_client
+from data_source_manager.utils.network_utils import make_api_request, create_client
 
 async def fetch_data():
     client = create_client(client_type="httpx")
@@ -107,7 +107,7 @@ async def fetch_data():
 ### Using VisionDownloadManager
 
 ```python
-from utils.network_utils import VisionDownloadManager, create_client
+from data_source_manager.utils.network_utils import VisionDownloadManager, create_client
 from datetime import datetime, timezone
 
 async def download_vision_data():

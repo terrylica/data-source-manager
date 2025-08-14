@@ -86,13 +86,13 @@ This module provides centralized time-related utilities for handling datetime ob
 ```python
 # Timezone handling
 from datetime import datetime
-from utils.time_utils import enforce_utc_timezone
+from data_source_manager.utils.time_utils import enforce_utc_timezone
 
 dt = datetime(2023, 1, 1, 12, 0, 0)  # Naive datetime
 dt_utc = enforce_utc_timezone(dt)  # Now timezone-aware
 
 # Time window validation
-from utils.validation import DataValidation
+from data_source_manager.utils.validation import DataValidation
 from datetime import datetime, timezone, timedelta
 
 start = datetime(2023, 1, 1, tzinfo=timezone.utc)
@@ -100,8 +100,8 @@ end = start + timedelta(days=7)
 DataValidation.validate_time_window(start, end)  # Validates the time window
 
 # Interval calculations
-from utils.time_utils import get_interval_floor, get_interval_ceiling
-from utils.market_constraints import Interval
+from data_source_manager.utils.time_utils import get_interval_floor, get_interval_ceiling
+from data_source_manager.utils.market_constraints import Interval
 
 dt = datetime(2023, 1, 1, 12, 30, 45, tzinfo=timezone.utc)
 interval = Interval.HOUR_1
@@ -111,7 +111,7 @@ ceiling_dt = get_interval_ceiling(dt, interval)  # 2023-01-01 13:00:00+00:00
 
 # DataFrame filtering
 import pandas as pd
-from utils.time_utils import filter_dataframe_by_time
+from data_source_manager.utils.time_utils import filter_dataframe_by_time
 
 df = pd.DataFrame(...)  # DataFrame with datetime index
 filtered_df = filter_dataframe_by_time(df, start_time, end_time)

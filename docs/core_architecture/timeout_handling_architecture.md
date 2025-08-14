@@ -25,7 +25,7 @@ The centralized timeout handling system in Data Source Manager provides a consis
 
 ### 1. Centralized Timeout Configuration
 
-The system uses a centralized timeout constant defined in `utils/config.py`:
+The system uses a centralized timeout constant defined in `src/data_source_manager/utils/config.py`:
 
 ```python
 MAX_TIMEOUT: Final = 9.0  # Maximum timeout for any individual operation
@@ -39,7 +39,7 @@ Key features:
 
 ### 2. Specialized Timeout Logging
 
-The `utils/logger_setup.py` module implements specialized logging for timeout events:
+The `src/data_source_manager/utils/logger_setup.py` module implements specialized logging for timeout events:
 
 ```python
 def log_timeout(self, operation: str, timeout_value: float, details: dict = None):

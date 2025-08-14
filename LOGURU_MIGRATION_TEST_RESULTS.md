@@ -4,7 +4,7 @@
 
 ✅ **All examples are now successfully using the new loguru-based logging system!**
 
-The migration from `utils.logger_setup` to `utils.loguru_setup` has been completed and tested across all example scripts. Users now have much better control over log levels and enjoy improved logging performance.
+The migration from `data_source_manager.utils.logger_setup` to `data_source_manager.utils.loguru_setup` has been completed and tested across all example scripts. Users now have much better control over log levels and enjoy improved logging performance.
 
 ## Migration Completed
 
@@ -17,8 +17,8 @@ The migration from `utils.logger_setup` to `utils.loguru_setup` has been complet
 
 ### Key Changes
 
-- All imports changed from `from utils.logger_setup import logger` to `from utils.loguru_setup import logger`
-- Added `configure_session_logging` function to `utils.loguru_setup.py` for backward compatibility
+- All imports changed from `from data_source_manager.data_source_manager.utils.logger_setup import logger` to `from data_source_manager.data_source_manager.utils.loguru_setup import logger`
+- Added `configure_session_logging` function to `data_source_manager.utils.loguru_setup.py` for backward compatibility
 - Maintained all existing logging API calls - no code changes required beyond imports
 
 ## Test Results
@@ -37,7 +37,7 @@ DSM_LOG_LEVEL=ERROR python examples/sync/dsm_demo_cli.py -s BTCUSDT -d 1 -l E
 
 **Results:**
 
-- Beautiful loguru formatting: `2025-06-02 21:01:45.436 | INFO | utils.loguru_setup:info:167 - Session logging initialized`
+- Beautiful loguru formatting: `2025-06-02 21:01:45.436 | INFO | data_source_manager.utils.loguru_setup:info:167 - Session logging initialized`
 - Log level control working perfectly - ERROR level shows only ERROR/CRITICAL messages
 - All FCP functionality working correctly
 - Performance: Retrieved 1,440 records in ~0.06 seconds
@@ -138,7 +138,7 @@ DSM_LOG_LEVEL=INFO python your_script.py     # Balanced logging
 ### 3. **Beautiful Output Format**
 
 ```
-2025-06-02 21:01:45.436 | INFO | utils.loguru_setup:info:167 - Session logging initialized
+2025-06-02 21:01:45.436 | INFO | data_source_manager.utils.loguru_setup:info:167 - Session logging initialized
 ```
 
 - Timestamp with milliseconds

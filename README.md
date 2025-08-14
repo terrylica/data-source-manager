@@ -11,6 +11,25 @@ A high-performance, robust package for efficient market data retrieval from mult
 - **Automatic Retry**: Built-in retry logic with exponential backoff
 - **Data Validation**: Comprehensive data integrity checks
 - **Rich Logging**: Beautiful, configurable logging with loguru support
+- **Professional Package Structure**: Proper src-layout with clean namespace imports
+
+## Package Structure
+
+Data Source Manager follows modern Python packaging standards with a clean src-layout structure:
+
+```
+data-source-manager/
+├── src/
+│   └── data_source_manager/        # Main package namespace
+│       ├── __init__.py             # Public API exports
+│       ├── core/                   # Core functionality
+│       │   ├── sync/              # Synchronous data managers
+│       │   └── providers/         # Data provider implementations
+│       └── utils/                 # Utility modules
+├── examples/                      # Usage examples and demos
+├── tests/                        # Test suite
+└── docs/                         # Documentation
+```
 
 ## Installation
 
@@ -65,6 +84,55 @@ This will install Data Source Manager into your Python environment's `site-packa
 
 **Note on CLI Tools:**
 The installation process (through either method) automatically registers the CLI commands (`dsm-demo-cli` and `dsm-demo-module`) as executable scripts in your Python environment. These commands will be available in your terminal after successful installation.
+
+## Usage
+
+### Basic Example
+
+```python
+from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from datetime import datetime, timedelta
+
+# Create a DataSourceManager instance
+dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+
+# Define time range (last 7 days)
+end_time = datetime.utcnow()
+start_time = end_time - timedelta(days=7)
+
+# Fetch BTCUSDT data using the Failover Control Protocol
+data = dsm.get_data(
+    symbol="BTCUSDT",
+    start_time=start_time,
+    end_time=end_time,
+    interval=Interval.MINUTE_1,
+)
+
+print(f"Retrieved {len(data)} records")
+print(data.head())
+```
+
+### Advanced Configuration
+
+```python
+from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from data_source_manager.core.sync.data_source_manager import DataSource
+
+# Create with specific configuration
+dsm = DataSourceManager.create(
+    provider=DataProvider.BINANCE,
+    market_type=MarketType.FUTURES_USDT,  # USDS-Margined Futures
+    enforce_source=DataSource.AUTO,       # Use Failover Control Protocol
+)
+
+# Fetch futures data
+futures_data = dsm.get_data(
+    symbol="BTCUSDT",
+    start_time=datetime(2024, 1, 1),
+    end_time=datetime(2024, 1, 7),
+    interval=Interval.HOUR_1,
+)
+```
 
 ## Running the Demos
 
@@ -181,14 +249,14 @@ if df is not None:
 
 You can import `fetch_market_data` directly from the `data_source_manager` package. The necessary enums (`MarketType`, `DataProvider`, `ChartType`, `Interval`, `DataSource`) and `DataSourceConfig` are also exposed at the top level for easy access.
 
-Refer to the source code of `data_source_manager.core.sync.dsm_lib.fetch_market_data` and `data_source_manager.core.sync.data_source_manager.DataSourceConfig` for detailed parameter information and usage.
+Refer to the source code of `data_source_manager.data_source_manager.core.sync.dsm_lib.fetch_market_data` and `data_source_manager.data_source_manager.core.sync.data_source_manager.DataSourceConfig` for detailed parameter information and usage.
 
 ## Data Source Manager (DSM) Demo
 
 ### Quick Start
 
 - **[DSM Demo CLI Documentation](examples/sync/)**: Interactive demonstration of the Failover Control Protocol mechanism, the core data retrieval strategy that ensures robust and efficient data collection from multiple sources.
-- **[DSM Demo Module Documentation](examples/lib_module/)**: Programmatic interface to `core/sync/dsm_lib.py` functions, complementing the CLI tool by providing a library approach to implement the same data retrieval functionality in custom applications.
+- **[DSM Demo Module Documentation](examples/lib_module/)**: Programmatic interface to `src/data_source_manager/core/sync/dsm_lib.py` functions, complementing the CLI tool by providing a library approach to implement the same data retrieval functionality in custom applications.
 
 ### Understanding Data Sources
 
@@ -252,8 +320,7 @@ DSM now supports **loguru** for much easier log level control:
 import os
 os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 
-from core.sync.data_source_manager import DataSourceManager
-from utils.market_constraints import DataProvider, MarketType, Interval
+from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
 
 # Create DSM instance - minimal logging
 dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
@@ -300,7 +367,7 @@ python your_script.py
 ### Programmatic Control
 
 ```python
-from utils.loguru_setup import logger
+from data_source_manager.data_source_manager.utils.loguru_setup import logger
 
 # Set log level
 logger.configure_level("DEBUG")
@@ -314,15 +381,15 @@ logger.info("Status: <green>SUCCESS</green>")
 
 ### Migration from Old Logger
 
-If you're using the old `utils.logger_setup`, migrate easily:
+If you're using the old `data_source_manager.utils.logger_setup`, migrate easily:
 
 ```bash
 # Automatic migration (recommended)
 python scripts/dev/migrate_to_loguru.py
 
 # Or manually change imports:
-# Old: from utils.logger_setup import logger
-# New: from utils.loguru_setup import logger
+# Old: from data_source_manager.data_source_manager.utils.logger_setup import logger
+# New: from data_source_manager.data_source_manager.utils.loguru_setup import logger
 ```
 
 ### Demo

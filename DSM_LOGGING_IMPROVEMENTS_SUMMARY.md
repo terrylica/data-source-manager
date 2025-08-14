@@ -47,7 +47,7 @@ dsm = DataSourceManager.create(
 ### 3. **Convenient Context Managers**
 
 ```python
-from utils.for_demo.dsm_clean_logging import get_clean_market_data, get_quiet_market_data
+from data_source_manager.data_source_manager.utils.for_demo.dsm_clean_logging import get_clean_market_data, get_quiet_market_data
 
 # Clean usage - minimal logging
 with get_clean_market_data() as dsm:
@@ -119,8 +119,8 @@ dsm = DataSourceManager.create(
 
 ### Files Modified
 
-- **`core/sync/data_source_manager.py`**: Enhanced with logging configuration
-- **`utils/for_demo/dsm_clean_logging.py`**: New utility module with context managers
+- **`src/data_source_manager/core/sync/data_source_manager.py`**: Enhanced with logging configuration
+- **`src/data_source_manager/utils/for_demo/dsm_clean_logging.py`**: New utility module with context managers
 - **`tests/unit/test_dsm_logging_improvements.py`**: Comprehensive test coverage
 
 ### Logging Configuration Logic
@@ -150,7 +150,7 @@ manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
 ### Workaround for Users Who Can't Upgrade
 
 ```python
-from utils.for_demo.dsm_clean_logging import suppress_http_logging
+from data_source_manager.data_source_manager.utils.for_demo.dsm_clean_logging import suppress_http_logging
 
 suppress_http_logging()  # Apply globally
 # Now all DSM usage will have clean output
@@ -197,8 +197,8 @@ pytest tests/unit/test_dsm_logging_improvements.py -v
 
 ```python
 # Clean logging utilities
-from utils.for_demo.dsm_clean_logging import get_clean_market_data
-from utils.market_constraints import Interval
+from data_source_manager.data_source_manager.utils.for_demo.dsm_clean_logging import get_clean_market_data
+from data_source_manager.data_source_manager.utils.market_constraints import Interval
 from datetime import datetime
 
 with get_clean_market_data() as dsm:

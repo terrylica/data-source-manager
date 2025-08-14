@@ -6,9 +6,9 @@ This file tracks the progress of implementing Python package principles in the D
 
 ### Core API Modules
 
-- [x] `core/sync/dsm_lib.py` - Enhanced with comprehensive module, function, and parameter documentation
-- [x] `core/sync/data_source_manager.py` - Enhanced with comprehensive class, method, parameter documentation and examples
-- [x] `core/providers/binance/vision_data_client.py` - Enhanced VisionDataClient with comprehensive docstrings and examples
+- [x] `src/data_source_manager/core/sync/dsm_lib.py` - Enhanced with comprehensive module, function, and parameter documentation
+- [x] `src/data_source_manager/core/sync/data_source_manager.py` - Enhanced with comprehensive class, method, parameter documentation and examples
+- [x] `src/data_source_manager/core/providers/binance/vision_data_client.py` - Enhanced VisionDataClient with comprehensive docstrings and examples
 
 ### Package Structure
 
@@ -16,9 +16,9 @@ This file tracks the progress of implementing Python package principles in the D
 
 ### Public Interface Modules
 
-- [x] `utils/dataframe_types.py` - Enhanced TimestampedDataFrame with comprehensive docstrings and examples
-- [x] `utils/market_constraints.py` - Enhanced with comprehensive module, class, function and parameter documentation
-- [x] `utils/time_utils.py` - Enhanced with comprehensive module and function documentation, including examples
+- [x] `src/data_source_manager/utils/dataframe_types.py` - Enhanced TimestampedDataFrame with comprehensive docstrings and examples
+- [x] `src/data_source_manager/utils/market_constraints.py` - Enhanced with comprehensive module, class, function and parameter documentation
+- [x] `src/data_source_manager/utils/time_utils.py` - Enhanced with comprehensive module and function documentation, including examples
 
 ### CLI Tools
 
@@ -32,8 +32,8 @@ This file tracks the progress of implementing Python package principles in the D
 
 ### Utility Modules
 
-- [ ] `utils/logger_setup.py` - Logging setup needs better documentation
-- [ ] `utils/app_paths.py` - Application paths need better documentation
+- [ ] `src/data_source_manager/utils/logger_setup.py` - Logging setup needs better documentation
+- [ ] `src/data_source_manager/utils/app_paths.py` - Application paths need better documentation
 
 ## Implementation Notes
 

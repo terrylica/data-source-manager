@@ -2,7 +2,7 @@
 
 ## Overview
 
-This module demonstrates the programmatic use of `core/sync/dsm_lib.py` functions to fetch historical market data from Binance.
+This module demonstrates the programmatic use of `src/data_source_manager/core/sync/dsm_lib.py` functions to fetch historical market data from Binance.
 
 ## Features
 
@@ -21,7 +21,7 @@ This module demonstrates the programmatic use of `core/sync/dsm_lib.py` function
 ## Example Code
 
 ```python
-from core.sync.dsm_lib import (
+from data_source_manager.data_source_manager.core.sync.dsm_lib import (
     setup_environment,
     process_market_parameters,
     fetch_market_data,

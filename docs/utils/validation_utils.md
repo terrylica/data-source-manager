@@ -2,7 +2,7 @@
 
 This module provides centralized validation utilities for ensuring data integrity, including DataFrame validation, API boundary validation, and cache validation. These utilities help maintain consistency and reliability across the codebase.
 
-> **IMPORTANT**: This module is now deprecated. Please use the `utils.validation` module and its `DataValidation` and `DataFrameValidator` classes instead.
+> **IMPORTANT**: This module is now deprecated. Please use the `data_source_manager.utils.validation` module and its `DataValidation` and `DataFrameValidator` classes instead.
 
 ## Key Components
 
@@ -104,7 +104,7 @@ The `DataValidator` class provides comprehensive data validation including struc
 
 ```python
 # Basic validation - USE UPDATED MODULES
-from utils.validation import DataValidation
+from data_source_manager.utils.validation import DataValidation
 
 # Validate a time window
 from datetime import datetime, timezone, timedelta
@@ -114,7 +114,7 @@ DataValidation.validate_time_window(start_time, end_time)
 
 # DataFrame validation - USE UPDATED MODULES
 import pandas as pd
-from utils.validation import DataFrameValidator
+from data_source_manager.utils.validation import DataFrameValidator
 
 # Create a DataFrame
 df = pd.DataFrame(...)

@@ -27,7 +27,7 @@ Our testing confirmed the user's complaint:
 
 ### 🔍 Root Cause Analysis
 
-The issue occurs in `core/sync/data_source_manager.py` in the `get_data()` method:
+The issue occurs in `src/data_source_manager/core/sync/data_source_manager.py` in the `get_data()` method:
 
 ```python
 # Lines 856-859 (before fix)
@@ -143,7 +143,7 @@ df = dsm.get_data(
 
 ### 🔧 Files Modified
 
-1. **`core/sync/data_source_manager.py`**:
+1. **`src/data_source_manager/core/sync/data_source_manager.py`**:
 
    - Added `auto_reindex` parameter to `get_data()` method
    - Implemented intelligent reindexing logic

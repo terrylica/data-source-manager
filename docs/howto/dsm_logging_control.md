@@ -45,8 +45,8 @@ export DSM_LOG_LEVEL=DEBUG
 import os
 os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 
-from core.sync.data_source_manager import DataSourceManager
-from utils.market_constraints import DataProvider, MarketType, Interval
+from data_source_manager.core.sync.data_source_manager import DataSourceManager
+from data_source_manager.utils.market_constraints import DataProvider, MarketType, Interval
 
 # Create DSM instance - minimal logging
 dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
@@ -68,13 +68,13 @@ print(f"✓ Feature engineering complete: {len(data)} records processed")
 Configure logging directly in your code:
 
 ```python
-from utils.loguru_setup import logger
+from data_source_manager.utils.loguru_setup import logger
 
 # Set log level before importing DSM components
 logger.configure_level("CRITICAL")
 
 # Now import and use DSM with suppressed logging
-from core.sync.data_source_manager import DataSourceManager
+from data_source_manager.core.sync.data_source_manager import DataSourceManager
 ```
 
 ### Method 3: Global Configuration
@@ -88,7 +88,7 @@ import os
 os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 
 # All subsequent DSM usage will respect this setting
-from core.sync.data_source_manager import DataSourceManager
+from data_source_manager.core.sync.data_source_manager import DataSourceManager
 ```
 
 ## Logging Level Reference
@@ -105,11 +105,11 @@ from core.sync.data_source_manager import DataSourceManager
 
 The logging control applies to all DSM components:
 
-- **Core DSM** (`core.sync.data_source_manager`)
-- **Cache utilities** (`utils.for_core.dsm_cache_utils`)
-- **FCP utilities** (`utils.for_core.dsm_fcp_utils`)
-- **DataFrame utilities** (`utils.dataframe_utils`)
-- **API utilities** (`utils.for_core.dsm_api_utils`)
+- **Core DSM** (`data_source_manager.core.sync.data_source_manager`)
+- **Cache utilities** (`data_source_manager.utils.for_core.dsm_cache_utils`)
+- **FCP utilities** (`data_source_manager.utils.for_core.dsm_fcp_utils`)
+- **DataFrame utilities** (`data_source_manager.utils.dataframe_utils`)
+- **API utilities** (`data_source_manager.utils.for_core.dsm_api_utils`)
 - **All other DSM-related modules**
 
 ## Before and After Comparison
@@ -124,20 +124,20 @@ from loguru import logger as loguru_logger
 # Suppress ALL logging including DSM cache and FCP logs
 logging.getLogger().setLevel(logging.CRITICAL)
 logging.getLogger("core").setLevel(logging.CRITICAL)
-logging.getLogger("core.sync").setLevel(logging.CRITICAL)
-logging.getLogger("core.sync.data_source_manager").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.core.sync").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.core.sync.data_source_manager").setLevel(logging.CRITICAL)
 logging.getLogger("utils").setLevel(logging.CRITICAL)
-logging.getLogger("utils.for_core").setLevel(logging.CRITICAL)
-logging.getLogger("utils.for_core.dsm_cache_utils").setLevel(logging.CRITICAL)
-logging.getLogger("utils.for_core.dsm_fcp_utils").setLevel(logging.CRITICAL)
-logging.getLogger("utils.dataframe_utils").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.for_core").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.for_core.dsm_cache_utils").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.for_core.dsm_fcp_utils").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.dataframe_utils").setLevel(logging.CRITICAL)
 
 # Suppress loguru logs from DSM
 loguru_logger.remove()
 loguru_logger.add(lambda _: None)
 
 # Finally use DSM
-from core.sync.data_source_manager import DataSourceManager
+from data_source_manager.core.sync.data_source_manager import DataSourceManager
 ```
 
 ### After (Clean Solution)
@@ -147,8 +147,8 @@ from core.sync.data_source_manager import DataSourceManager
 import os
 os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 
-from core.sync.data_source_manager import DataSourceManager
-from utils.market_constraints import DataProvider, Interval, MarketType
+from data_source_manager.core.sync.data_source_manager import DataSourceManager
+from data_source_manager.utils.market_constraints import DataProvider, Interval, MarketType
 
 # No more logging boilerplate needed!
 dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
@@ -185,7 +185,7 @@ export DSM_DISABLE_COLORS="true"
 For temporary debugging sessions:
 
 ```python
-from utils.loguru_setup import configure_session_logging
+from data_source_manager.utils.loguru_setup import configure_session_logging
 
 # Configure timestamped log files
 main_log, error_log, timestamp = configure_session_logging("my_session", "DEBUG")
@@ -277,7 +277,7 @@ If DSM logs still appear after setting `DSM_LOG_LEVEL=CRITICAL`:
 2. **Set before import**: Ensure you set the environment variable before importing DSM
 3. **Verify effective level**:
    ```python
-   from utils.loguru_setup import logger
+   from data_source_manager.utils.loguru_setup import logger
    print(f"Effective level: {logger.getEffectiveLevel()}")
    ```
 
@@ -310,7 +310,7 @@ logging.basicConfig(level=logging.INFO)
 
 ### Technical Implementation
 
-- **Centralized Logger**: All DSM components use `utils.loguru_setup.logger`
+- **Centralized Logger**: All DSM components use `data_source_manager.utils.loguru_setup.logger`
 - **Environment Variable**: `DSM_LOG_LEVEL` is checked at import time
 - **Cleaner Default**: Default level is now `ERROR` for quieter operation by default
 - **Performance**: Loguru provides better performance than standard logging

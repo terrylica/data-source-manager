@@ -130,7 +130,7 @@ The system implements a robust centralized timeout handling architecture to ensu
 
 ### Timeout Configuration
 
-A centralized timeout constant `MAX_TIMEOUT` in `utils/config.py` provides a system-wide maximum timeout value (currently 9.0 seconds).
+A centralized timeout constant `MAX_TIMEOUT` in `src/data_source_manager/utils/config.py` provides a system-wide maximum timeout value (currently 9.0 seconds).
 
 ### Client-Specific Implementation
 

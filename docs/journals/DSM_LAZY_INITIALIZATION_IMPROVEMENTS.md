@@ -27,8 +27,8 @@ We implemented the **"Import Fast, Initialize Lazy"** principle used by major Py
 
 ```python
 # ✅ BEFORE: Heavy imports at module level
-from core.sync.data_source_manager import DataSourceManager  # 314ms!
-from utils.market_constraints import DataProvider, MarketType  # Heavy!
+from data_source_manager.core.sync.data_source_manager import DataSourceManager  # 314ms!
+from data_source_manager.utils.market_constraints import DataProvider, MarketType  # Heavy!
 
 # ✅ AFTER: Zero heavy imports
 # All imports deferred until actually needed
@@ -57,7 +57,7 @@ manager = DSMManager.create("BINANCE", "SPOT")  # <1ms creation!
 
 ```python
 # ✅ NEW: Explicit configuration following industry patterns
-from utils.dsm_config import DSMConfig
+from data_source_manager.utils.dsm_config import DSMConfig
 
 # Production configuration
 config = DSMConfig.for_production(
@@ -254,7 +254,7 @@ data = manager.fetch_market_data(
 ## 📝 **Files Modified**
 
 - `__init__.py` - Ultra-lightweight main module
-- `utils/dsm_config.py` - Configuration management
+- `src/data_source_manager/utils/dsm_config.py` - Configuration management
 - `tests/test_import_compatibility.py` - Import testing
 - `examples/dsm_lazy_initialization_demo.py` - Demonstration
 

@@ -55,7 +55,7 @@ To use the centralized CLI option definitions:
 
 ```python
 # Import the CLI options
-from utils.for_demo.dsm_help_content import CLI_OPTIONS
+from data_source_manager.data_source_manager.utils.for_demo.dsm_help_content import CLI_OPTIONS
 
 # Use them in your Typer options
 typer.Option(

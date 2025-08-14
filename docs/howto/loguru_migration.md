@@ -1,6 +1,6 @@
 # Migrating to Loguru Logger
 
-The DSM package now supports loguru for better log level control and improved logging experience. This guide helps you migrate from the old `utils.logger_setup` to the new `utils.loguru_setup`.
+The DSM package now supports loguru for better log level control and improved logging experience. This guide helps you migrate from the old `data_source_manager.utils.logger_setup` to the new `data_source_manager.utils.loguru_setup`.
 
 ## Why Loguru?
 
@@ -35,10 +35,10 @@ Simply change your import statement:
 
 ```python
 # Old import
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # New import
-from utils.loguru_setup import logger
+from data_source_manager.utils.loguru_setup import logger
 
 # All existing logging calls work unchanged!
 logger.debug("Debug message")
@@ -68,7 +68,7 @@ export DSM_DISABLE_COLORS=true
 ### Programmatic Configuration
 
 ```python
-from utils.loguru_setup import logger
+from data_source_manager.utils.loguru_setup import logger
 
 # Set log level
 logger.configure_level("DEBUG")
@@ -88,7 +88,7 @@ logger.configure_level("INFO").configure_file("./logs/app.log")
 ### Basic Usage
 
 ```python
-from utils.loguru_setup import logger
+from data_source_manager.utils.loguru_setup import logger
 
 # Set log level for your session
 logger.configure_level("DEBUG")
@@ -112,7 +112,7 @@ export DSM_LOG_FILE=./logs/dsm.log
 
 # Now just import and use
 python -c "
-from utils.loguru_setup import logger
+from data_source_manager.utils.loguru_setup import logger
 logger.info('Configured from environment!')
 "
 ```
@@ -120,7 +120,7 @@ logger.info('Configured from environment!')
 ### Advanced Features
 
 ```python
-from utils.loguru_setup import logger
+from data_source_manager.utils.loguru_setup import logger
 
 # Bind context to all log messages
 contextual_logger = logger.bind(user_id=123, session="abc")
@@ -135,7 +135,7 @@ logger.opt(colors=True).info("Force <red>colored</red> output")
 After migration, test your logging:
 
 ```python
-from utils.loguru_setup import logger
+from data_source_manager.utils.loguru_setup import logger
 
 # Test different levels
 logger.configure_level("DEBUG")

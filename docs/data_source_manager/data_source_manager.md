@@ -14,8 +14,8 @@ The `DataSourceManager` serves as a mediator between different data sources acro
 ### Module Location
 
 ```python
-from core.sync.data_source_manager import DataSourceManager, DataSource
-from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
+from data_source_manager.core.sync.data_source_manager import DataSourceManager, DataSource
+from data_source_manager.utils.market_constraints import Interval, MarketType, ChartType, DataProvider
 ```
 
 ## System Architecture

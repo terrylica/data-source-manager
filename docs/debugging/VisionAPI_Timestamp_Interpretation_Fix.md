@@ -8,7 +8,7 @@ This document summarizes the implementation of the fix for the Vision API timest
 
 ### 1. Fixed Timestamp Processing with Utility Function
 
-The core fix was implemented in the `process_timestamp_columns` utility function in `utils/for_core/vision_timestamp.py`:
+The core fix was implemented in the `process_timestamp_columns` utility function in `src/data_source_manager/utils/for_core/vision_timestamp.py`:
 
 ```python
 def process_timestamp_columns(df: pd.DataFrame, interval_str: str) -> pd.DataFrame:

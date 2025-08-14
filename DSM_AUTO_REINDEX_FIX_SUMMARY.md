@@ -107,7 +107,7 @@ result_df = standardize_columns(result_df)
 # CRITICAL FIX: Filter to user's exact time range when auto_reindex=False
 if not auto_reindex and not result_df.empty:
     # Filter the result to the user's exact requested time range
-    from utils.time_utils import filter_dataframe_by_time
+    from data_source_manager.data_source_manager.utils.time_utils import filter_dataframe_by_time
     original_length = len(result_df)
     result_df = filter_dataframe_by_time(result_df, start_time, end_time, "open_time")
     logger.info(f"[FCP] auto_reindex=False: Filtered to user's exact range: {original_length} -> {len(result_df)} records")
@@ -119,7 +119,7 @@ if not auto_reindex and not result_df.empty:
 
 ```python
 # ALWAYS performed completeness checks against aligned boundaries
-from utils.dataframe_utils import verify_data_completeness
+from data_source_manager.data_source_manager.utils.dataframe_utils import verify_data_completeness
 is_complete, gaps = verify_data_completeness(result_df, aligned_start, aligned_end, interval.value)
 ```
 
@@ -129,7 +129,7 @@ is_complete, gaps = verify_data_completeness(result_df, aligned_start, aligned_e
 # CRITICAL FIX: Different completeness checks based on auto_reindex
 if auto_reindex:
     # Original completeness check for reindexed data
-    from utils.dataframe_utils import verify_data_completeness
+    from data_source_manager.data_source_manager.utils.dataframe_utils import verify_data_completeness
     is_complete, gaps = verify_data_completeness(result_df, aligned_start, aligned_end, interval.value)
     if not is_complete:
         logger.warning(f"Data retrieval for {symbol} has {len(gaps)} gaps in the time series.")

@@ -1,6 +1,6 @@
 # Logger Setup - Centralized Logging and Output Control
 
-The `utils/logger_setup.py` module provides a centralized solution for all logging and console output needs in the application. It features a single import approach that provides powerful capabilities including log level control, rich formatting, and automatic suppression of visual output at higher log levels.
+The `src/data_source_manager/utils/logger_setup.py` module provides a centralized solution for all logging and console output needs in the application. It features a single import approach that provides powerful capabilities including log level control, rich formatting, and automatic suppression of visual output at higher log levels.
 
 ## Key Features
 
@@ -15,7 +15,7 @@ The `utils/logger_setup.py` module provides a centralized solution for all loggi
 ## Basic Usage
 
 ```python
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 logger.setLevel("INFO")
@@ -124,11 +124,11 @@ This means that logs from different modules will correctly show the source modul
 
 ```python
 # In module_a.py
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 logger.info("Processing data")  # Shows: INFO module_a: Processing data
 
 # In module_b.py
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 logger.info("Handling request")  # Shows: INFO module_b: Handling request
 ```
 
@@ -150,13 +150,13 @@ While the root logger level applies to all modules by default, you can set diffe
 
 ```python
 # In your main application:
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # Set the root logger level
 logger.setLevel("WARNING")  # Only WARNING and above shown by default
 
 # In a specific module that needs more detailed logging:
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 import logging
 
 # Set a module-specific log level (only affects this module)
@@ -178,7 +178,7 @@ This means that the main script or entry point can set the overall logging behav
 
 ```python
 # In your main.py (the entry point of your application)
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # Set the global log level for ALL modules
 logger.setLevel("INFO", configure_root=True)  # Default is True
@@ -199,7 +199,7 @@ Individual modules can override the inherited log level if needed:
 
 ```python
 # In a module that needs different logging behavior
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # Override just for this module (doesn't affect other modules)
 logger.setLevel("DEBUG", configure_root=False)  # Don't configure root logger
@@ -211,7 +211,7 @@ The hierarchical control extends to smart print functionality as well. When you 
 
 ```python
 # In your main.py
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # Set global log level
 logger.setLevel("ERROR")
@@ -234,7 +234,7 @@ This provides a powerful way to control verbosity across your entire application
 For main scripts or entry points in your application:
 
 ```python
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # Configure global logging at the start
 logger.setLevel("INFO")        # Set global log level
@@ -257,7 +257,7 @@ This example demonstrates the key features:
 ```python
 #!/usr/bin/env python3
 import argparse
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 from rich.panel import Panel
 from rich.table import Table
 
@@ -316,7 +316,7 @@ python examples/logger_demo/simple_print_demo.py --level ERROR
 
 ## Best Practices
 
-1. **Single Import**: Always use `from utils.logger_setup import logger` as the only import
+1. **Single Import**: Always use `from data_source_manager.utils.logger_setup import logger` as the only import
 2. **Enable Smart Print**: Call `logger.enable_smart_print(True)` early in your script
 3. **Log Levels**: Use appropriate log levels for your messages
    - DEBUG: Detailed debugging information
@@ -346,7 +346,7 @@ The smart print functionality has been integrated into the DSM Demo to provide a
 
 ```python
 # Import only logger
-from utils.logger_setup import logger
+from data_source_manager.utils.logger_setup import logger
 
 # Enable smart print
 logger.enable_smart_print(True)

@@ -49,7 +49,7 @@ Total timeline: 3 months (Q3 2025)
 
 ### 1. Resource Tracking Framework
 
-#### 1.1 `utils/resource_tracker.py`
+#### 1.1 `src/data_source_manager/utils/resource_tracker.py`
 
 Create a core module for resource tracking:
 

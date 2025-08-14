@@ -78,8 +78,8 @@ Parameters:
 ```python
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from core.sync.data_source_manager import DataSourceManager
+from data_source_manager.utils.market_constraints import Interval, MarketType, ChartType, DataProvider
+from data_source_manager.core.sync.data_source_manager import DataSourceManager
 
 # Set time range for data retrieval
 end_time = datetime.now(timezone.utc)
@@ -171,5 +171,5 @@ The design allows for easy extension:
 - `DataClientInterface`: Abstract base class implemented by this client
 - `DataClientFactory`: Factory that creates instances of this client
 - `DataSourceManager`: Uses this client via the factory
-- `utils/config.py`: Contains funding rate column definitions
-- `utils/market_constraints.py`: Contains enum definitions
+- `src/data_source_manager/utils/config.py`: Contains funding rate column definitions
+- `src/data_source_manager/utils/market_constraints.py`: Contains enum definitions

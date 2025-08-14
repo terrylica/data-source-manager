@@ -13,48 +13,48 @@ This consolidation will be performed in phases to minimize risk and allow for it
 - **Objective**: Consolidate time-related functionalities from `time_alignment.py` and relevant parts of `api_boundary_validator.py` into a single, cohesive time utility module.
 - **Tasks**:
   1. **Identify Core Time Functions**: Review `time_alignment.py` and `api_boundary_validator.py` to identify all functions related to time manipulation, timezone handling, and interval calculations.
-  2. **Create `time_utils.py`**: Create a new file `utils/time_utils.py`.
-  3. **Move Time Functions**: Move relevant functions from `time_alignment.py` and `api_boundary_validator.py` to `utils/time_utils.py`. Ensure to:
+  2. **Create `time_utils.py`**: Create a new file `src/data_source_manager/utils/time_utils.py`.
+  3. **Move Time Functions**: Move relevant functions from `time_alignment.py` and `api_boundary_validator.py` to `src/data_source_manager/utils/time_utils.py`. Ensure to:
      - Maintain original function signatures for backward compatibility.
      - Resolve any naming conflicts and ensure clear, consistent naming.
      - Consolidate duplicated timezone handling logic into a single function in `time_utils.py`.
-  4. **Update Imports**: Update all files in `utils` and `core` that currently import from `time_alignment.py` and `api_boundary_validator.py` (for time functions) to import from `utils/time_utils.py` instead.
-  5. **Deprecate Old Functions**: In `time_alignment.py` and `api_boundary_validator.py`, mark the moved time-related functions as deprecated, but keep them as wrappers that call the new functions in `utils/time_utils.py`. This will provide a transition period and avoid immediate breaking changes. Add clear deprecation warnings using the `warnings` module.
+  4. **Update Imports**: Update all files in `utils` and `core` that currently import from `time_alignment.py` and `api_boundary_validator.py` (for time functions) to import from `src/data_source_manager/utils/time_utils.py` instead.
+  5. **Deprecate Old Functions**: In `time_alignment.py` and `api_boundary_validator.py`, mark the moved time-related functions as deprecated, but keep them as wrappers that call the new functions in `src/data_source_manager/utils/time_utils.py`. This will provide a transition period and avoid immediate breaking changes. Add clear deprecation warnings using the `warnings` module.
   6. **Testing**:
      - Run existing tests using `scripts/op/run_tests_parallel.sh tests/core tests/utils` to ensure no regressions are introduced in core functionality.
-     - Create new unit tests specifically for `utils/time_utils.py` to test all consolidated time functions thoroughly.
+     - Create new unit tests specifically for `src/data_source_manager/utils/time_utils.py` to test all consolidated time functions thoroughly.
 
 ## Phase 2: Validation Logic Consolidation
 
 - **Objective**: Combine validation functionalities from `cache_validator.py` and `validation.py` into a unified validation module.
 - **Tasks**:
   1. **Identify Core Validation Functions**: Review `cache_validator.py` and `validation.py` to identify all validation functions, including data validation, cache validation, and input validation.
-  2. **Create `validation_utils.py`**: Create a new file `utils/validation_utils.py`.
-  3. **Move Validation Functions**: Move relevant functions from `cache_validator.py` and `validation.py` to `utils/validation_utils.py`. Ensure to:
+  2. **Create `validation_utils.py`**: Create a new file `src/data_source_manager/utils/validation_utils.py`.
+  3. **Move Validation Functions**: Move relevant functions from `cache_validator.py` and `validation.py` to `src/data_source_manager/utils/validation_utils.py`. Ensure to:
      - Maintain original function signatures.
      - Consolidate any overlapping validation logic and error handling.
      - Refactor `CacheValidationError` and related classes/enums into `validation_utils.py` for better organization.
-  4. **Update Imports**: Update all files in `utils` and `core` that currently import from `cache_validator.py` and `validation.py` to import from `utils/validation_utils.py` for validation functions.
-  5. **Deprecate Old Validation Classes/Functions**: In `cache_validator.py` and `validation.py`, mark the moved validation functions and classes as deprecated, using wrapper functions that call the new implementations in `utils/validation_utils.py`. Add deprecation warnings.
+  4. **Update Imports**: Update all files in `utils` and `core` that currently import from `cache_validator.py` and `validation.py` to import from `src/data_source_manager/utils/validation_utils.py` for validation functions.
+  5. **Deprecate Old Validation Classes/Functions**: In `cache_validator.py` and `validation.py`, mark the moved validation functions and classes as deprecated, using wrapper functions that call the new implementations in `src/data_source_manager/utils/validation_utils.py`. Add deprecation warnings.
   6. **Testing**:
      - Run existing tests using `scripts/op/run_tests_parallel.sh tests/core tests/utils`.
-     - Create new unit tests for `utils/validation_utils.py` to cover all consolidated validation logic.
+     - Create new unit tests for `src/data_source_manager/utils/validation_utils.py` to cover all consolidated validation logic.
 
 ## Phase 3: HTTP Client and Download Handling Consolidation
 
 - **Objective**: Consolidate HTTP client creation and download handling logic from `download_handler.py` and `http_client_factory.py` into a single module focused on network operations.
 - **Tasks**:
   1. **Review HTTP Client and Download Logic**: Analyze `download_handler.py` and `http_client_factory.py` to understand HTTP client creation, configuration, retry mechanisms, and download progress tracking.
-  2. **Create `network_utils.py`**: Create a new file `utils/network_utils.py`.
-  3. **Move HTTP Client and Download Functions**: Move relevant classes and functions from `download_handler.py` and `http_client_factory.py` to `utils/network_utils.py`. Ensure to:
+  2. **Create `network_utils.py`**: Create a new file `src/data_source_manager/utils/network_utils.py`.
+  3. **Move HTTP Client and Download Functions**: Move relevant classes and functions from `download_handler.py` and `http_client_factory.py` to `src/data_source_manager/utils/network_utils.py`. Ensure to:
      - Maintain key function signatures (e.g., `download_file` in `DownloadHandler`, `create_client` in `HttpClientFactory`).
      - Consolidate HTTP client creation logic and configurations.
      - Ensure `DownloadHandler` in `network_utils.py` uses the client factory from the same module.
-  4. **Update Imports**: Update imports in `utils` and `core` to use `utils/network_utils.py` for HTTP client and download functionalities.
-  5. **Deprecate Old Classes/Functions**: In `download_handler.py` and `http_client_factory.py`, deprecate the moved classes and functions, providing wrappers that call the new implementations in `utils/network_utils.py`. Add deprecation warnings.
+  4. **Update Imports**: Update imports in `utils` and `core` to use `src/data_source_manager/utils/network_utils.py` for HTTP client and download functionalities.
+  5. **Deprecate Old Classes/Functions**: In `download_handler.py` and `http_client_factory.py`, deprecate the moved classes and functions, providing wrappers that call the new implementations in `src/data_source_manager/utils/network_utils.py`. Add deprecation warnings.
   6. **Testing**:
      - Run existing tests using `scripts/op/run_tests_parallel.sh tests/core tests/utils`.
-     - Create unit tests for `utils/network_utils.py`, focusing on HTTP client creation, request handling, and download functionalities.
+     - Create unit tests for `src/data_source_manager/utils/network_utils.py`, focusing on HTTP client creation, request handling, and download functionalities.
 
 ## Phase 4: Deprecated Code Removal and Final Cleanup
 

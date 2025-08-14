@@ -32,13 +32,13 @@ from loguru import logger as loguru_logger
 # Suppress ALL logging including DSM cache and FCP logs
 logging.getLogger().setLevel(logging.CRITICAL)
 logging.getLogger("core").setLevel(logging.CRITICAL)
-logging.getLogger("core.sync").setLevel(logging.CRITICAL)
-logging.getLogger("core.sync.data_source_manager").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.core.sync").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.core.sync.data_source_manager").setLevel(logging.CRITICAL)
 logging.getLogger("utils").setLevel(logging.CRITICAL)
-logging.getLogger("utils.for_core").setLevel(logging.CRITICAL)
-logging.getLogger("utils.for_core.dsm_cache_utils").setLevel(logging.CRITICAL)
-logging.getLogger("utils.for_core.dsm_fcp_utils").setLevel(logging.CRITICAL)
-logging.getLogger("utils.dataframe_utils").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.for_core").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.for_core.dsm_cache_utils").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.for_core.dsm_fcp_utils").setLevel(logging.CRITICAL)
+logging.getLogger("data_source_manager.utils.dataframe_utils").setLevel(logging.CRITICAL)
 
 # Suppress loguru logs from DSM
 loguru_logger.remove()
@@ -55,7 +55,7 @@ os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 ### 2. Programmatic Control (Alternative Solution)
 
 ```python
-from utils.loguru_setup import logger
+from data_source_manager.data_source_manager.utils.loguru_setup import logger
 logger.configure_level("CRITICAL")
 ```
 
@@ -71,11 +71,11 @@ os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 
 ### Affected Components (All Covered)
 
-✅ **Core DSM** (`core.sync.data_source_manager`)  
-✅ **Cache utilities** (`utils.for_core.dsm_cache_utils`)  
-✅ **FCP utilities** (`utils.for_core.dsm_fcp_utils`)  
-✅ **DataFrame utilities** (`utils.dataframe_utils`)  
-✅ **API utilities** (`utils.for_core.dsm_api_utils`)  
+✅ **Core DSM** (`data_source_manager.core.sync.data_source_manager`)  
+✅ **Cache utilities** (`data_source_manager.utils.for_core.dsm_cache_utils`)  
+✅ **FCP utilities** (`data_source_manager.utils.for_core.dsm_fcp_utils`)  
+✅ **DataFrame utilities** (`data_source_manager.utils.dataframe_utils`)  
+✅ **API utilities** (`data_source_manager.utils.for_core.dsm_api_utils`)  
 ✅ **All other DSM-related modules**
 
 ### Logging Level Mapping (Exactly as Requested)
@@ -104,8 +104,8 @@ os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 import os
 os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
 
-from core.sync.data_source_manager import DataSourceManager
-from utils.market_constraints import DataProvider, MarketType, Interval
+from data_source_manager.data_source_manager.core.sync.data_source_manager import DataSourceManager
+from data_source_manager.data_source_manager.utils.market_constraints import DataProvider, MarketType, Interval
 
 # Create DSM instance - minimal logging
 dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
@@ -183,7 +183,7 @@ python your_debugging_script.py
 
 ### Centralized Logger System
 
-- **All DSM components** use `utils.loguru_setup.logger`
+- **All DSM components** use `data_source_manager.utils.loguru_setup.logger`
 - **Environment variable** `DSM_LOG_LEVEL` checked at import time
 - **Thread-safe** logging operations
 - **Automatic log rotation** and compression available

@@ -89,7 +89,7 @@ A higher-level handler that uses fsspec for file operations:
 
 ```python
 from vision_path_mapper import VisionPathMapper
-from utils.market_constraints import MarketType
+from data_source_manager.data_source_manager.utils.market_constraints import MarketType
 import pendulum
 
 # Create a mapper instance
@@ -151,7 +151,7 @@ print(f"Remote URL: {remote_url}")
 
 ```python
 from vision_path_mapper import FSSpecVisionHandler
-from utils.market_constraints import MarketType
+from data_source_manager.data_source_manager.utils.market_constraints import MarketType
 
 # Create a handler instance
 handler = FSSpecVisionHandler(base_cache_dir="cache")
