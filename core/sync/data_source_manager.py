@@ -19,16 +19,20 @@ Example:
     >>> from utils.market_constraints import DataProvider, MarketType, Interval
     >>> from datetime import datetime
     >>>
-    >>> # Create a manager for spot market
-    >>> manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    >>> # Create a manager for UM futures market (USDT-margined perpetual contracts)
+    >>> manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
     >>>
-    >>> # Fetch BTCUSDT data for the last 3 days
+    >>> # Fetch BTCUSDT perpetual futures data
     >>> df = manager.get_data(
     ...     symbol="BTCUSDT",
     ...     start_time=datetime(2023, 1, 1),
     ...     end_time=datetime(2023, 1, 5),
     ...     interval=Interval.MINUTE_1,
     ... )
+    >>>
+    >>> # Validate market type in returned data
+    >>> print(f"Market Type: {df.attrs.get('market_type', 'Unknown')}")
+    >>> print(f"Contract Type: {df.attrs.get('contract_description', 'Unknown')}")
 """
 
 from datetime import datetime
@@ -836,6 +840,86 @@ class DataSourceManager:
             chart_type=self.chart_type,
         )
 
+    def _enrich_dataframe_metadata(self, df: pd.DataFrame, symbol: str, chart_type: ChartType) -> pd.DataFrame:
+        """
+        Enrich DataFrame with comprehensive market type metadata for validation and debugging.
+        
+        This method adds detailed market information to the DataFrame's attrs dictionary,
+        making it possible to verify data source, market type, and contract details after
+        data retrieval. This eliminates confusion between SPOT and futures data.
+        
+        Args:
+            df: DataFrame to enrich with metadata
+            symbol: Trading symbol used for data retrieval
+            chart_type: Chart type requested
+            
+        Returns:
+            DataFrame with enriched metadata in df.attrs
+            
+        Example:
+            After calling this method, users can access:
+            >>> df.attrs['market_type']  # 'FUTURES_USDT'
+            >>> df.attrs['contract_description']  # 'USDT-margined futures (UM) - Perpetual contracts'
+            >>> df.attrs['api_endpoint']  # 'https://fapi.binance.com'
+            >>> df.attrs['vision_path']  # 'futures/um'
+        """
+        from utils.market_constraints import (
+            validate_symbol_market_consistency,
+            get_market_type_description,
+            get_market_capabilities
+        )
+        
+        # Get market capabilities for technical details
+        try:
+            capabilities = get_market_capabilities(self.market_type)
+            api_endpoint = capabilities.primary_endpoint
+            max_records = capabilities.max_limit
+        except Exception:
+            api_endpoint = "Unknown"
+            max_records = "Unknown"
+        
+        # Validate symbol consistency and get suggestions
+        validation = validate_symbol_market_consistency(symbol, self.market_type)
+        
+        # Enrich DataFrame with comprehensive metadata
+        df.attrs.update({
+            # Core market identification
+            'market_type': self.market_type.name,
+            'market_type_enum': self.market_type,
+            'provider': self.provider.name,
+            'symbol': symbol,
+            'chart_type': chart_type.name,
+            
+            # Contract and trading details
+            'contract_description': get_market_type_description(self.market_type, include_technical_details=False),
+            'is_futures': self.market_type.is_futures,
+            'is_perpetual': self.market_type.name in ['FUTURES_USDT', 'FUTURES_COIN'],
+            
+            # Technical API information
+            'api_endpoint': api_endpoint,
+            'vision_path': self.market_type.vision_api_path,
+            'max_records_per_request': max_records,
+            
+            # Data validation and quality
+            'symbol_validation': validation,
+            'data_contract': f"{self.market_type.name}_{self.provider.name}_{chart_type.name}",
+            
+            # Metadata timestamp
+            'metadata_generated_at': pd.Timestamp.now().isoformat(),
+            
+            # Human-readable summary
+            'data_summary': f"{symbol} {self.market_type.name} data from {self.provider.name} ({chart_type.name})"
+        })
+        
+        # Log validation warnings if symbol doesn't match market type
+        if not validation['is_consistent'] and validation['warning_level'] in ['medium', 'high']:
+            logger.warning(
+                f"⚠️ Market Type Validation: {validation['suggestion']} "
+                f"(confidence: {validation['confidence']:.1%}, warning: {validation['warning_level']})"
+            )
+        
+        return df
+
     def get_data(
         self,
         symbol: str,
@@ -1098,6 +1182,10 @@ class DataSourceManager:
                         logger.error(f"[FCP] BUG: auto_reindex=False should not create {nan_count} NaN values!")
 
             logger.info(f"[FCP] Successfully retrieved {len(result_df)} records for {symbol}")
+            
+            # Enrich DataFrame with market type metadata for validation
+            self._enrich_dataframe_metadata(result_df, symbol, chart_type or self.chart_type)
+            
             return result_df
 
         except Exception as e:
