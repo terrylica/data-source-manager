@@ -560,18 +560,15 @@ def filter_dataframe_by_time(
     logger.debug(f"Filtering DataFrame by time: {start_time} to {end_time}")
     logger.debug(f"Before filtering: {len(df)} rows")
 
-    # Debug: Trace timestamps at boundaries
-    # Extracted to utils_for_debug/timestamp_debug.py
+    # FAIL-FAST: Timezone-aware timestamp debugging with rich exception context
     from utils_for_debug.timestamp_debug import (
         analyze_filter_conditions,
         compare_filtered_results,
         trace_dataframe_timestamps,
     )
-
-    # Log detailed timestamp information for debugging
+    
+    # Rich timezone-aware debugging - fails fast on timezone issues
     trace_dataframe_timestamps(df, time_column, start_time, end_time)
-
-    # Analyze filter conditions for debugging
     analyze_filter_conditions(df, start_time, end_time, time_column)
 
     # Check if the time column exists
@@ -633,7 +630,7 @@ def filter_dataframe_by_time(
                 logger.debug(f"First timestamp: {min_ts} (represents BEGINNING of candle)")
                 logger.debug(f"Last timestamp: {max_ts} (represents BEGINNING of candle)")
 
-    # Debug: Compare input and output dataframes to verify filtering worked correctly
+    # FAIL-FAST: Timezone-aware validation of filtering results
     compare_filtered_results(df, filtered_df, start_time, end_time, time_column)
 
     return filtered_df
