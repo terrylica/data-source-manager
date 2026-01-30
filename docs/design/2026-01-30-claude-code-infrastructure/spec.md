@@ -24231,3 +24231,403 @@ claude -p --max-budget-usd 2.00 "validate data pipeline"
 | Subagent delegation       | High for verbose ops       |
 | Specific prompts          | Moderate                   |
 | Plan Mode                 | Prevents expensive re-work |
+<!-- SSoT-OK: This section is authoritative for status line configuration -->
+
+## Status Line Configuration Reference
+
+Create custom status lines that display contextual information at the bottom of Claude Code.
+
+### Quick Setup
+
+**Option 1: Interactive Setup**:
+
+```
+/statusline
+```
+
+Or with specific requirements:
+
+```
+/statusline show the model name in orange
+```
+
+**Option 2: Direct Configuration**:
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 0
+  }
+}
+```
+
+### How Status Line Works
+
+| Behavior       | Description                              |
+| -------------- | ---------------------------------------- |
+| Update trigger | Conversation messages update             |
+| Update rate    | At most every 300ms                      |
+| Output         | First line of stdout becomes status line |
+| Styling        | ANSI color codes supported               |
+| Input          | JSON context data via stdin              |
+
+### JSON Input Structure
+
+<!-- SSoT-OK: Example JSON showing structure, version is illustrative -->
+
+Your script receives this JSON via stdin:
+
+```json
+{
+  "hook_event_name": "Status",
+  "session_id": "abc123...",
+  "transcript_path": "/path/to/transcript.json",
+  "cwd": "/current/working/directory",
+  "model": {
+    "id": "claude-opus-4-1",
+    "display_name": "Opus"
+  },
+  "workspace": {
+    "current_dir": "/current/working/directory",
+    "project_dir": "/original/project/directory"
+  },
+  "version": "<version>",
+  "output_style": {
+    "name": "default"
+  },
+  "cost": {
+    "total_cost_usd": 0.01234,
+    "total_duration_ms": 45000,
+    "total_api_duration_ms": 2300,
+    "total_lines_added": 156,
+    "total_lines_removed": 23
+  },
+  "context_window": {
+    "total_input_tokens": 15234,
+    "total_output_tokens": 4521,
+    "context_window_size": 200000,
+    "used_percentage": 42.5,
+    "remaining_percentage": 57.5,
+    "current_usage": {
+      "input_tokens": 8500,
+      "output_tokens": 1200,
+      "cache_creation_input_tokens": 5000,
+      "cache_read_input_tokens": 2000
+    }
+  }
+}
+```
+
+### Available Data Fields
+
+**Model Information**:
+
+| Field        | Path                  | Example           |
+| ------------ | --------------------- | ----------------- |
+| Model ID     | `.model.id`           | `claude-opus-4-1` |
+| Display name | `.model.display_name` | `Opus`            |
+
+**Workspace Information**:
+
+| Field             | Path                     | Description               |
+| ----------------- | ------------------------ | ------------------------- |
+| Current directory | `.workspace.current_dir` | Working directory         |
+| Project directory | `.workspace.project_dir` | Original project root     |
+| CWD               | `.cwd`                   | Current working directory |
+
+**Session Information**:
+
+| Field           | Path               | Description               |
+| --------------- | ------------------ | ------------------------- |
+| Session ID      | `.session_id`      | Unique session identifier |
+| Transcript path | `.transcript_path` | Path to conversation file |
+| Version         | `.version`         | Claude Code version       |
+
+**Cost Information**:
+
+| Field          | Path                          | Description        |
+| -------------- | ----------------------------- | ------------------ |
+| Total cost     | `.cost.total_cost_usd`        | USD spent          |
+| Total duration | `.cost.total_duration_ms`     | Wall time (ms)     |
+| API duration   | `.cost.total_api_duration_ms` | API call time (ms) |
+| Lines added    | `.cost.total_lines_added`     | Code lines added   |
+| Lines removed  | `.cost.total_lines_removed`   | Code lines removed |
+
+**Context Window Information**:
+
+| Field         | Path                                   | Description              |
+| ------------- | -------------------------------------- | ------------------------ |
+| Input tokens  | `.context_window.total_input_tokens`   | Total input tokens       |
+| Output tokens | `.context_window.total_output_tokens`  | Total output tokens      |
+| Window size   | `.context_window.context_window_size`  | Max context (200000)     |
+| Used %        | `.context_window.used_percentage`      | Pre-calculated usage     |
+| Remaining %   | `.context_window.remaining_percentage` | Pre-calculated remaining |
+
+**Current Usage** (from last API call, may be null):
+
+| Field          | Path                                                        |
+| -------------- | ----------------------------------------------------------- |
+| Input tokens   | `.context_window.current_usage.input_tokens`                |
+| Output tokens  | `.context_window.current_usage.output_tokens`               |
+| Cache creation | `.context_window.current_usage.cache_creation_input_tokens` |
+| Cache read     | `.context_window.current_usage.cache_read_input_tokens`     |
+
+### Simple Status Line Script
+
+```bash
+#!/bin/bash
+input=$(cat)
+
+MODEL_DISPLAY=$(echo "$input" | jq -r '.model.display_name')
+CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir')
+
+echo "[$MODEL_DISPLAY] 📁 ${CURRENT_DIR##*/}"
+```
+
+### Git-Aware Status Line
+
+```bash
+#!/bin/bash
+input=$(cat)
+
+MODEL_DISPLAY=$(echo "$input" | jq -r '.model.display_name')
+CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir')
+
+GIT_BRANCH=""
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    BRANCH=$(git branch --show-current 2>/dev/null)
+    if [ -n "$BRANCH" ]; then
+        GIT_BRANCH=" | 🌿 $BRANCH"
+    fi
+fi
+
+echo "[$MODEL_DISPLAY] 📁 ${CURRENT_DIR##*/}$GIT_BRANCH"
+```
+
+### Context Window Display
+
+**Simple (pre-calculated)**:
+
+```bash
+#!/bin/bash
+input=$(cat)
+
+MODEL=$(echo "$input" | jq -r '.model.display_name')
+PERCENT_USED=$(echo "$input" | jq -r '.context_window.used_percentage // 0')
+
+echo "[$MODEL] Context: ${PERCENT_USED}%"
+```
+
+**Advanced (manual calculation)**:
+
+```bash
+#!/bin/bash
+input=$(cat)
+
+MODEL=$(echo "$input" | jq -r '.model.display_name')
+CONTEXT_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size')
+USAGE=$(echo "$input" | jq '.context_window.current_usage')
+
+if [ "$USAGE" != "null" ]; then
+    CURRENT_TOKENS=$(echo "$USAGE" | jq '.input_tokens + .cache_creation_input_tokens + .cache_read_input_tokens')
+    PERCENT_USED=$((CURRENT_TOKENS * 100 / CONTEXT_SIZE))
+    echo "[$MODEL] Context: ${PERCENT_USED}%"
+else
+    echo "[$MODEL] Context: 0%"
+fi
+```
+
+### Helper Functions Pattern
+
+```bash
+#!/bin/bash
+input=$(cat)
+
+# Helper functions
+get_model_name() { echo "$input" | jq -r '.model.display_name'; }
+get_current_dir() { echo "$input" | jq -r '.workspace.current_dir'; }
+get_project_dir() { echo "$input" | jq -r '.workspace.project_dir'; }
+get_version() { echo "$input" | jq -r '.version'; }
+get_cost() { echo "$input" | jq -r '.cost.total_cost_usd'; }
+get_duration() { echo "$input" | jq -r '.cost.total_duration_ms'; }
+get_lines_added() { echo "$input" | jq -r '.cost.total_lines_added'; }
+get_lines_removed() { echo "$input" | jq -r '.cost.total_lines_removed'; }
+get_input_tokens() { echo "$input" | jq -r '.context_window.total_input_tokens'; }
+get_output_tokens() { echo "$input" | jq -r '.context_window.total_output_tokens'; }
+get_context_window_size() { echo "$input" | jq -r '.context_window.context_window_size'; }
+
+# Use helpers
+MODEL=$(get_model_name)
+DIR=$(get_current_dir)
+echo "[$MODEL] 📁 ${DIR##*/}"
+```
+
+### Python Status Line
+
+```python
+#!/usr/bin/env python3
+import json
+import sys
+import os
+
+data = json.load(sys.stdin)
+
+model = data['model']['display_name']
+current_dir = os.path.basename(data['workspace']['current_dir'])
+
+git_branch = ""
+if os.path.exists('.git'):
+    try:
+        with open('.git/HEAD', 'r') as f:
+            ref = f.read().strip()
+            if ref.startswith('ref: refs/heads/'):
+                git_branch = f" | 🌿 {ref.replace('ref: refs/heads/', '')}"
+    except:
+        pass
+
+print(f"[{model}] 📁 {current_dir}{git_branch}")
+```
+
+### Node.js Status Line
+
+```javascript
+#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+
+let input = "";
+process.stdin.on("data", (chunk) => (input += chunk));
+process.stdin.on("end", () => {
+  const data = JSON.parse(input);
+
+  const model = data.model.display_name;
+  const currentDir = path.basename(data.workspace.current_dir);
+
+  let gitBranch = "";
+  try {
+    const head = fs.readFileSync(".git/HEAD", "utf8").trim();
+    if (head.startsWith("ref: refs/heads/")) {
+      gitBranch = ` | 🌿 ${head.replace("ref: refs/heads/", "")}`;
+    }
+  } catch (e) {}
+
+  console.log(`[${model}] 📁 ${currentDir}${gitBranch}`);
+});
+```
+
+### ANSI Color Codes
+
+| Color   | Code       | Reset     |
+| ------- | ---------- | --------- |
+| Red     | `\033[31m` | `\033[0m` |
+| Green   | `\033[32m` | `\033[0m` |
+| Yellow  | `\033[33m` | `\033[0m` |
+| Blue    | `\033[34m` | `\033[0m` |
+| Magenta | `\033[35m` | `\033[0m` |
+| Cyan    | `\033[36m` | `\033[0m` |
+| Bold    | `\033[1m`  | `\033[0m` |
+
+**Example with colors**:
+
+```bash
+#!/bin/bash
+input=$(cat)
+MODEL=$(echo "$input" | jq -r '.model.display_name')
+COST=$(echo "$input" | jq -r '.cost.total_cost_usd')
+
+# Color based on cost
+if (( $(echo "$COST > 1" | bc -l) )); then
+    COLOR="\033[31m"  # Red if > $1
+elif (( $(echo "$COST > 0.5" | bc -l) )); then
+    COLOR="\033[33m"  # Yellow if > $0.50
+else
+    COLOR="\033[32m"  # Green otherwise
+fi
+
+echo -e "[$MODEL] ${COLOR}\$${COST}\033[0m"
+```
+
+### Third-Party Tools
+
+**ccstatusline** (sirmalloc):
+
+- Powerline support
+- Themes
+- YAML configuration
+
+**ccstatusline** (syou6162):
+
+- YAML configuration
+- Template syntax
+- Command execution
+
+**ccusage**:
+
+- Usage analysis
+- Status line integration
+
+### Testing Status Line
+
+```bash
+# Test with mock JSON input
+echo '{"model":{"display_name":"Test"},"workspace":{"current_dir":"/test"}}' | ./statusline.sh
+```
+
+### Troubleshooting
+
+| Issue                      | Solution                                    |
+| -------------------------- | ------------------------------------------- |
+| Status line doesn't appear | Check script is executable (`chmod +x`)     |
+| No output                  | Ensure script outputs to stdout, not stderr |
+| JSON parsing fails         | Verify `jq` is installed                    |
+| Colors not working         | Check terminal ANSI support                 |
+
+### DSM Status Line Example
+
+```bash
+#!/bin/bash
+input=$(cat)
+
+# Extract data
+MODEL=$(echo "$input" | jq -r '.model.display_name')
+COST=$(echo "$input" | jq -r '.cost.total_cost_usd')
+PERCENT=$(echo "$input" | jq -r '.context_window.used_percentage // 0')
+DIR=$(echo "$input" | jq -r '.workspace.current_dir')
+
+# Git branch
+BRANCH=""
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    B=$(git branch --show-current 2>/dev/null)
+    [ -n "$B" ] && BRANCH=" 🌿 $B"
+fi
+
+# Format cost
+COST_FMT=$(printf "%.2f" "$COST")
+
+# Color context based on usage
+if (( $(echo "$PERCENT > 80" | bc -l) )); then
+    CTX_COLOR="\033[31m"  # Red
+elif (( $(echo "$PERCENT > 60" | bc -l) )); then
+    CTX_COLOR="\033[33m"  # Yellow
+else
+    CTX_COLOR="\033[32m"  # Green
+fi
+
+echo -e "[$MODEL] 📁 ${DIR##*/}$BRANCH | \$${COST_FMT} | ${CTX_COLOR}${PERCENT}%\033[0m"
+```
+
+**Output**: `[Sonnet] 📁 data-source-manager 🌿 main | $0.55 | 42%`
+
+### Best Practices
+
+| Practice            | Description                |
+| ------------------- | -------------------------- |
+| Keep concise        | Fit on one line            |
+| Use emojis          | Make info scannable        |
+| Use colors          | Highlight important data   |
+| Cache expensive ops | Git status, etc.           |
+| Test manually       | Mock JSON before deploying |
