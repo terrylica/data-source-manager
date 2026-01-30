@@ -10295,3 +10295,356 @@ Savings: (X + Y) * (N - 1) tokens
 5. **Don't re-read files**: One read per file per session
 6. **Use extended thinking wisely**: Toggle off for simple tasks
 7. **Leverage context awareness**: Trust Claude to manage its budget
+
+## Custom Subagent Configuration
+
+### Overview
+
+Subagents are specialized AI assistants that handle specific tasks in isolated context windows. Each subagent has its own system prompt, tool access, and permissions.
+
+### Benefits of Subagents
+
+- **Preserve context**: Keep verbose operations out of main conversation
+- **Enforce constraints**: Limit tools per task type
+- **Control costs**: Route to cheaper models like Haiku
+- **Specialize behavior**: Focused prompts for domains
+
+### Built-in Subagents
+
+| Subagent          | Model   | Tools     | Purpose                       |
+| ----------------- | ------- | --------- | ----------------------------- |
+| Explore           | Haiku   | Read-only | File discovery, code search   |
+| Plan              | Inherit | Read-only | Codebase research for plans   |
+| general-purpose   | Inherit | All       | Complex multi-step operations |
+| Bash              | Inherit | Bash      | Terminal commands             |
+| Claude Code Guide | Haiku   | Read-only | Questions about Claude Code   |
+
+### Subagent File Format
+
+```markdown
+---
+name: code-reviewer
+description: Reviews code for quality and best practices
+tools: Read, Glob, Grep
+model: sonnet
+---
+
+You are a code reviewer. Analyze code and provide
+specific, actionable feedback on quality and security.
+```
+
+### Frontmatter Fields
+
+| Field             | Required | Description                          |
+| ----------------- | -------- | ------------------------------------ |
+| `name`            | Yes      | Lowercase with hyphens               |
+| `description`     | Yes      | When Claude delegates to this agent  |
+| `tools`           | No       | Allowlist (inherits all if omitted)  |
+| `disallowedTools` | No       | Denylist (removed from inherited)    |
+| `model`           | No       | `sonnet`, `opus`, `haiku`, `inherit` |
+| `permissionMode`  | No       | Permission handling mode             |
+| `skills`          | No       | Skills to preload                    |
+| `hooks`           | No       | Lifecycle hooks scoped to agent      |
+
+### Subagent Locations (Priority Order)
+
+| Location            | Scope           | Priority |
+| ------------------- | --------------- | -------- |
+| `--agents` CLI flag | Current session | 1        |
+| `.claude/agents/`   | Current project | 2        |
+| `~/.claude/agents/` | All projects    | 3        |
+| Plugin's `agents/`  | Plugin scope    | 4        |
+
+### Permission Modes
+
+| Mode                | Behavior                           |
+| ------------------- | ---------------------------------- |
+| `default`           | Standard permission checking       |
+| `acceptEdits`       | Auto-accept file edits             |
+| `dontAsk`           | Auto-deny prompts                  |
+| `bypassPermissions` | Skip all checks (use with caution) |
+| `plan`              | Read-only exploration              |
+
+### CLI-Defined Subagents
+
+```bash
+claude --agents '{
+  "fcp-analyzer": {
+    "description": "Analyzes FCP decisions for DSM data sources",
+    "prompt": "You analyze Failover Control Protocol decisions...",
+    "tools": ["Read", "Grep", "Glob"],
+    "model": "sonnet"
+  }
+}'
+```
+
+### Hooks in Subagent Frontmatter
+
+```yaml
+---
+name: db-reader
+description: Execute read-only database queries
+tools: Bash
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/validate-readonly-query.sh"
+---
+```
+
+### Preload Skills into Subagents
+
+```yaml
+---
+name: api-developer
+description: Implement API endpoints following team conventions
+skills:
+  - api-conventions
+  - error-handling-patterns
+---
+```
+
+### Foreground vs Background Execution
+
+| Mode       | Behavior                          | Permissions         |
+| ---------- | --------------------------------- | ------------------- |
+| Foreground | Blocks main conversation          | Interactive prompts |
+| Background | Concurrent (Ctrl+B to background) | Pre-approved only   |
+
+### Parallel Subagent Patterns
+
+**Parallel Exploration**:
+
+```
+Use 4 Explore subagents in parallel to scan different directories:
+- Agent 1: src/core/
+- Agent 2: src/adapters/
+- Agent 3: src/protocols/
+- Agent 4: tests/
+```
+
+**Parallel Code Review**:
+
+```
+Launch parallel reviewers for:
+- Security vulnerabilities
+- Performance issues
+- API consistency
+```
+
+### Context Management
+
+- Subagents have independent 200K context windows
+- Results return to main conversation (be mindful of output size)
+- Auto-compaction at ~95% capacity
+- Resume subagents with agent ID for continued work
+
+### DSM Custom Subagents
+
+```
+.claude/agents/
+├── api-reviewer.md         # Reviews API consistency
+├── data-fetcher.md         # Tests data fetching with FCP
+├── fcp-debugger.md         # Diagnoses FCP issues
+├── silent-failure-hunter.md # Finds bare excepts
+└── test-writer.md          # Writes tests following patterns
+```
+
+**Example: FCP Debugger**
+
+```markdown
+---
+name: fcp-debugger
+description: Diagnoses FCP cache misses and failover issues
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
+
+You are an FCP specialist for data-source-manager.
+
+When invoked:
+
+1. Check cache status with mise run cache:status
+2. Review FCP decision logs
+3. Identify fetch/cache/persist issues
+4. Suggest fixes
+
+FCP Decision Flow:
+
+- FETCH_FRESH: API call required
+- USE_CACHE: Valid cache exists
+- CACHE_STALE: Update needed
+- FAILOVER: Primary failed, try secondary
+```
+
+### Subagent Best Practices
+
+1. **Design focused agents**: One task per subagent
+2. **Limit tool access**: Grant only necessary permissions
+3. **Write detailed descriptions**: Claude uses these for delegation
+4. **Check into version control**: Share project subagents with team
+5. **Use hooks for validation**: Conditional tool restrictions
+
+## Git Worktree Multi-Agent Development
+
+### Overview
+
+Git worktrees enable running multiple Claude sessions simultaneously on different features, each in complete isolation.
+
+### Why Worktrees
+
+| Problem                | Solution                          |
+| ---------------------- | --------------------------------- |
+| One branch at a time   | Multiple checkouts simultaneously |
+| Claude sessions clash  | Complete isolation per feature    |
+| Context pollution      | Fresh context per worktree        |
+| Sequential development | Parallel feature development      |
+
+### Worktree vs Clone
+
+| Approach | Storage     | .git Directory | Branches          |
+| -------- | ----------- | -------------- | ----------------- |
+| Clone    | Full copy   | Duplicated     | Independent repos |
+| Worktree | Shared repo | Single, shared | Same repo         |
+
+### Setup Directory Structure
+
+```
+~/projects/
+├── data-source-manager/        # Main working copy
+├── worktrees/
+│   └── data-source-manager/
+│       ├── feature-fcp-v2/     # Worktree 1
+│       ├── fix-rate-limits/    # Worktree 2
+│       └── refactor-adapters/  # Worktree 3
+```
+
+### Creating Worktrees
+
+```bash
+# From main repo directory
+cd ~/projects/data-source-manager
+
+# Create worktree for new feature
+git worktree add ../worktrees/data-source-manager/feature-fcp-v2 -b feature-fcp-v2
+
+# Create worktree from existing branch
+git worktree add ../worktrees/data-source-manager/fix-rate-limits fix-rate-limits
+
+# List worktrees
+git worktree list
+```
+
+### Launching Parallel Sessions
+
+```bash
+# Terminal 1: Main feature
+cd ~/projects/worktrees/data-source-manager/feature-fcp-v2
+claude
+
+# Terminal 2: Bug fix
+cd ~/projects/worktrees/data-source-manager/fix-rate-limits
+claude
+
+# Terminal 3: Refactoring
+cd ~/projects/worktrees/data-source-manager/refactor-adapters
+claude
+```
+
+### Automation Script
+
+```bash
+#!/bin/bash
+# w - Worktree helper function
+
+w() {
+    local project=$1
+    local branch=$2
+    local cmd=${3:-}
+
+    local worktree_dir="$HOME/projects/worktrees/$project/$branch"
+
+    if [ ! -d "$worktree_dir" ]; then
+        # Create worktree
+        cd "$HOME/projects/$project"
+        git worktree add "$worktree_dir" -b "$branch" 2>/dev/null || \
+        git worktree add "$worktree_dir" "$branch"
+    fi
+
+    if [ "$cmd" = "claude" ]; then
+        cd "$worktree_dir" && claude
+    elif [ -n "$cmd" ]; then
+        cd "$worktree_dir" && $cmd
+    else
+        cd "$worktree_dir"
+    fi
+}
+
+# Usage:
+# w data-source-manager new-feature          # Create and enter
+# w data-source-manager new-feature claude   # Launch Claude
+# w data-source-manager new-feature "git status"
+```
+
+### Worktree + Claude Code Workflow
+
+1. **Initialize worktree** for feature branch
+2. **Launch Claude** in isolated context
+3. **Use Plan Mode** for safe exploration
+4. **Develop in parallel** (7+ concurrent sessions possible)
+5. **Commit within worktree** (Claude can commit/push)
+6. **Merge via PR** when feature complete
+7. **Cleanup worktree** after merge
+
+### Resource Considerations
+
+| Sessions | Memory Impact | Recommendation       |
+| -------- | ------------- | -------------------- |
+| 1-3      | Low           | Standard development |
+| 4-7      | Medium        | Close unused apps    |
+| 8+       | High          | Use ephemeral envs   |
+
+### Cleanup
+
+```bash
+# Remove worktree (keeps branch)
+git worktree remove ../worktrees/data-source-manager/feature-fcp-v2
+
+# Prune stale worktrees
+git worktree prune
+
+# List for cleanup
+git worktree list
+```
+
+### DSM Worktree Patterns
+
+```bash
+# Parallel development scenarios
+
+# Feature: FCP improvements
+w data-source-manager feature/fcp-improvements claude
+
+# Feature: New exchange adapter
+w data-source-manager feature/kraken-adapter claude
+
+# Bugfix: Rate limit handling
+w data-source-manager fix/rate-limit-backoff claude
+
+# Each Claude session has:
+# - Isolated file state
+# - Independent context window
+# - Own commit history
+# - No interference with others
+```
+
+### Best Practices
+
+1. **Use naming conventions**: `feature/`, `fix/`, `refactor/`
+2. **Prune regularly**: Clean up merged branches
+3. **Organize by project**: `worktrees/{project}/{branch}`
+4. **Use Plan Mode**: Safe exploration before changes
+5. **Monitor resources**: Watch memory with many sessions
+6. **Commit frequently**: Each worktree can commit independently
