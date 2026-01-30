@@ -133,18 +133,20 @@ From [Anthropic best practices](https://platform.claude.com/docs/en/agents-and-t
 ### Core Quality
 
 - [x] Descriptions include what skill does AND when to use it
-- [x] SKILL.md body under 500 lines (largest: 150 lines)
+- [x] SKILL.md body under 500 lines (largest: 154 lines)
 - [x] Consistent terminology throughout
 - [x] File references one level deep
 - [x] Third-person descriptions (not "I" or "You")
+- [x] Workflow checklists for complex operations
 
 ### Structure
 
-- [x] CLAUDE.md under 300 lines (currently 283)
+- [x] CLAUDE.md under 300 lines (currently 290)
 - [x] Side-effect commands have `disable-model-invocation: true`
 - [x] Skills have `user-invocable: true` and `$ARGUMENTS`
 - [x] Agents have explicit `tools` field (prevents inheriting all tools)
-- [x] Domain-specific CLAUDE.md files (examples/, tests/) for lazy loading
+- [x] Domain-specific CLAUDE.md files (src/, docs/, examples/, tests/) for lazy loading
+- [x] 5 hooks: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop
 
 ### Testing
 
