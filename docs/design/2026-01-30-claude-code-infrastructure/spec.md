@@ -27035,3 +27035,314 @@ Use descriptive tag names that convey purpose.
 2. **Use modifiers** - "Include as many relevant features as possible"
 3. **Request features explicitly** - Animations, interactivity won't be inferred
 4. **Dial back aggressive language** - "CRITICAL: You MUST" → "Use this when..."
+## Batch Processing and Rate Limits Reference
+
+Reference for Claude API batch processing, rate limits, and cost optimization strategies.
+
+### Rate Limit Types
+
+| Limit Type | Measurement       | Purpose            |
+| ---------- | ----------------- | ------------------ |
+| RPM        | Requests/minute   | API call frequency |
+| ITPM       | Input tokens/min  | Input throughput   |
+| OTPM       | Output tokens/min | Output throughput  |
+| Spend      | $/month           | Monthly cost cap   |
+
+### Usage Tiers
+
+| Tier | Credit Purchase | Max Credit | RPM (Sonnet) | ITPM (Sonnet) | OTPM (Sonnet) |
+| ---- | --------------- | ---------- | ------------ | ------------- | ------------- |
+| 1    | $5              | $100       | 50           | 30,000        | 8,000         |
+| 2    | $40             | $500       | 1,000        | 450,000       | 90,000        |
+| 3    | $200            | $1,000     | 2,000        | 800,000       | 160,000       |
+| 4    | $400            | $5,000     | 4,000        | 2,000,000     | 400,000       |
+
+**Notes**:
+
+- Sonnet 4.x limits apply to combined Sonnet 4 and Sonnet 4.5 traffic
+- Opus 4.x limits apply to combined Opus 4, 4.1, and 4.5 traffic
+- Advance tiers immediately upon reaching credit threshold
+
+### Token Bucket Algorithm
+
+Rate limits use the token bucket algorithm:
+
+- Capacity continuously replenishes up to maximum
+- No fixed reset intervals
+- Short bursts can exceed rate limit
+
+**Example**: 60 RPM may enforce as 1 request/second. Burst of 10 requests at once will hit limit.
+
+### Cache-Aware ITPM
+
+**Only uncached input tokens count toward ITPM** for most models:
+
+| Token Type                    | Counts Toward ITPM |
+| ----------------------------- | ------------------ |
+| `input_tokens`                | Yes                |
+| `cache_creation_input_tokens` | Yes                |
+| `cache_read_input_tokens`     | No (most models)   |
+
+**Effective throughput calculation**:
+
+```
+With 2,000,000 ITPM limit and 80% cache hit rate:
+= 2M uncached + 8M cached = 10M effective tokens/minute
+```
+
+### 429 Error Handling
+
+Rate limit exceeded returns 429 with:
+
+- Error description identifying which limit exceeded
+- `retry-after` header with seconds to wait
+
+**Retry strategy**:
+
+```python
+import time
+import anthropic
+from anthropic import RateLimitError
+
+client = anthropic.Anthropic()
+
+def call_with_retry(prompt, max_retries=5):
+    for attempt in range(max_retries):
+        try:
+            return client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}]
+            )
+        except RateLimitError as e:
+            if attempt == max_retries - 1:
+                raise
+            # Exponential backoff with jitter
+            wait = (2 ** attempt) + random.uniform(0, 1)
+            time.sleep(wait)
+```
+
+### Response Headers
+
+| Header                                   | Description                        |
+| ---------------------------------------- | ---------------------------------- |
+| `retry-after`                            | Seconds to wait before retry       |
+| `anthropic-ratelimit-requests-limit`     | Max requests per period            |
+| `anthropic-ratelimit-requests-remaining` | Requests remaining                 |
+| `anthropic-ratelimit-tokens-limit`       | Max tokens per period              |
+| `anthropic-ratelimit-tokens-remaining`   | Tokens remaining (rounded to 1000) |
+| `anthropic-ratelimit-input-tokens-*`     | Input-specific limits              |
+| `anthropic-ratelimit-output-tokens-*`    | Output-specific limits             |
+
+### Message Batches API
+
+Process large volumes asynchronously with 50% discount on all tokens.
+
+**Batch limits by tier**:
+
+| Tier | RPM   | Max Requests in Queue | Max per Batch |
+| ---- | ----- | --------------------- | ------------- |
+| 1    | 50    | 100,000               | 100,000       |
+| 2    | 1,000 | 200,000               | 100,000       |
+| 3    | 2,000 | 300,000               | 100,000       |
+| 4    | 4,000 | 500,000               | 100,000       |
+
+**Usage**:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+# Create batch
+batch = client.messages.batches.create(
+    requests=[
+        {
+            "custom_id": f"request-{i}",
+            "params": {
+                "model": "claude-sonnet-4-5",
+                "max_tokens": 1024,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+        }
+        for i, prompt in enumerate(prompts)
+    ]
+)
+
+# Check status
+status = client.messages.batches.retrieve(batch.id)
+
+# Get results when complete
+if status.processing_status == "ended":
+    results = client.messages.batches.results(batch.id)
+```
+
+**Key characteristics**:
+
+- Results within 24 hours
+- 50% discount on input and output tokens
+- Can combine with prompt caching for additional savings
+- Maximum 100,000 requests per batch
+
+### Long Context Rate Limits
+
+For 1M token context window (Sonnet 4.x only, Tier 4+):
+
+| Threshold | ITPM      | OTPM    |
+| --------- | --------- | ------- |
+| >200K     | 1,000,000 | 200,000 |
+
+**Note**: Entire request charged at long context rate if >200K tokens.
+
+### Pricing Summary
+
+| Model      | Input ($/M) | Output ($/M) | Batch Input | Batch Output |
+| ---------- | ----------- | ------------ | ----------- | ------------ |
+| Haiku 4.5  | $1          | $5           | $0.50       | $2.50        |
+| Sonnet 4.5 | $3          | $15          | $1.50       | $7.50        |
+| Opus 4.5   | $5          | $25          | $2.50       | $12.50       |
+
+**Prompt caching pricing**:
+
+- Cache write: 1.25x base input price
+- Cache read: 0.1x base input price
+- TTL: 5 minutes (1 hour available)
+
+### Cost Optimization Strategies
+
+#### 1. Prompt Caching
+
+```python
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    system=[
+        {
+            "type": "text",
+            "text": large_system_prompt,
+            "cache_control": {"type": "ephemeral"}
+        }
+    ],
+    messages=[{"role": "user", "content": user_query}]
+)
+```
+
+**Savings**: 90% on repeated content.
+
+#### 2. Batch Processing
+
+- Use for non-urgent workloads
+- 50% savings on all tokens
+- Combine with caching for maximum savings
+
+#### 3. Model Selection
+
+| Use Case               | Recommended Model | Rationale           |
+| ---------------------- | ----------------- | ------------------- |
+| Simple tasks           | Haiku 4.5         | Lowest cost         |
+| Balanced workloads     | Sonnet 4.5        | Cost/capability mix |
+| Complex reasoning      | Opus 4.5          | Best capability     |
+| High-volume processing | Haiku 4.5 + Batch | Cost optimization   |
+
+#### 4. Token Optimization
+
+- Set appropriate `max_tokens` (reduces OTPM estimation)
+- Use prompt caching for repeated system prompts
+- Minimize input by summarizing context
+
+### DSM-Specific Rate Limit Patterns
+
+**FCP with rate limit awareness**:
+
+```python
+from datasourcemanager import DataSourceManager
+
+# DSM handles rate limiting internally via FCP
+dsm = DataSourceManager(
+    failover_enabled=True,
+    rate_limit_cooldown=60,  # seconds
+    max_retries=3
+)
+
+# FCP automatically switches sources on rate limit
+data = dsm.get_ohlcv(
+    symbol="BTCUSDT",
+    interval="1h",
+    limit=1000
+)
+```
+
+**Batch data fetching**:
+
+```python
+# For large historical data requests, use batch mode
+symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+
+# Process in batches to avoid rate limits
+for batch in chunked(symbols, 10):
+    data = dsm.get_multi_symbol_ohlcv(
+        symbols=batch,
+        interval="1h",
+        limit=1000
+    )
+    time.sleep(1)  # Rate limit buffer
+```
+
+**Claude API integration with DSM**:
+
+```python
+import anthropic
+from datasourcemanager import DataSourceManager
+
+client = anthropic.Anthropic()
+dsm = DataSourceManager()
+
+# Cache DSM documentation as system prompt
+dsm_docs = dsm.get_documentation()
+
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=4096,
+    system=[
+        {
+            "type": "text",
+            "text": dsm_docs,
+            "cache_control": {"type": "ephemeral"}
+        }
+    ],
+    messages=[{"role": "user", "content": "Analyze BTCUSDT patterns"}]
+)
+```
+
+### Monitoring Rate Limits
+
+**Console monitoring**:
+
+- View usage on Claude Console Usage page
+- Rate limit charts show:
+  - Hourly max uncached input tokens/minute
+  - Current rate limit
+  - Cache rate percentage
+
+**Programmatic monitoring**:
+
+```python
+# Check headers after each request
+response = client.messages.create(...)
+
+remaining = response.headers.get("anthropic-ratelimit-tokens-remaining")
+reset = response.headers.get("anthropic-ratelimit-tokens-reset")
+
+if int(remaining) < 10000:
+    print(f"Low tokens remaining, reset at {reset}")
+```
+
+### Workspace Rate Limits
+
+Organizations can set per-workspace limits:
+
+- Protects workspaces from overuse by others
+- Cannot exceed organization limit
+- Default workspace cannot have custom limits
+
+**Example**: Organization has 40,000 ITPM, limit workspace A to 30,000 ITPM, leaving 10,000+ for other workspaces.
