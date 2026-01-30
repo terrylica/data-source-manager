@@ -16622,3 +16622,339 @@ Provide the symbol (e.g., BTCUSDT) and I'll analyze the FCP state.
   }
 }
 ```
+---
+
+## Context Engineering Reference
+
+Optimize context usage for efficient Claude Code sessions.
+
+### Context Hierarchy
+
+Three-tier memory hierarchy with intelligent retrieval:
+
+| Level | Location | Scope | Persistence |
+|-------|----------|-------|-------------|
+| User | `~/.claude/CLAUDE.md` | All projects | Permanent |
+| Project | `./CLAUDE.md` | Current repo | Permanent |
+| Dynamic | `@imports`, Skills | On-demand | Session |
+
+**Loading priority**:
+
+1. User CLAUDE.md (global settings)
+2. Project CLAUDE.md (repo-specific)
+3. Subdirectory CLAUDE.md files (auto-discovered)
+4. Dynamic imports via `@file` syntax
+5. Skills loaded on invocation
+
+### Just-In-Time (JIT) Loading
+
+Load context only when needed, not upfront:
+
+**Skills as JIT context**:
+
+```markdown
+---
+
+name: fcp-debugging
+description: Debug FCP cache behavior
+
+---
+
+# Loaded only when skill is invoked
+
+````
+
+**@ imports for on-demand loading**:
+
+```markdown
+## References
+- @references/api-docs.md  # Loaded when referenced
+- @examples/usage.md       # Not loaded until needed
+````
+
+**Benefits**:
+
+- Reduces initial context consumption
+- Keeps main conversation lean
+- Loads specialized knowledge when relevant
+
+### Subagent Context Isolation
+
+Subagents run in separate context windows:
+
+```yaml
+---
+name: code-reviewer
+description: Reviews code for quality
+tools: Read, Grep, Glob
+model: haiku
+---
+```
+
+**Why use subagents**:
+
+- Heavy operations stay isolated
+- Verbose output doesn't pollute main context
+- Only summary returns to parent
+- Parallel research without context collision
+
+**Built-in subagents**:
+
+| Subagent        | Model   | Tools     | Purpose                         |
+| --------------- | ------- | --------- | ------------------------------- |
+| Explore         | Haiku   | Read-only | File discovery, codebase search |
+| Plan            | Inherit | Read-only | Research for planning           |
+| General-purpose | Inherit | All       | Complex multi-step tasks        |
+
+### Compaction Strategies
+
+**Auto-compaction** triggers at ~75-95% capacity:
+
+```bash
+# Override auto-compaction threshold
+export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50  # Trigger at 50%
+```
+
+**Manual compaction**:
+
+```bash
+/compact              # Compact current conversation
+/compact --aggressive # More aggressive summarization
+```
+
+**Compaction best practices**:
+
+- Compact before starting new major tasks
+- Use subagents for verbose operations
+- Clear between unrelated work sessions
+- Monitor with `/stats` command
+
+### Context Window Management
+
+**80% rule**: Keep context below 80% for optimal quality.
+
+**Monitor context**:
+
+```bash
+/stats    # View token usage statistics
+/context  # Check current context state
+```
+
+**Reduce context consumption**:
+
+1. Use subagents for exploration
+2. Delegate tests to subagents
+3. Clear with `/clear` between tasks
+4. Use skills instead of inline instructions
+5. Keep CLAUDE.md concise (<300 lines)
+
+### Subagent Configuration
+
+**Full configuration options**:
+
+```yaml
+---
+name: db-reader
+description: Execute read-only database queries
+tools: Bash, Read
+disallowedTools: Write, Edit
+model: sonnet
+permissionMode: default
+skills:
+  - sql-best-practices
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/validate-readonly.sh"
+---
+You are a database analyst with read-only access.
+Execute SELECT queries to answer questions about data.
+```
+
+**Frontmatter fields**:
+
+| Field             | Required | Description                                            |
+| ----------------- | -------- | ------------------------------------------------------ |
+| `name`            | Yes      | Unique identifier (kebab-case)                         |
+| `description`     | Yes      | When to delegate to this agent                         |
+| `tools`           | No       | Allowed tools (inherits all if omitted)                |
+| `disallowedTools` | No       | Tools to deny                                          |
+| `model`           | No       | sonnet, opus, haiku, or inherit                        |
+| `permissionMode`  | No       | default, acceptEdits, dontAsk, bypassPermissions, plan |
+| `skills`          | No       | Skills to preload                                      |
+| `hooks`           | No       | Lifecycle hooks                                        |
+
+### Model Selection for Subagents
+
+| Model   | Best For                        | Token Cost |
+| ------- | ------------------------------- | ---------- |
+| Haiku   | Fast searches, simple analysis  | Lowest     |
+| Sonnet  | Balanced capability/speed       | Medium     |
+| Opus    | Complex reasoning, architecture | Highest    |
+| Inherit | Match parent conversation       | Varies     |
+
+**Cost optimization pattern**:
+
+```yaml
+# Use Haiku for exploration (fast, cheap)
+---
+name: file-finder
+model: haiku
+tools: Read, Glob, Grep
+---
+# Use Sonnet for analysis (balanced)
+---
+name: code-analyzer
+model: sonnet
+tools: Read, Grep
+---
+# Use Opus for architecture (capable)
+---
+name: architect
+model: opus
+tools: Read, Grep, Glob, Task
+---
+```
+
+### Subagent Patterns
+
+**Isolate high-volume operations**:
+
+```
+Use a subagent to run the test suite and report only failing tests
+```
+
+**Parallel research**:
+
+```
+Research authentication, database, and API modules in parallel using separate subagents
+```
+
+**Chained subagents**:
+
+```
+Use code-reviewer to find issues, then optimizer to fix them
+```
+
+### Background vs Foreground
+
+**Foreground** (default):
+
+- Blocks main conversation
+- Permission prompts pass through
+- Use for interactive tasks
+
+**Background**:
+
+- Runs concurrently
+- Pre-approves permissions upfront
+- No interactive prompts
+- Resume if fails
+
+```bash
+# Disable background tasks
+export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1
+```
+
+**Run in background**: Press Ctrl+B or ask Claude.
+
+### Subagent Resumption
+
+Subagents persist independently of main conversation:
+
+```
+Use code-reviewer to review auth module
+[Agent completes]
+
+Continue that code review for authorization logic
+[Claude resumes with full context]
+```
+
+**Transcript location**: `~/.claude/projects/{project}/{sessionId}/subagents/agent-{id}.jsonl`
+
+### Permission Modes
+
+| Mode                | Behavior                    |
+| ------------------- | --------------------------- |
+| `default`           | Standard prompts            |
+| `acceptEdits`       | Auto-accept file edits      |
+| `dontAsk`           | Auto-deny prompts           |
+| `bypassPermissions` | Skip all checks (dangerous) |
+| `plan`              | Read-only exploration       |
+
+### Preload Skills
+
+Inject skill content into subagent context:
+
+```yaml
+---
+name: api-developer
+description: Implement API endpoints
+skills:
+  - api-conventions
+  - error-handling-patterns
+---
+```
+
+Skills are fully loaded at startup, not just available for invocation.
+
+### Disable Subagents
+
+In settings.json:
+
+```json
+{
+  "permissions": {
+    "deny": ["Task(Explore)", "Task(my-custom-agent)"]
+  }
+}
+```
+
+Or via CLI:
+
+```bash
+claude --disallowedTools "Task(Explore)"
+```
+
+### DSM Context Engineering
+
+**CLAUDE.md optimization** (keep <300 lines):
+
+```markdown
+# DSM Quick Reference
+
+## Commands
+
+- `uv run pytest tests/unit/`
+- `mise run cache:clear`
+
+## Key Patterns
+
+- FCP: See @.claude/rules/fcp-protocol.md
+- Timestamps: UTC with timezone.utc
+- DataFrames: Polars, not pandas
+```
+
+**DSM subagent configuration**:
+
+```yaml
+---
+name: fcp-validator
+description: Validate FCP cache behavior
+tools: Read, Grep, Glob, Bash
+model: haiku
+skills:
+  - fcp-protocol
+---
+Check FCP cache state and return summary.
+Only report anomalies, not full cache contents.
+```
+
+**DSM context patterns**:
+
+1. Use `@.claude/rules/fcp-protocol.md` for FCP details
+2. Keep OHLCV schema in skills, not CLAUDE.md
+3. Delegate cache inspection to subagents
+4. Use Explore for codebase questions
