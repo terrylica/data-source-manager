@@ -438,4 +438,4 @@ DSM_LOG_LEVEL=DEBUG python examples/dsm_logging_demo.py --test-dsm
 
 ## License
 
-Proprietary - See [LICENSE](LICENSE) file for details.
+MIT License - See [LICENSE](LICENSE) file for details.
