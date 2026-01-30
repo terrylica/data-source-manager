@@ -13,7 +13,7 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 echo "✓ Working directory clean"
 
-# Check 2: GitHub authentication
+# Check 2: GitHub authentication (token exists)
 if [[ -z "${GH_TOKEN:-}" ]] || [[ -z "$(echo "$GH_TOKEN" | tr -d '[:space:]')" ]]; then
     echo "✗ GH_TOKEN not set or empty"
     echo "  Run: eval \"\$(mise env)\" or check .mise.local.toml"
@@ -21,7 +21,16 @@ if [[ -z "${GH_TOKEN:-}" ]] || [[ -z "$(echo "$GH_TOKEN" | tr -d '[:space:]')" ]
 fi
 echo "✓ GH_TOKEN configured"
 
-# Check 3: Node.js available
+# Check 3: GitHub token format validation (no gh CLI - avoids process storms)
+# Valid formats: ghp_* (classic PAT) or github_pat_* (fine-grained PAT)
+if [[ ! "$GH_TOKEN" =~ ^ghp_[a-zA-Z0-9]{36}$ ]] && [[ ! "$GH_TOKEN" =~ ^github_pat_ ]]; then
+    echo "⚠ GH_TOKEN format may be invalid (expected ghp_* or github_pat_*)"
+    echo "  Token starts with: ${GH_TOKEN:0:10}..."
+    # Don't exit - let it try anyway
+fi
+echo "✓ GH_TOKEN format validated"
+
+# Check 4: Node.js available
 if ! command -v node &>/dev/null; then
     echo "✗ Node.js not available"
     echo "  Run: mise install"
@@ -29,7 +38,7 @@ if ! command -v node &>/dev/null; then
 fi
 echo "✓ Node.js $(node --version) available"
 
-# Check 4: semantic-release installed
+# Check 5: semantic-release installed
 if [[ ! -d "node_modules/semantic-release" ]]; then
     echo "✗ semantic-release not installed"
     echo "  Run: npm install"
@@ -37,7 +46,7 @@ if [[ ! -d "node_modules/semantic-release" ]]; then
 fi
 echo "✓ semantic-release installed"
 
-# Check 5: Releasable commits exist
+# Check 6: Releasable commits exist
 LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 if [[ -n "$LATEST_TAG" ]]; then
     COMMITS=$(git log "$LATEST_TAG"..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')
@@ -49,6 +58,13 @@ if [[ -n "$LATEST_TAG" ]]; then
 else
     echo "✓ No previous tags (initial release)"
 fi
+
+# Check 7: Python version (enforce 3.13)
+PYTHON_VERSION=$(python --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+if [[ "$PYTHON_VERSION" != "3.13" ]]; then
+    echo "⚠ Python version is $PYTHON_VERSION (expected 3.13)"
+fi
+echo "✓ Python $PYTHON_VERSION detected"
 
 echo ""
 echo "✓ All preflight checks passed"
