@@ -3299,6 +3299,197 @@ Note: Increases context usage since browser tools always loaded.
 | Visible window    | No headless mode              |
 | Modal blocking    | JS alerts pause commands      |
 
+## SDK & Programmatic Usage
+
+Run Claude Code programmatically from CLI, Python, or TypeScript.
+
+### SDK Options
+
+| Interface  | Use Case                      |
+| ---------- | ----------------------------- |
+| CLI (`-p`) | Scripts, CI/CD, automation    |
+| Python SDK | Native integration, callbacks |
+| TypeScript | Node.js apps, web services    |
+
+### Basic Headless Mode
+
+```bash
+# Single query
+claude -p "What does the auth module do?"
+
+# With tool permissions
+claude -p "Fix the bug in auth.py" --allowedTools "Read,Edit,Bash"
+```
+
+### Structured Output
+
+```bash
+# JSON output with metadata
+claude -p "Summarize project" --output-format json
+
+# JSON Schema validation
+claude -p "Extract function names" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}}}'
+```
+
+### Parse with jq
+
+```bash
+# Extract text result
+claude -p "Summarize" --output-format json | jq -r '.result'
+
+# Extract structured output
+claude -p "Extract names" --output-format json --json-schema '...' | jq '.structured_output'
+```
+
+### Auto-Approve Tools
+
+```bash
+# Allow specific tools without prompting
+claude -p "Run tests and fix failures" --allowedTools "Bash,Read,Edit"
+
+# Permission rule syntax with wildcards
+claude -p "Create commit" --allowedTools "Bash(git diff *),Bash(git commit *)"
+```
+
+### Continue Conversations
+
+```bash
+# Continue most recent
+claude -p "Review codebase"
+claude -p "Focus on database queries" --continue
+
+# Resume by session ID
+session_id=$(claude -p "Start review" --output-format json | jq -r '.session_id')
+claude -p "Continue review" --resume "$session_id"
+```
+
+### Custom System Prompts
+
+```bash
+# Append to default (preserves Claude Code behavior)
+gh pr diff "$1" | claude -p \
+  --append-system-prompt "You are a security engineer. Review for vulnerabilities."
+
+# Replace entire prompt
+claude -p "Query" --system-prompt "You are a Python expert"
+```
+
+### Limits and Budget
+
+```bash
+# Set spending limit
+claude -p "Complex task" --max-budget-usd 5.00
+
+# Limit agentic turns
+claude -p "Task" --max-turns 10
+```
+
+### DSM Programmatic Examples
+
+```bash
+# Analyze FCP cache
+claude -p "Analyze FCP cache hits for BTCUSDT last 7 days" \
+  --allowedTools "Read,Bash(uv run *)" \
+  --output-format json > fcp-analysis.json
+
+# CI integration
+claude -p "Run pytest and fix failures" \
+  --allowedTools "Bash(uv run pytest *),Read,Edit" \
+  --max-turns 5
+```
+
+## Prompt Caching Optimization
+
+Optimize cost and latency with automatic prompt caching.
+
+### How Caching Works
+
+Claude Code automatically enables prompt caching:
+
+1. Static content (tools, instructions) cached at prompt start
+2. Cache TTL: 5 minutes
+3. Subsequent requests reuse cached prefix
+4. Monitor with `/cost` command
+
+### Cost Savings
+
+| Operation   | Cost vs Base      |
+| ----------- | ----------------- |
+| Cache write | 125% (base + 25%) |
+| Cache read  | 10% of base       |
+| No cache    | 100% (base price) |
+
+Potential savings: Up to 90% on repeated prompts.
+
+### Minimum Cache Sizes
+
+| Model Family      | Min Tokens |
+| ----------------- | ---------- |
+| Claude Opus 4.x   | 1024       |
+| Claude Sonnet 4.x | 1024       |
+| Claude Haiku 3.5  | 2048       |
+
+### Cache Optimization Strategies
+
+| Strategy                  | Benefit                       |
+| ------------------------- | ----------------------------- |
+| Static content first      | Maximizes cacheable prefix    |
+| Tool definitions early    | Tools cached across requests  |
+| System instructions start | Instructions cached           |
+| Context before queries    | Context reused for follow-ups |
+
+### MCP and Caching
+
+MCP servers benefit significantly from caching:
+
+- Complex tool schemas cached
+- External knowledge cached
+- Reduces context reprocessing
+
+### Cache Breakpoints
+
+Mark cacheable sections with `cache_control`:
+
+```json
+{
+  "type": "text",
+  "text": "...",
+  "cache_control": { "type": "ephemeral" }
+}
+```
+
+### Latency Reduction
+
+Cache hits reduce latency by up to 85% by avoiding:
+
+- Token processing for cached content
+- Re-embedding of static context
+- Repeated tool schema parsing
+
+### DSM Caching Considerations
+
+| Content             | Caching Value                |
+| ------------------- | ---------------------------- |
+| FCP protocol docs   | High - static, reused often  |
+| Symbol format rules | High - static reference      |
+| DataFrame schemas   | Medium - varies by operation |
+| Error hierarchy     | High - stable, referenced    |
+| Rate limit configs  | Low - may change frequently  |
+
+### Monitoring Cache Performance
+
+```bash
+# Check token usage and cache stats
+> /cost
+
+# Output includes:
+# - Input tokens (cached vs uncached)
+# - Cache write/read costs
+# - Total session cost
+```
+
 ## Verification Checklist
 
 ### Infrastructure
