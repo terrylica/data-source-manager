@@ -141,6 +141,15 @@ echo "Valid market types: SPOT, FUTURES_USDT, FUTURES_COIN"
 """
 
 #
+# === CLAUDE CODE INFRASTRUCTURE TASKS ===
+#
+
+[tasks."claude:validate"]
+description = "Validate Claude Code infrastructure setup"
+run = "uv run -p 3.13 python docs/skills/dsm-usage/scripts/validate_infrastructure.py"
+sources = [".claude/**/*.md", "docs/skills/*/SKILL.md", "CLAUDE.md"]
+
+#
 # === QUICK CHECK TASKS ===
 #
 
@@ -206,6 +215,9 @@ echo "  mise run fcp:validate   # Validate symbol format"
 echo ""
 echo "Quick Checks:"
 echo "  mise run quick          # Quick validation (lint+test+import)"
+echo ""
+echo "Claude Code Infrastructure:"
+echo "  mise run claude:validate  # Validate Claude Code setup"
 echo ""
 echo "Release (see .mise/tasks/release/):
 echo "  mise run release:preflight  # Validate prerequisites"

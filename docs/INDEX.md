@@ -85,6 +85,8 @@ See [itp:adr-graph-easy-architect](https://github.com/terrylica/cc-skills) for d
 
 Claude Code extensions for AI-assisted development. See [.claude/](/.claude/) directory.
 
+**Reference**: [settings.md](/.claude/settings.md) - Human-readable settings documentation
+
 ### Skills
 
 Progressive disclosure for detailed guidance. Each has a SKILL.md with YAML frontmatter.
