@@ -9964,3 +9964,334 @@ Use: /compact Preserve FCP context, symbol formats, and error patterns
 3. **Monitor /context regularly**: Stay below 70%
 4. **Let server clear tool results**: Don't fight it
 5. **Design for compaction**: Commit decisions to files/tasks
+
+## Batch Processing API
+
+### Overview
+
+The Message Batches API enables large-scale asynchronous processing at 50% cost savings. Process up to 100,000 requests per batch with most completing within 1 hour.
+
+### When to Use Batch Processing
+
+- Large-scale evaluations (thousands of test cases)
+- Content moderation (user-generated content analysis)
+- Data analysis (dataset insights/summaries)
+- Bulk content generation (product descriptions)
+
+### Batch Limits
+
+| Limit               | Value                       |
+| ------------------- | --------------------------- |
+| Max requests        | 100,000 per batch           |
+| Max size            | 256 MB per batch            |
+| Processing time     | Up to 24 hours              |
+| Results available   | 29 days after creation      |
+| Workspace isolation | Batches scoped to workspace |
+
+### Batch Pricing (50% Discount)
+
+| Model             | Batch Input  | Batch Output  |
+| ----------------- | ------------ | ------------- |
+| Claude Opus 4.5   | $2.50 / MTok | $12.50 / MTok |
+| Claude Sonnet 4.5 | $1.50 / MTok | $7.50 / MTok  |
+| Claude Haiku 4.5  | $0.50 / MTok | $2.50 / MTok  |
+
+### Creating a Batch (Python)
+
+```python
+import anthropic
+from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
+from anthropic.types.messages.batch_create_params import Request
+
+client = anthropic.Anthropic()
+
+message_batch = client.messages.batches.create(
+    requests=[
+        Request(
+            custom_id="dsm-eval-001",
+            params=MessageCreateParamsNonStreaming(
+                model="claude-sonnet-4-5",
+                max_tokens=1024,
+                messages=[{
+                    "role": "user",
+                    "content": "Analyze this market data pattern..."
+                }]
+            )
+        ),
+        Request(
+            custom_id="dsm-eval-002",
+            params=MessageCreateParamsNonStreaming(
+                model="claude-sonnet-4-5",
+                max_tokens=1024,
+                messages=[{
+                    "role": "user",
+                    "content": "Evaluate this FCP decision..."
+                }]
+            )
+        )
+    ]
+)
+print(f"Batch ID: {message_batch.id}")
+```
+
+### Polling for Completion
+
+```python
+import time
+
+while True:
+    batch = client.messages.batches.retrieve(batch_id)
+    if batch.processing_status == "ended":
+        break
+    print(f"Processing: {batch.request_counts.processing} remaining")
+    time.sleep(60)
+```
+
+### Retrieving Results
+
+```python
+for result in client.messages.batches.results(batch_id):
+    match result.result.type:
+        case "succeeded":
+            print(f"✓ {result.custom_id}: {result.result.message.content}")
+        case "errored":
+            print(f"✗ {result.custom_id}: {result.result.error}")
+        case "expired":
+            print(f"⏰ {result.custom_id}: Request expired")
+        case "canceled":
+            print(f"⊘ {result.custom_id}: Canceled")
+```
+
+### Result Types
+
+| Type        | Description                      | Billed |
+| ----------- | -------------------------------- | ------ |
+| `succeeded` | Request completed successfully   | Yes    |
+| `errored`   | Validation or server error       | No     |
+| `canceled`  | Batch canceled before processing | No     |
+| `expired`   | 24-hour limit reached            | No     |
+
+### Prompt Caching with Batches
+
+Combine batch processing with prompt caching for maximum savings:
+
+```python
+requests = [
+    Request(
+        custom_id=f"analysis-{i}",
+        params=MessageCreateParamsNonStreaming(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            system=[
+                {"type": "text", "text": "You analyze market data patterns."},
+                {
+                    "type": "text",
+                    "text": large_reference_document,  # Shared context
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=[{"role": "user", "content": f"Analyze pattern {i}"}]
+        )
+    )
+    for i in range(1000)
+]
+```
+
+**Cache hit rates**: 30-98% depending on traffic patterns. Use 1-hour cache duration for batches.
+
+### Batch Best Practices
+
+1. **Test with Messages API first**: Validate request shape before batching
+2. **Use meaningful custom_ids**: Match results to requests (order not guaranteed)
+3. **Break large datasets**: Multiple smaller batches for manageability
+4. **Handle all result types**: Implement retry logic for errors
+5. **Monitor request_counts**: Track succeeded/errored/expired ratios
+
+### DSM Batch Use Cases
+
+```python
+# Example: Batch evaluation of FCP decisions
+requests = []
+for symbol in symbols:
+    for scenario in scenarios:
+        requests.append(Request(
+            custom_id=f"{symbol}-{scenario}",
+            params=MessageCreateParamsNonStreaming(
+                model="claude-sonnet-4-5",
+                max_tokens=2048,
+                system=[{
+                    "type": "text",
+                    "text": dsm_fcp_context,  # FCP protocol reference
+                    "cache_control": {"type": "ephemeral"}
+                }],
+                messages=[{
+                    "role": "user",
+                    "content": f"Evaluate FCP for {symbol} under {scenario}"
+                }]
+            )
+        ))
+
+batch = client.messages.batches.create(requests=requests)
+```
+
+## Context Window Management
+
+### Overview
+
+Claude's context window is the "working memory" for conversations. Understanding and managing context is critical for effective AI-assisted development.
+
+### Context Window Sizes
+
+| Model             | Standard    | Extended (Beta) |
+| ----------------- | ----------- | --------------- |
+| Claude Opus 4.5   | 200K tokens | -               |
+| Claude Sonnet 4.5 | 200K tokens | 1M tokens       |
+| Claude Sonnet 4   | 200K tokens | 1M tokens       |
+| Claude Haiku 4.5  | 200K tokens | -               |
+
+### Token Composition
+
+```
+Context Window = Input Tokens + Output Tokens
+
+Input Tokens:
+- System prompt (CLAUDE.md, rules, MCP tools)
+- Conversation history
+- Tool results
+- File contents read
+
+Output Tokens:
+- Claude's responses
+- Extended thinking (if enabled)
+- Tool use requests
+```
+
+### Extended Thinking Token Management
+
+When using extended thinking, thinking tokens:
+
+- Count toward context window during generation
+- Are **automatically stripped** from subsequent turns
+- Are billed as output tokens only once
+
+```
+Turn 1: Input(10K) + Thinking(50K) + Output(5K) = 65K total
+Turn 2: Input(15K) + Thinking(stripped) + Output(3K) = 18K (not 68K)
+```
+
+### 1M Context Window (Beta)
+
+Available for Sonnet 4/4.5 in usage tier 4:
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic()
+
+response = client.beta.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=4096,
+    messages=[{"role": "user", "content": large_codebase_analysis}],
+    betas=["context-1m-2025-08-07"]
+)
+```
+
+**1M Context Pricing**:
+
+- Requests >200K tokens: 2x input, 1.5x output pricing
+- Dedicated rate limits apply
+
+### Context Awareness (Claude 4.5)
+
+Claude Sonnet 4.5 and Haiku 4.5 track remaining context:
+
+```
+Start: <budget:token_budget>200000</budget:token_budget>
+After tools: <system_warning>Token usage: 35000/200000; 165000 remaining</system_warning>
+```
+
+Benefits:
+
+- Better long-running session management
+- More effective multi-window workflows
+- Precise token budget utilization
+
+### Context Optimization Strategies
+
+**1. Monitor Usage**
+
+```bash
+/context    # Show current token usage
+/cost       # Show cost breakdown
+```
+
+**2. Manage MCP Servers**
+
+```
+Linear MCP: ~14K tokens (7% of 200K)
+GitHub MCP: ~8K tokens
+Docs MCP: ~5K tokens
+
+Strategy: Disable unused MCPs during implementation
+```
+
+**3. Phase-Based Server Loading**
+
+| Phase          | MCP Servers          |
+| -------------- | -------------------- |
+| Planning       | Linear, GitHub, Docs |
+| Implementation | Code-related only    |
+| Review         | Re-enable as needed  |
+
+**4. CLAUDE.md Optimization**
+
+```markdown
+# Bad: Bloated CLAUDE.md
+
+@docs/entire-api-reference.md # 50K tokens embedded
+
+# Good: On-demand loading
+
+See: docs/api/ for API reference # Load only when needed
+```
+
+**5. Subagent Delegation**
+
+```
+Main window: Complex task requires (X + Y + Z) * N tokens
+Subagent: Processes (X + Y) * N, returns only Z tokens
+
+Savings: (X + Y) * (N - 1) tokens
+```
+
+### DSM Context Strategy
+
+```markdown
+# In CLAUDE.md
+
+## Context Guidelines
+
+1. Start sessions with /clear for fresh context
+2. Use /context after reading large files
+3. Delegate verbose operations to subagents
+4. Compact at 70% with: /compact Preserve FCP, symbols, errors
+5. Disable unused MCP servers during implementation
+
+## Token-Heavy Operations
+
+| Operation           | Tokens | Strategy              |
+| ------------------- | ------ | --------------------- |
+| Full codebase scan  | 100K+  | Use Explore subagent  |
+| Test suite analysis | 50K+   | Use test-writer agent |
+| API reference       | 30K+   | Load on demand        |
+```
+
+### Context Window Best Practices
+
+1. **Clear between tasks**: `/clear` for fresh context
+2. **Monitor at 70%**: Proactive management prevents issues
+3. **Delegate verbose ops**: Subagents return summaries only
+4. **Disable unused MCPs**: Reclaim 10-20K tokens
+5. **Don't re-read files**: One read per file per session
+6. **Use extended thinking wisely**: Toggle off for simple tasks
+7. **Leverage context awareness**: Trust Claude to manage its budget
