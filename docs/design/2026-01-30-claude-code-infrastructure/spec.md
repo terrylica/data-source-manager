@@ -39931,3 +39931,287 @@ data with a cache miss, then cache hit on retry.
 | Other Chromium browsers           | Not supported |
 | WSL (Windows Subsystem for Linux) | Not supported |
 | Headless mode                     | Not supported |
+## IDE Integration Reference
+
+Integrate Claude Code with VS Code and JetBrains IDEs for native coding assistance with inline diffs, context sharing, and keyboard shortcuts.
+
+### VS Code Extension
+
+The VS Code extension provides a native graphical interface for Claude Code directly in your IDE.
+
+#### Prerequisites
+
+| Requirement       | Version                                       |
+| ----------------- | --------------------------------------------- |
+| VS Code           | Recent version (check extension requirements) |
+| Anthropic account | Pro, Team, or Enterprise                      |
+
+#### Installation
+
+Install from VS Code:
+
+1. Press `Cmd+Shift+X` (Mac) / `Ctrl+Shift+X` (Windows/Linux)
+2. Search "Claude Code"
+3. Click **Install**
+
+Or install directly: [VS Code Marketplace](vscode:extension/anthropic.claude-code)
+
+#### Key Features
+
+| Feature                | Description                                     |
+| ---------------------- | ----------------------------------------------- |
+| Sidebar panel          | Dedicated chat panel with conversation history  |
+| Inline diffs           | Side-by-side comparison of proposed changes     |
+| Plan review            | Review and edit Claude's plans before accepting |
+| Auto-accept            | Make edits without asking permission            |
+| @-mentions             | Reference files with specific line ranges       |
+| Multiple conversations | Open tabs or windows for parallel work          |
+
+#### Opening Claude Code
+
+| Method          | Action                                 |
+| --------------- | -------------------------------------- |
+| Editor Toolbar  | Click Spark icon (top-right of editor) |
+| Status Bar      | Click "✱ Claude Code" (bottom-right)   |
+| Command Palette | `Cmd+Shift+P` → "Claude Code"          |
+
+#### Keyboard Shortcuts
+
+| Command          | Mac             | Windows/Linux    | Description                             |
+| ---------------- | --------------- | ---------------- | --------------------------------------- |
+| Focus Input      | `Cmd+Esc`       | `Ctrl+Esc`       | Toggle focus between editor and Claude  |
+| Open in New Tab  | `Cmd+Shift+Esc` | `Ctrl+Shift+Esc` | Open new conversation as tab            |
+| New Conversation | `Cmd+N`         | `Ctrl+N`         | Start new conversation (Claude focused) |
+| Insert @-Mention | `Option+K`      | `Alt+K`          | Insert file path and line numbers       |
+
+#### @-Mentions and File References
+
+```
+> Explain the logic in @auth (fuzzy matches auth.js, AuthService.ts)
+> What's in @src/components/ (trailing slash for folders)
+> Fix the bug in @app.ts#5-10 (specific line range)
+```
+
+Claude automatically sees selected text. Press `Option+K` / `Alt+K` to insert @-mention.
+
+#### Permission Modes
+
+| Mode               | Behavior                            |
+| ------------------ | ----------------------------------- |
+| Default            | Ask permission for each action      |
+| Plan               | Describe actions, wait for approval |
+| Auto-accept        | Make edits without asking           |
+| Bypass permissions | Skip all prompts (use with caution) |
+
+Set default in VS Code settings: `claudeCode.initialPermissionMode`
+
+#### Extension Settings
+
+| Setting                 | Default   | Description                              |
+| ----------------------- | --------- | ---------------------------------------- |
+| `selectedModel`         | `default` | Model for new conversations              |
+| `useTerminal`           | `false`   | Terminal mode instead of graphical panel |
+| `initialPermissionMode` | `default` | Approval behavior                        |
+| `preferredLocation`     | `panel`   | Where Claude opens: sidebar or panel     |
+| `autosave`              | `true`    | Auto-save before reads/writes            |
+| `respectGitIgnore`      | `true`    | Exclude .gitignore patterns              |
+
+#### Checkpoints in VS Code
+
+Hover over any message to reveal rewind button:
+
+- **Fork conversation from here**: New branch, keep code changes
+- **Rewind code to here**: Revert files, keep conversation
+- **Fork and rewind**: New branch, revert files
+
+#### CLI Integration
+
+The extension includes the CLI. Run `claude` in VS Code's integrated terminal for advanced features.
+
+| Feature             | CLI | Extension                |
+| ------------------- | --- | ------------------------ |
+| All commands/skills | Yes | Subset (type `/` to see) |
+| MCP server config   | Yes | No (configure via CLI)   |
+| Checkpoints         | Yes | Yes                      |
+| `!` bash shortcut   | Yes | No                       |
+| Tab completion      | Yes | No                       |
+
+### JetBrains Plugin
+
+Claude Code integrates with JetBrains IDEs through a dedicated plugin.
+
+#### Supported IDEs
+
+- IntelliJ IDEA
+- PyCharm
+- Android Studio
+- WebStorm
+- PhpStorm
+- GoLand
+
+#### Installation
+
+1. Install from [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/27310-claude-code-beta-)
+2. Restart IDE
+3. Install Claude Code CLI separately (see quickstart guide)
+
+#### Features
+
+| Feature            | Description                            |
+| ------------------ | -------------------------------------- |
+| Quick launch       | Open Claude Code from editor           |
+| Diff viewing       | Changes in IDE diff viewer             |
+| Selection context  | Current selection shared automatically |
+| File references    | Insert @File#L1-99 references          |
+| Diagnostic sharing | Lint/syntax errors shared with Claude  |
+
+#### Keyboard Shortcuts
+
+| Action         | Mac            | Windows/Linux |
+| -------------- | -------------- | ------------- |
+| Quick launch   | `Cmd+Esc`      | `Ctrl+Esc`    |
+| File reference | `Cmd+Option+K` | `Alt+Ctrl+K`  |
+
+#### Plugin Settings
+
+Go to **Settings → Tools → Claude Code [Beta]**:
+
+| Setting                    | Description                                         |
+| -------------------------- | --------------------------------------------------- |
+| Claude command             | Custom command path (e.g., `/usr/local/bin/claude`) |
+| Suppress notification      | Skip "command not found" notifications              |
+| Option+Enter for multiline | Insert newlines in prompts (macOS)                  |
+| Automatic updates          | Check for plugin updates                            |
+
+**WSL users**: Set `wsl -d Ubuntu -- bash -lic "claude"` as Claude command.
+
+#### ESC Key Configuration
+
+If ESC doesn't interrupt Claude in JetBrains terminals:
+
+1. Go to **Settings → Tools → Terminal**
+2. Uncheck "Move focus to the editor with Escape"
+3. Or: Click "Configure terminal keybindings" → Delete "Switch focus to Editor"
+
+#### Remote Development
+
+Install plugin on remote host via **Settings → Plugin (Host)**, not local client.
+
+#### Usage
+
+**From IDE terminal**:
+
+```bash
+claude
+```
+
+All integration features active.
+
+**From external terminal**:
+
+```bash
+claude
+> /ide
+```
+
+Connects Claude Code to JetBrains IDE.
+
+### VS Code vs JetBrains Comparison
+
+| Aspect             | VS Code Extension      | JetBrains Plugin         |
+| ------------------ | ---------------------- | ------------------------ |
+| Interface          | Native graphical panel | CLI with IDE diff viewer |
+| Inline diffs       | Yes (sidebar panel)    | Yes (IDE diff viewer)    |
+| Plan review        | Visual editing         | CLI-based                |
+| Selection context  | Automatic              | Automatic                |
+| Diagnostic sharing | Yes                    | Yes                      |
+| File references    | Yes                    | Yes                      |
+| MCP config         | Via CLI                | Via CLI                  |
+
+### Context Sharing
+
+Both IDEs automatically share:
+
+- Current file
+- Selected code
+- Diagnostic errors (lint, syntax)
+- Open tabs
+
+This reduces context switching and lets Claude understand your current work.
+
+### Security Considerations
+
+With auto-edit permissions enabled, Claude Code can modify IDE configuration files that may be automatically executed:
+
+- `settings.json` (VS Code)
+- `tasks.json` (VS Code)
+- IDE config files (JetBrains)
+
+**Recommendations**:
+
+- Use manual approval mode for edits
+- Enable Restricted Mode for untrusted workspaces (VS Code)
+- Review changes carefully before accepting
+- Use trusted prompts only
+
+### DSM-Specific IDE Patterns
+
+IDE integration for data-source-manager development.
+
+#### VS Code Settings
+
+```json
+{
+  "claudeCode.initialPermissionMode": "default",
+  "claudeCode.respectGitIgnore": true,
+  "claudeCode.autosave": true
+}
+```
+
+#### PyCharm Configuration
+
+1. Install Claude Code plugin
+2. Set Claude command: `uv run claude` (uses project Python)
+3. Configure ESC key for terminal interrupts
+
+#### Common Workflows
+
+**FCP Debugging with Context**:
+
+```
+> Look at @src/data_source_manager/fcp.py#100-150 and explain
+> the cache invalidation logic. The current selection shows
+> where I'm seeing unexpected behavior.
+```
+
+**Test Development**:
+
+```
+> Generate tests for @src/data_source_manager/sources/binance.py
+> following the patterns in @tests/unit/test_binance_source.py
+```
+
+**Code Review with Diagnostics**:
+
+```
+> Review the current file. The diagnostics show type errors
+> that need fixing.
+```
+
+### Troubleshooting
+
+#### VS Code Issues
+
+| Issue                   | Solution                                 |
+| ----------------------- | ---------------------------------------- |
+| Extension won't install | Check VS Code version meets requirements |
+| Spark icon not visible  | Open a file; check Restricted Mode       |
+| No response             | Check internet; try CLI for details      |
+
+#### JetBrains Issues
+
+| Issue              | Solution                           |
+| ------------------ | ---------------------------------- |
+| Plugin not working | Run from project root; restart IDE |
+| IDE not detected   | Check plugin enabled; restart      |
+| Command not found  | Configure Claude command path      |
