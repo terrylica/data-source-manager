@@ -33189,3 +33189,248 @@ Ensure symbols follow market-specific formats:
 - Binance spot: `BTCUSDT`
 - Binance futures: `BTCUSDT` (perp) or `BTCUSDT_241227` (delivery)
 - OKX: `BTC-USDT`, `BTC-USDT-SWAP`
+## Extended Thinking Reference
+
+### Overview
+
+Extended thinking allows Claude to work through complex problems step-by-step, improving performance on difficult tasks. Developers can toggle this mode and set a "thinking budget" to control reasoning tokens before the answer.
+
+### When to Use Extended Thinking
+
+| Use Case                | Benefit                                 |
+| ----------------------- | --------------------------------------- |
+| Complex STEM problems   | Build mental models, sequential logic   |
+| Constraint optimization | Satisfy multiple competing requirements |
+| Multi-step reasoning    | Work through intricate dependencies     |
+| Thinking frameworks     | Follow explicit methodology             |
+| Debugging logic         | Inspect reasoning process               |
+
+### Budget Tokens
+
+| Setting                | Value                                 |
+| ---------------------- | ------------------------------------- |
+| Minimum budget         | 1,024 tokens                          |
+| Recommended start      | 1,024 tokens (increase incrementally) |
+| Default in Claude Code | 31,999 tokens (sweet spot)            |
+| Batch processing       | Recommended for budgets above 32K     |
+
+**Best practice:** Start with minimum budget and increase based on task complexity. Higher token counts allow more comprehensive reasoning but may have diminishing returns.
+
+The thinking budget is a target, not strict limit - actual usage varies by task.
+
+### Streaming Requirements
+
+Streaming is required when `max_tokens > 21,333`.
+
+When streaming with thinking enabled:
+
+- Handle both thinking and text content blocks as they arrive
+- Text may arrive in larger chunks alternating with smaller, token-by-token delivery
+- This is expected behavior for optimal performance
+
+### Prompting Techniques
+
+#### Use General Instructions First
+
+**Instead of:**
+
+```
+Think through this math problem step by step:
+1. First, identify the variables
+2. Then, set up the equation
+3. Next, solve for x
+...
+```
+
+**Prefer:**
+
+```
+Please think about this math problem thoroughly and in great detail.
+Consider multiple approaches and show your complete reasoning.
+Try different methods if your first approach doesn't work.
+```
+
+Claude often performs better with high-level instructions rather than step-by-step prescriptive guidance. The model's creativity may exceed human ability to prescribe optimal thinking.
+
+#### Multishot Prompting
+
+Works well with extended thinking. Use XML tags like `<thinking>` or `<scratchpad>` to show canonical thinking patterns in examples:
+
+```
+I'm going to show you how to solve a math problem, then solve a similar one.
+
+Problem 1: What is 15% of 80?
+
+<thinking>
+To find 15% of 80:
+1. Convert 15% to a decimal: 15% = 0.15
+2. Multiply: 0.15 × 80 = 12
+</thinking>
+
+The answer is 12.
+
+Now solve this one:
+Problem 2: What is 35% of 240?
+```
+
+#### Reflection and Verification
+
+Ask Claude to verify work before completing:
+
+```
+Write a function to calculate factorial of a number.
+Before you finish, please verify your solution with test cases for:
+- n=0
+- n=1
+- n=5
+- n=10
+And fix any issues you find.
+```
+
+### Tool Use with Extended Thinking
+
+| Constraint            | Details                                    |
+| --------------------- | ------------------------------------------ |
+| Supported tool_choice | `any` only                                 |
+| Not supported         | Specific tool, `auto`, other values        |
+| Thinking blocks       | Pass back unmodified for continuity        |
+| Interleaved thinking  | Claude 4 models only, requires beta header |
+
+During tool use, you must pass thinking blocks back to the API for the last assistant message. Include the complete unmodified block to maintain reasoning continuity.
+
+**Beta header for interleaved thinking:** `interleaved-thinking-2025-05-14`
+
+### Limitations
+
+| Feature                  | Status                            |
+| ------------------------ | --------------------------------- |
+| Temperature modification | Not compatible                    |
+| top_k modification       | Not compatible                    |
+| top_p                    | Values between 1 and 0.95 only    |
+| Response prefilling      | Not allowed with thinking enabled |
+| Forced tool use          | Not compatible                    |
+
+**Note:** Previous thinking blocks are automatically ignored by the API and not included in context usage calculation.
+
+### Best Practices
+
+1. **Start small, increase incrementally** - Begin with minimum 1,024 tokens, increase based on task needs
+
+2. **Use general instructions** - Let Claude determine optimal thinking approach
+
+3. **Don't pass thinking back** - Passing thinking output in user text doesn't improve performance and may degrade results
+
+4. **Don't manually modify** - Changing output after thinking block causes model confusion
+
+5. **Request clean output** - If Claude repeats thinking in output, instruct it to only output the answer
+
+6. **Use batch for 32K+** - Batch processing avoids networking issues for high budgets
+
+7. **English for thinking** - Extended thinking performs best in English (final output can be any language)
+
+### Complex Use Cases
+
+#### Complex STEM Problems
+
+```
+Write a Python script for a bouncing yellow ball within a tesseract,
+making sure to handle collision detection properly.
+Make the tesseract slowly rotate.
+Make sure the ball stays within the tesseract.
+```
+
+4D visualization makes good use of extended thinking time.
+
+#### Constraint Optimization
+
+```
+Plan a 7-day trip to Japan with the following constraints:
+- Budget of $2,500
+- Must include Tokyo and Kyoto
+- Need to accommodate a vegetarian diet
+- Preference for cultural experiences over shopping
+- Must include one day of hiking
+- No more than 2 hours of travel between locations per day
+- Need free time each afternoon for calls back home
+- Must avoid crowds where possible
+```
+
+Multiple constraints benefit from longer reasoning time.
+
+#### Thinking Frameworks
+
+```
+Develop a comprehensive strategy for Microsoft entering
+the personalized medicine market by 2027.
+
+Begin with:
+1. A Blue Ocean Strategy canvas
+2. Apply Porter's Five Forces to identify competitive pressures
+
+Next, conduct a scenario planning exercise with four
+distinct futures based on regulatory and technological variables.
+
+For each scenario:
+- Develop strategic responses using the Ansoff Matrix
+
+Finally, apply the Three Horizons framework to:
+- Map the transition pathway
+- Identify potential disruptive innovations at each stage
+```
+
+Multiple frameworks naturally increase thinking time.
+
+### DSM Extended Thinking Patterns
+
+**FCP decision analysis:**
+
+```
+Analyze the FCP (Failover Control Protocol) behavior for this data source.
+Think through:
+- What triggers would cause a failover?
+- What are the timeout thresholds?
+- How does cache state affect decisions?
+- What edge cases could cause unexpected behavior?
+
+Consider multiple failure scenarios before recommending improvements.
+```
+
+**DataFrame transformation planning:**
+
+```
+I need to transform this OHLCV data from Binance format to our internal format.
+Think through the transformation thoroughly:
+- What columns need renaming?
+- What timestamp conversions are required?
+- What validation should occur?
+- What edge cases could cause data loss?
+
+Verify your transformation preserves all data integrity.
+```
+
+**Data source integration design:**
+
+```
+Design the integration for a new data source: Kraken.
+Think deeply about:
+- Symbol format mapping (Kraken vs internal)
+- Rate limit handling
+- Error recovery patterns
+- Cache strategy
+
+Consider how this fits with existing FCP patterns before implementing.
+```
+
+### Alternative: Chain-of-Thought Without Thinking Mode
+
+If thinking budget below 1,024 is needed, use standard mode with XML tags:
+
+```
+<thinking>
+Let me work through this step by step...
+</thinking>
+
+[Answer here]
+```
+
+This gives similar reasoning benefits without the thinking budget overhead.
