@@ -4542,6 +4542,109 @@ If DSM becomes a monorepo:
 | @dsm/cli       | CLI commands, arguments   |
 | @dsm/mcp       | MCP server implementation |
 
+## Codebase Exploration & Semantic Search
+
+Natural language queries for understanding and navigating codebases.
+
+### Built-in Exploration
+
+Claude Code understands codebase structure natively:
+
+```
+> Give me an overview of this codebase
+> Explain the main architecture patterns used here
+> What are the key data models?
+> How is authentication handled?
+```
+
+### Explore Subagent
+
+Use the Explore subagent for efficient search:
+
+```
+> Use the Explore subagent to find all error handling code
+```
+
+Benefits:
+
+- Powered by Haiku (fast, efficient)
+- Saves main conversation context
+- Reports findings only
+
+### Semantic Search MCP
+
+Enhance search with semantic MCP plugins:
+
+```json
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["@zilliztech/claude-context", "--index", "."]
+    }
+  }
+}
+```
+
+Features:
+
+- Hybrid search (BM25 + dense vector)
+- Semantic code understanding
+- Million-line codebase support
+
+### Local Semantic Search
+
+For no-API-cost option:
+
+```json
+{
+  "mcpServers": {
+    "context-local": {
+      "command": "npx",
+      "args": ["claude-context-local"]
+    }
+  }
+}
+```
+
+Uses local embeddings with Google's EmbeddingGemma.
+
+### Query Patterns
+
+| Query Type   | Example                                  |
+| ------------ | ---------------------------------------- |
+| Architecture | "How does data flow through the system?" |
+| Dependencies | "What does X depend on?"                 |
+| Usage        | "Where is function Y called?"            |
+| Patterns     | "What patterns are used for caching?"    |
+| Changes      | "What would I need to change to add Z?"  |
+
+### Exploration Workflow
+
+1. **Start broad**: "Give me an overview of this codebase"
+2. **Narrow down**: "Explain the authentication module"
+3. **Deep dive**: "How does token refresh work?"
+4. **Find code**: "Show me where tokens are validated"
+
+### DSM Exploration Examples
+
+| Query                              | Purpose                   |
+| ---------------------------------- | ------------------------- |
+| "How does FCP decide to fetch?"    | Understand caching logic  |
+| "Where are symbols validated?"     | Find validation code      |
+| "What happens on rate limit?"      | Trace error handling      |
+| "How are DataFrames constructed?"  | Understand data pipeline  |
+| "Where is the Binance API called?" | Find provider integration |
+
+### Indexing for Large Codebases
+
+For codebases over 100k LOC:
+
+1. Pre-index with semantic search MCP
+2. Use hybrid search (keyword + semantic)
+3. Focus queries on specific domains
+4. Leverage CLAUDE.md hierarchy
+
 ## Verification Checklist
 
 ### Infrastructure
