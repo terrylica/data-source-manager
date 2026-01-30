@@ -11034,3 +11034,475 @@ class ResilientDataFetcher:
 5. **Monitor metrics**: Track failure rates and circuit state
 6. **Test failure modes**: Simulate failures in tests
 7. **Configure per-service**: Different services need different thresholds
+
+## Hooks Lifecycle Reference
+
+### Overview
+
+Hooks are shell commands that execute at specific lifecycle events in Claude Code. They enable automation, validation, and context injection.
+
+### Hook Events
+
+| Hook                 | When It Fires                   | Matcher    |
+| -------------------- | ------------------------------- | ---------- |
+| `SessionStart`       | Session begins or resumes       | source     |
+| `UserPromptSubmit`   | User submits a prompt           | No         |
+| `PreToolUse`         | Before tool execution           | Tool name  |
+| `PermissionRequest`  | When permission dialog appears  | Tool name  |
+| `PostToolUse`        | After tool succeeds             | Tool name  |
+| `PostToolUseFailure` | After tool fails                | Tool name  |
+| `SubagentStart`      | When spawning a subagent        | Agent name |
+| `SubagentStop`       | When subagent finishes          | Agent name |
+| `Stop`               | Claude finishes responding      | No         |
+| `PreCompact`         | Before context compaction       | trigger    |
+| `Setup`              | With --init/--maintenance flags | trigger    |
+| `SessionEnd`         | Session terminates              | reason     |
+| `Notification`       | Claude sends notifications      | type       |
+
+### Configuration Format
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/validate-bash.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Matcher Syntax
+
+| Matcher         | Matches                |
+| --------------- | ---------------------- |
+| `"Write"`       | Exactly the Write tool |
+| `"Edit\|Write"` | Edit OR Write (regex)  |
+| `"Notebook.*"`  | All Notebook tools     |
+| `"*"` or `""`   | All tools              |
+| `"mcp__.*"`     | All MCP tools          |
+
+### Exit Codes
+
+| Exit Code | Behavior                                 |
+| --------- | ---------------------------------------- |
+| 0         | Success, stdout shown in verbose mode    |
+| 2         | Blocking error, stderr shown to Claude   |
+| Other     | Non-blocking error, stderr shown to user |
+
+### Exit Code 2 Behavior by Event
+
+| Event               | Exit Code 2 Effect                  |
+| ------------------- | ----------------------------------- |
+| `PreToolUse`        | Blocks tool call, stderr to Claude  |
+| `PermissionRequest` | Denies permission, stderr to Claude |
+| `PostToolUse`       | Shows stderr to Claude (tool ran)   |
+| `UserPromptSubmit`  | Blocks prompt, erases it            |
+| `Stop`              | Blocks stoppage, stderr to Claude   |
+| `SubagentStop`      | Blocks stoppage, stderr to subagent |
+
+### Hook Input JSON
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "~/.claude/projects/.../session.jsonl",
+  "cwd": "/Users/...",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "npm run test",
+    "description": "Run tests"
+  },
+  "tool_use_id": "toolu_01ABC123..."
+}
+```
+
+### JSON Output (Advanced)
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "permissionDecisionReason": "Auto-approved npm command",
+    "updatedInput": {
+      "command": "npm run test --coverage"
+    },
+    "additionalContext": "Running in CI environment"
+  }
+}
+```
+
+### Permission Decisions
+
+| Decision  | Effect                                  |
+| --------- | --------------------------------------- |
+| `"allow"` | Bypass permission, auto-approve         |
+| `"deny"`  | Block tool call, reason shown to Claude |
+| `"ask"`   | Show permission dialog to user          |
+
+### Environment Variables
+
+| Variable             | Description                    |
+| -------------------- | ------------------------------ |
+| `CLAUDE_PROJECT_DIR` | Project root directory         |
+| `CLAUDE_PLUGIN_ROOT` | Plugin directory (for plugins) |
+| `CLAUDE_ENV_FILE`    | File for persisting env vars   |
+| `CLAUDE_CODE_REMOTE` | "true" in web, empty in CLI    |
+
+### SessionStart with Environment
+
+```bash
+#!/bin/bash
+# Persist environment variables for the session
+
+if [ -n "$CLAUDE_ENV_FILE" ]; then
+  echo 'export NODE_ENV=production' >> "$CLAUDE_ENV_FILE"
+  echo 'export DEBUG=dsm:*' >> "$CLAUDE_ENV_FILE"
+fi
+
+# Add context for Claude
+echo "Session started at $(date)"
+exit 0
+```
+
+### Prompt-Based Hooks
+
+Use LLM evaluation instead of bash:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Evaluate if Claude should stop. Context: $ARGUMENTS. Check if all tasks are complete. Return {\"ok\": true} or {\"ok\": false, \"reason\": \"...\"}",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### DSM Hook Examples
+
+**PreToolUse: Block dangerous commands**
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-bash-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**PostToolUse: Detect silent failures**
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-code-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**SessionStart: Load FCP context**
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-session-start.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Settings Configuration Reference
+
+### Settings File Hierarchy
+
+| Scope   | Location                           | Audience         | Shared |
+| ------- | ---------------------------------- | ---------------- | ------ |
+| Managed | `/Library/.../ClaudeCode/` (macOS) | All users        | IT     |
+| User    | `~/.claude/settings.json`          | Personal         | No     |
+| Project | `.claude/settings.json`            | Team             | Git    |
+| Local   | `.claude/settings.local.json`      | Personal/project | No     |
+
+### Precedence Order (Highest First)
+
+1. Managed settings
+2. Command-line arguments
+3. Local project settings
+4. Shared project settings
+5. User settings
+
+### Permission Rules
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(uv run *)", "Bash(mise run *)", "Bash(git commit *)"],
+    "ask": ["Bash(git push *)"],
+    "deny": [
+      "Bash(pip install *)",
+      "Bash(sudo *)",
+      "Read(.env*)",
+      "Read(**/.env)"
+    ]
+  }
+}
+```
+
+### Rule Evaluation Order
+
+1. **Deny** rules checked first (always take precedence)
+2. **Ask** rules checked second
+3. **Allow** rules checked last
+
+### Bash Wildcards
+
+| Pattern             | Matches                           |
+| ------------------- | --------------------------------- |
+| `Bash(npm run *)`   | npm run test, npm run build       |
+| `Bash(git * main)`  | git merge main, git rebase main   |
+| `Bash(* --version)` | ls --version, git --version       |
+| `Bash(ls *)`        | ls -la (NOT lsof - space matters) |
+| `Bash(ls*)`         | ls, lsof, ls-files                |
+
+### Read/Write Patterns
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(**/*.key)",
+      "Read(**/node_modules/**)"
+    ]
+  }
+}
+```
+
+### Complete Settings Example
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(mise run *)",
+      "Bash(git commit *)",
+      "Bash(git add *)"
+    ],
+    "ask": ["Bash(git push *)"],
+    "deny": [
+      "Bash(pip install *)",
+      "Bash(python3.14 *)",
+      "Bash(rm -rf *)",
+      "Read(.env*)",
+      "Read(**/.secrets/**)"
+    ],
+    "additionalDirectories": ["../shared-libs/"],
+    "defaultMode": "acceptEdits"
+  },
+  "env": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "UV_PYTHON": "3.13"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-bash-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-code-guard.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "model": "claude-sonnet-4-5",
+  "cleanupPeriodDays": 30,
+  "respectGitignore": true
+}
+```
+
+### Key Settings
+
+| Setting                        | Purpose                              |
+| ------------------------------ | ------------------------------------ |
+| `permissions`                  | Allow/deny/ask rules                 |
+| `env`                          | Environment variables                |
+| `hooks`                        | Lifecycle hooks                      |
+| `model`                        | Default model override               |
+| `cleanupPeriodDays`            | Session cleanup period               |
+| `additionalDirectories`        | Extra allowed directories            |
+| `respectGitignore`             | Honor .gitignore in file picker      |
+| `disableBypassPermissionsMode` | Block --dangerously-skip-permissions |
+
+### Environment Variables
+
+| Variable                          | Purpose                  |
+| --------------------------------- | ------------------------ |
+| `ANTHROPIC_API_KEY`               | API key                  |
+| `ANTHROPIC_MODEL`                 | Override default model   |
+| `CLAUDE_CODE_USE_BEDROCK`         | Use AWS Bedrock          |
+| `CLAUDE_CODE_USE_VERTEX`          | Use Google Vertex AI     |
+| `MAX_THINKING_TOKENS`             | Extended thinking budget |
+| `BASH_DEFAULT_TIMEOUT_MS`         | Default bash timeout     |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | Auto-compact threshold   |
+| `DISABLE_PROMPT_CACHING`          | Disable caching          |
+
+### MCP Server Configuration
+
+**User-level** (`~/.claude.json`):
+
+```json
+{
+  "mcp_servers": {
+    "memory": {
+      "command": "npx",
+      "args": ["mcp-server-memory"]
+    }
+  }
+}
+```
+
+**Project-level** (`.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "..." }
+    }
+  }
+}
+```
+
+### DSM Settings Configuration
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(mise run *)",
+      "Bash(pytest *)",
+      "Bash(git commit *)",
+      "Bash(git add *)"
+    ],
+    "ask": ["Bash(git push *)"],
+    "deny": [
+      "Bash(pip install *)",
+      "Bash(python3.14 *)",
+      "Bash(python3.12 *)",
+      "Bash(rm -rf cache/)",
+      "Read(.env*)",
+      "Read(.mise.local.toml)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-session-start.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-bash-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-code-guard.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dsm-final-check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
