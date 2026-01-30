@@ -4,6 +4,7 @@ description: Use proactively after writing or modifying code. Reviews code chang
 tools: Read, Grep, Glob
 model: sonnet
 permissionMode: plan
+color: red
 skills:
   - dsm-usage
 ---

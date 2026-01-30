@@ -3,6 +3,7 @@ name: fcp-debugger
 description: Use when debugging Failover Control Protocol issues - empty DataFrames, unexpected data sources, cache misses, Vision API failures, or REST fallback behavior.
 tools: Read, Grep, Glob, Bash
 model: sonnet
+color: yellow
 skills:
   - dsm-fcp-monitor
   - dsm-usage

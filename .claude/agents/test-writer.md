@@ -3,6 +3,7 @@ name: test-writer
 description: Use proactively after implementing new features. Writes and improves unit tests for DataSourceManager with proper mocking, coverage analysis, and test isolation.
 tools: Read, Bash, Grep, Glob
 model: sonnet
+color: blue
 skills:
   - dsm-testing
 ---

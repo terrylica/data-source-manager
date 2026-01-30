@@ -16,13 +16,13 @@ This directory contains Claude Code extensions for AI-assisted development of da
 
 Agents run in separate context windows for specialized tasks.
 
-| Agent                 | Purpose                                | Tools                         |
-| --------------------- | -------------------------------------- | ----------------------------- |
-| api-reviewer          | Reviews code for API consistency       | Read, Grep, Glob              |
-| data-fetcher          | Fetches data with proper FCP handling  | Read, Grep, Glob, Bash        |
-| test-writer           | Writes tests following DSM patterns    | Read, Grep, Glob, Edit, Write |
-| silent-failure-hunter | Finds silent failures and bare excepts | Read, Grep, Glob              |
-| fcp-debugger          | Diagnoses FCP issues                   | Read, Grep, Glob, Bash        |
+| Agent                 | Color  | Purpose                                | Tools                  |
+| --------------------- | ------ | -------------------------------------- | ---------------------- |
+| api-reviewer          | red    | Reviews code for API consistency       | Read, Grep, Glob       |
+| data-fetcher          | green  | Fetches data with proper FCP handling  | Read, Grep, Glob, Bash |
+| test-writer           | blue   | Writes tests following DSM patterns    | Read, Bash, Grep, Glob |
+| silent-failure-hunter | red    | Finds silent failures and bare excepts | Read, Grep, Glob       |
+| fcp-debugger          | yellow | Diagnoses FCP issues                   | Read, Grep, Glob, Bash |
 
 **Usage:**
 
@@ -67,6 +67,7 @@ Project-specific hooks for code quality and safety.
 | dsm-skill-suggest.sh | UserPromptSubmit | Suggest relevant skills based on keywords  |
 | dsm-bash-guard.sh    | PreToolUse       | Block dangerous commands before execution  |
 | dsm-code-guard.sh    | PostToolUse      | Detect silent failure patterns (11 checks) |
+| dsm-final-check.sh   | Stop             | Final validation at session end            |
 
 **Blocked by PreToolUse:**
 

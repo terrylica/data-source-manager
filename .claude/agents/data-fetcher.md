@@ -3,6 +3,7 @@ name: data-fetcher
 description: Use proactively for data validation tasks. Fetches and validates market data using DataSourceManager, checks for gaps, duplicates, and timestamp consistency.
 tools: Read, Bash, Grep, Glob
 model: sonnet
+color: green
 skills:
   - dsm-usage
 ---

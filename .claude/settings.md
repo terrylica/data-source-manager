@@ -15,13 +15,13 @@ This project uses Claude Code extensions for AI-assisted development:
 
 ### Agents
 
-| Agent                 | Model  | Tools                  | Trigger Keywords                     |
+| Agent                 | Color  | Tools                  | Trigger Keywords                     |
 | --------------------- | ------ | ---------------------- | ------------------------------------ |
-| api-reviewer          | sonnet | Read, Grep, Glob       | "review", "API", "consistency"       |
-| data-fetcher          | sonnet | Read, Grep, Glob, Bash | "fetch", "data", "market"            |
-| fcp-debugger          | sonnet | Read, Grep, Glob, Bash | "FCP", "failover", "cache miss"      |
-| silent-failure-hunter | sonnet | Read, Grep, Glob       | "silent", "except", "error handling" |
-| test-writer           | sonnet | Read, Grep, Glob, Edit | "test", "pytest", "coverage"         |
+| api-reviewer          | red    | Read, Grep, Glob       | "review", "API", "consistency"       |
+| data-fetcher          | green  | Read, Grep, Glob, Bash | "fetch", "data", "market"            |
+| fcp-debugger          | yellow | Read, Grep, Glob, Bash | "FCP", "failover", "cache miss"      |
+| silent-failure-hunter | red    | Read, Grep, Glob       | "silent", "except", "error handling" |
+| test-writer           | blue   | Read, Bash, Grep, Glob | "test", "pytest", "coverage"         |
 
 ### Commands
 
@@ -52,12 +52,12 @@ Claude loads these rules on demand based on context:
 
 ### Skills (in docs/skills/)
 
-| Skill           | Context | Agent   | Purpose                        |
-| --------------- | ------- | ------- | ------------------------------ |
-| dsm-usage       | -       | -       | DataSourceManager API guide    |
-| dsm-testing     | -       | -       | Testing patterns and pytest    |
-| dsm-research    | fork    | Explore | Codebase research (subagent)   |
-| dsm-fcp-monitor | -       | -       | FCP monitoring and diagnostics |
+| Skill           | Context | Agent   | allowed-tools          | Purpose                        |
+| --------------- | ------- | ------- | ---------------------- | ------------------------------ |
+| dsm-usage       | -       | -       | Read, Bash             | DataSourceManager API guide    |
+| dsm-testing     | -       | -       | Read, Bash, Grep, Glob | Testing patterns and pytest    |
+| dsm-research    | fork    | Explore | (agent's tools)        | Codebase research (subagent)   |
+| dsm-fcp-monitor | fork    | -       | Read, Bash, Grep, Glob | FCP monitoring and diagnostics |
 
 ## Hooks Configuration
 
@@ -66,15 +66,30 @@ Project hooks are in `.claude/hooks/hooks.json`:
 ```json
 {
   "hooks": {
+    "UserPromptSubmit": [
+      { "matcher": ".*", "hooks": [{ "command": "dsm-skill-suggest.sh" }] }
+    ],
     "PreToolUse": [
       { "matcher": "Bash", "hooks": [{ "command": "dsm-bash-guard.sh" }] }
     ],
     "PostToolUse": [
       { "matcher": "Write|Edit", "hooks": [{ "command": "dsm-code-guard.sh" }] }
-    ]
+    ],
+    "Stop": [{ "hooks": [{ "command": "dsm-final-check.sh" }] }]
   }
 }
 ```
+
+### Skill Suggest (UserPromptSubmit)
+
+The `dsm-skill-suggest.sh` hook provides suggestions based on prompt keywords:
+
+| Keyword             | Suggested Skill  |
+| ------------------- | ---------------- |
+| fetch, data, klines | /dsm-usage       |
+| test, pytest, mock  | /dsm-testing     |
+| FCP, cache miss     | /dsm-fcp-monitor |
+| how does, explore   | /dsm-research    |
 
 ### Bash Guard (PreToolUse)
 
@@ -125,7 +140,7 @@ From [Anthropic best practices](https://platform.claude.com/docs/en/agents-and-t
 
 ### Structure
 
-- [x] CLAUDE.md under 300 lines (currently 247)
+- [x] CLAUDE.md under 300 lines (currently 283)
 - [x] Side-effect commands have `disable-model-invocation: true`
 - [x] Skills have `user-invocable: true` and `$ARGUMENTS`
 - [x] Agents have explicit `tools` field (prevents inheriting all tools)

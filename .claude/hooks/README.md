@@ -118,6 +118,19 @@ The hooks are configured in `hooks.json`:
 
 Following [cc-skills Code Correctness Policy](https://github.com/terrylica/cc-skills/blob/main/plugins/itp-hooks/CLAUDE.md#code-correctness-philosophy)
 
+### dsm-final-check.sh (Stop)
+
+Runs final validation when Claude Code session ends or task completes.
+
+**Checks Performed:**
+
+| Check        | Purpose                               |
+| ------------ | ------------------------------------- |
+| Import check | Verify `DataSourceManager` importable |
+| Lint check   | Report silent failure patterns        |
+
+**Behavior**: Provides summary via feedback (non-blocking).
+
 ## Related
 
 - [Hooks Reference](https://code.claude.com/docs/en/hooks)

@@ -37,6 +37,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_ROOT}/.claude/hooks/dsm-final-check.sh",
+            "timeout": 10000
+          }
+        ]
+      }
     ]
   }
 }

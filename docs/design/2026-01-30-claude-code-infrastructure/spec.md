@@ -76,6 +76,7 @@ description: Use proactively when [trigger]. Performs [task].
 tools: Read, Grep, Glob, Bash
 model: sonnet
 permissionMode: plan # Optional: plan, default, acceptEdits, dontAsk
+color: red # Optional: visual identifier (red, green, blue, yellow)
 skills: # Optional: preload skills into agent context
   - dsm-usage
   - dsm-testing
@@ -84,13 +85,13 @@ skills: # Optional: preload skills into agent context
 
 ### Agent Features
 
-| Agent                 | Read | Grep | Glob | Bash | Mode | Skills       |
-| --------------------- | ---- | ---- | ---- | ---- | ---- | ------------ |
-| api-reviewer          | ✓    | ✓    | ✓    | -    | plan | dsm-usage    |
-| data-fetcher          | ✓    | ✓    | ✓    | ✓    | -    | dsm-usage    |
-| fcp-debugger          | ✓    | ✓    | ✓    | ✓    | -    | dsm-fcp, dsm |
-| silent-failure-hunter | ✓    | ✓    | ✓    | -    | plan | dsm-usage    |
-| test-writer           | ✓    | ✓    | ✓    | ✓    | -    | dsm-testing  |
+| Agent                 | Color  | Tools              | Mode | Skills       |
+| --------------------- | ------ | ------------------ | ---- | ------------ |
+| api-reviewer          | red    | Read, Grep, Glob   | plan | dsm-usage    |
+| data-fetcher          | green  | Read, Grep, Glob,B | -    | dsm-usage    |
+| fcp-debugger          | yellow | Read, Grep, Glob,B | -    | dsm-fcp, dsm |
+| silent-failure-hunter | red    | Read, Grep, Glob   | plan | dsm-usage    |
+| test-writer           | blue   | Read, Bash, Grep,G | -    | dsm-testing  |
 
 ### Description Best Practices
 
@@ -203,6 +204,7 @@ Run operation for: $ARGUMENTS
 | UserPromptSubmit | Suggest skills on prompt   | No       | dsm-skill-suggest.sh |
 | PreToolUse       | Validate before execution  | Yes (2)  | dsm-bash-guard.sh    |
 | PostToolUse      | Validate after file writes | No       | dsm-code-guard.sh    |
+| Stop             | Final validation at end    | No       | dsm-final-check.sh   |
 
 ### DSM Code Guard Checks
 

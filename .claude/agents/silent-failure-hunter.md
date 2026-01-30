@@ -4,6 +4,7 @@ description: Use proactively when reviewing DSM code for silent failures, inadeq
 tools: Read, Grep, Glob
 model: sonnet
 permissionMode: plan
+color: red
 skills:
   - dsm-usage
 ---

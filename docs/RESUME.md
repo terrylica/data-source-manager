@@ -4,6 +4,28 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Stop Hook & Agent Visual Enhancements (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added Stop hook (dsm-final-check.sh) for session-end validation
+- Added `color` field to all 5 agents for visual distinction in Claude Code UI
+- Total hooks: 4 (UserPromptSubmit + PreToolUse + PostToolUse + Stop)
+
+**Agent Colors**:
+
+| Agent                 | Color  | Purpose     |
+| --------------------- | ------ | ----------- |
+| api-reviewer          | red    | Review/warn |
+| silent-failure-hunter | red    | Review/warn |
+| fcp-debugger          | yellow | Debug       |
+| test-writer           | blue   | Testing     |
+| data-fetcher          | green  | Success/go  |
+
+**Sources**: [cc-skills agent patterns](https://github.com/terrylica/cc-skills)
+
 ### UserPromptSubmit Hook & Skill Context Isolation (2026-01-30)
 
 **Status**: Complete
@@ -13,7 +35,6 @@ Last updated: 2026-01-30
 - Added UserPromptSubmit hook (dsm-skill-suggest.sh) for proactive skill suggestions
 - Added `context: fork` to dsm-fcp-monitor skill for diagnostic isolation
 - Updated design spec with hook events summary table and skill context isolation table
-- Total hooks: 3 (UserPromptSubmit + PreToolUse + PostToolUse)
 
 **Sources**: [claude-code-showcase](https://github.com/ChrisWiles/claude-code-showcase), [HumanLayer CLAUDE.md guide](https://www.humanlayer.dev/blog/writing-a-good-claude-md)
 
