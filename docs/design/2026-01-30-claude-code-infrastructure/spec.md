@@ -34238,3 +34238,246 @@ Your context window will be automatically compacted. Do not stop tasks
 early due to token budget concerns. Save progress before context refresh.
 Be persistent and complete tasks fully.
 ```
+## Sandboxing and Security Reference
+
+### Overview
+
+Claude Code features native sandboxing to provide a more secure environment for agent execution while reducing permission prompts. Instead of asking permission for each bash command, sandboxing creates defined boundaries where Claude Code works more freely with reduced risk.
+
+### Why Sandboxing Matters
+
+Traditional permission-based security leads to:
+
+- **Approval fatigue** - Repeatedly clicking "approve" causes less attention
+- **Reduced productivity** - Constant interruptions slow workflows
+- **Limited autonomy** - Claude waits for approvals
+
+Sandboxing addresses these by:
+
+- Defining clear boundaries for directory and network access
+- Reducing permission prompts for safe commands
+- Maintaining security with immediate notifications for boundary violations
+- Enabling autonomy within defined limits
+
+### Filesystem Isolation
+
+| Access Type    | Description                                         |
+| -------------- | --------------------------------------------------- |
+| Default writes | Read/write to current directory and subdirectories  |
+| Default reads  | Read access to entire computer (except denied dirs) |
+| Blocked        | Cannot modify files outside working directory       |
+| Configurable   | Define custom allowed/denied paths in settings      |
+
+### Network Isolation
+
+| Feature             | Description                                    |
+| ------------------- | ---------------------------------------------- |
+| Domain restrictions | Only approved domains can be accessed          |
+| User confirmation   | New domain requests trigger permission prompts |
+| Custom proxy        | Advanced users can implement custom rules      |
+| Comprehensive       | Restrictions apply to all spawned processes    |
+
+Network isolation works through a proxy server running outside the sandbox that enforces domain restrictions.
+
+### OS-Level Enforcement
+
+| Platform | Technology                                |
+| -------- | ----------------------------------------- |
+| macOS    | Seatbelt (built-in, works out of box)     |
+| Linux    | bubblewrap                                |
+| WSL2     | bubblewrap (same as Linux)                |
+| WSL1     | **Not supported** (lacks kernel features) |
+
+All child processes inherit the same security boundaries.
+
+### Prerequisites
+
+**macOS:** Works out of the box.
+
+**Linux/WSL2:**
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install bubblewrap socat
+
+# Fedora
+sudo dnf install bubblewrap socat
+```
+
+### Enable Sandboxing
+
+```
+/sandbox
+```
+
+Opens menu to choose sandbox modes. Shows installation instructions if dependencies missing.
+
+### Sandbox Modes
+
+| Mode                     | Description                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Auto-allow mode          | Sandboxed commands run without permission. Commands that can't be sandboxed fall back to regular permission flow. |
+| Regular permissions mode | All commands go through standard permission flow, even when sandboxed.                                            |
+
+Both modes enforce the same filesystem and network restrictions. Difference is whether sandboxed commands are auto-approved.
+
+**Note:** Auto-allow mode works independently of permission mode setting. Sandboxed bash commands run automatically even when file edit tools would normally require approval.
+
+### Configuration
+
+Configure in `settings.json`:
+
+```json
+{
+  "sandbox": {
+    "network": {
+      "httpProxyPort": 8080,
+      "socksProxyPort": 8081
+    }
+  }
+}
+```
+
+### Security Benefits
+
+#### Protection Against Prompt Injection
+
+**Filesystem protection:**
+
+- Cannot modify critical config files (`~/.bashrc`)
+- Cannot modify system files (`/bin/`)
+- Cannot read denied files per permission settings
+
+**Network protection:**
+
+- Cannot exfiltrate data to attacker servers
+- Cannot download malicious scripts
+- Cannot make unexpected API calls
+- Cannot contact unapproved domains
+
+**Monitoring:**
+
+- All access attempts outside sandbox blocked at OS level
+- Immediate notifications when boundaries tested
+- Choose to deny, allow once, or permanently allow
+
+#### Reduced Attack Surface
+
+Limits damage from:
+
+- Malicious dependencies (npm packages with harmful code)
+- Compromised scripts (build tools with vulnerabilities)
+- Social engineering attacks
+- Prompt injection attacks
+
+### Escape Hatch Mechanism
+
+When commands fail due to sandbox restrictions, Claude may retry with `dangerouslyDisableSandbox` parameter. These commands go through normal permissions flow.
+
+**Disable escape hatch:**
+
+```json
+{
+  "sandbox": {
+    "allowUnsandboxedCommands": false
+  }
+}
+```
+
+When disabled, all commands must run sandboxed or be in `excludedCommands`.
+
+### Security Limitations
+
+| Limitation                        | Risk                                                        |
+| --------------------------------- | ----------------------------------------------------------- |
+| Network filtering                 | Operates on domains only, doesn't inspect traffic           |
+| Broad domains (github.com)        | May allow data exfiltration                                 |
+| Domain fronting                   | Potential bypass of network filtering                       |
+| Unix sockets (`allowUnixSockets`) | Can grant access to powerful services (e.g., Docker socket) |
+| Filesystem write permissions      | Overly broad writes can enable privilege escalation         |
+| Linux nested sandbox              | `enableWeakerNestedSandbox` considerably weakens security   |
+
+### Compatibility Notes
+
+| Tool      | Compatibility                            |
+| --------- | ---------------------------------------- |
+| watchman  | Incompatible - use `jest --no-watchman`  |
+| docker    | Incompatible - add to `excludedCommands` |
+| CLI tools | May need network host permissions        |
+
+### Best Practices
+
+1. **Start restrictive** - Begin with minimal permissions, expand as needed
+
+2. **Monitor logs** - Review sandbox violation attempts
+
+3. **Environment-specific configs** - Different rules for dev vs production
+
+4. **Combine with permissions** - Use sandboxing alongside IAM policies
+
+5. **Test configurations** - Verify settings don't block legitimate workflows
+
+### Integration Points
+
+| Integration            | Purpose                                   |
+| ---------------------- | ----------------------------------------- |
+| IAM policies           | Defense-in-depth with permission settings |
+| Development containers | Additional isolation with devcontainers   |
+| Enterprise policies    | Enforce via managed settings              |
+
+### Open Source Sandbox Runtime
+
+Available as npm package for your own projects:
+
+```bash
+npx @anthropic-ai/sandbox-runtime <command-to-sandbox>
+```
+
+Can sandbox MCP servers and other processes.
+
+**Repository:** <https://github.com/anthropic-experimental/sandbox-runtime>
+
+### Limitations
+
+| Limitation           | Impact                                          |
+| -------------------- | ----------------------------------------------- |
+| Performance overhead | Minimal, some filesystem operations slower      |
+| Compatibility        | Some tools need configuration or exclusion      |
+| Platform support     | macOS, Linux, WSL2 (not WSL1 or native Windows) |
+
+### DSM Sandboxing Configuration
+
+**Recommended settings:**
+
+```json
+{
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "api.binance.com",
+        "fapi.binance.com",
+        "www.okx.com",
+        "pypi.org",
+        "files.pythonhosted.org"
+      ]
+    },
+    "filesystem": {
+      "allowedWritePaths": ["./src", "./tests", "./.cache"],
+      "deniedReadPaths": [".env", ".env.local", "~/.ssh"]
+    },
+    "excludedCommands": ["docker"]
+  }
+}
+```
+
+**FCP testing with sandbox:**
+
+```
+/sandbox  # Enable auto-allow mode
+
+# FCP tests can run with network access to allowed exchanges
+uv run pytest tests/test_fcp.py -v
+```
+
+**Data source integration:**
+When adding new exchanges, add their domains to `allowedDomains` before testing connectivity.
