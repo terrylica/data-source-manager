@@ -48290,3 +48290,384 @@ The thinking process helps Claude systematically explore:
 2. Timer handling
 3. Race conditions
 4. Configuration issues
+# Prompt Engineering Reference
+
+This section covers prompt engineering best practices for Claude 4.x models, with specific guidance for Sonnet 4.5, Haiku 4.5, and Opus 4.5.
+
+## General Principles
+
+### Be Explicit with Instructions
+
+Claude 4.x models respond well to clear, explicit instructions. Be specific about desired output.
+
+**Less effective:**
+
+```text
+Create an analytics dashboard
+```
+
+**More effective:**
+
+```text
+Create an analytics dashboard. Include as many relevant features and interactions as possible. Go beyond the basics to create a fully-featured implementation.
+```
+
+### Add Context to Improve Performance
+
+Providing context or motivation behind instructions helps Claude understand goals:
+
+**Less effective:**
+
+```text
+NEVER use ellipses
+```
+
+**More effective:**
+
+```text
+Your response will be read aloud by a text-to-speech engine, so never use ellipses since the text-to-speech engine will not know how to pronounce them.
+```
+
+Claude generalizes from explanations.
+
+### Be Vigilant with Examples
+
+Claude 4.x models pay close attention to details and examples. Ensure examples align with desired behaviors and minimize behaviors to avoid.
+
+## Long-Horizon Reasoning and State Tracking
+
+Claude 4.5 models excel at long-horizon tasks with exceptional state tracking. They maintain orientation across extended sessions by focusing on incremental progress.
+
+### Context Awareness
+
+Claude 4.5 models feature context awareness, tracking remaining token budget throughout a conversation.
+
+**Managing context limits:**
+
+```text
+Your context window will be automatically compacted as it approaches its limit, allowing you to continue working indefinitely from where you left off. Therefore, do not stop tasks early due to token budget concerns. As you approach your token budget limit, save your current progress and state to memory before the context window refreshes. Always be as persistent and autonomous as possible and complete tasks fully, even if the end of your budget is approaching. Never artificially stop any task early regardless of the context remaining.
+```
+
+### Multi-Context Window Workflows
+
+For tasks spanning multiple context windows:
+
+1. **First window setup**: Use the first context window to set up a framework (write tests, create setup scripts), then iterate on a todo-list in future windows.
+
+2. **Structured test format**: Ask Claude to create tests in structured format (e.g., `tests.json`):
+
+   ```text
+   It is unacceptable to remove or edit tests because this could lead to missing or buggy functionality.
+   ```
+
+3. **Quality of life tools**: Encourage Claude to create setup scripts (e.g., `init.sh`) for servers, test suites, and linters.
+
+4. **Starting fresh vs compacting**: Claude 4.5 models are effective at discovering state from the local filesystem. Be prescriptive about how it should start:
+   - "Call pwd; you can only read and write files in this directory."
+   - "Review progress.txt, tests.json, and the git logs."
+   - "Manually run through a fundamental integration test before moving on."
+
+5. **Provide verification tools**: Tools like Playwright MCP server or computer use capabilities help Claude verify correctness without human feedback.
+
+6. **Encourage complete context usage**:
+
+   ```text
+   This is a very long task, so it may be beneficial to plan out your work clearly. It's encouraged to spend your entire output context working on the task - just make sure you don't run out of context with significant uncommitted work. Continue working systematically until you have completed this task.
+   ```
+
+### State Management Best Practices
+
+- **Structured formats for state data**: Use JSON for tracking structured information
+- **Unstructured text for progress notes**: Freeform notes work well for general progress
+- **Git for state tracking**: Git provides logs and checkpoints. Claude 4.5 performs especially well using git.
+- **Emphasize incremental progress**: Explicitly ask Claude to track progress
+
+**Example state files:**
+
+```json
+// tests.json
+{
+  "tests": [
+    { "id": 1, "name": "authentication_flow", "status": "passing" },
+    { "id": 2, "name": "user_management", "status": "failing" }
+  ],
+  "total": 200,
+  "passing": 150,
+  "failing": 25
+}
+```
+
+```text
+// progress.txt
+Session 3 progress:
+- Fixed authentication token validation
+- Updated user model to handle edge cases
+- Next: investigate user_management test failures (test #2)
+```
+
+## Communication Style
+
+Claude 4.5 models have a more concise communication style:
+
+- **More direct and grounded**: Fact-based progress reports
+- **More conversational**: Fluent and colloquial, less machine-like
+- **Less verbose**: May skip detailed summaries unless prompted
+
+## Tool Usage Patterns
+
+### Proactive Action
+
+Claude 4.5 benefits from explicit direction to use tools. "Can you suggest some changes" may result in suggestions rather than implementation.
+
+**Less effective (suggests only):**
+
+```text
+Can you suggest some changes to improve this function?
+```
+
+**More effective (takes action):**
+
+```text
+Change this function to improve its performance.
+```
+
+### Default to Action
+
+```text
+<default_to_action>
+By default, implement changes rather than only suggesting them. If the user's intent is unclear, infer the most useful likely action and proceed, using tools to discover any missing details instead of guessing. Try to infer the user's intent about whether a tool call (e.g., file edit or read) is intended or not, and act accordingly.
+</default_to_action>
+```
+
+### Conservative Action
+
+```text
+<do_not_act_before_instructions>
+Do not jump into implementation or change files unless clearly instructed to make changes. When the user's intent is ambiguous, default to providing information, doing research, and providing recommendations rather than taking action. Only proceed with edits, modifications, or implementations when the user explicitly requests them.
+</do_not_act_before_instructions>
+```
+
+### Tool Usage and Triggering
+
+Claude Opus 4.5 is more responsive to the system prompt. If prompts were designed to reduce undertriggering, Claude may now overtrigger.
+
+**Fix**: Dial back aggressive language:
+
+- Instead of: "CRITICAL: You MUST use this tool when..."
+- Use: "Use this tool when..."
+
+## XML Tags Usage
+
+XML tags help structure prompts with multiple components:
+
+```text
+<instructions>
+Your main task instructions here
+</instructions>
+
+<context>
+Background information and context
+</context>
+
+<examples>
+Example inputs and outputs
+</examples>
+
+<formatting>
+Output format requirements
+</formatting>
+```
+
+Claude was trained on structured prompts and knows how to parse XML tags effectively.
+
+## Control Response Format
+
+### Tell Claude What to Do (Not What Not to Do)
+
+- Instead of: "Do not use markdown in your response"
+- Try: "Your response should be composed of smoothly flowing prose paragraphs."
+
+### Use XML Format Indicators
+
+```text
+Write the prose sections of your response in <smoothly_flowing_prose_paragraphs> tags.
+```
+
+### Match Prompt Style to Output Style
+
+The formatting style in your prompt may influence response style. Removing markdown from prompts can reduce markdown in output.
+
+### Detailed Formatting Control
+
+```text
+<avoid_excessive_markdown_and_bullet_points>
+When writing reports, documents, technical explanations, analyses, or any long-form content, write in clear, flowing prose using complete paragraphs and sentences. Use standard paragraph breaks for organization and reserve markdown primarily for `inline code`, code blocks, and simple headings.
+
+DO NOT use ordered lists (1. ...) or unordered lists (*) unless: a) you're presenting truly discrete items where a list format is the best option, or b) the user explicitly requests a list or ranking
+
+Instead of listing items with bullets or numbers, incorporate them naturally into sentences. Your goal is readable, flowing text that guides the reader naturally through ideas rather than fragmenting information into isolated points.
+</avoid_excessive_markdown_and_bullet_points>
+```
+
+## Parallel Tool Calling
+
+Claude 4.x models excel at parallel tool execution:
+
+```text
+<use_parallel_tool_calls>
+If you intend to call multiple tools and there are no dependencies between the tool calls, make all of the independent tool calls in parallel. Prioritize calling tools simultaneously whenever the actions can be done in parallel rather than sequentially. For example, when reading 3 files, run 3 tool calls in parallel to read all 3 files into context at the same time. Maximize use of parallel tool calls where possible to increase speed and efficiency. However, if some tool calls depend on previous calls to inform dependent values like the parameters, do NOT call these tools in parallel and instead call them sequentially. Never use placeholders or guess missing parameters in tool calls.
+</use_parallel_tool_calls>
+```
+
+To reduce parallel execution:
+
+```text
+Execute operations sequentially with brief pauses between each step to ensure stability.
+```
+
+## Avoiding Over-Engineering
+
+Claude Opus 4.5 tends to overengineer. Add explicit prompting:
+
+```text
+Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
+
+Don't add features, refactor code, or make "improvements" beyond what was asked. A bug fix doesn't need surrounding code cleaned up. A simple feature doesn't need extra configurability.
+
+Don't add error handling, fallbacks, or validation for scenarios that can't happen. Trust internal code and framework guarantees. Only validate at system boundaries (user input, external APIs). Don't use backwards-compatibility shims when you can just change the code.
+
+Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. The right amount of complexity is the minimum needed for the current task. Reuse existing abstractions where possible and follow the DRY principle.
+```
+
+## Research and Information Gathering
+
+Claude 4.5 excels at agentic search. For optimal results:
+
+1. **Provide clear success criteria**
+2. **Encourage source verification**
+3. **Use structured approach for complex research:**
+
+```text
+Search for this information in a structured way. As you gather data, develop several competing hypotheses. Track your confidence levels in your progress notes to improve calibration. Regularly self-critique your approach and plan. Update a hypothesis tree or research notes file to persist information and provide transparency. Break down this complex research task systematically.
+```
+
+## Subagent Orchestration
+
+Claude 4.5 models proactively recognize when tasks benefit from subagents:
+
+1. **Ensure well-defined subagent tools**
+2. **Let Claude orchestrate naturally**
+3. **Adjust conservativeness if needed:**
+
+```text
+Only delegate to subagents when the task clearly benefits from a separate agent with a new context window.
+```
+
+## Extended Thinking Prompting
+
+For tasks involving reflection after tool use:
+
+```text
+After receiving tool results, carefully reflect on their quality and determine optimal next steps before proceeding. Use your thinking to plan and iterate based on this new information, and then take the best next action.
+```
+
+### Thinking Sensitivity
+
+When extended thinking is disabled, Claude Opus 4.5 is sensitive to "think" and variants. Replace with alternatives: "consider," "believe," "evaluate."
+
+## Code Exploration
+
+Claude Opus 4.5 can be conservative when exploring code:
+
+```text
+ALWAYS read and understand relevant files before proposing code edits. Do not speculate about code you have not inspected. If the user references a specific file/path, you MUST open and inspect it before explaining or proposing fixes. Be rigorous and persistent in searching code for key facts. Thoroughly review the style, conventions, and abstractions of the codebase before implementing new features or abstractions.
+```
+
+## Minimizing Hallucinations
+
+```text
+<investigate_before_answering>
+Never speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.
+</investigate_before_answering>
+```
+
+## Avoiding Hard-Coding
+
+```text
+Please write a high-quality, general-purpose solution using the standard tools available. Do not create helper scripts or workarounds to accomplish the task more efficiently. Implement a solution that works correctly for all valid inputs, not just the test cases. Do not hard-code values or create solutions that only work for specific test inputs. Instead, implement the actual logic that solves the problem generally.
+
+Focus on understanding the problem requirements and implementing the correct algorithm. Tests are there to verify correctness, not to define the solution. Provide a principled implementation that follows best practices and software design principles.
+```
+
+## Model Self-Knowledge
+
+For correct model identification:
+
+```text
+The assistant is Claude, created by Anthropic. The current model is Claude Sonnet 4.5.
+```
+
+For LLM-powered apps:
+
+```text
+When an LLM is needed, please default to Claude Sonnet 4.5 unless the user requests otherwise. The exact model string for Claude Sonnet 4.5 is claude-sonnet-4-5-20250929.
+```
+
+## DSM-Specific Prompt Engineering
+
+For data-source-manager development, use these patterns:
+
+### FCP Development Context
+
+```text
+<fcp_context>
+You are working on the Failover Control Protocol (FCP) module. Key constraints:
+- All timestamps must be UTC
+- Symbol formats follow exchange-specific conventions
+- Error handling must not silently fail
+- Rate limits must be respected
+
+Read .claude/rules/fcp-protocol.md for detailed FCP specifications.
+</fcp_context>
+```
+
+### Exchange API Integration
+
+```text
+<exchange_api_guidelines>
+When implementing exchange API integrations:
+1. Always validate response schemas
+2. Handle rate limit errors with exponential backoff
+3. Log all API calls with request/response details
+4. Use the caching layer for repeated requests
+
+Review src/data_source_manager/exchanges/ for existing patterns.
+</exchange_api_guidelines>
+```
+
+### Test-First Development
+
+```text
+<test_requirements>
+For any FCP or exchange integration changes:
+1. Write tests BEFORE implementation
+2. Use pytest fixtures from tests/conftest.py
+3. Include both success and failure scenarios
+4. Verify timestamp handling in tests
+
+Run: uv run pytest tests/test_fcp.py -v
+</test_requirements>
+```
+
+### State Tracking for DSM
+
+```json
+// dsm-progress.json
+{
+  "current_task": "Implement OKX spot market data fetcher",
+  "completed": ["Added rate limit handling", "Implemented basic fetch logic"],
+  "pending": ["Add timestamp validation", "Write integration tests"],
+  "blockers": [],
+  "next_session_start": "Review tests/test_okx.py and continue with timestamp validation"
+}
+```
