@@ -11506,3 +11506,406 @@ Use LLM evaluation instead of bash:
   }
 }
 ```
+## Skills Reference
+
+### Overview
+
+Skills extend Claude's capabilities with structured instructions. Create a `SKILL.md` file and Claude adds it to its toolkit, using it when relevant or when you invoke it with `/skill-name`.
+
+### Skill Locations
+
+| Location   | Path                               | Scope             |
+| ---------- | ---------------------------------- | ----------------- |
+| Enterprise | Managed settings                   | All org users     |
+| Personal   | `~/.claude/skills/<name>/SKILL.md` | All your projects |
+| Project    | `.claude/skills/<name>/SKILL.md`   | This project only |
+| Plugin     | `<plugin>/skills/<name>/SKILL.md`  | Plugin scope      |
+
+### SKILL.md Structure
+
+```yaml
+---
+name: explain-code
+description: Explains code with visual diagrams and analogies
+---
+When explaining code, always include:
+
+1. **Start with an analogy**: Compare to everyday life
+2. **Draw a diagram**: Use ASCII art for flow/structure
+3. **Walk through the code**: Explain step-by-step
+4. **Highlight a gotcha**: Common mistake or misconception
+```
+
+### Frontmatter Fields
+
+| Field                      | Required    | Description                           |
+| -------------------------- | ----------- | ------------------------------------- |
+| `name`                     | No          | Display name (defaults to directory)  |
+| `description`              | Recommended | When to use the skill                 |
+| `argument-hint`            | No          | Hint for autocomplete                 |
+| `disable-model-invocation` | No          | Only user can invoke (default: false) |
+| `user-invocable`           | No          | Show in / menu (default: true)        |
+| `allowed-tools`            | No          | Tools without permission prompts      |
+| `model`                    | No          | Model to use when skill is active     |
+| `context`                  | No          | Set to `fork` for subagent context    |
+| `agent`                    | No          | Subagent type when context: fork      |
+| `hooks`                    | No          | Hooks scoped to skill lifecycle       |
+
+### String Substitutions
+
+| Variable               | Description                        |
+| ---------------------- | ---------------------------------- |
+| `$ARGUMENTS`           | All arguments passed               |
+| `$ARGUMENTS[N]`        | Specific argument by 0-based index |
+| `$N`                   | Shorthand for `$ARGUMENTS[N]`      |
+| `${CLAUDE_SESSION_ID}` | Current session ID                 |
+
+### Invocation Control
+
+| Frontmatter                      | You Invoke | Claude Invokes |
+| -------------------------------- | ---------- | -------------- |
+| (default)                        | Yes        | Yes            |
+| `disable-model-invocation: true` | Yes        | No             |
+| `user-invocable: false`          | No         | Yes            |
+
+### Context Fork for Subagents
+
+```yaml
+---
+name: deep-research
+description: Research a topic thoroughly
+context: fork
+agent: Explore
+---
+
+Research $ARGUMENTS thoroughly:
+
+1. Find relevant files using Glob and Grep
+2. Read and analyze the code
+3. Summarize findings with file references
+```
+
+**Execution**:
+
+1. New isolated context created
+2. Subagent receives skill content as prompt
+3. Agent type determines tools/permissions
+4. Results summarized and returned
+
+### Dynamic Context Injection
+
+Use `!`command\`\` for shell command preprocessing:
+
+```yaml
+---
+name: pr-summary
+description: Summarize changes in a pull request
+context: fork
+agent: Explore
+---
+
+## Pull request context
+- PR diff: !`gh pr diff`
+- PR comments: !`gh pr view --comments`
+- Changed files: !`gh pr diff --name-only`
+
+## Your task
+Summarize this pull request...
+```
+
+### Supporting Files
+
+```
+my-skill/
+├── SKILL.md           # Main instructions (required)
+├── template.md        # Template for Claude
+├── examples/
+│   └── sample.md      # Example output
+└── scripts/
+    └── validate.sh    # Script Claude can execute
+```
+
+Reference from SKILL.md:
+
+```markdown
+## Additional resources
+
+- For complete API details, see [reference.md](reference.md)
+- For usage examples, see [examples.md](examples.md)
+```
+
+### DSM Skills
+
+```
+docs/skills/
+├── dsm-usage/
+│   ├── SKILL.md            # DataSourceManager API usage
+│   ├── examples/           # Code examples
+│   └── references/         # API reference
+├── dsm-testing/
+│   ├── SKILL.md            # Testing patterns
+│   └── examples/           # Test examples
+├── dsm-research/
+│   └── SKILL.md            # Codebase research (context: fork)
+└── dsm-fcp-monitor/
+    └── SKILL.md            # FCP monitoring
+```
+
+**Example: DSM Research Skill**
+
+```yaml
+---
+name: dsm-research
+description: Research DSM codebase for patterns and implementations
+context: fork
+agent: Explore
+user-invocable: true
+---
+
+Research the data-source-manager codebase for $ARGUMENTS:
+
+1. Search for relevant files using Glob
+2. Grep for implementation patterns
+3. Read key files and analyze
+4. Summarize findings with file:line references
+
+Focus on:
+- FCP decision logic
+- Data source adapters
+- Caching mechanisms
+- Error handling patterns
+```
+
+### Skill Best Practices
+
+1. **Keep SKILL.md under 500 lines**: Move details to supporting files
+2. **Write clear descriptions**: Claude uses these for triggering
+3. **Use context: fork for exploration**: Keep noise out of main context
+4. **Add argument-hint**: Help users with autocomplete
+5. **Test with both invocation methods**: `/skill-name` and natural language
+
+## Plugin Marketplace Reference
+
+### Overview
+
+Plugin marketplaces distribute Claude Code extensions across teams. They provide centralized discovery, version tracking, and automatic updates.
+
+### Marketplace Structure
+
+```
+my-marketplace/
+├── .claude-plugin/
+│   └── marketplace.json      # Marketplace catalog
+├── plugins/
+│   └── example-plugin/
+│       ├── .claude-plugin/
+│       │   └── plugin.json   # Plugin manifest
+│       ├── skills/           # Skills
+│       ├── commands/         # Slash commands
+│       ├── agents/           # Specialized agents
+│       └── hooks/            # Event hooks
+```
+
+### marketplace.json Schema
+
+<!-- SSoT-OK: Example versions in Claude Code documentation -->
+
+```json
+{
+  "name": "company-tools",
+  "owner": {
+    "name": "DevTools Team",
+    "email": "devtools@example.com"
+  },
+  "metadata": {
+    "description": "Company development tools",
+    "version": "<version>",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "code-formatter",
+      "source": "./plugins/formatter",
+      "description": "Automatic code formatting",
+      "version": "<version>"
+    }
+  ]
+}
+```
+
+### Required Marketplace Fields
+
+| Field     | Type   | Description                   |
+| --------- | ------ | ----------------------------- |
+| `name`    | string | Marketplace identifier        |
+| `owner`   | object | Maintainer info (name, email) |
+| `plugins` | array  | List of available plugins     |
+
+### Plugin Entry Fields
+
+| Field         | Type    | Description                         |
+| ------------- | ------- | ----------------------------------- |
+| `name`        | string  | Plugin identifier (required)        |
+| `source`      | string  | Where to fetch (required)           |
+| `description` | string  | Brief description                   |
+| `version`     | string  | Plugin version                      |
+| `author`      | object  | Author info                         |
+| `homepage`    | string  | Documentation URL                   |
+| `license`     | string  | SPDX identifier                     |
+| `keywords`    | array   | Discovery tags                      |
+| `strict`      | boolean | Require plugin.json (default: true) |
+
+### Plugin Sources
+
+**Relative paths** (same repo):
+
+```json
+{ "source": "./plugins/my-plugin" }
+```
+
+**GitHub**:
+
+```json
+{
+  "source": {
+    "source": "github",
+    "repo": "owner/plugin-repo",
+    "ref": "v2"
+  }
+}
+```
+
+**Git URL**:
+
+```json
+{
+  "source": {
+    "source": "url",
+    "url": "https://gitlab.com/team/plugin.git"
+  }
+}
+```
+
+### Plugin Manifest (plugin.json)
+
+<!-- SSoT-OK: Example version in Claude Code documentation -->
+
+```json
+{
+  "name": "my-plugin",
+  "description": "Plugin description",
+  "version": "<version>",
+  "author": { "name": "Author Name" },
+  "commands": ["./commands/"],
+  "agents": ["./agents/"],
+  "hooks": "./hooks/hooks.json"
+}
+```
+
+### Distribution Methods
+
+**GitHub (recommended)**:
+
+```bash
+/plugin marketplace add owner/repo
+```
+
+**Other git hosts**:
+
+```bash
+/plugin marketplace add https://gitlab.com/company/plugins.git
+```
+
+**Local testing**:
+
+```bash
+/plugin marketplace add ./my-local-marketplace
+```
+
+### Installation Commands
+
+```bash
+# Add marketplace
+/plugin marketplace add company/tools
+
+# Install plugin
+/plugin install code-formatter@company-tools
+
+# Update marketplace
+/plugin marketplace update
+
+# Validate structure
+/plugin validate .
+```
+
+### Project-Level Plugin Configuration
+
+In `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "company-tools": {
+      "source": {
+        "source": "github",
+        "repo": "your-org/claude-plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "code-formatter@company-tools": true,
+    "deployment-tools@company-tools": true
+  }
+}
+```
+
+### Enterprise Restrictions
+
+In managed settings:
+
+```json
+{
+  "strictKnownMarketplaces": [
+    {
+      "source": "github",
+      "repo": "acme-corp/approved-plugins"
+    }
+  ]
+}
+```
+
+### DSM Plugin Marketplace
+
+<!-- SSoT-OK: Example version in Claude Code documentation -->
+
+```json
+{
+  "name": "dsm-tools",
+  "owner": {
+    "name": "DSM Team"
+  },
+  "plugins": [
+    {
+      "name": "dsm-skills",
+      "source": "./plugins/dsm-skills",
+      "description": "DSM usage, testing, and research skills",
+      "version": "<version>"
+    },
+    {
+      "name": "dsm-agents",
+      "source": "./plugins/dsm-agents",
+      "description": "DSM specialized agents (FCP debugger, etc.)",
+      "version": "<version>"
+    }
+  ]
+}
+```
+
+### Best Practices
+
+1. **Use kebab-case names**: Consistent identifiers
+2. **Version your plugins**: Track changes with semver
+3. **Include descriptions**: Help users discover plugins
+4. **Test locally first**: Validate before distribution
+5. **Use GitHub for public**: Built-in version control
+6. **Pin versions in enterprise**: Stability over freshness
