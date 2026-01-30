@@ -69,6 +69,20 @@ if echo "$CONTENT" | grep -qE 'MarketType\.(SPOT|FUTURES_USDT)' && echo "$CONTEN
     WARNINGS+=("⚠️ COIN-margined symbol format (_PERP) used with SPOT/FUTURES_USDT market type")
 fi
 
+# Check 10: DataFrame validation (DSM-specific)
+# Warn if returning DataFrame without validation
+if echo "$CONTENT" | grep -qE '(return|yield)\s+df' && ! echo "$CONTENT" | grep -qE 'len\(df\)|df\.empty|assert|validate'; then
+    WARNINGS+=("⚠️ Returning DataFrame without validation - consider checking len(df) > 0 or df.empty")
+fi
+
+# Check 11: Polars preference reminder (DSM-specific)
+# Note: This is informational only, not blocking
+if echo "$CONTENT" | grep -qE 'import pandas as pd|from pandas import' && echo "$CONTENT" | grep -qE 'pd\.DataFrame\('; then
+    if ! echo "$CONTENT" | grep -qE '# polars-exception|# legacy|# compatibility'; then
+        WARNINGS+=("💡 Consider using Polars for new DataFrame code (faster, memory-efficient)")
+    fi
+fi
+
 # Output result
 if [[ ${#WARNINGS[@]} -gt 0 ]]; then
     MESSAGE=$(printf '%s\n' "${WARNINGS[@]}")

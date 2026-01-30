@@ -40,6 +40,8 @@ Detects silent failure patterns in Python code AFTER file writes.
 - `DataSourceManager.create()` without `manager.close()`
 - Async functions using sync `DataSourceManager` (mixing patterns)
 - COIN-margined symbol format (`_PERP`) with wrong market type
+- Returning DataFrame without validation (`len(df) > 0` or `df.empty`)
+- Using Pandas when Polars preferred (informational, use `# polars-exception` to suppress)
 
 ## Hook Configuration
 
