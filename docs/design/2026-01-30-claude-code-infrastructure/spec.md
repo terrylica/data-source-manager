@@ -13627,3 +13627,258 @@ When validating OHLCV DataFrames:
 | Parallel tool calls       | Speed and efficiency             |
 | Investigation prompts     | Reduce hallucinations            |
 | Minimize overengineering  | Focused, simple solutions        |
+
+---
+
+## Computer Use Tool Reference
+
+Claude can interact with desktop environments through screenshots and mouse/keyboard control for autonomous desktop automation.
+
+### Model Compatibility
+
+| Model            | Tool Version      | Beta Flag               |
+| ---------------- | ----------------- | ----------------------- |
+| Claude Opus 4.5  | computer_20251124 | computer-use-2025-11-24 |
+| All other models | computer_20250124 | computer-use-2025-01-24 |
+
+### Basic Usage
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.beta.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    tools=[
+        {
+            "type": "computer_20250124",
+            "name": "computer",
+            "display_width_px": 1024,
+            "display_height_px": 768,
+            "display_number": 1,
+        }
+    ],
+    messages=[{"role": "user", "content": "Take a screenshot of the desktop."}],
+    betas=["computer-use-2025-01-24"]
+)
+```
+
+### Available Actions
+
+**Basic actions (all versions)**:
+
+| Action     | Description             | Parameters         |
+| ---------- | ----------------------- | ------------------ |
+| screenshot | Capture current display | None               |
+| left_click | Click at coordinates    | coordinate: [x, y] |
+| type       | Type text string        | text: string       |
+| key        | Press key combination   | text: "ctrl+s"     |
+| mouse_move | Move cursor to position | coordinate: [x, y] |
+
+**Enhanced actions (computer_20250124)**:
+
+| Action          | Description                | Parameters                    |
+| --------------- | -------------------------- | ----------------------------- |
+| scroll          | Scroll in any direction    | coordinate, direction, amount |
+| left_click_drag | Click and drag             | start_coordinate, coordinate  |
+| right_click     | Right mouse button         | coordinate: [x, y]            |
+| double_click    | Double click               | coordinate: [x, y]            |
+| triple_click    | Triple click (select line) | coordinate: [x, y]            |
+| hold_key        | Hold key for duration      | text, duration_seconds        |
+| wait            | Pause between actions      | duration_seconds              |
+
+**Enhanced actions (computer_20251124 - Opus 4.5)**:
+
+| Action | Description                    | Parameters               |
+| ------ | ------------------------------ | ------------------------ |
+| zoom   | View screen region at full res | region: [x1, y1, x2, y2] |
+
+### Action Examples
+
+```json
+// Take a screenshot
+{"action": "screenshot"}
+
+// Click at position
+{"action": "left_click", "coordinate": [500, 300]}
+
+// Type text
+{"action": "type", "text": "Hello, world!"}
+
+// Keyboard shortcut
+{"action": "key", "text": "ctrl+s"}
+
+// Scroll down
+{
+    "action": "scroll",
+    "coordinate": [500, 400],
+    "scroll_direction": "down",
+    "scroll_amount": 3
+}
+
+// Shift+click for selection
+{
+    "action": "left_click",
+    "coordinate": [500, 300],
+    "text": "shift"
+}
+
+// Zoom to region (Opus 4.5)
+{"action": "zoom", "region": [100, 200, 400, 350]}
+```
+
+### Tool Parameters
+
+| Parameter         | Required | Description                   |
+| ----------------- | -------- | ----------------------------- |
+| type              | Yes      | Tool version                  |
+| name              | Yes      | Must be "computer"            |
+| display_width_px  | Yes      | Display width in pixels       |
+| display_height_px | Yes      | Display height in pixels      |
+| display_number    | No       | X11 display number            |
+| enable_zoom       | No       | Enable zoom action (Opus 4.5) |
+
+### Agent Loop Implementation
+
+```python
+async def sampling_loop(model, messages, max_iterations=10):
+    client = Anthropic()
+    tools = [
+        {"type": "computer_20250124", "name": "computer",
+         "display_width_px": 1024, "display_height_px": 768}
+    ]
+
+    iterations = 0
+    while iterations < max_iterations:
+        iterations += 1
+
+        response = client.beta.messages.create(
+            model=model,
+            max_tokens=4096,
+            messages=messages,
+            tools=tools,
+            betas=["computer-use-2025-01-24"]
+        )
+
+        messages.append({"role": "assistant", "content": response.content})
+
+        # Process tool calls
+        tool_results = []
+        for block in response.content:
+            if block.type == "tool_use":
+                result = handle_computer_action(block.input["action"], block.input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result
+                })
+
+        if not tool_results:
+            return messages  # Task complete
+
+        messages.append({"role": "user", "content": tool_results})
+```
+
+### Coordinate Scaling
+
+Handle higher resolutions by scaling coordinates:
+
+```python
+import math
+
+def get_scale_factor(width, height):
+    """Calculate scale for API constraints (1568px max edge, 1.15MP total)."""
+    long_edge_scale = 1568 / max(width, height)
+    total_pixels_scale = math.sqrt(1_150_000 / (width * height))
+    return min(1.0, long_edge_scale, total_pixels_scale)
+
+# Scale screenshot before sending
+scale = get_scale_factor(screen_width, screen_height)
+scaled_width = int(screen_width * scale)
+scaled_height = int(screen_height * scale)
+
+# Scale coordinates back up when executing
+def execute_click(x, y):
+    screen_x = x / scale
+    screen_y = y / scale
+    perform_click(screen_x, screen_y)
+```
+
+### Security Considerations
+
+1. **Use sandboxed environment**: Containerized or VM with minimal privileges
+2. **Avoid sensitive data access**: No account credentials without oversight
+3. **Limit internet access**: Allowlist approved domains
+4. **Human confirmation**: For meaningful real-world consequences
+5. **Prompt injection defense**: Auto-classifiers steer to user confirmation
+
+### Prompting Tips
+
+```text
+After each step, take a screenshot and carefully evaluate if you
+have achieved the right outcome. Explicitly show your thinking:
+"I have evaluated step X..." If not correct, try again. Only when
+you confirm a step was executed correctly should you move on.
+```
+
+**For login credentials**:
+
+```text
+<robot_credentials>
+username: test_user
+password: test_pass
+</robot_credentials>
+```
+
+### Combining with Other Tools
+
+```python
+tools = [
+    {"type": "computer_20250124", "name": "computer",
+     "display_width_px": 1024, "display_height_px": 768},
+    {"type": "text_editor_20250728", "name": "str_replace_based_edit_tool"},
+    {"type": "bash_20250124", "name": "bash"},
+    # Custom tools
+    {"name": "get_weather", "description": "Get weather",
+     "input_schema": {...}}
+]
+```
+
+### Error Handling
+
+```json
+// Screenshot failure
+{
+    "type": "tool_result",
+    "tool_use_id": "toolu_01A09q90qw90lq917835lq9",
+    "content": "Error: Failed to capture screenshot. Display unavailable.",
+    "is_error": true
+}
+
+// Invalid coordinates
+{
+    "type": "tool_result",
+    "tool_use_id": "toolu_01A09q90qw90lq917835lq9",
+    "content": "Error: Coordinates (1200, 900) outside bounds (1024x768).",
+    "is_error": true
+}
+```
+
+### Limitations
+
+1. **Latency**: May be slow for real-time interactions
+2. **Vision accuracy**: May hallucinate coordinates
+3. **Scrolling**: Improved in Claude 4 models
+4. **Spreadsheets**: Use fine-grained mouse control
+5. **Account creation**: Limited on social platforms
+6. **Prompt injection**: Content may override instructions
+
+### Token Usage
+
+| Component                | Tokens                 |
+| ------------------------ | ---------------------- |
+| System prompt overhead   | 466-499                |
+| Computer tool definition | 735 per tool           |
+| Screenshots              | Vision pricing applies |
