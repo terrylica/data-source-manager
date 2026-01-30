@@ -138,6 +138,7 @@ bun.lockb
 !.claude/agents/
 !.claude/commands/
 !.claude/hooks/
+!.claude/rules/
 
 # Lychee link checker cache
 .lycheecache
