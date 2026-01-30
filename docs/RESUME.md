@@ -4,6 +4,25 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Sandboxing & Permission Modes (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added permission modes table (default, acceptEdits, plan, bypassPermissions)
+- Added sandbox isolation boundaries table
+- Added OS-level primitives table (bubblewrap, seatbelt)
+- Added bash tool control patterns JSON example
+- Added safe autonomous mode Docker example
+- Added PreToolUse hooks as controls example
+- Added DSM permission configuration table
+
+**Sources**:
+
+- [Official Sandboxing Docs](https://code.claude.com/docs/en/sandboxing)
+- [Anthropic Engineering Blog](https://www.anthropic.com/engineering/claude-code-sandboxing)
+
 ### Keyboard Shortcuts & Productivity (2026-01-30)
 
 **Status**: Complete

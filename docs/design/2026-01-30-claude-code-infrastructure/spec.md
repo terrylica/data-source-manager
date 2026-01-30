@@ -2295,6 +2295,100 @@ alias ci="claude --init"
 | `Ctrl+R` for commands   | Find previous mise/git commands |
 | Tab-complete file paths | Faster file references          |
 
+## Sandboxing & Permission Modes
+
+Based on [Official Sandboxing Docs](https://code.claude.com/docs/en/sandboxing) and [Anthropic Engineering Blog](https://www.anthropic.com/engineering/claude-code-sandboxing).
+
+### Permission Modes
+
+| Mode              | Behavior                            | Use Case                  |
+| ----------------- | ----------------------------------- | ------------------------- |
+| default           | Prompt for all tool uses            | Interactive development   |
+| acceptEdits       | Auto-approve file operations        | Trusted editing workflows |
+| plan              | Read-only, no write operations      | Research and exploration  |
+| bypassPermissions | Auto-approve all (use with caution) | Controlled CI/CD only     |
+
+Set in `settings.json`:
+
+```json
+{
+  "defaultMode": "acceptEdits"
+}
+```
+
+### Sandbox Isolation
+
+| Boundary   | Default Behavior                           |
+| ---------- | ------------------------------------------ |
+| Filesystem | Read/write to cwd and subdirs              |
+| Filesystem | Read-only for rest of system (some denied) |
+| Network    | Optional isolation for autonomous mode     |
+
+**Impact**: Sandboxing reduces permission prompts by ~84% in internal usage.
+
+### OS-Level Primitives
+
+| OS    | Technology | Purpose                      |
+| ----- | ---------- | ---------------------------- |
+| Linux | bubblewrap | Filesystem/network isolation |
+| macOS | seatbelt   | Sandbox enforcement          |
+
+### Bash Tool Control Patterns
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(git:*)",
+      "Bash(mise run:*)"
+    ],
+    "deny": ["Read(./.env*)", "Bash(npm publish:*)", "Bash(rm -rf:*)"]
+  }
+}
+```
+
+### Safe Autonomous Mode
+
+For CI/CD or automated workflows:
+
+```bash
+# Run in Docker with network isolation
+docker run --network none \
+  -v $(pwd):/workspace \
+  claude-code --dangerously-skip-permissions \
+  --disallowedTools "Bash(curl:*),Bash(wget:*)"
+```
+
+**Key flags**:
+
+- `--disallowedTools`: Works correctly in all modes
+- `--allowedTools`: May be ignored with bypassPermissions (known issue)
+
+### PreToolUse Hooks as Controls
+
+```bash
+#!/bin/bash
+# dsm-bash-guard.sh - block dangerous commands
+TOOL_INPUT="$1"
+if echo "$TOOL_INPUT" | grep -qE "(rm -rf|drop table|--force)"; then
+  echo "Blocked: dangerous command pattern detected"
+  exit 2  # Exit 2 = block
+fi
+exit 0  # Exit 0 = allow
+```
+
+### DSM Permission Configuration
+
+| Tool Pattern               | Rule  | Reason               |
+| -------------------------- | ----- | -------------------- |
+| `Bash(uv run:*)`           | allow | Standard development |
+| `Bash(mise run:*)`         | allow | Task runner          |
+| `Bash(git push --force:*)` | deny  | Prevent force push   |
+| `Bash(pip install:*)`      | deny  | Use uv instead       |
+| `Read(.env*)`              | deny  | Protect secrets      |
+
 ## Verification Checklist
 
 ### Infrastructure
