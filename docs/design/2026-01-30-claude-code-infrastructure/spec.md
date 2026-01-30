@@ -8173,6 +8173,534 @@ jobs:
 - **GitHub access**: Mounted auth still allows repository operations
 - **Memory requirements**: 4GB minimum for smooth operation
 
+## Structured Outputs
+
+### Overview
+
+Structured outputs constrain Claude's responses to follow a specific JSON schema, ensuring valid, parseable output for downstream processing. Two complementary features:
+
+- **JSON outputs** (`output_config.format`): Get responses in a specific JSON format
+- **Strict tool use** (`strict: true`): Guarantee schema validation on tool inputs
+
+### Why Use Structured Outputs
+
+Without structured outputs:
+
+- Parsing errors from invalid JSON syntax
+- Missing required fields
+- Inconsistent data types
+- Schema violations requiring retries
+
+With structured outputs:
+
+- **Always valid**: No `JSON.parse()` errors
+- **Type safe**: Guaranteed field types and required fields
+- **Reliable**: No retries needed for schema violations
+
+### JSON Schema API
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    messages=[
+        {
+            "role": "user",
+            "content": "Extract contact info from: John Smith (john@example.com)"
+        }
+    ],
+    output_config={
+        "format": {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "email": {"type": "string"}
+                },
+                "required": ["name", "email"],
+                "additionalProperties": False
+            }
+        }
+    }
+)
+```
+
+### Pydantic Integration (Python)
+
+```python
+from pydantic import BaseModel
+from anthropic import Anthropic
+
+class ContactInfo(BaseModel):
+    name: str
+    email: str
+    plan_interest: str
+    demo_requested: bool
+
+client = Anthropic()
+
+# Using parse() method - automatic transformation and validation
+response = client.messages.parse(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Extract: John Smith..."}],
+    output_format=ContactInfo,
+)
+
+# Access typed output directly
+contact = response.parsed_output
+print(contact.name, contact.email)
+```
+
+### Zod Integration (TypeScript)
+
+```typescript
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+
+const ContactSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  plan_interest: z.string(),
+  demo_requested: z.boolean(),
+});
+
+const client = new Anthropic();
+
+const response = await client.messages.create({
+  model: "claude-sonnet-4-5",
+  max_tokens: 1024,
+  messages: [{ role: "user", content: "Extract: John Smith..." }],
+  output_config: { format: zodOutputFormat(ContactSchema) },
+});
+```
+
+### Strict Tool Use
+
+Validate tool parameters for agentic workflows:
+
+```python
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "What's the weather in SF?"}],
+    tools=[{
+        "name": "get_weather",
+        "description": "Get current weather",
+        "strict": True,  # Enable strict mode
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {"type": "string"},
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+            },
+            "required": ["location"],
+            "additionalProperties": False
+        }
+    }]
+)
+```
+
+**Guarantees:**
+
+- Tool `input` strictly follows the `input_schema`
+- Tool `name` is always valid
+- Types are correct (no `"2"` instead of `2`)
+
+### Combined Usage
+
+Use JSON outputs and strict tool use together:
+
+```python
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Plan a trip to Paris"}],
+    # JSON outputs for response format
+    output_config={
+        "format": {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "summary": {"type": "string"},
+                    "next_steps": {"type": "array", "items": {"type": "string"}}
+                },
+                "required": ["summary", "next_steps"],
+                "additionalProperties": False
+            }
+        }
+    },
+    # Strict tool use for validated parameters
+    tools=[{
+        "name": "search_flights",
+        "strict": True,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "destination": {"type": "string"},
+                "date": {"type": "string", "format": "date"}
+            },
+            "required": ["destination", "date"],
+            "additionalProperties": False
+        }
+    }]
+)
+```
+
+### Common Use Cases
+
+**Data Extraction:**
+
+```python
+class Invoice(BaseModel):
+    invoice_number: str
+    date: str
+    total_amount: float
+    line_items: List[dict]
+
+response = client.messages.parse(
+    model="claude-sonnet-4-5",
+    output_format=Invoice,
+    messages=[{"role": "user", "content": f"Extract: {invoice_text}"}]
+)
+```
+
+**Classification:**
+
+```python
+class Classification(BaseModel):
+    category: str
+    confidence: float
+    tags: List[str]
+    sentiment: str
+
+response = client.messages.parse(
+    model="claude-sonnet-4-5",
+    output_format=Classification,
+    messages=[{"role": "user", "content": f"Classify: {feedback_text}"}]
+)
+```
+
+### JSON Schema Limitations
+
+**Supported:**
+
+- Basic types: object, array, string, integer, number, boolean, null
+- `enum`, `const`, `anyOf`, `allOf`
+- `$ref`, `$def`, `definitions`
+- String formats: date-time, date, email, uri, uuid
+- Array `minItems` (0 or 1 only)
+
+**Not Supported:**
+
+- Recursive schemas
+- Complex types within enums
+- External `$ref`
+- Numerical constraints (minimum, maximum)
+- String constraints (minLength, maxLength)
+- `additionalProperties` other than `false`
+
+### SDK Transformation
+
+SDKs automatically transform schemas with unsupported features:
+
+1. Remove unsupported constraints
+2. Update descriptions with constraint info
+3. Add `additionalProperties: false`
+4. Validate responses against original schema
+
+### Performance Considerations
+
+- **First request latency**: Grammar compilation on first use
+- **Automatic caching**: Compiled grammars cached 24 hours
+- **Cache invalidation**: Changes to schema structure invalidate cache
+- **Token costs**: Schema explanation injected into system prompt
+
+### Invalid Outputs
+
+**Refusals** (`stop_reason: "refusal"`):
+
+- Claude maintains safety properties
+- Output may not match schema
+- 200 status code, billed for tokens
+
+**Token limit** (`stop_reason: "max_tokens"`):
+
+- Output may be incomplete
+- Retry with higher `max_tokens`
+
+### DSM Structured Outputs Example
+
+```python
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
+
+class OHLCVBar(BaseModel):
+    open_time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+class DataFetchResult(BaseModel):
+    symbol: str
+    interval: str
+    bars: List[OHLCVBar]
+    source: str
+    cache_hit: bool
+    fetch_duration_ms: Optional[float]
+
+# Use in Claude API for structured data extraction
+response = client.messages.parse(
+    model="claude-sonnet-4-5",
+    output_format=DataFetchResult,
+    messages=[{"role": "user", "content": f"Parse this OHLCV response: {raw_data}"}]
+)
+```
+
+## MCP Server Ecosystem
+
+### Overview
+
+The Model Context Protocol (MCP) provides a standardized way to connect Claude with external tools, data sources, and services. Essential MCP servers enhance Claude Code's capabilities.
+
+### Core Development Servers
+
+#### Sequential Thinking
+
+Enables structured problem-solving with iterative refinement.
+
+```bash
+claude mcp add sequential-thinking npx -- -y @modelcontextprotocol/server-sequential-thinking
+```
+
+**Use cases:**
+
+- Complex architectural decisions
+- Multi-step debugging
+- Design trade-off analysis
+
+#### Context7
+
+Fetches real-time documentation from source repositories.
+
+```bash
+claude mcp add --transport http context7 https://mcp.context7.com/mcp
+```
+
+**Usage in prompts:**
+
+```
+Create a React Server Component using Next.js 14 patterns - use context7
+```
+
+**Benefits:**
+
+- Eliminates outdated API suggestions
+- Version-specific documentation
+- Current code examples
+
+#### GitHub
+
+Direct repository, PR, and CI/CD workflow management.
+
+```bash
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/
+```
+
+**Use cases:**
+
+- PR reviews and creation
+- Issue management
+- Workflow monitoring
+
+#### Playwright
+
+Web automation using accessibility trees.
+
+```bash
+claude mcp add playwright npx -- @playwright/mcp@latest
+```
+
+**Use cases:**
+
+- End-to-end testing
+- Web scraping
+- Browser automation
+
+#### Apidog
+
+API specification integration and code generation.
+
+```bash
+claude mcp add apidog -- npx -y apidog-mcp-server@latest --oas=<openapi-url>
+```
+
+**Benefits:**
+
+- Type-safe client generation
+- API validation
+- Documentation-implementation sync
+
+### Cloud Infrastructure Servers
+
+#### AWS
+
+```bash
+claude mcp add aws npx -- -y @aws/mcp-server-aws
+```
+
+**Capabilities:**
+
+- Infrastructure provisioning
+- Service management
+- Real-time debugging
+
+#### Cloudflare
+
+```bash
+claude mcp add cloudflare npx -- -y @cloudflare/mcp-server-cloudflare
+```
+
+**Capabilities:**
+
+- Workers deployment
+- KV storage management
+- DNS configuration
+
+#### Google Cloud Platform
+
+```bash
+claude mcp add gcp npx -- -y @anthropic/mcp-server-gcp
+```
+
+**Capabilities:**
+
+- Cloud Run deployment
+- BigQuery queries
+- IAM management
+
+### Observability Servers
+
+#### Sentry
+
+```bash
+claude mcp add sentry npx -- -y @sentry/mcp-server
+```
+
+**Capabilities:**
+
+- Error tracking
+- Performance monitoring
+- Release health
+
+#### PostHog
+
+```bash
+claude mcp add posthog npx -- -y @posthog/mcp-server
+```
+
+**Capabilities:**
+
+- User behavior analytics
+- Feature flag management
+- A/B testing data
+
+### Project Management Servers
+
+#### Linear
+
+```bash
+claude mcp add linear -- npx -y @anthropic/mcp-server-linear
+```
+
+**Capabilities:**
+
+- Issue creation and management
+- Sprint planning
+- Workflow automation
+
+#### Notion
+
+```bash
+claude mcp add notion -- npx -y @anthropic/mcp-server-notion
+```
+
+**Capabilities:**
+
+- Page creation and editing
+- Database queries
+- Knowledge base access
+
+### Desktop Commander
+
+Local-first MCP server for filesystem and terminal control.
+
+```bash
+claude mcp add desktop-commander npx -- -y @wonderwhy-er/desktop-commander-mcp
+```
+
+**Capabilities:**
+
+- Terminal command execution
+- File system operations
+- Diff-based code editing
+
+### DSM MCP Configuration
+
+```json
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "context7": {
+      "transport": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic/mcp-server-filesystem",
+        "${CLAUDE_PROJECT_ROOT}"
+      ]
+    }
+  }
+}
+```
+
+### Installation Best Practices
+
+1. **Scope appropriately**: Use `--scope project` for project-specific servers
+2. **Configure authentication**: Store tokens in environment variables
+3. **Test connectivity**: Verify server responds before complex workflows
+4. **Monitor usage**: Track API calls and rate limits
+5. **Update regularly**: Keep servers updated for security and features
+
+### MCP Server Selection Guide
+
+| Need                  | Server              | Priority |
+| --------------------- | ------------------- | -------- |
+| Structured reasoning  | Sequential Thinking | High     |
+| Current documentation | Context7            | High     |
+| GitHub workflow       | GitHub              | High     |
+| Browser automation    | Playwright          | Medium   |
+| API development       | Apidog              | Medium   |
+| Cloud infrastructure  | AWS/GCP/Cloudflare  | Medium   |
+| Error tracking        | Sentry              | Medium   |
+| Project management    | Linear/Notion       | Low      |
+
 ## Verification Checklist
 
 ### Infrastructure
