@@ -4,6 +4,19 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### CC-Skills Patterns Integration (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added TRIGGERS keywords to all 4 skills for better Claude invocation matching
+- Added YAML frontmatter to design specs (adr, source, status, phase, last-updated)
+- Documented code correctness philosophy with explicit rules tables
+- Expanded hooks README with checked vs NOT checked rules rationale
+
+**Pattern applied**: [terrylica/cc-skills](https://github.com/terrylica/cc-skills) repository patterns
+
 ### Path-Specific Rules & Agent Enhancements (2026-01-30)
 
 **Status**: Complete
