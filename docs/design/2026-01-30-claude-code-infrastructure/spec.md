@@ -49971,3 +49971,419 @@ async for message in query(
     if hasattr(message, "result"):
         print(message.result)
 ```
+# Skills Architecture Reference
+
+This section covers Claude Code skills - the extension system for adding specialized capabilities through SKILL.md files with YAML frontmatter and progressive disclosure.
+
+## Overview
+
+Skills extend Claude's capabilities. Create a `SKILL.md` file with instructions, and Claude adds it to its toolkit. Claude uses skills when relevant, or you can invoke one directly with `/skill-name`.
+
+Skills follow the Agent Skills open standard and work across multiple AI tools.
+
+## SKILL.md Structure
+
+Every skill needs a `SKILL.md` file with two parts:
+
+1. **YAML frontmatter** (between `---` markers) - tells Claude when to use the skill
+2. **Markdown content** - instructions Claude follows when invoked
+
+```yaml
+---
+name: explain-code
+description: Explains code with visual diagrams and analogies. Use when explaining how code works, teaching about a codebase, or when the user asks "how does this work?"
+---
+When explaining code, always include:
+
+1. **Start with an analogy**: Compare the code to something from everyday life
+2. **Draw a diagram**: Use ASCII art to show the flow, structure, or relationships
+3. **Walk through the code**: Explain step-by-step what happens
+4. **Highlight a gotcha**: What's a common mistake or misconception?
+```
+
+## Skill Locations
+
+Where you store a skill determines who can use it:
+
+| Location   | Path                                     | Applies to                |
+| ---------- | ---------------------------------------- | ------------------------- |
+| Enterprise | See managed settings                     | All users in organization |
+| Personal   | `~/.claude/skills/<skill-name>/SKILL.md` | All your projects         |
+| Project    | `.claude/skills/<skill-name>/SKILL.md`   | This project only         |
+| Plugin     | `<plugin>/skills/<skill-name>/SKILL.md`  | Where plugin is enabled   |
+
+Priority order: enterprise > personal > project. Plugin skills use namespace (`plugin-name:skill-name`).
+
+### Automatic Discovery
+
+Claude Code automatically discovers skills from nested `.claude/skills/` directories. When editing files in `packages/frontend/`, it also looks for skills in `packages/frontend/.claude/skills/`.
+
+## Directory Structure
+
+Each skill is a directory with `SKILL.md` as the entrypoint:
+
+```
+my-skill/
+├── SKILL.md           # Main instructions (required)
+├── template.md        # Template for Claude to fill in
+├── examples/
+│   └── sample.md      # Example output
+└── scripts/
+    └── validate.sh    # Script Claude can execute
+```
+
+## Frontmatter Reference
+
+| Field                      | Required    | Description                                                  |
+| -------------------------- | ----------- | ------------------------------------------------------------ |
+| `name`                     | No          | Display name (uses directory name if omitted). Max 64 chars. |
+| `description`              | Recommended | What the skill does and when to use it                       |
+| `argument-hint`            | No          | Hint for autocomplete (e.g., `[issue-number]`)               |
+| `disable-model-invocation` | No          | Set `true` to prevent automatic loading. Default: `false`    |
+| `user-invocable`           | No          | Set `false` to hide from `/` menu. Default: `true`           |
+| `allowed-tools`            | No          | Tools Claude can use without permission when skill is active |
+| `model`                    | No          | Model to use when skill is active                            |
+| `context`                  | No          | Set to `fork` to run in subagent context                     |
+| `agent`                    | No          | Which subagent type for `context: fork`                      |
+| `hooks`                    | No          | Hooks scoped to skill lifecycle                              |
+
+### Validation Rules
+
+- **name**: Max 64 chars, lowercase letters/numbers/hyphens only, no XML tags
+- **description**: Max 1024 chars, non-empty, no XML tags
+
+## Progressive Disclosure
+
+Skills employ a progressive disclosure architecture:
+
+1. **Metadata loading (~100 tokens)**: Claude scans available skills to identify relevant matches
+2. **Full instructions (<5k tokens)**: Loads when Claude determines skill applies
+
+At startup, the agent pre-loads only the name and description of every installed skill. The actual body loads only when Claude thinks the skill is relevant.
+
+**Best practice**: Keep `SKILL.md` under 500 lines. Move detailed reference to separate files.
+
+## Invocation Control
+
+### Control Who Invokes
+
+| Frontmatter                      | You can invoke | Claude can invoke | When loaded into context        |
+| -------------------------------- | -------------- | ----------------- | ------------------------------- |
+| (default)                        | Yes            | Yes               | Description always, full on use |
+| `disable-model-invocation: true` | Yes            | No                | Description not loaded          |
+| `user-invocable: false`          | No             | Yes               | Description always, full on use |
+
+### Use Cases
+
+- **`disable-model-invocation: true`**: For workflows with side effects (deploy, commit, send-slack-message)
+- **`user-invocable: false`**: For background knowledge that isn't actionable (legacy-system-context)
+
+## String Substitutions
+
+| Variable               | Description                        |
+| ---------------------- | ---------------------------------- |
+| `$ARGUMENTS`           | All arguments passed when invoking |
+| `$ARGUMENTS[N]`        | Specific argument by 0-based index |
+| `$N`                   | Shorthand for `$ARGUMENTS[N]`      |
+| `${CLAUDE_SESSION_ID}` | Current session ID                 |
+
+### Example
+
+```yaml
+---
+name: migrate-component
+description: Migrate a component from one framework to another
+---
+Migrate the $0 component from $1 to $2.
+Preserve all existing behavior and tests.
+```
+
+Running `/migrate-component SearchBar React Vue` substitutes appropriately.
+
+## Supporting Files
+
+Reference supporting files from `SKILL.md`:
+
+```markdown
+## Additional resources
+
+- For complete API details, see [reference.md](reference.md)
+- For usage examples, see [examples.md](examples.md)
+```
+
+Standard directory structure:
+
+```
+my-skill/
+├── SKILL.md           # Overview and navigation
+├── reference.md       # Detailed API docs (loaded when needed)
+├── examples.md        # Usage examples (loaded when needed)
+└── scripts/
+    └── helper.py      # Utility script (executed, not loaded)
+```
+
+## Dynamic Context Injection
+
+The `!`command\`\` syntax runs shell commands before the skill content is sent to Claude:
+
+```yaml
+---
+name: pr-summary
+description: Summarize changes in a pull request
+context: fork
+agent: Explore
+allowed-tools: Bash(gh *)
+---
+
+## Pull request context
+- PR diff: !`gh pr diff`
+- PR comments: !`gh pr view --comments`
+- Changed files: !`gh pr diff --name-only`
+
+## Your task
+Summarize this pull request...
+```
+
+Commands execute immediately (preprocessing), and output replaces the placeholder.
+
+## Subagent Execution
+
+Add `context: fork` to run skills in isolation:
+
+```yaml
+---
+name: deep-research
+description: Research a topic thoroughly
+context: fork
+agent: Explore
+---
+
+Research $ARGUMENTS thoroughly:
+
+1. Find relevant files using Glob and Grep
+2. Read and analyze the code
+3. Summarize findings with specific file references
+```
+
+### Agent Options
+
+The `agent` field specifies subagent configuration:
+
+- Built-in: `Explore`, `Plan`, `general-purpose`
+- Custom: Any subagent from `.claude/agents/`
+
+## Skill Types
+
+### Reference Content
+
+Knowledge Claude applies to current work (conventions, patterns, style guides):
+
+```yaml
+---
+name: api-conventions
+description: API design patterns for this codebase
+---
+When writing API endpoints:
+  - Use RESTful naming conventions
+  - Return consistent error formats
+  - Include request validation
+```
+
+### Task Content
+
+Step-by-step instructions for specific actions:
+
+```yaml
+---
+name: deploy
+description: Deploy the application to production
+context: fork
+disable-model-invocation: true
+---
+
+Deploy the application:
+1. Run the test suite
+2. Build the application
+3. Push to the deployment target
+```
+
+## Tool Restrictions
+
+Use `allowed-tools` to limit tools during skill execution:
+
+```yaml
+---
+name: safe-reader
+description: Read files without making changes
+allowed-tools: Read, Grep, Glob
+---
+```
+
+## Permission Control
+
+### Disable All Skills
+
+Add to deny rules in `/permissions`:
+
+```
+Skill
+```
+
+### Allow/Deny Specific Skills
+
+```
+# Allow only specific
+Skill(commit)
+Skill(review-pr *)
+
+# Deny specific
+Skill(deploy *)
+```
+
+Syntax: `Skill(name)` for exact match, `Skill(name *)` for prefix match.
+
+## Troubleshooting
+
+### Skill Not Triggering
+
+1. Check description includes keywords users would naturally say
+2. Verify skill appears in "What skills are available?"
+3. Try rephrasing request to match description
+4. Invoke directly with `/skill-name`
+
+### Skill Triggers Too Often
+
+1. Make description more specific
+2. Add `disable-model-invocation: true` for manual only
+
+### Claude Doesn't See All Skills
+
+Skill descriptions may exceed character budget (default 15,000 chars). Set `SLASH_COMMAND_TOOL_CHAR_BUDGET` environment variable to increase.
+
+## DSM-Specific Skill Patterns
+
+For data-source-manager development:
+
+### FCP Protocol Skill
+
+```yaml
+---
+name: fcp-protocol
+description: Failover Control Protocol implementation guidance. Use when implementing FCP handlers, debugging failover issues, or working with FCP state machines.
+---
+
+## FCP Protocol Guidelines
+
+When implementing FCP handlers:
+
+1. **Timestamp handling**: All timestamps must be UTC, use `datetime.utcnow()`
+2. **State transitions**: Follow state machine diagram in @references/fcp-state-machine.md
+3. **Error handling**: Never silently fail - log all errors with context
+4. **Rate limits**: Respect exchange-specific rate limits from @references/rate-limits.md
+
+## Common Patterns
+
+- Use the `FCPManager` class for state management
+- Implement retry logic with exponential backoff
+- Validate symbol formats before API calls
+
+See @references/fcp-examples.md for implementation examples.
+```
+
+### Exchange Integration Skill
+
+```yaml
+---
+name: exchange-integration
+description: Guidelines for implementing exchange API integrations. Use when adding new exchanges, debugging API calls, or implementing data fetchers.
+allowed-tools: Read, Grep, Glob, Bash
+---
+
+## Exchange Integration Guidelines
+
+1. **Symbol formats**: Follow exchange-specific conventions
+   - Binance: `BTCUSDT`
+   - OKX: `BTC-USDT`
+   - See @references/symbol-formats.md
+
+2. **Rate limiting**: Implement proper rate limit handling
+   - Use `RateLimiter` class from `src/data_source_manager/utils/`
+   - Check @references/exchange-rate-limits.md for limits
+
+3. **Error handling**: Use domain-specific exceptions
+   - `ExchangeAPIError` for API failures
+   - `RateLimitError` for rate limit hits
+   - `DataValidationError` for invalid responses
+
+4. **Testing**: Write tests for all new integrations
+   - Use `pytest` fixtures from `tests/conftest.py`
+   - Mock external API calls
+```
+
+### DSM Testing Skill
+
+````yaml
+---
+name: dsm-testing
+description: Test writing guidance for data-source-manager. Use when writing tests, fixing test failures, or setting up test fixtures.
+context: fork
+agent: general-purpose
+allowed-tools: Bash, Read, Edit, Grep
+---
+
+## Test Writing Guidelines
+
+Run tests with:
+```bash
+uv run pytest tests/ -v
+````
+
+### Test Structure
+
+1. **Fixtures**: Use fixtures from `tests/conftest.py`
+2. **Mocking**: Mock external APIs with `pytest-mock`
+3. **Assertions**: Use descriptive assertion messages
+
+### Coverage Requirements
+
+- All FCP state transitions must have tests
+- Exchange integrations need success and failure cases
+- Timestamp handling needs edge case tests
+
+### Running Specific Tests
+
+```bash
+# FCP tests
+uv run pytest tests/test_fcp.py -v
+
+# Exchange tests
+uv run pytest tests/exchanges/ -v
+
+# With coverage
+uv run pytest --cov=src/data_source_manager
+```
+
+```
+
+### Project Skill Directory
+
+```
+
+.claude/skills/
+├── fcp-protocol/
+│ ├── SKILL.md
+│ └── references/
+│ ├── fcp-state-machine.md
+│ ├── fcp-examples.md
+│ └── rate-limits.md
+├── exchange-integration/
+│ ├── SKILL.md
+│ └── references/
+│ ├── symbol-formats.md
+│ └── exchange-rate-limits.md
+└── dsm-testing/
+└── SKILL.md
+
+```
+
+```
