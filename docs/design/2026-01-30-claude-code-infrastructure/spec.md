@@ -1677,6 +1677,95 @@ git worktree remove ../dsm-worktrees/fcp-refactor
 | Binance fixes + OKX implementation | Yes              |
 | Symbol normalization + Docs update | Yes              |
 
+## Configuration Sync & Team Sharing
+
+Based on [Chezmoi Sync Guide](https://www.arun.blog/sync-claude-code-with-chezmoi-and-age/), [Dotfiles Sync](https://github.com/NovaAI-innovation/claude-code-mastery/blob/main/docs/guides/dotfiles-sync.md), and [Anthropic Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices).
+
+### CLAUDE.md Location Hierarchy
+
+| Location              | Scope        | When Loaded                  |
+| --------------------- | ------------ | ---------------------------- |
+| `~/.claude/CLAUDE.md` | Global       | All Claude sessions          |
+| `./CLAUDE.md`         | Project      | Working in this repo         |
+| `./CLAUDE.local.md`   | Local only   | Personal overrides           |
+| `parent/CLAUDE.md`    | Monorepo     | Inherited by child dirs      |
+| `child/CLAUDE.md`     | Subdirectory | On-demand when working there |
+
+### Team Sharing Strategy
+
+| File                    | Commit to Git? | Reason                      |
+| ----------------------- | -------------- | --------------------------- |
+| `CLAUDE.md`             | Yes            | Share conventions with team |
+| `CLAUDE.local.md`       | No             | Personal preferences        |
+| `.claude/settings.json` | Yes            | Team permission rules       |
+| `settings.local.json`   | No             | Personal tool overrides     |
+| `.claude/agents/`       | Yes            | Shared agent configurations |
+| `.claude/commands/`     | Yes            | Shared slash commands       |
+| `.claude/rules/`        | Yes            | Domain-specific context     |
+| `.claude/hooks/`        | Yes            | Team code quality checks    |
+
+### Files to Sync via Dotfiles
+
+```
+~/.claude/
+├── CLAUDE.md          # Sync (global preferences)
+├── settings.json      # Sync (global permissions)
+├── commands/          # Sync (personal commands)
+├── skills/            # Sync (personal skills)
+└── plugins/           # Sync (marketplace plugins)
+```
+
+**Do NOT sync**: Session data, cache files, project-specific files.
+
+### Dotfiles Structure Example
+
+```
+dotfiles/
+├── dot_claude/
+│   ├── CLAUDE.md
+│   ├── settings.json
+│   ├── commands/
+│   │   └── my-workflow.md
+│   └── skills/
+│       └── my-skill/
+└── install.sh          # Symlinks to ~/.claude/
+```
+
+### Encrypted Sync with Chezmoi + Age
+
+For sensitive configs (API keys in hooks):
+
+```bash
+# Initialize with age encryption
+chezmoi init --apply
+
+# Add encrypted file
+chezmoi add --encrypt ~/.claude/settings.json
+
+# Sync across machines
+chezmoi update
+```
+
+### CLAUDE.md Maintenance Best Practices
+
+| Practice         | Description                                     |
+| ---------------- | ----------------------------------------------- |
+| Prune regularly  | Remove instructions that don't affect behavior  |
+| Test changes     | Observe if Claude's behavior shifts             |
+| Use emphasis     | "IMPORTANT" or "YOU MUST" for critical rules    |
+| Include in PRs   | Add CLAUDE.md changes with related code changes |
+| Use `#` shortcut | Press `#` to add instructions Claude remembers  |
+
+### DSM Configuration Sharing
+
+| Component             | Committed? | Notes                              |
+| --------------------- | ---------- | ---------------------------------- |
+| Root CLAUDE.md        | Yes        | DSM conventions for all developers |
+| .claude/settings.json | Yes        | Permission rules (no secrets)      |
+| All agents/commands   | Yes        | Domain-specific workflows          |
+| hooks/hooks.json      | Yes        | Code quality automation            |
+| CLAUDE.local.md       | No         | Individual preferences             |
+
 ## Verification Checklist
 
 ### Infrastructure

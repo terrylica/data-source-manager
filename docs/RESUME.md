@@ -4,6 +4,26 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Configuration Sync & Team Sharing (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added CLAUDE.md location hierarchy table
+- Added team sharing strategy table (commit vs gitignore)
+- Added files to sync via dotfiles structure
+- Added dotfiles directory structure example
+- Added encrypted sync with Chezmoi + Age
+- Added CLAUDE.md maintenance best practices table
+- Added DSM configuration sharing table
+
+**Sources**:
+
+- [Chezmoi Sync Guide](https://www.arun.blog/sync-claude-code-with-chezmoi-and-age/)
+- [Dotfiles Sync](https://github.com/NovaAI-innovation/claude-code-mastery/blob/main/docs/guides/dotfiles-sync.md)
+- [Anthropic Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+
 ### Workspace & Session Management (2026-01-30)
 
 **Status**: Complete
