@@ -40706,3 +40706,220 @@ WSL1 does not support sandboxing.
 2. `/bug` - Report to Anthropic
 3. [GitHub Issues](https://github.com/anthropics/claude-code)
 4. Ask Claude about capabilities
+## Extended Thinking Reference
+
+Guide Claude to spend more time reasoning through complex problems with extended thinking mode.
+
+### Overview
+
+Extended thinking allows Claude to work through problems step-by-step before responding, improving performance on difficult tasks.
+
+**Key capabilities**:
+
+- Complex multi-step reasoning
+- Reflection after tool use
+- Better instruction following
+- Self-verification
+
+### Configuration
+
+#### In Claude Code
+
+```bash
+# Toggle via command menu
+/  → Toggle extended thinking
+
+# Or via settings
+/config → Extended thinking
+```
+
+Default budget: 31,999 tokens (billed as output tokens).
+
+#### Environment Variable
+
+```bash
+export MAX_THINKING_TOKENS=8000  # Lower budget for simple tasks
+```
+
+#### API Parameters
+
+```json
+{
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 16000
+  }
+}
+```
+
+Minimum budget: 1,024 tokens.
+
+### Budget Recommendations
+
+| Task Complexity | Budget        | Use Case                         |
+| --------------- | ------------- | -------------------------------- |
+| Simple          | 1,024-2,000   | Quick decisions, basic reasoning |
+| Medium          | 4,000-8,000   | Multi-step problems, code review |
+| Complex         | 16,000-32,000 | Architecture, debugging, STEM    |
+| Very Complex    | 32,000+       | Use batch processing             |
+
+Start small and increase only if quality improves.
+
+### Prompting Techniques
+
+#### General Instructions Over Step-by-Step
+
+**Better**:
+
+```
+Think about this problem thoroughly. Consider multiple
+approaches and show your complete reasoning.
+```
+
+**Avoid**:
+
+```
+Think step by step:
+1. First identify X
+2. Then calculate Y
+...
+```
+
+Claude's creativity often exceeds prescribed processes.
+
+#### Verification Prompts
+
+```
+Write a function to calculate factorial.
+Before finishing, verify with test cases:
+- n=0, n=1, n=5, n=10
+Fix any issues you find.
+```
+
+#### Constraint Optimization
+
+Extended thinking excels with multiple constraints:
+
+```
+Plan a 7-day trip with constraints:
+- Budget $2,500
+- Must include Tokyo and Kyoto
+- Vegetarian diet
+- Prefer cultural experiences
+- One hiking day
+- Max 2 hours travel between locations
+```
+
+### Interleaved Thinking
+
+Claude 4 models support thinking between tool calls.
+
+**Benefits**:
+
+- Reason about tool results before next action
+- Chain multiple tool calls with reasoning
+- Make nuanced decisions based on intermediate results
+
+Enabled via beta header: `interleaved-thinking-2025-05-14`
+
+### Streaming
+
+Required when `max_tokens > 21,333`.
+
+```bash
+claude -p "Complex task" \
+  --output-format stream-json \
+  --verbose \
+  --include-partial-messages
+```
+
+Both thinking and text content blocks stream as they arrive.
+
+### Caching Considerations
+
+| What Changes                | Cache Impact              |
+| --------------------------- | ------------------------- |
+| Thinking enabled/disabled   | Invalidates message cache |
+| Budget allocation change    | Invalidates message cache |
+| Interleaved thinking blocks | Amplifies invalidation    |
+| System prompts              | Remain cached             |
+| Tool definitions            | Remain cached             |
+
+For long thinking tasks (>5 min), use 1-hour cache duration.
+
+### Context Window
+
+```
+context_window = input_tokens - previous_thinking_tokens + current_turn_tokens
+```
+
+Previous thinking blocks are automatically ignored - no manual removal needed.
+
+### Best Practices
+
+| Practice                      | Reason                               |
+| ----------------------------- | ------------------------------------ |
+| Start with minimum budget     | Find optimal range incrementally     |
+| Don't pass thinking back      | Doesn't improve, may degrade results |
+| Don't prefill thinking        | Explicitly not allowed               |
+| Benchmark accuracy vs latency | Find sweet spot for your use case    |
+| Use batch for >32K budgets    | Avoid network timeouts               |
+
+### What NOT to Do
+
+- Don't push for more tokens just for tokens' sake
+- Don't manually change output text after thinking block
+- Don't use for simple tasks where reasoning isn't needed
+- Don't stream raw thinking to end users without safety considerations
+
+### When to Use Extended Thinking
+
+| Use                            | Skip                 |
+| ------------------------------ | -------------------- |
+| Complex STEM problems          | Simple lookups       |
+| Multi-constraint optimization  | Basic formatting     |
+| Architecture decisions         | File operations      |
+| Debugging complex issues       | Routine code changes |
+| Code review with deep analysis | Quick edits          |
+
+### DSM-Specific Patterns
+
+#### FCP Decision Analysis
+
+```
+Analyze the FCP decision logic for BTCUSDT:
+- Cache state and timestamps
+- Source availability
+- Fallback conditions
+Think thoroughly about edge cases.
+```
+
+#### Complex Debugging
+
+```
+Debug the symbol format conversion issue.
+Consider multiple approaches and verify
+your solution handles all exchange formats.
+```
+
+#### Architecture Review
+
+```
+Review the data source abstraction layer.
+Apply the SOLID principles and identify
+any violations with suggested fixes.
+```
+
+### Cost Optimization
+
+Extended thinking tokens are billed as output tokens.
+
+```bash
+# Lower budget for routine tasks
+export MAX_THINKING_TOKENS=4000
+
+# Full budget for complex reasoning
+export MAX_THINKING_TOKENS=32000
+```
+
+Track usage with `/cost` to find optimal settings.
