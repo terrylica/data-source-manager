@@ -2915,6 +2915,180 @@ For data-source-manager specific refactoring:
 | DataFrame operations | Maintain Polars compatibility    |
 | Rate limiting        | Don't break backoff logic        |
 
+## Streaming Output & Formatting
+
+Control output format for scripts, CI/CD, and automation.
+
+### Output Format Options
+
+| Format      | Flag                          | Output Type             |
+| ----------- | ----------------------------- | ----------------------- |
+| Text        | `--output-format text`        | Plain text (default)    |
+| JSON        | `--output-format json`        | Full conversation log   |
+| Stream JSON | `--output-format stream-json` | Real-time NDJSON stream |
+
+### Streaming JSON for Automation
+
+```bash
+# Stream output as NDJSON
+claude -p "analyze this code" --output-format stream-json
+
+# Include partial messages
+claude -p --output-format stream-json --include-partial-messages "query"
+```
+
+### Stream Chaining
+
+Pipe conversations together:
+
+```bash
+# Input format for piped conversations
+claude -p --output-format json --input-format stream-json
+```
+
+### Parsing with jq
+
+Extract text content in real-time:
+
+```bash
+claude -p "query" --output-format stream-json | jq -j '.content // empty'
+```
+
+### CI/CD Integration
+
+```json
+// package.json
+{
+  "scripts": {
+    "lint:claude": "claude -p 'linter: report issues as filename:line description'"
+  }
+}
+```
+
+### Budget and Turn Limits
+
+| Flag               | Purpose              |
+| ------------------ | -------------------- |
+| `--max-budget-usd` | Cap spending per run |
+| `--max-turns`      | Limit agentic turns  |
+
+```bash
+claude -p --max-budget-usd 5.00 --max-turns 10 "complex task"
+```
+
+### Verbose Mode
+
+Enable turn-by-turn logging:
+
+```bash
+claude --verbose -p "query"
+```
+
+Toggle in interactive mode: `Ctrl+O`
+
+### System Prompt Customization
+
+| Flag                          | Behavior              | Modes               |
+| ----------------------------- | --------------------- | ------------------- |
+| `--system-prompt`             | Replace entire prompt | Interactive + Print |
+| `--system-prompt-file`        | Replace from file     | Print only          |
+| `--append-system-prompt`      | Append to default     | Interactive + Print |
+| `--append-system-prompt-file` | Append from file      | Print only          |
+
+### DSM CLI Usage
+
+```bash
+# Run DSM analysis with JSON output
+claude -p "analyze FCP cache hit rate for BTCUSDT" --output-format json > analysis.json
+
+# Pipe build errors to Claude
+cat build-error.txt | claude -p 'explain root cause' > diagnosis.txt
+```
+
+## Vision & Multimodal Analysis
+
+Using Claude Code's image understanding capabilities.
+
+### Adding Images to Conversations
+
+| Method        | How to Use                                |
+| ------------- | ----------------------------------------- |
+| Drag and drop | Drag image into Claude Code window        |
+| Paste         | Copy image, paste with Ctrl+V (not Cmd+V) |
+| File path     | "Analyze this: /path/to/image.png"        |
+
+### Image Limits
+
+| Limit                  | Value             |
+| ---------------------- | ----------------- |
+| Max size               | 8000x8000 px      |
+| Max images (API)       | 100 per request   |
+| Max images (claude.ai) | 20 per request    |
+| Multi-image limit      | 2000x2000 px each |
+
+### Analysis Prompts
+
+```
+> What does this image show?
+> Describe the UI elements in this screenshot
+> Are there any problematic elements in this diagram?
+```
+
+### Error Screenshot Analysis
+
+```
+> Here's a screenshot of the error. What's causing it?
+```
+
+### Design to Code
+
+```
+> Generate CSS to match this design mockup
+> What HTML structure would recreate this component?
+```
+
+### Chart and Diagram Analysis
+
+```
+> Analyze this architecture diagram
+> Extract data from this chart
+> Review this database schema diagram
+```
+
+### OCR Capabilities
+
+Claude can accurately transcribe text from:
+
+- Retail receipts and labels
+- Logistics documents
+- Financial statements
+- Screenshots with text
+
+### Limitations
+
+| Limitation         | Details                           |
+| ------------------ | --------------------------------- |
+| No person ID       | Cannot identify named individuals |
+| Low quality images | May hallucinate details           |
+| Rotated images     | Reduced accuracy                  |
+| Small images       | Issues under 200 pixels           |
+
+### Opening Images
+
+When Claude references images (e.g., `[Image #1]`):
+
+- macOS: `Cmd+Click` to open in default viewer
+- Windows/Linux: `Ctrl+Click` to open
+
+### DSM Vision Use Cases
+
+| Use Case              | Application                     |
+| --------------------- | ------------------------------- |
+| Chart analysis        | Analyze candlestick screenshots |
+| Error screenshots     | Debug from terminal screenshots |
+| API response viewing  | Analyze JSON viewer screenshots |
+| Architecture diagrams | Review FCP flow diagrams        |
+
 ## Verification Checklist
 
 ### Infrastructure
