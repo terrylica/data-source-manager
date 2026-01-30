@@ -4,6 +4,23 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Debugging & Troubleshooting Section (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added diagnostic commands table (/doctor, /context, /memory, /compact, /clear, /bug)
+- Added context management table with usage levels and actions
+- Added debugging flags (CLAUDE_DEBUG, --mcp-debug, config list)
+- Added session recovery flags (--continue, --resume, /rename)
+- Added context poisoning prevention pattern
+
+**Sources**:
+
+- [Official Best Practices](https://code.claude.com/docs/en/best-practices)
+- [ClaudeLog Troubleshooting](https://claudelog.com/troubleshooting/)
+
 ### Advanced Hook Patterns from cc-skills (2026-01-30)
 
 **Status**: Complete

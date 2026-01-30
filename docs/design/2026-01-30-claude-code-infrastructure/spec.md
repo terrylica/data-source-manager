@@ -854,6 +854,62 @@ From [Official Plugin Marketplace Docs](https://code.claude.com/docs/en/plugin-m
 
 Team members are automatically prompted to install the marketplace when they trust the project folder.
 
+## Debugging & Troubleshooting
+
+Based on [Official Best Practices](https://code.claude.com/docs/en/best-practices) and [ClaudeLog Troubleshooting](https://claudelog.com/troubleshooting/).
+
+### Diagnostic Commands
+
+| Command    | Purpose                                       |
+| ---------- | --------------------------------------------- |
+| `/doctor`  | Run diagnostics on installation               |
+| `/context` | Check context window usage                    |
+| `/memory`  | Show loaded CLAUDE.md and rules files         |
+| `/compact` | Summarize history, preserve essential context |
+| `/clear`   | Reset conversation completely                 |
+| `/bug`     | Report issues with full context               |
+
+### Context Management
+
+| Usage Level | Action                       | Result          |
+| ----------- | ---------------------------- | --------------- |
+| ~72%        | Run `/compact`               | Reduces to ~36% |
+| ~88%        | Commit changes, run `/clear` | Reduces to 0%   |
+| Degraded    | Break into smaller tasks     | Better focus    |
+
+**Signs of context depletion**: Short responses, forgotten instructions, inconsistent behavior.
+
+### Debugging Flags
+
+```bash
+# Verbose logging
+CLAUDE_DEBUG=1 claude
+
+# MCP connection debugging
+claude --mcp-debug
+
+# Check configuration
+claude config list
+```
+
+### Session Recovery
+
+| Flag         | Purpose                        |
+| ------------ | ------------------------------ |
+| `--continue` | Resume last session            |
+| `--resume`   | Choose from recent sessions    |
+| `/rename`    | Name sessions for easy finding |
+
+### Context Poisoning Prevention
+
+When switching tasks, use explicit boundaries:
+
+```
+---NEW TASK---
+Starting fresh implementation of [feature].
+Do not carry over patterns from previous tasks.
+```
+
 ## Verification Checklist
 
 - [ ] CLAUDE.md is under 300 lines
