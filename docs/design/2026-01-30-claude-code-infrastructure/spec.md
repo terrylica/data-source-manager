@@ -11506,6 +11506,7 @@ Use LLM evaluation instead of bash:
   }
 }
 ```
+
 ## Skills Reference
 
 ### Overview
@@ -11909,3 +11910,291 @@ In managed settings:
 4. **Test locally first**: Validate before distribution
 5. **Use GitHub for public**: Built-in version control
 6. **Pin versions in enterprise**: Stability over freshness
+
+---
+
+## Headless Mode and SDK
+
+Claude Code supports headless operation for CI/CD pipelines, automation scripts, and programmatic usage without interactive terminals.
+
+### CLI Flags for Headless Mode
+
+```bash
+# Basic headless execution with prompt
+claude -p "Explain this code" --print
+
+# Pipe input to Claude
+cat file.py | claude -p "Review this code"
+
+# Print-only mode (no interactive session)
+claude --print "What does this function do?"
+```
+
+### Output Format Options
+
+```bash
+# Plain text output (default)
+claude -p "Generate a function" --output-format text
+
+# JSON output for parsing
+claude -p "List all functions" --output-format json
+
+# Streaming JSON for real-time processing
+claude -p "Refactor this code" --output-format stream-json
+```
+
+### JSON Output Schema
+
+```json
+{
+  "type": "result",
+  "subtype": "success",
+  "cost_usd": 0.003,
+  "is_error": false,
+  "duration_ms": 1234,
+  "duration_api_ms": 1100,
+  "num_turns": 1,
+  "result": "Generated code here...",
+  "session_id": "abc123"
+}
+```
+
+### Streaming JSON Processing
+
+```bash
+# Process streaming output with jq
+claude -p "Generate tests" --output-format stream-json | \
+  jq -c 'select(.type == "assistant") | .message.content[0].text'
+
+# Extract final result
+claude -p "Analyze code" --output-format stream-json | \
+  jq -s '.[-1] | select(.type == "result")'
+```
+
+### Auto-Approve Tools in Headless
+
+```bash
+# Approve all tools (use with caution)
+claude -p "Run tests" --dangerously-skip-permissions
+
+# Approve specific tool patterns
+claude -p "Format code" --allowedTools "Bash(prettier *)" --allowedTools "Edit(*)"
+```
+
+### Session Continuation
+
+```bash
+# Continue last session
+claude --continue
+
+# Resume specific session
+claude --resume abc123
+
+# Continue with new prompt
+claude --continue -p "Now add error handling"
+```
+
+### CI/CD Integration
+
+```yaml
+# GitHub Actions example
+- name: Code Review with Claude
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  run: |
+    git diff HEAD~1 | claude -p "Review these changes" --print
+```
+
+### Authentication in CI/CD
+
+```bash
+# Environment variable (recommended)
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Or via config file
+echo '{"apiKey": "sk-ant-..."}' > ~/.claude/config.json
+```
+
+### Structured Output with JSON Schema
+
+```bash
+# Enforce output schema
+claude -p "Extract function signatures" \
+  --output-format json \
+  --json-schema '{"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "params": {"type": "array"}}}}'
+```
+
+### DSM Headless Patterns
+
+```bash
+# Validate FCP behavior
+claude -p "Check FCP for BTCUSDT" \
+  --allowedTools "Bash(uv run *)" \
+  --output-format json
+
+# Generate tests headlessly
+claude -p "Write tests for src/data_source_manager/core/manager.py" \
+  --allowedTools "Read(*)" --allowedTools "Write(tests/*)" \
+  --print
+
+# CI pipeline validation
+cat src/data_source_manager/core/fcp.py | \
+  claude -p "Check for silent failure patterns" \
+  --output-format json | \
+  jq '.result | test("bare except|except Exception") | not'
+```
+
+---
+
+## CLAUDE.md Best Practices
+
+Effective CLAUDE.md files optimize context usage while providing essential project guidance.
+
+### Core Structure
+
+```markdown
+# Project Name
+
+Brief description (1-2 sentences).
+
+## Quick Start
+
+Essential commands to get started.
+
+## Architecture
+
+Key patterns and decisions.
+
+## Conventions
+
+Code style, naming, testing patterns.
+
+## Common Tasks
+
+Frequent workflows with examples.
+```
+
+### Token Optimization Principles
+
+1. **Keep CLAUDE.md under 500 lines**: Large files waste context on every message
+2. **Use progressive disclosure**: Link to detailed docs instead of embedding
+3. **Prefer tables over prose**: More scannable, fewer tokens
+4. **Avoid redundancy**: Don't repeat what's in code comments or README
+5. **Update regularly**: Remove outdated information
+
+### What to Include
+
+| Include                   | Exclude                   |
+| ------------------------- | ------------------------- |
+| Project-specific patterns | Generic language patterns |
+| Critical invariants       | Obvious conventions       |
+| Common gotchas            | Full API documentation    |
+| Essential commands        | Exhaustive command lists  |
+| Architecture decisions    | Implementation details    |
+| Testing requirements      | Test case specifics       |
+
+### Hub-Spoke Pattern
+
+```markdown
+# Root CLAUDE.md
+
+**Navigation**: [src/](src/CLAUDE.md) | [tests/](tests/CLAUDE.md) | [docs/](docs/CLAUDE.md)
+
+## Project Overview
+
+...
+
+## Key Patterns
+
+...
+```
+
+Each subdirectory has focused CLAUDE.md:
+
+```markdown
+# src/CLAUDE.md
+
+**Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [tests/](../tests/CLAUDE.md)
+
+## Directory-Specific Context
+
+...
+```
+
+### Using @ Imports
+
+```markdown
+## References
+
+For detailed FCP documentation:
+@docs/skills/dsm-fcp-monitor/references/fcp-protocol.md
+
+For testing patterns:
+@docs/skills/dsm-testing/examples/
+```
+
+### Permission Configuration
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(mise run *)",
+      "Read(src/**)",
+      "Edit(src/**)"
+    ],
+    "deny": ["Read(.env*)", "Bash(rm -rf *)", "Bash(git push --force *)"]
+  }
+}
+```
+
+### Verification Criteria Pattern
+
+```markdown
+## Testing Requirements
+
+Before submitting changes:
+
+1. `uv run pytest tests/unit/` passes
+2. `uv run pytest tests/integration/` passes
+3. `uv run ruff check src/` clean
+4. `uv run mypy src/` no errors
+```
+
+### Explore-Plan-Code Workflow
+
+```markdown
+## Development Workflow
+
+1. **Explore**: Understand existing code before changes
+2. **Plan**: Outline approach, identify affected files
+3. **Code**: Implement with tests
+4. **Verify**: Run all checks before committing
+```
+
+### Context Efficiency Tips
+
+1. **Use glob patterns**: `src/**/*.py` instead of listing files
+2. **Reference by path**: "See `src/core/manager.py:45`" instead of copying code
+3. **Link don't embed**: "@docs/architecture.md" instead of copying content
+4. **Keep examples minimal**: Show pattern, not exhaustive cases
+
+### DSM CLAUDE.md Hierarchy
+
+```
+CLAUDE.md                 # Root: Overview, commands, patterns
+├── src/CLAUDE.md         # Source: Architecture, modules, imports
+├── tests/CLAUDE.md       # Tests: Patterns, fixtures, markers
+├── docs/CLAUDE.md        # Docs: ADR format, navigation
+└── examples/CLAUDE.md    # Examples: Conventions, common patterns
+```
+
+### Anti-Patterns to Avoid
+
+1. **Giant monolithic files**: Split into hierarchy
+2. **Duplicating README**: CLAUDE.md is for AI, README for humans
+3. **Listing every file**: Use glob patterns
+4. **Full code snippets**: Reference by path instead
+5. **Outdated information**: Review monthly
+6. **Generic advice**: Only project-specific guidance
