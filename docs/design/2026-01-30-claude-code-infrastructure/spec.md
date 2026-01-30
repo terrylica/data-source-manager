@@ -4645,6 +4645,200 @@ For codebases over 100k LOC:
 3. Focus queries on specific domains
 4. Leverage CLAUDE.md hierarchy
 
+## Pair Programming Workflows
+
+Human-AI collaboration patterns for effective development.
+
+### Collaboration Modes
+
+| Mode              | Use Case                             |
+| ----------------- | ------------------------------------ |
+| Interactive       | Permission prompts, review each step |
+| Auto-accept edits | Trust Claude for simple tasks        |
+| Full autonomy     | Isolated environment, sandboxed      |
+
+### Progression Pattern
+
+Start conservative, increase autonomy:
+
+1. **Beginner**: Check everything Claude does
+2. **Intermediate**: Auto-accept for trusted patterns
+3. **Advanced**: Full autonomy in isolated environments
+
+### Plan Mode Workflow
+
+```
+1. Start in Plan Mode (Shift+Tab or --permission-mode plan)
+2. Iterate on plan until satisfied
+3. Switch to auto-accept edits mode
+4. Claude executes the plan (often 1-shot)
+```
+
+### Test-Driven Pair Programming
+
+```
+> Write tests based on these expected input/output pairs:
+> Input: "BTCUSDT" -> Output: {"symbol": "BTCUSDT", "market": "futures"}
+> Use TDD - write tests first, then implement
+```
+
+Being explicit about TDD prevents mock implementations.
+
+### Team CLAUDE.md Practices
+
+| Practice          | Benefit                    |
+| ----------------- | -------------------------- |
+| Document mistakes | Claude learns from errors  |
+| Style conventions | Consistent code generation |
+| Design guidelines | Architectural alignment    |
+| @.claude PR tags  | Continuous improvement     |
+
+### IDE Integration Benefits
+
+| IDE       | Features                              |
+| --------- | ------------------------------------- |
+| VS Code   | Inline diffs, @-mentions, plan review |
+| JetBrains | IDE diff viewing, context sharing     |
+| Terminal  | Full CLI power, scripting             |
+
+### Safe Autonomy Environments
+
+For full autonomous mode:
+
+- Isolated compute (VM or container)
+- Isolated user account
+- Docker image boundaries
+- Sandboxed filesystem
+
+### Collaboration Anti-Patterns
+
+| Avoid                   | Instead                       |
+| ----------------------- | ----------------------------- |
+| Giving Claude free rein | Define clear boundaries       |
+| Ignoring CLAUDE.md      | Document learnings            |
+| Skip code review        | Review autonomous changes     |
+| No rollback plan        | Commit before autonomous work |
+
+### DSM Pair Programming Tips
+
+| Task          | Recommended Approach         |
+| ------------- | ---------------------------- |
+| FCP changes   | Plan Mode + careful review   |
+| Test writing  | Auto-accept after TDD prompt |
+| Documentation | Auto-accept with style guide |
+| New providers | Plan Mode + incremental      |
+| Bug fixes     | Interactive for diagnosis    |
+
+## Error Handling & Resilience Patterns
+
+Retry logic, circuit breakers, and graceful degradation.
+
+### Retry Pattern Components
+
+| Component           | Purpose                                |
+| ------------------- | -------------------------------------- |
+| Max retries         | Prevent infinite loops (3-5)           |
+| Exponential backoff | Increasing delay between retries       |
+| Jitter              | ±25% randomness avoids thundering herd |
+| Circuit breaker     | Stop retrying after threshold          |
+
+### Exponential Backoff Implementation
+
+```python
+# DSM pattern for API retries
+import tenacity
+
+@tenacity.retry(
+    wait=tenacity.wait_exponential(multiplier=1, min=1, max=60),
+    stop=tenacity.stop_after_attempt(5),
+    retry=tenacity.retry_if_exception_type(RateLimitError)
+)
+def fetch_with_retry():
+    ...
+```
+
+### Rate Limit Handling (429 Errors)
+
+| Strategy                | Benefit                  |
+| ----------------------- | ------------------------ |
+| Read retry-after header | Exact wait time          |
+| Prompt caching          | 5x effective throughput  |
+| Request queuing         | Smooth out bursts        |
+| Tier optimization       | Higher limits with spend |
+
+### Circuit Breaker States
+
+```
+CLOSED → OPEN → HALF-OPEN → CLOSED
+   ↓        ↓        ↓
+Normal   Blocking   Testing
+```
+
+- **CLOSED**: Normal operation
+- **OPEN**: All requests fail fast
+- **HALF-OPEN**: Test recovery
+
+### Graceful Degradation
+
+| Failure         | Degradation Strategy        |
+| --------------- | --------------------------- |
+| API timeout     | Return cached data          |
+| Rate limit      | Queue and retry later       |
+| Parse error     | Log and skip malformed      |
+| Network failure | Exponential backoff + alert |
+
+### Error Recovery Skill
+
+Add to `.claude/commands/`:
+
+```yaml
+---
+name: recover-errors
+description: Diagnose and fix error patterns
+user-invocable: true
+---
+
+Analyze error patterns in the codebase:
+1. Find bare except clauses
+2. Find missing error handling
+3. Identify missing retries on network calls
+4. Suggest improvements with proper patterns
+```
+
+### DSM Error Handling Rules
+
+Add to CLAUDE.md:
+
+```markdown
+# Error Handling
+
+- Always use specific exception types
+- Implement retry with exponential backoff for API calls
+- Log errors with structured context
+- Never swallow exceptions silently
+- Return FetchResult with failure info, not None
+```
+
+### DSM-Specific Patterns
+
+| Error Type          | Handling Pattern             |
+| ------------------- | ---------------------------- |
+| RateLimitError      | Exponential backoff + cache  |
+| SymbolNotFoundError | Return empty DataFrame + log |
+| NetworkError        | Retry with circuit breaker   |
+| ParseError          | Log + skip + alert           |
+| CacheError          | Fallback to fresh fetch      |
+
+### Known Issue: Rate Limit as Success
+
+Claude Code returns "You've hit your limit" with exit code 0.
+
+Mitigation:
+
+- Check output content, not just exit code
+- Parse for rate limit messages
+- Implement output validation
+
 ## Verification Checklist
 
 ### Infrastructure
