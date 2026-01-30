@@ -53,5 +53,14 @@ run = "uv build"
 description = "Clean build artifacts"
 run = "rm -rf dist/ build/ *.egg-info src/*.egg-info"
 
+# Documentation tasks
+[tasks."docs:links"]
+description = "Check documentation links (offline mode)"
+run = "lychee --offline --root . ."
+
+[tasks."docs:check"]
+description = "Run all documentation checks"
+depends = ["docs:links"]
+
 # Release tasks are in .mise/tasks/release/ directory
 # Run: mise run release:preflight, release:dry, release:full

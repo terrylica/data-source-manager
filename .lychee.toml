@@ -1,46 +1,48 @@
 # Lychee link checker configuration
-# See: https://lychee.cli.rs/
+# https://lychee.cli.rs/configuration/
+
+# Check offline only (no network requests)
+# Validates internal documentation links without external dependencies
+offline = true
+
+# Skip progress bar (cleaner output)
+no_progress = true
 
 # Cache results for faster re-runs
 cache = true
 
-# Max concurrent requests
-max_concurrency = 16
-
-# Request timeout in seconds
-timeout = 30
-
-# Accept these status codes as valid
-accept = [200, 204, 206, 301, 302, 307, 308]
-
-# Skip these URLs (patterns)
-exclude = [
-    # Local-only paths that won't resolve in CI
-    "^file://",
-    # Internal network URLs
-    "^http://localhost",
-    "^http://127\\.0\\.0\\.1",
-    # GitHub rate limiting issues
-    "^https://github\\.com/.*/blob/",
-    # Binance Vision API (requires auth)
-    "^https://data\\.binance\\.vision",
-]
-
-# Skip these file patterns
+# Exclude directories that should not be link-checked
+# Note: These are REGEX patterns, not globs
 exclude_path = [
-    "node_modules",
-    ".venv",
+    # Python artifacts
     "__pycache__",
-    ".git",
+    "\\.venv",
     "dist",
     "build",
+    # Git and Node
+    "\\.git",
+    "node_modules",
+    # Test cache directories
+    "tests/binance_data_cache",
+    "test_cache",
+    # Local-only documentation (gitignored)
+    "^docs/journals",
+    "^docs/sr&ed",
+]
+
+# Exclude link targets (URL patterns to skip checking)
+exclude = [
+    # Local-only paths that won't resolve
+    "^file://",
+    # Binance Vision API (requires auth, not checkable offline)
+    "^https://data\\.binance\\.vision",
 ]
 
 # Markdown files only
 include = ["**/*.md"]
 
-# Output format
-output = "compact"
-
 # Don't check mail addresses
 exclude_mail = true
+
+# Output format
+output = "compact"
