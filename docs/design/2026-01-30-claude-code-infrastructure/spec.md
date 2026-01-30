@@ -37203,3 +37203,421 @@ Keep interviewing until we've covered everything, then write a complete spec to 
 - [How Claude Code Works](https://code.claude.com/docs/en/how-claude-code-works)
 - [Common Workflows](https://code.claude.com/docs/en/common-workflows)
 - [Extend Claude Code](https://code.claude.com/docs/en/features-overview)
+## Common Workflows Reference
+
+Step-by-step guides for codebase exploration, debugging, refactoring, testing, PRs, documentation, images, and sessions.
+
+### Codebase Exploration
+
+#### Quick Overview
+
+```txt
+> give me an overview of this codebase
+> explain the main architecture patterns used here
+> what are the key data models?
+> how is authentication handled?
+```
+
+#### Find Relevant Code
+
+```txt
+> find the files that handle user authentication
+> how do these authentication files work together?
+> trace the login process from front-end to database
+```
+
+**Tips**:
+
+- Start with broad questions, narrow down
+- Use domain language from the project
+- Install a code intelligence plugin for precise navigation
+
+### Debugging Workflows
+
+#### Share Error and Fix
+
+```txt
+> I'm seeing an error when I run npm test
+> suggest a few ways to fix the @ts-ignore in user.ts
+> update user.ts to add the null check you suggested
+```
+
+**Tips**:
+
+- Tell Claude the command to reproduce
+- Mention steps to reproduce
+- Note if error is intermittent or consistent
+
+### Refactoring Workflows
+
+#### Identify and Refactor
+
+```txt
+> find deprecated API usage in our codebase
+> suggest how to refactor utils.js to use modern JavaScript features
+> refactor utils.js to use ES2024 features while maintaining same behavior
+> run tests for the refactored code
+```
+
+**Tips**:
+
+- Ask Claude to explain benefits of modern approach
+- Request backward compatibility when needed
+- Do refactoring in small, testable increments
+
+### Testing Workflows
+
+#### Add Tests for Uncovered Code
+
+```txt
+> find functions in NotificationsService.swift that are not covered by tests
+> add tests for the notification service
+> add test cases for edge conditions in the notification service
+> run the new tests and fix any failures
+```
+
+Claude examines existing test files to match style, frameworks, and patterns.
+
+#### Test-Driven Development
+
+```txt
+> write tests based on these expected input/output pairs:
+> - "BTCUSDT" -> "BTC/USDT"
+> - "btc/usdt" -> "BTC/USDT"
+> - "BTC-USDT" -> "BTC/USDT"
+> then implement the function to pass the tests
+```
+
+Be explicit about TDD to avoid mock implementations.
+
+### Plan Mode
+
+Plan Mode creates a plan by analyzing the codebase with read-only operations.
+
+#### When to Use
+
+- Multi-step implementation (edits to many files)
+- Code exploration (research before changing)
+- Interactive development (iterate on direction)
+
+#### How to Use
+
+**During session**: `Shift+Tab` to cycle modes (Normal → Auto-Accept → Plan)
+
+**Start new session in Plan Mode**:
+
+```bash
+claude --permission-mode plan
+```
+
+**Headless Plan Mode**:
+
+```bash
+claude --permission-mode plan -p "Analyze authentication system and suggest improvements"
+```
+
+**Configure as default**:
+
+```json
+{
+  "permissions": {
+    "defaultMode": "plan"
+  }
+}
+```
+
+#### Example: Planning Complex Refactor
+
+```txt
+> I need to refactor our authentication system to use OAuth2. Create a detailed migration plan.
+> What about backward compatibility?
+> How should we handle database migration?
+```
+
+Press `Ctrl+G` to open plan in text editor for direct editing.
+
+### Create Pull Requests
+
+#### Quick PR
+
+```txt
+> /commit-push-pr
+```
+
+Commits, pushes, and opens PR in one step.
+
+#### Step-by-Step PR
+
+```txt
+> summarize the changes I've made to the authentication module
+> create a pr
+> enhance the PR description with more context about the security improvements
+```
+
+### Documentation Workflows
+
+```txt
+> find functions without proper JSDoc comments in the auth module
+> add JSDoc comments to the undocumented functions in auth.js
+> improve the generated documentation with more context and examples
+> check if the documentation follows our project standards
+```
+
+**Tips**:
+
+- Specify documentation style (JSDoc, docstrings)
+- Ask for examples in documentation
+- Request docs for public APIs and complex logic
+
+### Working with Images
+
+#### Add Image to Conversation
+
+1. Drag and drop image into Claude Code window
+2. Copy image and paste with `Ctrl+V` (not `Cmd+V`)
+3. Provide image path: "Analyze this image: /path/to/image.png"
+
+#### Analyze Images
+
+```txt
+> What does this image show?
+> Describe the UI elements in this screenshot
+> Are there any problematic elements in this diagram?
+```
+
+#### Use Images for Context
+
+```txt
+> Here's a screenshot of the error. What's causing it?
+> This is our current database schema. How should we modify it?
+```
+
+#### Generate Code from Images
+
+```txt
+> Generate CSS to match this design mockup
+> What HTML structure would recreate this component?
+```
+
+### File and Directory References
+
+```txt
+> Explain the logic in @src/utils/auth.js
+> What's the structure of @src/components?
+> Show me the data from @github:repos/owner/repo/issues
+```
+
+**Tips**:
+
+- Paths can be relative or absolute
+- `@` references add CLAUDE.md from directory and parents
+- Directory references show listings, not contents
+
+### Extended Thinking Mode
+
+Extended thinking reserves up to 31,999 tokens for step-by-step reasoning.
+
+#### Toggle Thinking
+
+- **Shortcut**: `Option+T` (macOS) or `Alt+T` (Windows/Linux)
+- **Global default**: Use `/config` to toggle
+- **Limit budget**: Set `MAX_THINKING_TOKENS` environment variable
+
+#### View Thinking Process
+
+Press `Ctrl+O` to toggle verbose mode (gray italic text).
+
+#### When to Use
+
+- Complex architectural decisions
+- Challenging bugs
+- Multi-step implementation planning
+- Evaluating tradeoffs
+
+### Session Management
+
+#### Resume Sessions
+
+```bash
+claude --continue    # Most recent in current directory
+claude --resume      # Session picker
+claude --resume auth-refactor  # Resume by name
+```
+
+#### Name Sessions
+
+```txt
+> /rename auth-refactor
+```
+
+#### Session Picker Shortcuts
+
+| Shortcut  | Action                 |
+| --------- | ---------------------- |
+| `↑` / `↓` | Navigate sessions      |
+| `→` / `←` | Expand/collapse groups |
+| `Enter`   | Resume session         |
+| `P`       | Preview session        |
+| `R`       | Rename session         |
+| `/`       | Search filter          |
+| `A`       | Toggle all projects    |
+| `B`       | Filter by git branch   |
+| `Esc`     | Exit                   |
+
+### Git Worktrees for Parallel Sessions
+
+```bash
+# Create worktree with new branch
+git worktree add ../project-feature-a -b feature-a
+
+# Create worktree with existing branch
+git worktree add ../project-bugfix bugfix-123
+
+# Run Claude in worktree
+cd ../project-feature-a
+claude
+
+# List worktrees
+git worktree list
+
+# Remove worktree
+git worktree remove ../project-feature-a
+```
+
+**Tips**:
+
+- Each worktree has independent file state
+- Changes in one don't affect others
+- All worktrees share Git history
+- Initialize dev environment in each new worktree
+
+### Unix-Style Utility Usage
+
+#### As Linter
+
+```json
+{
+  "scripts": {
+    "lint:claude": "claude -p 'you are a linter. look at changes vs. main and report typos. report filename:line, then description.'"
+  }
+}
+```
+
+#### Pipe In/Out
+
+```bash
+cat build-error.txt | claude -p 'explain root cause of this build error' > output.txt
+```
+
+#### Output Formats
+
+```bash
+# Text (default)
+claude -p 'summarize this data' --output-format text
+
+# JSON (full conversation with metadata)
+claude -p 'analyze this code' --output-format json
+
+# Streaming JSON (real-time)
+claude -p 'parse this log' --output-format stream-json
+```
+
+### Subagent Workflows
+
+#### View Available Subagents
+
+```txt
+> /agents
+```
+
+#### Automatic Delegation
+
+```txt
+> review my recent code changes for security issues
+> run all tests and fix any failures
+```
+
+#### Explicit Subagent Request
+
+```txt
+> use the code-reviewer subagent to check the auth module
+> have the debugger subagent investigate why users can't log in
+```
+
+#### Create Custom Subagent
+
+```txt
+> /agents
+```
+
+Select "Create New subagent" and define:
+
+- Unique identifier (e.g., `code-reviewer`)
+- When Claude should use it
+- Tools it can access
+- System prompt describing role
+
+### DSM-Specific Workflows
+
+#### DSM Codebase Exploration
+
+```txt
+> give me an overview of this data-source-manager codebase
+> explain how FCP (Failover Control Protocol) handles data source failures
+> what are the key data models in src/data_source_manager/models/
+> how does caching work?
+```
+
+#### DSM Debugging
+
+```txt
+> I'm seeing an error when fetching OHLCV data from Binance
+> check the FCP log at ~/.cache/dsm/fcp.log for recent decisions
+> find where this error originates in src/data_source_manager/sources/
+> suggest fixes that maintain FCP failover behavior
+```
+
+#### DSM Testing
+
+```txt
+> find functions in BinanceClient that are not covered by tests
+> add tests for the OHLCV fetch function using sample_ohlcv_df fixture
+> add test cases for edge conditions (network timeout, partial data)
+> run pytest tests/test_binance.py -v and fix any failures
+```
+
+#### DSM Refactoring
+
+```txt
+> find deprecated API usage in the Binance client
+> suggest how to refactor symbol format validation to use shared utilities
+> refactor while maintaining backward compatibility with existing callers
+> run pytest and verify all tests pass
+```
+
+#### DSM Pull Request
+
+```txt
+> summarize changes I've made to the FCP failover logic
+> create a pr with clear description of the failover improvements
+> enhance PR with test coverage information
+```
+
+### Ask Claude About Capabilities
+
+```txt
+> can Claude Code create pull requests?
+> how does Claude Code handle permissions?
+> what skills are available?
+> how do I use MCP with Claude Code?
+> what are the limitations of Claude Code?
+```
+
+Claude has access to latest documentation and can explain complex features.
+
+### References
+
+- [Common Workflows](https://code.claude.com/docs/en/common-workflows)
+- [Best Practices](https://code.claude.com/docs/en/best-practices)
+- [Plan Mode](https://code.claude.com/docs/en/common-workflows#use-plan-mode-for-safe-code-analysis)
+- [Extended Thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking)
