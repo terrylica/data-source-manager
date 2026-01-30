@@ -135,6 +135,7 @@ bun.lockb
 
 # Claude Code local state (Ralph loop, etc.) - except shared components
 .claude/*
+!.claude/README.md
 !.claude/agents/
 !.claude/commands/
 !.claude/hooks/
