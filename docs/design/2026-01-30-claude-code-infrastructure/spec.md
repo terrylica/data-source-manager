@@ -20715,3 +20715,438 @@ When migrating to Claude 4.5:
 2. **Frame instructions with modifiers** - "Include as many relevant features as possible"
 3. **Request features explicitly** - Animations, interactive elements need explicit requests
 4. **Dial back aggressive language** - "CRITICAL: You MUST" → "Use this tool when"
+<!-- SSoT-OK: Skills Architecture Reference - comprehensive skills documentation from official docs -->
+
+## Skills Architecture Reference
+
+### Overview
+
+Skills extend what Claude can do. Create a `SKILL.md` file with instructions, and Claude adds it to its toolkit. Claude uses skills when relevant, or you can invoke one directly with `/skill-name`.
+
+Skills follow the [Agent Skills](https://agentskills.io) open standard, which works across multiple AI tools.
+
+### Skill Locations
+
+Where you store a skill determines who can use it:
+
+| Location   | Path                                     | Applies to                | Priority    |
+| ---------- | ---------------------------------------- | ------------------------- | ----------- |
+| Enterprise | Managed settings                         | All users in organization | 1 (highest) |
+| Personal   | `~/.claude/skills/<skill-name>/SKILL.md` | All your projects         | 2           |
+| Project    | `.claude/skills/<skill-name>/SKILL.md`   | This project only         | 3           |
+| Plugin     | `<plugin>/skills/<skill-name>/SKILL.md`  | Where plugin is enabled   | 4 (lowest)  |
+
+When skills share the same name, higher-priority locations win. Plugin skills use `plugin-name:skill-name` namespace.
+
+### SKILL.md Structure
+
+Every skill needs a `SKILL.md` file with two parts:
+
+1. **YAML frontmatter** (between `---` markers) - Tells Claude when to use the skill
+2. **Markdown content** - Instructions Claude follows when skill is invoked
+
+```yaml
+---
+name: explain-code
+description: Explains code with visual diagrams and analogies. Use when explaining how code works or when user asks "how does this work?"
+---
+When explaining code, always include:
+
+1. **Start with an analogy**: Compare the code to something from everyday life
+2. **Draw a diagram**: Use ASCII art to show the flow or relationships
+3. **Walk through the code**: Explain step-by-step what happens
+4. **Highlight a gotcha**: What's a common mistake?
+```
+
+### Frontmatter Fields
+
+| Field                      | Required    | Description                                                                   |
+| -------------------------- | ----------- | ----------------------------------------------------------------------------- |
+| `name`                     | No          | Display name. If omitted, uses directory name. Lowercase, numbers, hyphens.   |
+| `description`              | Recommended | What skill does and when to use it. Claude uses this to decide when to apply. |
+| `argument-hint`            | No          | Hint for autocomplete. Example: `[issue-number]` or `[filename] [format]`     |
+| `disable-model-invocation` | No          | `true` prevents Claude from auto-loading. Default: `false`                    |
+| `user-invocable`           | No          | `false` hides from `/` menu. Default: `true`                                  |
+| `allowed-tools`            | No          | Tools Claude can use without asking permission when skill is active           |
+| `model`                    | No          | Model to use when skill is active                                             |
+| `context`                  | No          | `fork` to run in forked subagent context                                      |
+| `agent`                    | No          | Subagent type when `context: fork` is set (`Explore`, `Plan`, etc.)           |
+| `hooks`                    | No          | Hooks scoped to this skill's lifecycle                                        |
+
+### Types of Skill Content
+
+**Reference Content** (knowledge applied to current work):
+
+```yaml
+---
+name: api-conventions
+description: API design patterns for this codebase
+---
+When writing API endpoints:
+  - Use RESTful naming conventions
+  - Return consistent error formats
+  - Include request validation
+```
+
+**Task Content** (step-by-step instructions):
+
+```yaml
+---
+name: deploy
+description: Deploy the application to production
+context: fork
+disable-model-invocation: true
+---
+
+Deploy the application:
+1. Run the test suite
+2. Build the application
+3. Push to the deployment target
+```
+
+### Invocation Control
+
+| Frontmatter                      | You can invoke | Claude can invoke | When loaded                                    |
+| -------------------------------- | -------------- | ----------------- | ---------------------------------------------- |
+| (default)                        | Yes            | Yes               | Description always in context, loads on invoke |
+| `disable-model-invocation: true` | Yes            | No                | Description not in context, loads on invoke    |
+| `user-invocable: false`          | No             | Yes               | Description always in context, loads on invoke |
+
+### String Substitutions
+
+Skills support dynamic values:
+
+| Variable               | Description                                      |
+| ---------------------- | ------------------------------------------------ |
+| `$ARGUMENTS`           | All arguments passed when invoking skill         |
+| `$ARGUMENTS[N]`        | Specific argument by 0-based index               |
+| `$N`                   | Shorthand for `$ARGUMENTS[N]` (`$0`, `$1`, etc.) |
+| `${CLAUDE_SESSION_ID}` | Current session ID for logging/correlation       |
+
+**Example**:
+
+```yaml
+---
+name: fix-issue
+description: Fix a GitHub issue
+disable-model-invocation: true
+---
+Fix GitHub issue $ARGUMENTS following our coding standards.
+
+1. Read the issue description
+2. Understand the requirements
+3. Implement the fix
+4. Write tests
+5. Create a commit
+```
+
+Invocation: `/fix-issue 123` → "Fix GitHub issue 123 following our coding standards..."
+
+### Directory Structure
+
+```
+my-skill/
+├── SKILL.md           # Main instructions (required)
+├── template.md        # Template for Claude to fill in
+├── examples/
+│   └── sample.md      # Example output showing expected format
+├── references/
+│   └── api-spec.md    # Detailed reference documentation
+└── scripts/
+    └── validate.sh    # Script Claude can execute
+```
+
+Reference supporting files from SKILL.md:
+
+```markdown
+## Additional resources
+
+- For complete API details, see [reference.md](reference.md)
+- For usage examples, see [examples.md](examples.md)
+```
+
+**Tip**: Keep SKILL.md under 500 lines. Move detailed reference material to separate files.
+
+### Running in Subagent
+
+Add `context: fork` to run skill in isolation:
+
+```yaml
+---
+name: deep-research
+description: Research a topic thoroughly
+context: fork
+agent: Explore
+---
+
+Research $ARGUMENTS thoroughly:
+
+1. Find relevant files using Glob and Grep
+2. Read and analyze the code
+3. Summarize findings with specific file references
+```
+
+**How it works**:
+
+1. New isolated context is created
+2. Subagent receives skill content as prompt
+3. `agent` field determines execution environment
+4. Results summarized and returned to main conversation
+
+### Dynamic Context Injection
+
+The `!`command\`\` syntax runs shell commands before skill content is sent:
+
+```yaml
+---
+name: pr-summary
+description: Summarize changes in a pull request
+context: fork
+agent: Explore
+allowed-tools: Bash(gh *)
+---
+
+## Pull request context
+- PR diff: !`gh pr diff`
+- PR comments: !`gh pr view --comments`
+- Changed files: !`gh pr diff --name-only`
+
+## Your task
+Summarize this pull request...
+```
+
+Commands execute immediately and output replaces placeholders. Claude only sees final result.
+
+### Restricting Tool Access
+
+```yaml
+---
+name: safe-reader
+description: Read files without making changes
+allowed-tools: Read, Grep, Glob
+---
+```
+
+### Skill Hooks
+
+Define hooks in skill frontmatter:
+
+```yaml
+---
+name: test-runner
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/validate-command.sh"
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "./scripts/lint-check.sh"
+---
+```
+
+### Permission Rules
+
+Control skill access:
+
+```
+# Allow specific skills
+Skill(commit)
+Skill(review-pr *)
+
+# Deny specific skills
+Skill(deploy *)
+
+# Disable all skills
+Skill
+```
+
+### Generating Visual Output
+
+Skills can generate interactive HTML:
+
+````yaml
+---
+name: codebase-visualizer
+description: Generate interactive tree visualization of codebase
+allowed-tools: Bash(python *)
+---
+
+# Codebase Visualizer
+
+Run the visualization script from your project root:
+
+```bash
+python ~/.claude/skills/codebase-visualizer/scripts/visualize.py .
+````
+
+This creates `codebase-map.html` and opens it in your browser.
+
+````
+
+### Progressive Disclosure Pattern
+
+At startup:
+- Only skill descriptions are loaded into context
+- Full skill content loads only when invoked
+
+This minimizes context usage while making skills discoverable.
+
+**Context budget**: Default 15,000 characters for skill descriptions. Increase with `SLASH_COMMAND_TOOL_CHAR_BUDGET` environment variable.
+
+### Best Practices
+
+**Description Writing**:
+- Include both what the skill does AND when to use it
+- Include all "when to use" information in description, not body
+- Body is only loaded after triggering
+
+**Content Guidelines**:
+- Keep SKILL.md under 500 lines
+- Split large content into separate files
+- Claude is smart - only add context Claude doesn't already have
+
+**Naming Conventions**:
+- Use gerund form (verb + -ing) for skill names
+- Makes activity clear: `explaining-code`, `reviewing-pr`, `deploying-app`
+
+### Memory and Rules Reference
+
+#### CLAUDE.md Hierarchy
+
+| Memory Type        | Location                                     | Purpose                               |
+| ------------------ | -------------------------------------------- | ------------------------------------- |
+| Managed policy     | `/Library/Application Support/ClaudeCode/`   | Organization-wide instructions        |
+| Project memory     | `./CLAUDE.md` or `./.claude/CLAUDE.md`       | Team-shared project instructions      |
+| Project rules      | `./.claude/rules/*.md`                       | Modular topic-specific instructions   |
+| User memory        | `~/.claude/CLAUDE.md`                        | Personal preferences (all projects)   |
+| Project local      | `./CLAUDE.local.md`                          | Personal project-specific (gitignored)|
+
+#### CLAUDE.md Imports
+
+Use `@path/to/import` syntax:
+
+```markdown
+See @README for project overview and @package.json for npm commands.
+
+# Additional Instructions
+- git workflow @docs/git-instructions.md
+- @~/.claude/my-project-instructions.md
+````
+
+Features:
+
+- Relative and absolute paths allowed
+- Recursive imports (max depth 5)
+- Not evaluated inside code spans/blocks
+
+#### Path-Specific Rules
+
+Rules can be scoped to specific files:
+
+```yaml
+---
+paths:
+  - "src/api/**/*.ts"
+---
+# API Development Rules
+
+- All API endpoints must include input validation
+- Use the standard error response format
+```
+
+Rules without `paths:` apply globally.
+
+**Glob patterns**:
+
+| Pattern             | Matches                               |
+| ------------------- | ------------------------------------- |
+| `**/*.ts`           | All TypeScript files in any directory |
+| `src/**/*`          | All files under src/ directory        |
+| `*.md`              | Markdown files in project root        |
+| `src/**/*.{ts,tsx}` | Both .ts and .tsx files               |
+| `{src,lib}/**/*.ts` | TypeScript in src or lib              |
+
+#### Rules Organization
+
+```
+.claude/rules/
+├── frontend/
+│   ├── react.md
+│   └── styles.md
+├── backend/
+│   ├── api.md
+│   └── database.md
+└── general.md
+```
+
+All `.md` files discovered recursively. Subdirectories and symlinks supported.
+
+### DSM Skill Implementation
+
+The data-source-manager uses 4 skills:
+
+| Skill           | Purpose                     | Context |
+| --------------- | --------------------------- | ------- |
+| dsm-usage       | DataSourceManager API usage | inline  |
+| dsm-testing     | Testing patterns            | inline  |
+| dsm-research    | Codebase research           | fork    |
+| dsm-fcp-monitor | FCP monitoring              | fork    |
+
+**Example DSM Skill** (`docs/skills/dsm-usage/SKILL.md`):
+
+````yaml
+---
+name: dsm-usage
+description: DataSourceManager API usage patterns. Use when fetching market data, handling OHLCV, or working with FCP.
+---
+
+## DataSourceManager API
+
+### Basic Usage
+
+```python
+from data_source_manager import DataSourceManager
+
+dsm = DataSourceManager()
+df = dsm.get_ohlcv(
+    symbol="BTC/USDT",
+    timeframe="1h",
+    start_time=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    end_time=datetime(2025, 1, 2, tzinfo=timezone.utc)
+)
+````
+
+### FCP Integration
+
+The Failover Control Protocol handles:
+
+- Primary/fallback provider selection
+- Cache management
+- Retry logic with exponential backoff
+
+See @references/fcp-protocol.md for detailed FCP documentation.
+
+```
+
+### Troubleshooting
+
+**Skill not triggering**:
+1. Check description includes natural keywords
+2. Verify skill appears in "What skills are available?"
+3. Rephrase request to match description
+4. Invoke directly with `/skill-name`
+
+**Skill triggers too often**:
+1. Make description more specific
+2. Add `disable-model-invocation: true`
+
+**Claude doesn't see all skills**:
+- Skills may exceed character budget (15,000 default)
+- Run `/context` to check for excluded skills warning
+- Increase `SLASH_COMMAND_TOOL_CHAR_BUDGET`
+
+```
