@@ -2101,6 +2101,91 @@ In `.claude/settings.json`:
 }
 ```
 
+## Enterprise & Team Deployment
+
+Based on [Official Enterprise Docs](https://code.claude.com/docs/en/third-party-integrations) and [Team/Enterprise Guide](https://support.claude.com/en/articles/11845131-using-claude-code-with-your-team-or-enterprise-plan).
+
+### Deployment Options
+
+| Option                | Best For                     | Key Features                |
+| --------------------- | ---------------------------- | --------------------------- |
+| Claude for Teams      | Smaller teams, quick start   | Self-service, collab tools  |
+| Claude for Enterprise | Large orgs, compliance needs | SSO, RBAC, managed policies |
+| Anthropic Console     | Individual developers        | PAYG, API key auth          |
+| Amazon Bedrock        | AWS-native deployments       | AWS IAM, CloudTrail         |
+| Google Vertex AI      | GCP-native deployments       | GCP IAM, Audit Logs         |
+| Microsoft Foundry     | Azure-native deployments     | Azure RBAC, Monitor         |
+
+### Enterprise Features
+
+| Feature                 | Description                        |
+| ----------------------- | ---------------------------------- |
+| SSO & domain capture    | Centralized authentication         |
+| Role-based permissions  | Granular access control            |
+| Compliance API          | Real-time programmatic access      |
+| Managed policy settings | Organization-wide configurations   |
+| Usage analytics         | LOC accepted, suggestion rate, DAU |
+| Spend controls          | Per-user and org-level budgets     |
+
+### Organization Onboarding Best Practices
+
+| Practice                    | Benefit                              |
+| --------------------------- | ------------------------------------ |
+| Invest in CLAUDE.md         | Claude understands codebase faster   |
+| Create "one-click" install  | Drives adoption across teams         |
+| Start with guided usage     | New users learn paradigm gradually   |
+| Configure security policies | Managed permissions, cannot override |
+| Centralize MCP config       | Check `.mcp.json` into codebase      |
+
+### Multi-Level CLAUDE.md Deployment
+
+| Level        | Location                                            | Purpose                 |
+| ------------ | --------------------------------------------------- | ----------------------- |
+| Organization | `/Library/Application Support/ClaudeCode/CLAUDE.md` | Company-wide standards  |
+| Repository   | `./CLAUDE.md`                                       | Project architecture    |
+| Team/Feature | `./feature/CLAUDE.md`                               | Domain-specific context |
+
+### Cloud Provider Configuration
+
+```bash
+# Amazon Bedrock
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_REGION=us-east-1
+
+# Google Vertex AI
+export CLAUDE_CODE_USE_VERTEX=1
+export CLOUD_ML_REGION=us-east5
+export ANTHROPIC_VERTEX_PROJECT_ID=your-project-id
+
+# Microsoft Foundry
+export CLAUDE_CODE_USE_FOUNDRY=1
+export ANTHROPIC_FOUNDRY_RESOURCE=your-resource
+```
+
+### LLM Gateway Pattern
+
+For centralized management:
+
+```bash
+# Route through gateway
+export ANTHROPIC_BASE_URL='https://your-llm-gateway.com'
+
+# Benefits:
+# - Centralized usage tracking across teams
+# - Custom rate limiting or budgets
+# - Centralized authentication management
+```
+
+### DSM Team Deployment Considerations
+
+| Consideration           | Recommendation                       |
+| ----------------------- | ------------------------------------ |
+| Shared CLAUDE.md        | Check into git, team benefits        |
+| Agents for common tasks | 5 agents (reviewer, fetcher, etc.)   |
+| Rules for domains       | 7 rules (FCP, symbols, timestamps)   |
+| Hooks for quality       | 5 hooks (guards, validators)         |
+| MCP servers             | .mcp.json checked in for consistency |
+
 ## Verification Checklist
 
 ### Infrastructure

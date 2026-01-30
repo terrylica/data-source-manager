@@ -4,6 +4,25 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Enterprise & Team Deployment (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added deployment options table (Teams, Enterprise, cloud providers)
+- Added enterprise features table (SSO, RBAC, compliance API)
+- Added organization onboarding best practices table
+- Added multi-level CLAUDE.md deployment table
+- Added cloud provider configuration examples
+- Added LLM gateway pattern
+- Added DSM team deployment considerations table
+
+**Sources**:
+
+- [Official Enterprise Docs](https://code.claude.com/docs/en/third-party-integrations)
+- [Team/Enterprise Guide](https://support.claude.com/en/articles/11845131-using-claude-code-with-your-team-or-enterprise-plan)
+
 ### Plugin & Marketplace Patterns (2026-01-30)
 
 **Status**: Complete
