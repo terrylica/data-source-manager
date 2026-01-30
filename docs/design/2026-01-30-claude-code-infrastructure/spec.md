@@ -46576,3 +46576,224 @@ uv tool install pyright
 ```
 
 Claude will then see type errors immediately after edits and can navigate to definitions in the Polars, ccxt, and other libraries.
+## Chrome Browser Integration
+
+This section provides comprehensive guidance on connecting Claude Code to Chrome for browser automation, testing, debugging, and GIF recording.
+
+### Overview
+
+Claude Code integrates with the Claude in Chrome browser extension to provide browser automation capabilities directly from your terminal. Build in your terminal, then test and debug in your browser without switching contexts.
+
+**Current Status**: Beta, Google Chrome only (not Brave, Arc, or other Chromium browsers). WSL not supported.
+
+### Prerequisites
+
+| Requirement                | Minimum Version                                                   |
+| -------------------------- | ----------------------------------------------------------------- |
+| Google Chrome              | Any recent                                                        |
+| Claude in Chrome extension | See Chrome Web Store <!-- SSoT-OK: version in external system --> |
+| Claude Code CLI            | Recent version                                                    |
+| Claude plan                | Pro, Team, or Enterprise                                          |
+
+### Key Capabilities
+
+| Capability          | Description                                    |
+| ------------------- | ---------------------------------------------- |
+| Live debugging      | Read console errors and DOM state, fix code    |
+| Design verification | Build UI, verify it matches Figma mock         |
+| Web app testing     | Test forms, visual regressions, user flows     |
+| Authenticated apps  | Access Google Docs, Gmail, Notion (logged in)  |
+| Data extraction     | Pull structured info from web pages            |
+| Task automation     | Data entry, form filling, multi-site workflows |
+| Session recording   | Record browser interactions as GIFs            |
+
+### How Integration Works
+
+- Claude Code communicates with Chrome through the extension
+- Extension uses Chrome's Native Messaging API
+- Claude controls tabs, reads page content, performs actions
+- Opens new tabs for tasks (doesn't take over existing ones)
+- Shares browser's login state (access authenticated sites)
+- Visible browser window required (no headless mode)
+- When encountering login pages or CAPTCHAs, Claude pauses and asks you to handle
+
+### Setup
+
+1. **Update Claude Code**:
+
+   ```bash
+   claude update
+   ```
+
+2. **Start with Chrome enabled**:
+
+   ```bash
+   claude --chrome
+   ```
+
+3. **Verify connection**:
+
+   ```
+   /chrome
+   ```
+
+Can also enable from within session using `/chrome` command.
+
+### Available Browser Tools
+
+Run `/mcp` and click into `claude-in-chrome` to see full list:
+
+| Tool Category | Capabilities                 |
+| ------------- | ---------------------------- |
+| Navigation    | Open URLs, navigate pages    |
+| Interaction   | Click, type, fill forms      |
+| Scrolling     | Scroll pages and elements    |
+| Console       | Read console logs and errors |
+| Network       | Read network requests        |
+| Tabs          | Manage tabs, create new ones |
+| Windows       | Resize browser windows       |
+| Recording     | Record interactions as GIFs  |
+
+### Example Workflows
+
+#### Test Local Web Application
+
+```
+I just updated the login form validation. Can you open localhost:3000,
+try submitting the form with invalid data, and check if the error
+messages appear correctly?
+```
+
+#### Debug with Console Logs
+
+```
+Open the dashboard page and check the console for any errors when
+the page loads.
+```
+
+#### Automate Form Filling
+
+```
+I have a spreadsheet of customer contacts in contacts.csv. For each row,
+go to our CRM at crm.example.com, click "Add Contact", and fill in the
+name, email, and phone fields.
+```
+
+#### Draft Content in Google Docs
+
+```
+Draft a project update based on our recent commits and add it to my
+Google Doc at docs.google.com/document/d/abc123
+```
+
+#### Extract Data from Web Pages
+
+```
+Go to the product listings page and extract the name, price, and
+availability for each item. Save the results as a CSV file.
+```
+
+#### Multi-Site Workflows
+
+```
+Check my calendar for meetings tomorrow, then for each meeting with
+an external attendee, look up their company on LinkedIn and add a
+note about what they do.
+```
+
+#### Record Demo GIF
+
+```
+Record a GIF showing how to complete the checkout flow, from adding
+an item to the cart through to the confirmation page.
+```
+
+### Best Practices
+
+| Practice                | Rationale                                         |
+| ----------------------- | ------------------------------------------------- |
+| Use fresh tabs          | If tab becomes unresponsive, create new one       |
+| Filter console output   | Ask for specific patterns, not all output         |
+| Handle modal dialogs    | JS alerts/confirms block events, dismiss manually |
+| Manage site permissions | Control which sites Claude can access             |
+
+### Troubleshooting
+
+#### Extension Not Detected
+
+1. Verify Chrome extension is installed from Chrome Web Store
+2. Check Claude Code version: `claude --version`
+3. Ensure Chrome is running
+4. Run `/chrome` and select "Reconnect extension"
+5. Restart both Claude Code and Chrome if needed
+
+#### Browser Not Responding
+
+1. Check if modal dialog (alert, confirm, prompt) is blocking
+2. Ask Claude to create a new tab
+3. Restart Chrome extension (disable and re-enable)
+
+#### First-Time Setup
+
+Claude Code installs a native messaging host on first use. If permission errors occur, restart Chrome for installation to take effect.
+
+### Enable by Default
+
+To enable Chrome integration by default:
+
+1. Run `/chrome`
+2. Select "Enabled by default"
+
+Note: This increases context usage since browser tools are always loaded. Use `--chrome` flag only when needed if context consumption is a concern.
+
+### Comparison with Playwright MCP
+
+| Feature                | Chrome Integration       | Playwright MCP               |
+| ---------------------- | ------------------------ | ---------------------------- |
+| Browser support        | Chrome only              | Chrome, Firefox, Safari      |
+| Setup complexity       | Extension-based          | MCP server configuration     |
+| Authenticated sessions | Uses browser login state | Requires credential handling |
+| Headless mode          | No (visible window)      | Yes                          |
+| GIF recording          | Built-in                 | Separate implementation      |
+| Device emulation       | No                       | Yes (143+ devices)           |
+| Cross-browser testing  | No                       | Yes                          |
+| Local development      | Ideal                    | Good                         |
+
+**When to Use Chrome Integration**:
+
+- Testing authenticated web apps (Google Docs, Gmail, etc.)
+- Quick browser debugging during development
+- Recording demo GIFs
+- Accessing sites where you're already logged in
+
+**When to Use Playwright MCP**:
+
+- Cross-browser testing (Firefox, Safari)
+- Headless CI/CD automation
+- Mobile device emulation
+- Comprehensive E2E test suites
+
+### DSM-Specific Browser Integration
+
+For data-source-manager development, browser integration is useful for:
+
+**Documentation Research**:
+
+```
+Go to the Polars documentation at pola.rs, search for "group_by_dynamic",
+and extract the function signature and examples.
+```
+
+**Exchange API Testing**:
+
+```
+Open the Binance API documentation, navigate to the GET /api/v3/klines
+endpoint, and summarize the rate limits and response format.
+```
+
+**GIF Recording for PRs**:
+
+```
+Record a GIF demonstrating the data validation error messages when
+invalid timestamps are provided to the FCP module.
+```
