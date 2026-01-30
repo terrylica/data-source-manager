@@ -42834,3 +42834,435 @@ async def main():
 | MCP           | `mcp_servers` configuration        |
 | Sessions      | `resume` with session_id           |
 | Configuration | `setting_sources=["project"]`      |
+## Skills Architecture and Development
+
+### Overview
+
+Skills extend Claude's capabilities through modular, on-demand knowledge encapsulation. A skill is a directory containing a `SKILL.md` file with instructions that Claude applies when relevant or when explicitly invoked via `/skill-name`.
+
+### Directory Structure
+
+```
+my-skill/
+├── SKILL.md           # Main instructions (required)
+├── references/        # Documentation loaded into context
+│   └── api-spec.md
+├── examples/          # Example outputs
+│   └── sample.md
+├── scripts/           # Executable utilities
+│   └── validate.py
+└── assets/            # Templates and binary files
+    └── template.md
+```
+
+### Skill Locations
+
+| Location   | Path                               | Scope                   |
+| ---------- | ---------------------------------- | ----------------------- |
+| Enterprise | Managed settings                   | All organization users  |
+| Personal   | `~/.claude/skills/<name>/SKILL.md` | All your projects       |
+| Project    | `.claude/skills/<name>/SKILL.md`   | This project only       |
+| Plugin     | `<plugin>/skills/<name>/SKILL.md`  | Where plugin is enabled |
+
+**Precedence**: enterprise > personal > project (when names conflict).
+
+### SKILL.md Structure
+
+Every skill needs YAML frontmatter and markdown instructions:
+
+```yaml
+---
+name: my-skill
+description: What this skill does and when to use it
+---
+# Skill Instructions
+
+Your instructions here...
+```
+
+### Frontmatter Fields
+
+| Field                    | Required    | Description                               |
+| ------------------------ | ----------- | ----------------------------------------- |
+| name                     | No          | Display name (defaults to directory name) |
+| description              | Recommended | What skill does and when to use it        |
+| argument-hint            | No          | Hint shown during autocomplete            |
+| disable-model-invocation | No          | If true, only user can invoke             |
+| user-invocable           | No          | If false, only Claude can invoke          |
+| allowed-tools            | No          | Tools Claude can use without asking       |
+| model                    | No          | Model to use when skill is active         |
+| context                  | No          | Set to `fork` for subagent execution      |
+| agent                    | No          | Subagent type when context: fork          |
+| hooks                    | No          | Hooks scoped to this skill                |
+
+### Field Validation Rules
+
+| Field       | Constraints                                     |
+| ----------- | ----------------------------------------------- |
+| name        | Max 64 chars, lowercase letters/numbers/hyphens |
+| description | Max 1024 chars, non-empty, no XML tags          |
+
+### Invocation Control Matrix
+
+| Frontmatter                    | User | Claude | Context Loading                      |
+| ------------------------------ | ---- | ------ | ------------------------------------ |
+| (default)                      | Yes  | Yes    | Description in context, loads on use |
+| disable-model-invocation: true | Yes  | No     | Not in context, loads when invoked   |
+| user-invocable: false          | No   | Yes    | Description in context, loads on use |
+
+### Argument Substitution
+
+| Variable               | Description                        |
+| ---------------------- | ---------------------------------- |
+| `$ARGUMENTS`           | All arguments passed to skill      |
+| `$ARGUMENTS[N]`        | Specific argument by 0-based index |
+| `$N`                   | Shorthand for `$ARGUMENTS[N]`      |
+| `${CLAUDE_SESSION_ID}` | Current session ID                 |
+
+```yaml
+---
+name: fix-issue
+description: Fix a GitHub issue by number
+---
+Fix GitHub issue $ARGUMENTS following coding standards.
+```
+
+### Dynamic Context Injection
+
+Use `!`command`` to run shell commands before skill content is sent to Claude:
+
+```yaml
+---
+name: pr-summary
+description: Summarize PR changes
+context: fork
+agent: Explore
+---
+
+## PR Context
+- Diff: !`gh pr diff`
+- Comments: !`gh pr view --comments`
+- Files: !`gh pr diff --name-only`
+
+Summarize this pull request...
+```
+
+### Progressive Disclosure Architecture
+
+Skills use three-level progressive disclosure for token efficiency:
+
+| Level | Content               | Token Cost     |
+| ----- | --------------------- | -------------- |
+| 1     | Metadata (name, desc) | ~100 tokens    |
+| 2     | Full SKILL.md         | <5K tokens     |
+| 3     | Bundled resources     | Load on demand |
+
+**Workflow**:
+
+1. Metadata preloaded at session start
+2. Claude scans descriptions to identify relevant skills
+3. Full SKILL.md loaded when Claude determines skill applies
+4. Supporting files loaded only when referenced
+
+### Size Guidelines
+
+| Content Type    | Recommendation                      |
+| --------------- | ----------------------------------- |
+| SKILL.md body   | Under 500 lines                     |
+| Reference files | No limit (loaded on demand)         |
+| Scripts         | Executable, not loaded into context |
+
+### Subagent Execution
+
+Add `context: fork` for isolated skill execution:
+
+```yaml
+---
+name: deep-research
+description: Research a topic thoroughly
+context: fork
+agent: Explore
+---
+
+Research $ARGUMENTS thoroughly:
+1. Find relevant files using Glob and Grep
+2. Read and analyze the code
+3. Summarize findings with file references
+```
+
+**Agent types**: `Explore`, `Plan`, `general-purpose`, or custom from `.claude/agents/`.
+
+### Reference Supporting Files
+
+Link to supporting files from SKILL.md:
+
+```markdown
+## Additional Resources
+
+- For API details, see [reference.md](reference.md)
+- For examples, see [examples.md](examples.md)
+- Run validation: `python scripts/validate.py`
+```
+
+### Permission Rules for Skills
+
+Control skill access via permissions:
+
+```
+# Allow specific skills
+Skill(commit)
+Skill(review-pr *)
+
+# Deny specific skills
+Skill(deploy *)
+
+# Disable all skills
+Skill
+```
+
+### DSM-Specific Skill Patterns
+
+#### DSM Usage Skill
+
+````yaml
+---
+name: dsm-usage
+description: DataSourceManager API usage patterns. Use when fetching market data, working with OHLCV DataFrames, or implementing data pipelines.
+---
+
+# DataSourceManager Usage
+
+## Quick Start
+
+```python
+from data_source_manager import DataSourceManager
+
+dsm = DataSourceManager()
+df = dsm.get_ohlcv("BTCUSDT", "1h", limit=100)
+````
+
+## Key Patterns
+
+1. Always use UTC timezone-aware timestamps
+2. Check FCP status before assuming cache validity
+3. Validate DataFrame columns match OHLCV schema
+
+## Additional Resources
+
+- For FCP details, see [references/fcp-protocol.md](references/fcp-protocol.md)
+- For examples, see [examples/basic-fetch.md](examples/basic-fetch.md)
+
+````
+
+#### DSM Testing Skill
+
+```yaml
+---
+name: dsm-testing
+description: Testing patterns for DSM. Use when writing tests for data fetching, FCP behavior, or DataFrame validation.
+---
+
+# DSM Testing Patterns
+
+## Test Structure
+
+```python
+@pytest.mark.asyncio
+async def test_fetch_ohlcv():
+    dsm = DataSourceManager()
+    df = await dsm.get_ohlcv("BTCUSDT", "1h", limit=10)
+
+    # Validate schema
+    assert list(df.columns) == ["open_time", "open", "high", "low", "close", "volume"]
+
+    # Validate timestamps
+    assert df["open_time"].dt.tz is not None  # Timezone aware
+````
+
+## Key Patterns
+
+1. Use pytest-asyncio for async tests
+2. Mock exchange APIs for unit tests
+3. Use real APIs sparingly in integration tests
+4. Always validate DataFrame schema
+
+See [references/testing-guide.md](references/testing-guide.md) for details.
+
+````
+
+#### DSM Research Skill
+
+```yaml
+---
+name: dsm-research
+description: Codebase research for DSM. Use when exploring FCP implementation, understanding data flow, or investigating cache behavior.
+context: fork
+agent: Explore
+user-invocable: false
+---
+
+# DSM Research
+
+Research the requested topic in the DSM codebase:
+
+1. Search for relevant files using Glob and Grep
+2. Read implementations, not just interfaces
+3. Trace data flow through the system
+4. Document findings with specific file:line references
+
+Focus areas:
+- FCP decision logic in src/data_source_manager/fcp/
+- Cache management in src/data_source_manager/cache/
+- Exchange adapters in src/data_source_manager/exchanges/
+````
+
+#### FCP Debug Skill
+
+````yaml
+---
+name: debug-fcp
+description: Debug FCP cache behavior for a symbol
+disable-model-invocation: true
+argument-hint: [symbol] [timeframe]
+allowed-tools: Read, Grep, Glob, Bash
+---
+
+# Debug FCP for $0
+
+## Steps
+
+1. Check FCP status:
+```bash
+mise run fcp:status $0
+````
+
+1. Read fcp_control_status() implementation:
+
+```
+Read src/data_source_manager/fcp/control.py
+```
+
+1. Check cache files:
+
+```bash
+ls -la ~/.cache/dsm/$0/
+```
+
+1. Verify timestamps use UTC:
+
+```
+Grep "datetime" src/data_source_manager/fcp/
+```
+
+1. Report findings with specific file:line references
+
+````
+
+#### Data Validation Skill
+
+```yaml
+---
+name: validate-data
+description: Validate market data DataFrame structure and quality
+disable-model-invocation: true
+argument-hint: [symbol]
+---
+
+# Validate Data for $ARGUMENTS
+
+## Validation Checks
+
+1. **Schema validation**
+   - Required columns: open_time, open, high, low, close, volume
+   - Types: open_time (datetime), OHLCV (numeric)
+
+2. **Timestamp validation**
+   - UTC timezone-aware
+   - Strictly increasing
+   - No duplicates
+
+3. **Data quality**
+   - No NaN values in OHLCV
+   - Prices > 0
+   - Volume >= 0
+   - High >= Low
+   - High >= Open, Close
+   - Low <= Open, Close
+
+4. **Continuity**
+   - Check for gaps (allow market closed periods)
+   - Report missing intervals
+
+Run validation script:
+```bash
+python scripts/validate_dataframe.py $ARGUMENTS
+````
+
+````
+
+### Skill Discovery Tips
+
+**For Claude auto-invocation**:
+- Use keywords users naturally say in description
+- Include "Use when..." triggers
+- Be specific about context
+
+**For manual invocation**:
+- Keep name short and memorable
+- Add `argument-hint` for clarity
+- Use `disable-model-invocation: true`
+
+### Visual Output Pattern
+
+Skills can generate interactive HTML:
+
+```yaml
+---
+name: visualize-fcp
+description: Generate FCP status visualization
+allowed-tools: Bash(python *)
+---
+
+# FCP Visualization
+
+Generate interactive HTML showing FCP status:
+
+```bash
+python ~/.claude/skills/visualize-fcp/scripts/visualize.py
+````
+
+Opens `fcp-status.html` in browser showing:
+
+- Cache hit/miss rates by symbol
+- Data freshness timeline
+- Fallback triggers
+
+````
+
+### Troubleshooting
+
+| Issue                    | Solution                                  |
+| ------------------------ | ----------------------------------------- |
+| Skill not triggering     | Check description keywords, verify in `/` menu|
+| Triggers too often       | Make description more specific            |
+| Not seeing all skills    | Check context budget (15K chars default)  |
+| Subagent no output       | Ensure skill has actionable task          |
+
+**Increase skill budget**:
+```bash
+export SLASH_COMMAND_TOOL_CHAR_BUDGET=30000
+claude
+````
+
+### Summary
+
+| Component              | Pattern                             |
+| ---------------------- | ----------------------------------- |
+| Structure              | SKILL.md + optional directories     |
+| Frontmatter            | name, description, control fields   |
+| Progressive disclosure | Metadata → SKILL.md → resources     |
+| Arguments              | `$ARGUMENTS`, `$N`, `${VAR}`        |
+| Dynamic context        | `!`command`` preprocessing          |
+| Subagent execution     | `context: fork`, `agent: Explore`   |
+| Size limit             | SKILL.md under 500 lines            |
+| DSM patterns           | Usage, testing, research, FCP debug |
