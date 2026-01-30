@@ -25,18 +25,15 @@ from data_source_manager.utils.market_constraints import Interval, MarketType, C
 #### Key Components
 
 - `DataSource` Enum:
-
   - `AUTO`: Automatically select best source
   - `REST`: Force REST API usage
   - `VISION`: Force Vision API usage
 
 - `DataProvider` Enum:
-
   - `BINANCE`: Binance data provider
   - `TRADESTATION`: TradeStation data provider
 
 - `ChartType` Enum:
-
   - `KLINES`: Standard candlestick data
   - `FUNDING_RATE`: Funding rate data (futures)
 
@@ -92,7 +89,6 @@ FUNDING_RATE_DTYPES = {
 #### Data Requirements
 
 1. Index Properties:
-
    - pd.DatetimeIndex in UTC timezone
    - Monotonically increasing
    - No duplicates

@@ -72,7 +72,6 @@ Where:
 From our exploration, we've identified these main data types available via the CDN:
 
 1.  **Trade Data (`trades`)**:
-
     - Individual trade records
     - Example: `BTC-USDT-trades-2023-04-19.zip`
     - Contains: trade_id, side, size, price, created_time
@@ -262,12 +261,10 @@ Note: All fields are returned as strings and need to be converted to appropriate
 Through our systematic testing, we've determined that the earliest available data varies by interval and endpoint for the REST API:
 
 1.  The earliest available data for BTC-USDT is:
-
     - For 1m (1-minute) interval data: From January 11, 2018 (timestamp: 1515669120000) in the history-candles endpoint
     - For 1D (daily) interval data: From May 21, 2021 in the candles endpoint and October 10, 2017 in the history-candles endpoint.
 
 2.  Endpoint capabilities differ significantly:
-
     - **candles endpoint**: Primarily provides **very recent** data for 1m interval (~24 hours). Cannot retrieve any historical 1m data beyond this ~24-hour window. For intervals of 15m and larger, provides deeper historical data as noted in the "Supported Time Intervals" table.
     - **history-candles endpoint**: Provides comprehensive historical data access, including 1m data back to January 11, 2018 and 1D data back to October 10, 2017. Successfully returns data for all tested periods (1-730 days back from current date) for intervals it supports historically. Is the only option for obtaining any historical sub-daily data beyond the recent window offered by the `candles` endpoint.
 
@@ -476,7 +473,6 @@ The binary search approach is highly efficient, allowing the script to:
 We've configured the tool to perform focused testing for specific intervals on the REST API. This testing precisely determined the historical depth for each interval as detailed in the "Supported Time Intervals" table.
 
 1.  **1-minute (1m) data testing**:
-
     - Confirmed that the `history-candles` endpoint provides 1m data dating back to January 11, 2018.
     - Precisely determined that the `candles` endpoint only provides 1m data for the most recent ~24 hours (23 hours and 58 minutes in our tests).
     - Verified that the `candles` endpoint returns no data for any test points 1+ days ago.

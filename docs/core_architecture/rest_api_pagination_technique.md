@@ -205,7 +205,6 @@ Key features:
 ## Key Advantages of This Approach
 
 1. **Interval-Optimized Chunking**
-
    - Different intervals use different chunking strategies optimized for their size
    - 1-second data uses small chunks (max ~16 minutes / 1000 records)
    - 1-minute data uses medium chunks (max ~16 hours / 1000 records)
@@ -213,27 +212,23 @@ Key features:
    - Day/week/month intervals use full chunk capacity
 
 2. **Parallel Processing with Resource Optimization**
-
    - Chunks are processed concurrently for maximum throughput
    - Concurrency is limited based on system capabilities (CPU, memory, network)
    - Parallelism is controlled via semaphores to prevent overwhelming the system
    - Endpoint rotation spreads load across multiple Binance endpoints
 
 3. **Robust Error Handling**
-
    - Exponential backoff for retries with configurable maximum retry count
    - API-driven rate limit handling via `Retry-After` headers
    - Exceptions are captured and reported clearly
    - Failed chunks are tracked separately from successful ones
 
 4. **Accurate Time Boundary Handling**
-
    - Implements the exact same boundary alignment behavior as the Binance API
    - Ensures consistent data retrieval regardless of timestamp precision
    - Provides clear logging of boundary adjustments for transparency
 
 5. **Resilience to Data Changes**
-
    - Even if data changes during retrieval, chunks capture consistent snapshots
    - New records don't affect previously retrieved chunks
    - No risk of duplicate or missing records if data changes during pagination
@@ -243,19 +238,16 @@ Key features:
 Unlike traditional offset/limit pagination used in many APIs, time-based chunking offers several advantages for time series data:
 
 1. **Natural Time Boundaries**
-
    - Chunks align with natural time boundaries for the interval
    - No overlapping or missing data between chunks
    - Clean aggregation of results without duplicates
 
 2. **Parallel Retrieval**
-
    - Independent time chunks can be retrieved concurrently
    - No need to wait for previous pages before requesting next ones
    - Dramatically reduces total time to retrieve large datasets
 
 3. **Resilience to Data Changes**
-
    - Time-based chunks are stable even if data is added/removed during pagination
    - Traditional offset/limit pagination can miss or duplicate records if data changes
 
@@ -328,18 +320,15 @@ async def fetch(self, symbol, interval, start_time, end_time):
 Key elements of the timeout handling implementation:
 
 1. **Centralized Timeout Configuration**
-
    - Uses `MAX_TIMEOUT` constant from `src/data_source_manager/utils/config.py` for consistency
    - Sets an effective timeout based on operation complexity
 
 2. **Task-Based Execution**
-
    - Creates explicit async tasks for all operations
    - Enables proper cancellation when timeouts occur
    - Prevents resource leaks through explicit task tracking
 
 3. **Resource Cleanup**
-
    - Implements dedicated cleanup method for hanging tasks
    - Ensures client sessions are properly closed
    - Prevents memory leaks and connection pool exhaustion

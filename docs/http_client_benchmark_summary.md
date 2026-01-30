@@ -13,7 +13,6 @@ This document summarizes our benchmarking of HTTP client libraries for three cri
 Based on our comprehensive testing, here are our key recommendations:
 
 1. **Use `curl_cffi` with AsyncSession for optimal maintainability and performance**
-
    - AsyncSession provides similar or better performance than the synchronous API in most cases
    - The `async`/`await` pattern offers better maintainability, resource management, and composability
    - Lower CPU usage with better connection pooling
@@ -21,13 +20,11 @@ Based on our comprehensive testing, here are our key recommendations:
    - Prefer AsyncSession for new code even if you're not yet using other async libraries
 
 2. **Use the "download-first" approach rather than checking before downloading**
-
    - 2.2-2.4x faster than separate check-then-download
    - Detects non-existent files 10-15% faster
    - Simplifies code and improves performance
 
 3. **Use concurrency for multiple file downloads**
-
    - AsyncSession with semaphores provides clean concurrency control
    - Use concurrency level 50 for optimal performance with multiple files
    - Adjust concurrency based on batch size:
@@ -83,7 +80,6 @@ Our latest benchmarks included a comparison of performance with different data g
 The benchmarking involved several dimensions:
 
 1. **Approaches tested:**
-
    - Traditional check-then-download (HEAD request followed by GET if available)
    - Download-first (direct GET without checking first)
    - Partial download (range request for first 1KB to quickly detect availability)

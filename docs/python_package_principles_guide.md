@@ -9,12 +9,10 @@ This guide provides a step-by-step approach to applying Python package principle
 Start by prioritizing modules for documentation enhancement:
 
 1. **Core API Modules**: Focus first on modules directly exposed to users
-
    - `src/data_source_manager/core/sync/dsm_lib.py` (contains `fetch_market_data`)
    - `src/data_source_manager/core/sync/data_source_manager.py` (core implementation)
 
 2. **Public Interface Modules**: Modules that define public interfaces
-
    - `src/data_source_manager/utils/market_constraints.py` (defines enums used in the API)
    - `src/data_source_manager/utils/dataframe_types.py` (defines data types)
 

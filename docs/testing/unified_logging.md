@@ -33,7 +33,6 @@ The unified logging abstraction is implemented in `tests/utils/unified_logging.p
 ### Core Components
 
 1. **`UnifiedLogCapture` Class**
-
    - Captures logs during test execution
    - Works with both synchronous and asynchronous tests
    - Compatible with pytest-xdist parallel execution
@@ -42,7 +41,6 @@ The unified logging abstraction is implemented in `tests/utils/unified_logging.p
    - Ensures proper cleanup of resources
 
 2. **Global Fixtures**
-
    - `caplog_unified`: The recommended fixture for new tests
    - `caplog_xdist_compatible`: For backward compatibility with existing tests
    - `caplog`: Enhanced version of pytest's native fixture

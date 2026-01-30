@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Phase 2: Run semantic-release"
+#MISE depends=["release:preflight"]
+set -euo pipefail
+
+echo "=== Running semantic-release ==="
+npm run release
+
+echo ""
+echo "✓ Version phase complete"

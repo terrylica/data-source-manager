@@ -1,0 +1,8 @@
+# mise configuration for data-source-manager
+# See: https://mise.jdx.dev/
+
+[tools]
+node = "25"  # Required for semantic-release
+
+# Environment variables are loaded from .mise.local.toml (git-ignored)
+# Create .mise.local.toml from .mise.local.toml.example for local development

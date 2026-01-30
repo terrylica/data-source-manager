@@ -16,21 +16,21 @@ dsm-demo-cli [OPTIONS]
 
 ## Options
 
-- **`-p, --provider [binance]`**: Data provider (binance, tradestation)  [default: binance]
-- **`-m, --market [spot|um|cm]`**: Market type (spot, um, cm)  [default: spot]
-- **`-ct, --chart-type [klines|fundingRate]`**: Chart type (klines, premiums)  [default: klines]
-- **`-s, --symbol TEXT`**: Symbol to fetch data for  [default: BTCUSDT]
-- **`-i, --interval TEXT`**: Time interval for klines/premiums  [default: 1m]
+- **`-p, --provider [binance]`**: Data provider (binance, tradestation) [default: binance]
+- **`-m, --market [spot|um|cm]`**: Market type (spot, um, cm) [default: spot]
+- **`-ct, --chart-type [klines|fundingRate]`**: Chart type (klines, premiums) [default: klines]
+- **`-s, --symbol TEXT`**: Symbol to fetch data for [default: BTCUSDT]
+- **`-i, --interval TEXT`**: Time interval for klines/premiums [default: 1m]
 - **`-st, --start-time TEXT`**: Start time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Can be used alone with --days to fetch forward, or with --end-time for exact range
 - **`-et, --end-time TEXT`**: End time in ISO format (YYYY-MM-DDTHH:MM:SS) or YYYY-MM-DD. Can be used alone with --days to fetch backward, or with --start-time for exact range
-- **`-d, --days INTEGER`**: Number of days of data to fetch. If used with --end-time, fetches data backward from end time. If used with --start-time, fetches data forward from start time. If used alone, fetches data backward from current time  [default: 3]
-- **`-es, --enforce-source [AUTO|REST|VISION]`**: Force specific data source (default: AUTO)  [default: AUTO]
-- **`-r, --retries INTEGER`**: Maximum number of retry attempts  [default: 3]
+- **`-d, --days INTEGER`**: Number of days of data to fetch. If used with --end-time, fetches data backward from end time. If used with --start-time, fetches data forward from start time. If used alone, fetches data backward from current time [default: 3]
+- **`-es, --enforce-source [AUTO|REST|VISION]`**: Force specific data source (default: AUTO) [default: AUTO]
+- **`-r, --retries INTEGER`**: Maximum number of retry attempts [default: 3]
 - **`-nc, --no-cache`**: Disable caching (cache is enabled by default)
 - **`-cc, --clear-cache`**: Clear the cache directory before running
 - **`-gd, --gen-doc`**: Generate Markdown documentation from Typer help into docs/dsm_demo_cli/ directory
 - **`-glc, --gen-lint-config`**: Generate markdown linting configuration files along with documentation (only used with --gen-doc)
-- **`-l, --log-level [D|I|W|E|C]`**: Set the log level (default: I). D, I, W, E, C  [default: I]
+- **`-l, --log-level [D|I|W|E|C]`**: Set the log level (default: I). D, I, W, E, C [default: I]
 - **`--help`**: Show this message and exit.
 - **`-h, --help`**: Show this message and exit.
 

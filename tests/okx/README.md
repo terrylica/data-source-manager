@@ -7,7 +7,6 @@ This directory contains an extensive suite of tests for the OKX API implementati
 This test suite includes the following files:
 
 - **`okx_api_test.py`**:
-
   - **Purpose:** Provides basic functional tests for the main OKX candlestick endpoints (`/market/candles` and `/market/history-candles`).
   - **Key Tests:**
     - Verifies successful data retrieval for various standard intervals (`1m`, `1H`, `1D`, etc.) for both SPOT (`BTC-USDT`) and SWAP (`BTC-USD-SWAP`) instruments.
@@ -15,7 +14,6 @@ This test suite includes the following files:
     - Analyzes the structure and data types of the returned candlestick data.
 
 - **`okx_symbol_test.py`**:
-
   - **Purpose:** Focuses on testing the internal utilities related to OKX symbol handling and endpoint resolution, particularly functions within `src/data_source_manager/utils/market_constraints.py`.
   - **Key Tests:**
     - Validates the correct formatting of symbols for different market types (SPOT, FUTURES_USDT), ensuring adherence to the `BASE-QUOTE` or `BASE-USD-SWAP` format (e.g., converts `BTCUSDT` to `BTC-USDT`).
@@ -23,7 +21,6 @@ This test suite includes the following files:
     - Verifies that the correct API endpoint URLs are returned based on the market type and chart type (candles or history-candles).
 
 - **`okx_endpoint_comparison_test.py`**:
-
   - **Purpose:** Performs a detailed comparison between the `/market/candles` and `/market/history-candles` endpoints to understand their differences, overlaps, and specific behaviors.
   - **Key Tests:**
     - **Boundary Overlap:** Confirms if the two endpoints provide overlapping data for recent timestamps.
@@ -33,7 +30,6 @@ This test suite includes the following files:
     - **Backfill Depth:** Determines the maximum historical depth of data available from each endpoint for various intervals.
 
 - **`okx_api_edge_cases_test.py`**:
-
   - **Purpose:** Tests how the OKX API responds to various invalid inputs and less common scenarios.
   - **Key Tests:**
     - **Limit Parameter Constraints:** Explores the actual maximum number of records returned by the API when requesting more than the typical limit.
@@ -43,7 +39,6 @@ This test suite includes the following files:
     - **Missing Required Parameters:** Checks if the API correctly returns errors when essential parameters like `instId` are omitted.
 
 - **`test_okx_1s_availability.py`**:
-
   - **Purpose:** Specifically investigates the availability of 1-second (`1s`) interval data from the OKX API, which is noted as having limited availability.
   - **Key Tests:**
     - Tests recent and historical availability of `1s` data for the `candles` and `history-candles` endpoints, confirming that `candles` does not support `1s`.
@@ -51,7 +46,6 @@ This test suite includes the following files:
     - Explores the actual historical depth of `1s` data available via the `history-candles` endpoint.
 
 - **`test_okx_candles_depth.py`**:
-
   - **Purpose:** Systematically determines the historical depth of candlestick data available for a range of intervals from both the `candles` and `history-candles` endpoints.
   - **Key Tests:**
     - Uses a binary search approach to efficiently find the approximate earliest date for which data is available for a given instrument and interval.

@@ -44,7 +44,6 @@ def test_example(caplog):
 - This method allows specific tests to capture logs at different levels as needed.
 
 1. Avoid Mixing Logging Configurations:
-
    - Be cautious when using logging.config.dictConfig() alongside pytest's logging mechanisms, as they can interfere with each other.
    - If dictConfig() is necessary, ensure it's configured appropriately within each test or fixture to maintain compatibility with pytest's logging capture.
 

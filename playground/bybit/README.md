@@ -11,6 +11,7 @@ pip install httpx typer platformdirs rich polars loguru
 ```
 
 ### Dependency Explanation
+
 - **httpx**: Modern HTTP client with sync and async APIs
 - **typer**: Command-line interface creation (built on Click)
 - **platformdirs**: Platform-specific directories for data and logs
@@ -72,13 +73,14 @@ chmod +x playground/bybit/download_spot_klines.py
 
 Bybit's API requires specific symbol naming conventions for different market categories:
 
-| Market Type | Category Parameter | Symbol Naming Convention                          | Example    |
-|-------------|-------------------|---------------------------------------------------|------------|
-| Spot        | `spot`            | Base currency + Quote currency                     | `BTCUSDT`  |
-| Linear      | `linear`          | Base currency + `USDT` suffix                      | `BTCUSDT`  |
-| Inverse     | `inverse`         | Base currency + `USD` suffix                       | `BTCUSD`   |
+| Market Type | Category Parameter | Symbol Naming Convention       | Example   |
+| ----------- | ------------------ | ------------------------------ | --------- |
+| Spot        | `spot`             | Base currency + Quote currency | `BTCUSDT` |
+| Linear      | `linear`           | Base currency + `USDT` suffix  | `BTCUSDT` |
+| Inverse     | `inverse`          | Base currency + `USD` suffix   | `BTCUSD`  |
 
 The script validates that the provided symbol follows the correct naming convention for the specified market category:
+
 - For inverse markets, symbols must end with `USD` (e.g., `BTCUSD`, `ETHUSD`)
 - For linear markets, symbols must end with `USDT` (e.g., `BTCUSDT`, `ETHUSDT`)
 
@@ -94,6 +96,7 @@ You can override this validation with the `--force` flag if necessary:
 **⚠️ Important API Behavior Warning:**
 
 Our empirical testing revealed a critical issue with Bybit's API when using incorrect symbol formats:
+
 - When using `category=inverse` with a USDT-suffixed symbol (e.g., BTCUSDT), the API returns data from the linear market
 - The API response incorrectly labels this data as "category": "inverse" while actually providing linear market data
 - The timestamps and values are identical to those returned by linear market queries
@@ -106,10 +109,10 @@ This discovery validates the importance of our symbol validation feature and why
 Based on our empirical testing, here's when data becomes available for different markets:
 
 | Market Type       | Symbol  | Earliest Available Timestamp (UTC) |
-|-------------------|---------|-----------------------------------|
-| Spot              | BTCUSDT | 2021-07-05 12:00:00               |
-| Linear Perpetual  | BTCUSDT | 2020-03-25 10:35:00               |
-| Inverse Perpetual | BTCUSD  | 2018-11-14 16:00:00               |
+| ----------------- | ------- | ---------------------------------- |
+| Spot              | BTCUSDT | 2021-07-05 12:00:00                |
+| Linear Perpetual  | BTCUSDT | 2020-03-25 10:35:00                |
+| Inverse Perpetual | BTCUSD  | 2018-11-14 16:00:00                |
 
 ### Important API Limits
 

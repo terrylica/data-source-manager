@@ -20,22 +20,18 @@ This module provides centralized time-related utilities for handling datetime ob
 ### Interval Calculations
 
 - **`get_interval_micros(interval: Union[str, MarketInterval]) -> int`**
-
   - Gets interval in microseconds
   - Supports both string and MarketInterval enum input
 
 - **`get_interval_seconds(interval: Union[str, MarketInterval]) -> int`**
-
   - Gets interval in seconds
   - Useful for API calls and time calculations
 
 - **`get_interval_timedelta(interval: Union[str, MarketInterval]) -> timedelta`**
-
   - Gets interval as a timedelta object
   - Convenient for datetime arithmetic
 
 - **`get_interval_floor(dt: datetime, interval: Union[str, MarketInterval]) -> datetime`**
-
   - Gets floor datetime aligned to interval boundary
   - Useful for standardizing start times
 
@@ -46,7 +42,6 @@ This module provides centralized time-related utilities for handling datetime ob
 ### Bar Analysis
 
 - **`get_bar_close_time(bar_open_time: datetime, interval: Union[str, MarketInterval]) -> datetime`**
-
   - Calculates exact close time for a bar given its open time
   - Takes interval into account
 
@@ -63,17 +58,14 @@ This module provides centralized time-related utilities for handling datetime ob
 ### API Boundary Alignment
 
 - **`align_time_boundaries(start_time: datetime, end_time: datetime, interval: Union[str, MarketInterval]) -> tuple[datetime, datetime]`**
-
   - Aligns start and end times to interval boundaries
   - Ensures consistent alignment with API expectations
 
 - **`estimate_record_count(start_time: datetime, end_time: datetime, interval: Union[str, MarketInterval]) -> int`**
-
   - Estimates number of records for a given time range and interval
   - Useful for API request planning and validation
 
 - **`vision_api_time_window_alignment(window_size: int) -> timedelta`**
-
   - Provides the appropriate time window for Vision API based on window size
   - Helps in preventing excessive data requests
 

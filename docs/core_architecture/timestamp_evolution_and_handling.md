@@ -14,7 +14,6 @@ This evolution necessitates a flexible timestamp handling strategy to ensure the
 Consistent precision patterns have been identified in Binance Vision timestamps:
 
 1. **`open_time`**:
-
    - Always aligned to second boundaries.
    - Microseconds component is always zero (`.000000`).
    - Format: `YYYYMMDD HH:MM:SS.000000`

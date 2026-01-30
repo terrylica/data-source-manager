@@ -331,7 +331,6 @@ The API returns an array of candlestick data with the following structure per el
 Based on empirical testing:
 
 - For 1-second intervals:
-
   - Open time is in milliseconds (e.g., 1742634854000)
   - Close time is exactly 999 milliseconds later (e.g., 1742634854999)
   - The difference between open and close time is always 999ms

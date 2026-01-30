@@ -22,7 +22,6 @@ This module provides centralized validation utilities for ensuring data integrit
 ### Data Availability Validation
 
 - **`validate_data_availability(start_time: datetime, end_time: datetime, consolidation_delay: timedelta = timedelta(hours=48)) -> None`**
-
   - Validates if data should be available for a given time range
   - Logs warnings for potentially incomplete data
 
@@ -33,7 +32,6 @@ This module provides centralized validation utilities for ensuring data integrit
 ### DataFrame Validation
 
 - **`validate_dataframe(df: pd.DataFrame) -> None`** [DEPRECATED]
-
   - Validates DataFrame structure and integrity
   - Checks index type, timezone awareness, column presence, etc.
   - Raises ValueError if validation fails
@@ -48,7 +46,6 @@ This module provides centralized validation utilities for ensuring data integrit
 ### File Validation
 
 - **`validate_cache_integrity(file_path: Union[str, Path], min_size: int = MIN_VALID_FILE_SIZE, max_age: timedelta = MAX_CACHE_AGE) -> Optional[Dict[str, Any]]`**
-
   - Validates cache file integrity
   - Checks existence, size, and age
   - Returns error information or None if valid
@@ -64,16 +61,13 @@ This module provides centralized validation utilities for ensuring data integrit
 The `ApiValidator` class provides methods for validating data against Binance API behavior.
 
 - **`__init__(self, api_boundary_validator: Optional[ApiBoundaryValidator] = None)`**
-
   - Initializes the validator with an optional ApiBoundaryValidator
 
 - **`validate_api_time_range(self, start_time: datetime, end_time: datetime, interval: Union[str, Interval], symbol: str = "BTCUSDT") -> bool`**
-
   - Validates if a time range is valid for the API
   - Returns boolean indicating validity
 
 - **`get_api_aligned_boundaries(self, start_time: datetime, end_time: datetime, interval: Union[str, Interval], symbol: str = "BTCUSDT") -> Dict[str, Any]`**
-
   - Gets API-aligned boundaries for a time range
   - Returns dictionary with boundary information
 
@@ -88,11 +82,9 @@ The `ApiValidator` class provides methods for validating data against Binance AP
 The `DataValidator` class provides comprehensive data validation including structure and API alignment.
 
 - **`__init__(self, api_validator: Optional[ApiValidator] = None)`**
-
   - Initializes the validator with an optional ApiValidator
 
 - **`validate_data(self, df: pd.DataFrame, options: ValidationOptions = None) -> Optional[CacheValidationError]`**
-
   - Validates data structure and content
   - Returns ValidationError if invalid, None if valid
 

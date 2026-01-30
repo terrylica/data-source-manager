@@ -7,7 +7,6 @@ We have identified a systematic issue with checksum verification for historical 
 ## Key Findings
 
 1. **1-Second Data Files Modified in April 2023**
-
    - Example file: `BTCUSDT-1s-2022-12-01.zip`
    - Expected checksum: `b0badded6508aefec4359938215a1991a976196eaab2dba14d9602ae4bbae1b6`
    - Actual checksum: `d782820021eb67f558cfd3909075baa7cbebfa954d3328e158e65b1cceedd006`

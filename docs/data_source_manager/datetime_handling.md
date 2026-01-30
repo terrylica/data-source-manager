@@ -7,13 +7,11 @@ This document explains the datetime handling and DataFrame consistency enhanceme
 The Data Source Manager now follows these core principles for datetime handling:
 
 1. **Consistent DateTime Representation**:
-
    - All timestamps are timezone-aware in UTC
    - `open_time` is available as both an index and a column in returned DataFrames
    - Missing timestamps are represented with NaN values (via reindexing)
 
 2. **Standard Output Format**:
-
    - All DataFrame columns have consistent data types
    - Column names follow a standardized naming convention
    - Timestamps are in millisecond precision (matching REST API)
@@ -212,17 +210,14 @@ complete_df = safely_reindex_dataframe(
 ### Common Issues
 
 1. **Timezone Warnings**:
-
    - Warning: "Converting tz-naive pandas.DatetimeIndex to tz-aware"
    - Solution: Always use timezone-aware datetimes
 
 2. **Type Comparison Errors**:
-
    - Error: "Cannot compare dtypes int64 and datetime64"
    - Solution: Use `safe_timestamp_comparison` for mixed type comparisons
 
 3. **Missing Data Issues**:
-
    - Warning: "Data incomplete: X/Y timestamps missing"
    - Solution: Use `safely_reindex_dataframe` to fill gaps or check completeness before analysis
 

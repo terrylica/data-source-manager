@@ -119,13 +119,11 @@ Similar queries were performed against multiple API endpoints to compare rate li
 Binance implements several rate limit types:
 
 1. **REQUEST_WEIGHT**: Weight-based rate limiting per IP address
-
    - Each endpoint has a specific weight cost
    - Weight is accumulated per minute
    - Different markets have different weight limits
 
 2. **ORDERS**: Order-based rate limiting per account
-
    - Limits the number of orders within a time interval
    - Applied across all API keys for the same account
    - Has both short-term (seconds) and long-term (day) constraints
@@ -163,24 +161,20 @@ When rate limits are exceeded, Binance returns:
 ## Optimization Strategies
 
 1. **Batch requests** when possible:
-
    - Get all price tickers at once (weight 2-4) rather than individually (weight 1-2 each)
    - Use maximum `limit` parameter values to reduce total requests
 
 2. **Endpoint rotation**:
-
    - Distribute requests across multiple available endpoints:
      - api.binance.com, api1.binance.com, api2.binance.com, etc.
    - Use data-only endpoints for non-critical data: data-api.binance.vision
 
 3. **Weight tracking**:
-
    - Monitor the weight headers in responses
    - Implement circuit breakers when approaching limits
    - Add exponential backoff for retries
 
 4. **WebSocket alternatives**:
-
    - Use WebSockets instead of REST API polling for real-time data
    - No rate limits for public market data streams
 

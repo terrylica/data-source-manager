@@ -15,13 +15,11 @@ The Memory Monitoring System is a comprehensive solution for monitoring, diagnos
 The Memory Monitoring System will provide:
 
 1. **Real-time Memory Usage Tracking**
-
    - Continuous monitoring of RSS and virtual memory usage
    - Per-component resource tracking
    - Long-term trend analysis
 
 2. **Advanced Diagnostics**
-
    - Memory leak detection
    - Reference cycle identification
    - curl_cffi resource tracking

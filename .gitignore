@@ -110,3 +110,18 @@ examples/schema_standardization/schema_test/
 playground/rate_limit_test/results/
 benchmark*.json
 .cursor/rules/env-local-macos-terryli.mdc
+
+# Local-only files (not tracked in public repo)
+.mise.local.toml
+EMERGENCY_RESTORE.md
+CRITICAL_BUG_FIX_REPORT.md
+DSM_AUTO_REINDEX_FIX_SUMMARY.md
+DSM_ENHANCEMENT_SUMMARY.md
+SOLUTION_SUMMARY.md
+docs/sr&ed/
+docs/journals/
+
+# Node.js (for semantic-release)
+node_modules/
+package-lock.json
+bun.lockb

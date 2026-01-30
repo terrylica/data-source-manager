@@ -26,18 +26,15 @@ scripts/op/run_tests_parallel.sh -h
 ## Best Practices
 
 1. **Use the Unified Logging Approach**
-
    - Use `caplog_unified` for all new tests
    - Leverage helper functions like `assert_log_contains` for cleaner assertions
    - Take advantage of the context manager for temporary log level changes
 
 2. **Mark Serial Tests Appropriately**
-
    - Use `@pytest.mark.serial` for tests that should not run in parallel
    - Keep most tests parallel-friendly for faster execution
 
 3. **Configure Asyncio Properly**
-
    - Use `@pytest.mark.asyncio` for async tests
    - Ensure `asyncio_default_fixture_loop_scope = function` is set
    - Clean up asyncio resources properly

@@ -37,7 +37,7 @@ All with automatic retry, data validation, and gap detection.
 
 __version__ = "0.2.0"
 __author__ = "EonLabs"
-__email__ = "chen@eonlabs.com"
+__email__ = "terry@eonlabs.com"
 
 # Lazy imports to avoid dependency issues during package discovery
 def __getattr__(name):
@@ -45,21 +45,20 @@ def __getattr__(name):
     if name == "DataSourceManager":
         from .core.sync.data_source_manager import DataSourceManager
         return DataSourceManager
-    elif name == "DataProvider":
+    if name == "DataProvider":
         from .utils.market_constraints import DataProvider
         return DataProvider
-    elif name == "MarketType":
+    if name == "MarketType":
         from .utils.market_constraints import MarketType
         return MarketType
-    elif name == "Interval":
+    if name == "Interval":
         from .utils.market_constraints import Interval
         return Interval
-    else:
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 __all__ = [
+    "DataProvider",
     "DataSourceManager",
-    "DataProvider", 
     "Interval",
     "MarketType",
 ]

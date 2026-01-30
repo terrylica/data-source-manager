@@ -216,14 +216,12 @@ And select from the available test options. You can also run multiple tests at o
 The cache builder supports three predefined test sizes for quick testing and development:
 
 1. **Very Small Test**
-
    - 1 symbol (BTCUSDT)
    - 1 interval (5m)
    - 1 day of data (yesterday to today)
    - Ideal for quick feature testing
 
 2. **Small Test (Default)**
-
    - 3 symbols (BTCUSDT, ETHUSDT, BNBUSDT)
    - 1 interval (5m)
    - 3 days of data
@@ -304,7 +302,6 @@ Standard supported values:
 The cache metadata is stored in a SQLite database at `logs/cache_index.db` with the following structure:
 
 - `cache_metadata` table: Stores global metadata about the cache
-
   - `key`: Metadata key (e.g., "last_update")
   - `value`: Metadata value
 
@@ -324,7 +321,6 @@ This database provides a comprehensive index of all cached data, including file 
 The cache metadata is stored in a SQLite database at `logs/cache_index.db` with the following structure:
 
 - `cache_metadata` table: Stores global metadata about the cache
-
   - `key`: Metadata key (e.g., "last_update")
   - `value`: Metadata value
 

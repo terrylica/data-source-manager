@@ -54,7 +54,6 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 The following core modules have been updated to use consolidated utility modules directly:
 
 1. **Core Modules**
-
    - `src/data_source_manager/core/vision_data_client.py` - Now uses consolidated utility modules directly
    - `src/data_source_manager/core/data_source_manager.py` - Now uses consolidated utility modules directly
    - `src/data_source_manager/core/cache_manager.py` - Now uses consolidated utility modules directly
@@ -86,37 +85,31 @@ All test modules have been updated to use the consolidated utility modules direc
 We've successfully updated several core modules to use the consolidated utility modules directly:
 
 1. **VisionDataClient**:
-
    - Replaced imports from `time_alignment` with imports from `time_utils`
    - Added a backward-compatible `TimeRangeManager` class that wraps the functions from `time_utils` with deprecation warnings
    - Updated all function calls to use the consolidated functions directly
 
 2. **DataSourceManager**:
-
    - Updated imports to include functions directly from `time_utils`
    - Replaced all calls to `TimeRangeManager` functions with direct calls to the corresponding functions
    - Maintained backward compatibility by keeping the import of TimeRangeManager
 
 3. **CacheManager**:
-
    - Updated imports to use functions directly from `time_utils`
    - Replaced all calls to deprecated functions with direct calls to the consolidated versions
    - Maintained backward compatibility by keeping the import of TimeRangeManager
 
 4. **DownloadHandler and VisionDownloadManager**:
-
    - Updated imports to include enforce_utc_timezone from time_utils
    - Replaced all calls to TimeRangeManager.enforce_utc_timezone with direct function calls
    - Maintained backward compatibility by retaining relevant imports
 
 5. **VisionConstraints**:
-
    - Added direct import of enforce_utc_timezone from time_utils
    - Updated enforce_utc_timestamp function to use the direct function call
    - Kept TimeRangeManager import for backward compatibility
 
 6. **MarketDataClient**:
-
    - Updated imports to directly use time-related functions from time_utils instead of time_alignment
    - Removed unnecessary TimeRangeManager import
    - Simplified dependency structure
@@ -141,7 +134,6 @@ These updates have eliminated numerous deprecation warnings and provided a clean
 #### Next Steps
 
 1. **Complete Phase 4 (Cleanup)**
-
    - ✅ All test files have been updated to use consolidated utility functions directly
    - ✅ All deprecation warnings in tests have been addressed
    - Continue monitoring for any additional files that may be using deprecated functions
@@ -202,18 +194,15 @@ scripts/op/run_tests_parallel.sh tests/time_utils
 ### Accomplishments
 
 1. **Structure and Organization**:
-
    - Created three consolidated utility modules: `time_utils.py`, `validation_utils.py`, and `network_utils.py`
    - Each module focuses on a specific area of functionality with clear boundaries and responsibilities
 
 2. **Code Consolidation**:
-
    - Moved all time-related functions from `time_alignment.py` and `api_boundary_validator.py` to `time_utils.py`
    - Consolidated validation logic from `cache_validator.py` and `validation.py` into `validation_utils.py`
    - Combined HTTP client factory and download handling from `http_client_factory.py` and `download_handler.py` into `network_utils.py`
 
 3. **Technical Improvements**:
-
    - Enhanced error handling throughout the codebase
    - Improved timestamp parsing with format auto-detection
    - Fixed CSV parsing to handle various timestamp formats (seconds, milliseconds, microseconds)

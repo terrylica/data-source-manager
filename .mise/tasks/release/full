@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Complete 4-phase release workflow"
+#MISE depends=["release:preflight"]
+set -euo pipefail
+
+echo "=== Full Release Workflow ==="
+echo ""
+
+mise run release:version
+mise run release:verify
+
+echo ""
+echo "✓ Release complete!"

@@ -124,7 +124,6 @@ For queries spanning year changes (December 31 to January 1):
 1. **Seamless Transitions**: The API treats all time transitions (second, minute, hour, day, month, year) as continuous with no special cases or gaps.
 
 2. **Consistent Rounding**: Millisecond precision is always ignored, with the same rounding rules applying at all times:
-
    - A timestamp of 23:59:59.999 will be treated as the next second (00:00:00) when used as startTime
    - A timestamp of 00:00:00.001 will be treated as the current second (00:00:00) when used as endTime
 
@@ -213,7 +212,6 @@ For a given time range with start time `S` and end time `E` for interval `I`:
 To correctly handle the API's boundary behavior:
 
 1. **Input Preparation**:
-
    - Align start time to interval boundary (round up if not on boundary)
    - Align end time to interval boundary (round down if not on boundary)
    - Use exact aligned timestamps in API calls
@@ -229,7 +227,6 @@ To correctly handle the API's boundary behavior:
 For a query requesting data from `2023-01-01T10:15:30.123Z` to `2023-01-01T10:25:45.789Z` with 1-minute interval:
 
 1. **API's internal alignment**:
-
    - Aligned start: `2023-01-01T10:16:00.000Z` (rounded up to next minute)
    - Aligned end: `2023-01-01T10:25:00.000Z` (rounded down to minute)
 
@@ -254,7 +251,6 @@ This LSP adherence allows for simpler client implementations that don't need spe
 
 1. **Filtering Logic**:
    When implementing filtering in your application code, be aware that:
-
    - If you filter with **inclusive-inclusive** boundaries, your results will match the API's natural behavior
    - If you filter with **inclusive-exclusive** boundaries, you'll need to add one interval to the end time
 
@@ -274,7 +270,6 @@ The Binance API's behavior with timestamps follows Occam's Razor - it implements
 1. **Whole Interval Principle**: The API only operates on complete intervals (1s, 1m, etc.) because financial candles represent complete periods of market activity.
 
 2. **Alignment by Design**: The millisecond rounding behavior ensures that:
-
    - Candles represent complete intervals
    - There are no partial or overlapping candles
    - All returned data aligns with standard interval boundaries
@@ -356,22 +351,18 @@ curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startT
 ## Best Practices
 
 1. **Alignment Awareness**:
-
    - Always be aware that timestamps will be aligned to interval boundaries
    - Design queries with these alignment rules in mind
 
 2. **Inclusive Boundaries**:
-
    - The API treats both startTime and endTime as inclusive after its internal boundary alignment
    - If you use an exclusive end time model in your application, adjust accordingly
 
 3. **Testing with Curl**:
-
    - When debugging time-related issues, use curl to directly test API behavior
    - Include millisecond precision in test cases to verify boundary handling
 
 4. **Validation**:
-
    - Always validate received data to ensure you got the expected time range
    - Check first and last timestamps to confirm proper boundary handling
 

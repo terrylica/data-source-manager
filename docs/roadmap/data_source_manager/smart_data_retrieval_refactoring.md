@@ -433,7 +433,6 @@ async def _update_cache_with_merged_data(
 ### 6. Testing Plan
 
 1. Unit tests:
-
    - Test time range splitting logic for various scenarios, ensuring FCP implementation
    - Test missing ranges identification with different cache states
    - Test merging logic for data from multiple sources (Cache, Vision, REST)
@@ -442,7 +441,6 @@ async def _update_cache_with_merged_data(
    - Test 1s interval handling for SPOT vs non-SPOT markets
 
 2. Integration tests:
-
    - Test end-to-end data retrieval with various time ranges using the FCP approach
    - Test partial cache hits - verify that only missing portions are retrieved from API
    - Test Vision API failures and confirm fallback to REST API
@@ -459,7 +457,6 @@ async def _update_cache_with_merged_data(
 ### 7. Implementation Phases
 
 1. **Phase 1: Update Source Selection Logic**
-
    - Correct the handling of 1s intervals for SPOT markets
    - Remove the historical threshold rule from `_should_use_vision_api`
    - Implement the FCP concept in the source selection logic
@@ -467,28 +464,24 @@ async def _update_cache_with_merged_data(
    - Review with team
 
 2. **Phase 2: Core FCP Logic**
-
    - Implement `_split_time_range()` based on the FCP strategy
    - Implement `_identify_missing_ranges()` for partial cache hits
    - Add tests for these functions
    - Review with team
 
 3. **Phase 3: Modified Retrieval Flow**
-
    - Update `_get_data_impl()` to use the FCP approach
    - Implement source tracking metadata
    - Ensure LSP compliance in the merged DataFrame
    - Keep backward compatibility
 
 4. **Phase 4: Caching Refinements**
-
    - Update caching strategy for the FCP approach
    - Implement single cache entry for merged data from all sources
    - Add source composition metadata
    - Optimize cache utilization for partial hits
 
 5. **Phase 5: Testing and Validation**
-
    - Add comprehensive tests for all FCP scenarios
    - Verify LSP compliance in all data retrieval paths
    - Benchmark performance of the FCP approach
@@ -503,25 +496,21 @@ async def _update_cache_with_merged_data(
 ## Risks and Mitigations
 
 1. **Complexity Increase**
-
    - Mitigation: Isolate FCP logic in clear, well-tested functions
    - Add comprehensive logging of source transitions
    - Ensure backward compatibility
 
 2. **Performance Overhead**
-
    - Mitigation: Optimize cache checking to minimize overhead
    - Implement efficient range merging to reduce API calls
    - Benchmark before/after implementation
 
 3. **Cache Coherence**
-
    - Mitigation: Develop clear rules for handling overlapping/conflicting data
    - Store source composition metadata to aid debugging
    - Ensure validation checks for merged data
 
 4. **Backward Compatibility**
-
    - Mitigation: Keep existing interfaces working
    - Add feature flags to enable/disable FCP behavior
    - Maintain LSP compliance across all code paths

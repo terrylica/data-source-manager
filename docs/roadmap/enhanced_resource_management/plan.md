@@ -7,21 +7,18 @@ This document outlines the plan for implementing an enhanced resource management
 ## Goals and Objectives
 
 1. **Comprehensive Resource Tracking**
-
    - Monitor file descriptors, handles, and open files
    - Track network connections and their states
    - Monitor asyncio tasks, especially long-running ones
    - Track curl_cffi instances and their associated resources
 
 2. **Resource Lifecycle Management**
-
    - Implement robust resource lifecycle tracking
    - Build resource dependency graphs
    - Automate resource cleanup and management
    - Prevent resource leaks and abandonments
 
 3. **Resource Optimization**
-
    - Identify resource usage patterns and inefficiencies
    - Implement resource pooling and reuse strategies
    - Optimize resource allocation and deallocation

@@ -9,14 +9,12 @@ Persistent "Task was destroyed but it is pending!" warnings related to `AsyncCur
 ### Root Causes
 
 1. **Timeout Task Design**:
-
    - curl_cffi creates `AsyncCurl._force_timeout` tasks that:
      - Run continuous `await asyncio.sleep(1)` loops
      - Monitor request timeouts
      - Maintain references to uncompleted futures
 
 2. **Cleanup Challenges**:
-
    - Standard `client.close()` doesn't guarantee task cancellation
    - Tasks remain pending if their futures aren't explicitly cancelled
    - Parallel test execution (-n8) complicates task ownership
@@ -28,7 +26,6 @@ Persistent "Task was destroyed but it is pending!" warnings related to `AsyncCur
 ### Diagnostic Process
 
 1. **Custom Test Suite** (`test_task_destruction.py`) revealed:
-
    - Average of 1-3 lingering timeout tasks per client
    - Tasks stuck in states:
 
@@ -81,12 +78,10 @@ def try_unblock_task(task):
 ### Key Strategies
 
 1. **Precision Targeting**:
-
    - Focus exclusively on `AsyncCurl._force_timeout` tasks
    - Filter using task string representation analysis
 
 2. **Escalating Cleanup**:
-
    - 3-phase approach:
      1. Polite cancellation
      2. Future termination
@@ -106,12 +101,10 @@ def try_unblock_task(task):
 ### Critical Insights
 
 1. **Task/Future Relationship**:
-
    - Cancelling tasks isn't sufficient - must cancel their futures
    - Futures can outlive their parent tasks
 
 2. **Parallel Testing**:
-
    - Each pytest worker has independent event loop
    - Cleanup must be self-contained per test
 

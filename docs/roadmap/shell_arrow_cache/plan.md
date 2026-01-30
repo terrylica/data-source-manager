@@ -19,7 +19,6 @@ Create a robust shell script to populate the local cache with historical market 
 We have implemented a complete solution for building the cache using the following components:
 
 1. **Python Script (`scripts/arrow_cache/cache_builder_sync.py`)**
-
    - Parses symbol information from the CSV file (`spot_synchronal.csv`):
      - Reads symbol, earliest_date, and available_intervals
      - Uses this information to determine valid download date ranges
@@ -33,7 +32,6 @@ We have implemented a complete solution for building the cache using the followi
    - Implements robust checksum verification and failure tracking
 
 2. **Shell Wrapper (`scripts/arrow_cache/cache_builder.sh`)**
-
    - Provides a user-friendly command-line interface
    - Supports both test and production modes
    - Handles default parameter configuration
@@ -42,7 +40,6 @@ We have implemented a complete solution for building the cache using the followi
    - Includes options for controlling checksum verification
 
 3. **Checksum Failure Management (`scripts/arrow_cache/view_checksum_failures.sh`)**
-
    - View and manage checksum failures
    - Generate summary statistics
    - Filter failures by symbol or interval
@@ -50,7 +47,6 @@ We have implemented a complete solution for building the cache using the followi
    - Clear and backup the failures registry
 
 4. **Implementation Features**
-
    - Robust error handling at multiple levels
    - Direct file system operations for maximum reliability
    - Progress tracking and reporting
@@ -75,20 +71,17 @@ We have implemented a complete solution for building the cache using the followi
 For data integrity, our implementation includes robust checksum verification of downloaded data files from Binance Vision API:
 
 1. **Download Process with Checksums**
-
    - For each date and symbol/interval combination:
      - Download the data ZIP file
      - Download the corresponding checksum file (.CHECKSUM)
      - Verify the ZIP file integrity by comparing its SHA-256 hash with the expected checksum
 
 2. **Checksum Verification Implementation**
-
    - Use `calculate_sha256(file_path)` to compute SHA-256 checksum of downloaded files
    - Compare with expected checksum from .CHECKSUM file
    - Log detailed information about checksum verification process and any failures
 
 3. **Handling Checksum Failures**
-
    - Log detailed error information including expected vs. actual checksum
    - Create a dedicated "checksum_failures.log" file to track all checksum mismatches
    - Implement a JSON-based registry of checksum failures for programmatic access
@@ -96,7 +89,6 @@ For data integrity, our implementation includes robust checksum verification of 
    - Add a "retry-failed-checksums" option to attempt re-downloading files with checksum mismatches
 
 4. **Checksum Failure Registry**
-
    - Store structured information about each failure:
 
      ```json

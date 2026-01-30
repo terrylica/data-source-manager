@@ -795,27 +795,23 @@ def check_connectivity(url, timeout=5):
 ## Integration Test Plan
 
 1. **Unit Tests for Error Classification**
-
    - Create tests to verify error classification logic for different exception types
    - Ensure consistent error type assignment based on exception characteristics
    - Test the empty data classification with different context scenarios
 
 2. **Unit Tests for Error Tracking**
-
    - Verify the singleton pattern of ErrorTracker
    - Test threshold detection for different error frequencies
    - Validate the cleanup of old entries works as expected
    - Confirm statistics gathering functions with time-based filtering
 
 3. **Unit Tests for Enhanced Logger**
-
    - Test the EnhancedLoggerProxy and error context capturing
    - Verify integration with pytest's caplog fixture
    - Ensure backward compatibility with existing logger usage
    - Test error context serialization in log output
 
 4. **Integration Test for DataResult Usage**
-
    - Test DataResult creation and property access
    - Verify error context is properly captured and propagated
    - Test serialization to log dictionaries
@@ -899,17 +895,14 @@ def test_data_result_tracking(caplog):
 The error tracking system will provide the following metrics:
 
 1. **Error counts by type and severity**
-
    - Track how often each error type occurs
    - Group by severity levels for better prioritization
 
 2. **Error rates over time**
-
    - Per-minute rates for immediate operational issues
    - Per-hour and per-day rates for trend analysis
 
 3. **Threshold violation alerts**
-
    - Configurable thresholds for different error types
    - Alerting when error rates exceed normal bounds
 

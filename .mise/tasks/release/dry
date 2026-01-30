@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#MISE description="Dry-run release (preview changes)"
+#MISE depends=["release:preflight"]
+set -euo pipefail
+
+echo "=== Dry-run Release ==="
+echo "(No changes will be made)"
+echo ""
+
+npm run release:dry
+
+echo ""
+echo "✓ Dry-run complete"

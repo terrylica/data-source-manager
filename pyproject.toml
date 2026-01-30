@@ -8,10 +8,9 @@ version = "0.2.0"
 description = "Professional market data integration with clean package architecture"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "LicenseRef-Proprietary" # Custom SPDX identifier for proprietary license (PEP 639 compliant)
-license-files = ["LICENSE"]  # Path to license file (required for custom licenses)
+license = "MIT"
 authors = [
-    {name = "EonLabs", email = "chen@eonlabs.com"},
+    {name = "EonLabs", email = "terry@eonlabs.com"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

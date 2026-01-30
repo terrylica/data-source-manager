@@ -34,24 +34,24 @@ The benchmarks were conducted with:
 ### Standard Processing (Without Checksum Validation)
 
 | Configuration           | fsspec Speed Advantage | Rows Processed | File Size (KB) |
-| ----------------------- | :--------------------: | :------------: | :------------: |
-| BTCUSDT 1m (spot)       |    **1.19x faster**    |      1440      |      68.3      |
-| ETHUSDT 1m (spot)       |    **1.06x faster**    |      1440      |      64.0      |
-| BTCUSDT 1m (futures/um) |    **1.04x faster**    |      1440      |      59.7      |
-| BTCUSDT 1h (spot)       |    **1.20x faster**    |       24       |      1.5       |
-| BTCUSDT 1m (spot/June)  |    **1.02x faster**    |      1440      |      66.8      |
-| ARBUSDT 1m (spot)       |    **1.32x faster**    |      1440      |      53.1      |
+| ----------------------- | ---------------------- | -------------- | -------------- |
+| BTCUSDT 1m (spot)       | **1.19x faster**       | 1440           | 68.3           |
+| ETHUSDT 1m (spot)       | **1.06x faster**       | 1440           | 64.0           |
+| BTCUSDT 1m (futures/um) | **1.04x faster**       | 1440           | 59.7           |
+| BTCUSDT 1h (spot)       | **1.20x faster**       | 24             | 1.5            |
+| BTCUSDT 1m (spot/June)  | **1.02x faster**       | 1440           | 66.8           |
+| ARBUSDT 1m (spot)       | **1.32x faster**       | 1440           | 53.1           |
 
 ### With Checksum Validation
 
 | Configuration           | fsspec Speed Advantage | Rows Processed | File Size (KB) |
-| ----------------------- | :--------------------: | :------------: | :------------: |
-| BTCUSDT 1m (spot)       |    **1.15x faster**    |      1440      |      68.3      |
-| ETHUSDT 1m (spot)       |    **1.17x faster**    |      1440      |      64.0      |
-| BTCUSDT 1m (futures/um) |    **1.01x faster**    |      1440      |      59.7      |
-| BTCUSDT 1h (spot)       |    **1.68x faster**    |       24       |      1.5       |
-| BTCUSDT 1m (spot/June)  |    **1.34x faster**    |      1440      |      66.8      |
-| ARBUSDT 1m (spot)       |    **1.09x faster**    |      1440      |      53.1      |
+| ----------------------- | ---------------------- | -------------- | -------------- |
+| BTCUSDT 1m (spot)       | **1.15x faster**       | 1440           | 68.3           |
+| ETHUSDT 1m (spot)       | **1.17x faster**       | 1440           | 64.0           |
+| BTCUSDT 1m (futures/um) | **1.01x faster**       | 1440           | 59.7           |
+| BTCUSDT 1h (spot)       | **1.68x faster**       | 24             | 1.5            |
+| BTCUSDT 1m (spot/June)  | **1.34x faster**       | 1440           | 66.8           |
+| ARBUSDT 1m (spot)       | **1.09x faster**       | 1440           | 53.1           |
 
 ### Key Findings
 

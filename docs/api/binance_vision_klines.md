@@ -322,7 +322,6 @@ Based on direct testing with the Binance Vision API, we've observed the followin
 For each interval type, the raw data files follow these timestamp patterns:
 
 1. **All intervals start at interval boundaries**: The first data point in each file corresponds to the first interval boundary of the day.
-
    - For 1s intervals: First timestamp is exactly 00:00:00
    - For 1m intervals: First timestamp is exactly 00:00:00
    - For 3m intervals: First timestamp is exactly 00:00:00
@@ -331,7 +330,6 @@ For each interval type, the raw data files follow these timestamp patterns:
    - For 1h intervals: First timestamp is exactly 00:00:00
 
 2. **Timestamp semantic meaning**:
-
    - `open_time` (first column): Represents the **beginning** of the candle period
    - `close_time` (7th column): Represents the **end** of the candle period
 
@@ -383,7 +381,6 @@ dt = datetime.fromtimestamp(microsecond_ts / 1000000, tz=timezone.utc)
 For applications that need to fetch and merge data across time boundaries, understanding how the Binance Vision API structures these boundaries is crucial:
 
 1. **Daily files contain all intervals that start within that day**:
-
    - A 1m candle starting at 23:59:00 on March 15 will be in the March 15 file, even though it ends at 00:00:00 on March 16
    - A 1h candle starting at 23:00:00 on March 15 will be in the March 15 file, even though it ends at 00:00:00 on March 16
 

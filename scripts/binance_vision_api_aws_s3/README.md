@@ -92,22 +92,18 @@ Options:
 The script generates several output files in the specified output directory:
 
 1. **Market-specific files**:
-
    - `spot_earliest_dates.csv` - All spot market symbols and their earliest dates
    - `um_earliest_dates.csv` - All USDT-M futures symbols and earliest dates
    - `cm_earliest_dates.csv` - All COIN-M futures symbols and earliest dates
 
 2. **Combined files**:
-
    - `all_markets_earliest_dates.csv` - Combined results from all scanned markets
 
 3. **Filtered files**:
-
    - `spot_um_usdt_filtered.csv` - Symbols that exist in both spot and USDT-M markets with USDT quote currency
    - `spot_synchronal.csv` - Symbols that exist in all three markets
 
 4. **Consolidated file**:
-
    - `consolidated_base_symbols.csv` - Base symbols with their data from all available markets
 
 5. **Performance data**:
@@ -141,25 +137,21 @@ The `verify_multi_interval.sh` script downloads and verifies historical kline (c
 ### Key Features
 
 1. **Improved Date Terminology**
-
    - Uses clear terminology (`LATEST_DATE`/`EARLIEST_DATE` instead of START/END) to accurately reflect the date processing direction
    - Processes data chronologically from newest to oldest dates
    - Creates filenames with chronological ordering for improved clarity
 
 2. **Dependency Management**
-
    - Automatically detects required dependencies (curl, aria2c, unzip, sha256sum)
    - Option to automatically install missing dependencies
    - Graceful fallbacks (e.g., curl if aria2c is not available)
 
 3. **Error Handling and Recovery**
-
    - Smart distinction between 404 errors (missing data) and network failures
    - Exponential backoff retry mechanism with jitter
    - Detailed error categorization and reporting
 
 4. **Performance Optimization**
-
    - Parallel download and processing
    - Configurable connection parameters
    - Efficient file operations and cleanup

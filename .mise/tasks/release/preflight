@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#MISE description="Phase 1: Validate prerequisites"
+set -euo pipefail
+
+echo "=== Release Preflight ==="
+
+# Check 1: Working directory clean
+git update-index --refresh -q || true
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "✗ Working directory not clean"
+    git status --short
+    exit 1
+fi
+echo "✓ Working directory clean"
+
+# Check 2: GitHub authentication
+if [[ -z "${GH_TOKEN:-}" ]] || [[ -z "$(echo "$GH_TOKEN" | tr -d '[:space:]')" ]]; then
+    echo "✗ GH_TOKEN not set or empty"
+    echo "  Run: eval \"\$(mise env)\" or check .mise.local.toml"
+    exit 1
+fi
+echo "✓ GH_TOKEN configured"
+
+# Check 3: Node.js available
+if ! command -v node &>/dev/null; then
+    echo "✗ Node.js not available"
+    echo "  Run: mise install"
+    exit 1
+fi
+echo "✓ Node.js $(node --version) available"
+
+# Check 4: semantic-release installed
+if [[ ! -d "node_modules/semantic-release" ]]; then
+    echo "✗ semantic-release not installed"
+    echo "  Run: npm install"
+    exit 1
+fi
+echo "✓ semantic-release installed"
+
+# Check 5: Releasable commits exist
+LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [[ -n "$LATEST_TAG" ]]; then
+    COMMITS=$(git log "$LATEST_TAG"..HEAD --oneline 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$COMMITS" -eq 0 ]]; then
+        echo "✗ No commits since $LATEST_TAG"
+        exit 1
+    fi
+    echo "✓ $COMMITS commits since $LATEST_TAG"
+else
+    echo "✓ No previous tags (initial release)"
+fi
+
+echo ""
+echo "✓ All preflight checks passed"

@@ -10,19 +10,21 @@ Bybit offers REST API endpoints for accessing market data including candlestick 
 
 Bybit offers several market types with a unified REST API structure:
 
-| Market Type | Category Parameter | Description                             | Symbol Naming Convention                           |
-| ----------- | ------------------ | --------------------------------------- | -------------------------------------------------- |
-| Spot        | `spot`             | Spot trading pairs                      | Base currency + Quote currency (e.g., `BTCUSDT`)   |
-| Linear      | `linear`           | Perpetual contracts settled in USDT     | Base currency + `USDT` (e.g., `BTCUSDT`)          |
-| Inverse     | `inverse`          | Perpetual contracts settled in the coin | Base currency + `USD` (e.g., `BTCUSD`)            |
-| Option      | `option`           | Options trading                         | Various formats based on expiry and strike price   |
+| Market Type | Category Parameter | Description                             | Symbol Naming Convention                         |
+| ----------- | ------------------ | --------------------------------------- | ------------------------------------------------ |
+| Spot        | `spot`             | Spot trading pairs                      | Base currency + Quote currency (e.g., `BTCUSDT`) |
+| Linear      | `linear`           | Perpetual contracts settled in USDT     | Base currency + `USDT` (e.g., `BTCUSDT`)         |
+| Inverse     | `inverse`          | Perpetual contracts settled in the coin | Base currency + `USD` (e.g., `BTCUSD`)           |
+| Option      | `option`           | Options trading                         | Various formats based on expiry and strike price |
 
 **Important Note on Naming Conventions:**
+
 - **Inverse Perpetual Contracts**: Use `USD` suffix (not `USDT`), such as `BTCUSD`, `ETHUSD`, `XRPUSD`
 - **Linear Perpetual Contracts**: Use `USDT` suffix, such as `BTCUSDT`, `ETHUSDT`, `XRPUSDT`
 - Each market type has its own distinct symbol format which must be adhered to when making API requests
 
 **Common Symbols by Category (Based on Empirical Testing):**
+
 - **Inverse (`category=inverse`)**: `BTCUSD`, `ETHUSD`, `XRPUSD`, `BTCUSDM25` (monthly futures), `BTCUSDU25` (quarterly futures)
 - **Linear (`category=linear`)**: `BTCUSDT`, `ETHUSDT`, `XRPUSDT`, `BTCPERP` (perpetual), `BTCUSDT-26DEC25` (dated futures)
 
@@ -31,6 +33,7 @@ Note that naming conventions must be strictly followed when making API requests,
 **⚠️ Critical API Behavior Warning:**
 
 Our empirical testing has revealed a potentially misleading behavior in the Bybit API:
+
 - When using `category=inverse` with a USDT-suffixed symbol (e.g., BTCUSDT), the API **does not return an error**
 - Instead, it returns data from the linear market while incorrectly labeling it as "category": "inverse" in the response
 - The data returned is identical to what would be returned from a `category=linear` request with the same symbol
@@ -175,19 +178,19 @@ Based on empirical testing using the Bybit REST API, historical data availabilit
 
 ### 4.1 Earliest Data by Market and Interval (Empirical Findings)
 
-| Market Type       | Symbol  | Interval   | Earliest Available Timestamp (UTC)                   | Notes                                                |
-| ----------------- | ------- | ---------- | --------------------------------------------------- | ---------------------------------------------------- |
-| Spot              | BTCUSDT | 1 minute   | 2021-07-05 12:00:00                                 |                                                      |
-| Spot              | BTCUSDT | 5 minutes  | 2021-07-05 12:00:00                                 |                                                      |
-| Spot              | BTCUSDT | 15 minutes | 2021-07-05 12:00:00                                 |                                                      |
-| Linear Perpetual  | BTCUSDT | 1 minute   | 2020-03-25 10:36:00                                 | Verified first active data at 2020-03-25 10:36:00    |
-| Linear Perpetual  | BTCUSDT | 5 minutes  | 2020-03-25 10:35:00                                 |                                                      |
-| Linear Perpetual  | BTCUSDT | 15 minutes | 2020-03-25 10:30:00                                 |                                                      |
-| Inverse Perpetual | BTCUSD  | 1 minute   | 2018-11-14 16:00:00                                 | Initial record with zero volume, active trading      |
-|                   |         |            |                                                     | begins at 2018-11-14 22:00:00 with volume data       |
-| Inverse Perpetual | BTCUSD  | 5 minutes  | 2018-11-14 16:00:00                                 | Similar pattern to 1-minute data                     |
-| Inverse Perpetual | BTCUSD  | 15 minutes | 2018-11-14 16:00:00                                 | Similar pattern to 1-minute data                     |
-| Inverse Perpetual | ETHUSD  | 1 minute   | 2019-01-25 00:00:00                                 | Added based on empirical testing                     |
+| Market Type       | Symbol  | Interval   | Earliest Available Timestamp (UTC) | Notes                                             |
+| ----------------- | ------- | ---------- | ---------------------------------- | ------------------------------------------------- |
+| Spot              | BTCUSDT | 1 minute   | 2021-07-05 12:00:00                |                                                   |
+| Spot              | BTCUSDT | 5 minutes  | 2021-07-05 12:00:00                |                                                   |
+| Spot              | BTCUSDT | 15 minutes | 2021-07-05 12:00:00                |                                                   |
+| Linear Perpetual  | BTCUSDT | 1 minute   | 2020-03-25 10:36:00                | Verified first active data at 2020-03-25 10:36:00 |
+| Linear Perpetual  | BTCUSDT | 5 minutes  | 2020-03-25 10:35:00                |                                                   |
+| Linear Perpetual  | BTCUSDT | 15 minutes | 2020-03-25 10:30:00                |                                                   |
+| Inverse Perpetual | BTCUSD  | 1 minute   | 2018-11-14 16:00:00                | Initial record with zero volume, active trading   |
+|                   |         |            |                                    | begins at 2018-11-14 22:00:00 with volume data    |
+| Inverse Perpetual | BTCUSD  | 5 minutes  | 2018-11-14 16:00:00                | Similar pattern to 1-minute data                  |
+| Inverse Perpetual | BTCUSD  | 15 minutes | 2018-11-14 16:00:00                | Similar pattern to 1-minute data                  |
+| Inverse Perpetual | ETHUSD  | 1 minute   | 2019-01-25 00:00:00                | Added based on empirical testing                  |
 
 **Note:** While our testing provides precise earliest times based on API responses, the official listing dates announced by Bybit may slightly predate the availability of granular kline data in the API. Initial records may have zero volume before active trading begins.
 

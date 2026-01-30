@@ -5,19 +5,16 @@
 We have successfully implemented a robust Arrow cache building solution using a fully synchronous approach that:
 
 1. **Correctly uses Binance Vision API for downloadable zipped data**
-
    - Directly accesses the Binance Vision API using standard Python libraries
    - Downloads and processes ZIP files efficiently
    - Avoids any async/await code which could lead to hanging
 
 2. **Implements reliable data processing and caching**
-
    - Uses direct file system operations for all cache reads/writes
    - Leverages PyArrow directly for fast and efficient file operations
    - Implements proper error handling and recovery
 
 3. **Provides controlled concurrency**
-
    - Uses ThreadPoolExecutor for manageable parallelism
    - Prevents overwhelming the system or API
    - Implements proper cancellation and shutdown handling
@@ -34,7 +31,6 @@ We have successfully implemented a robust Arrow cache building solution using a 
 After extensive testing of both async and synchronous approaches, we made the following observations:
 
 1. **Advantages of Synchronous Implementation**
-
    - Much more reliable, with no hanging issues
    - Easier to understand, debug, and maintain
    - Direct file operations without complex intermediate layers
@@ -51,26 +47,22 @@ After extensive testing of both async and synchronous approaches, we made the fo
 ## Technical Insights
 
 1. **Direct File System Operations**
-
    - Using the synchronous file system operations provided much better reliability
    - PyArrow's direct file operations were efficient and easy to work with
    - Bypassing complex cache managers eliminated hanging issues
    - Simple path-based file checks worked perfectly for cache detection
 
 2. **Controlled Concurrency**
-
    - ThreadPoolExecutor provided adequate parallelism without the complexity of asyncio
    - Simple future-based concurrency was easy to understand and debug
    - Proper cancellation and shutdown handling were straightforward to implement
 
 3. **Error Handling**
-
    - Try/except blocks with detailed logging made error handling straightforward
    - Continuing after non-critical errors enabled robust operation
    - Signal handlers for graceful shutdown worked perfectly
 
 4. **Data Integrity and Checksum Verification**
-
    - Binance Vision API provides .CHECKSUM files for all downloadable data
    - SHA-256 checksums provide strong cryptographic verification
    - Storing checksum failures in a JSON registry enables easy management
@@ -81,14 +73,12 @@ After extensive testing of both async and synchronous approaches, we made the fo
 ## Project Structure
 
 1. **Python Script (`scripts/arrow_cache/cache_builder_sync.py`)**
-
    - The main entry point for the cache builder
    - Implements all the core functionality
    - Uses standard Python libraries and PyArrow
    - Implements checksum verification and failure tracking
 
 2. **Shell Script Wrapper (`scripts/arrow_cache/cache_builder.sh`)**
-
    - Provides a user-friendly command-line interface
    - Supports both test and production modes
    - Manages logging and parameter handling
@@ -104,13 +94,11 @@ After extensive testing of both async and synchronous approaches, we made the fo
 ## Checksum Verification Insights
 
 1. **Importance of Data Integrity**
-
    - Financial data must be accurate and reliable
    - Corrupt or incomplete data can lead to incorrect analysis
    - Checksums provide a way to verify data hasn't been corrupted or tampered with
 
 2. **Implementation Approach**
-
    - Download both data files and their corresponding checksum files
    - Calculate SHA-256 hash of downloaded files
    - Compare against the expected hash from the checksum file
@@ -118,7 +106,6 @@ After extensive testing of both async and synchronous approaches, we made the fo
    - Track failures in a structured registry for later management
 
 3. **Failure Handling Options**
-
    - Skip verification entirely when speed is more important than integrity
    - Proceed despite failures when having potentially corrupt data is better than no data
    - Retry failed downloads to recover from transient issues
