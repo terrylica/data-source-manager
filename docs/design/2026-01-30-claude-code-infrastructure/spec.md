@@ -2487,6 +2487,199 @@ jobs:
 | Test/lint execution       | No (local-first policy) |
 | Deployment automation     | Yes                     |
 
+## Observability & Tracing
+
+Real-time debugging and monitoring for Claude Code sessions.
+
+### OpenTelemetry Configuration
+
+Enable telemetry with environment variables:
+
+```bash
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+```
+
+### Metrics Available
+
+| Metric Category  | Data Points                      |
+| ---------------- | -------------------------------- |
+| Session Tracking | Active sessions, duration, LOC   |
+| Token Usage      | Input, output, cache by model    |
+| Cost Analysis    | Spending by model, session, team |
+| Tool Performance | Execution frequency, success %   |
+| Performance      | API latency, error rates         |
+
+### Observability Stack
+
+| Component  | Purpose         | Default Port |
+| ---------- | --------------- | ------------ |
+| OTel       | Data collection | 4317 (gRPC)  |
+| Prometheus | Metrics storage | 9090         |
+| Loki       | Log aggregation | 3100         |
+| Grafana    | Visualization   | 3000         |
+
+### Claude HUD
+
+Real-time terminal statusline showing:
+
+- Context health (token utilization %)
+- Tool activity (recent tool calls)
+- Agent status (active subagents)
+- Task progress (completion %)
+
+### Dev-Agent-Lens
+
+Proxy-based observability for Claude Code:
+
+```
+Claude Code → LiteLLM Proxy → Dev-Agent-Lens → Arize/Phoenix
+```
+
+Features:
+
+- OpenInference spans for each tool call
+- Structured JSON input/output correlation
+- Model prompts side-by-side with tool results
+
+### Privacy Controls
+
+| Variable                | Purpose                             |
+| ----------------------- | ----------------------------------- |
+| OTEL_LOG_USER_PROMPTS=1 | Enable prompt logging (off default) |
+| OTEL_INCLUDE_SESSION_ID | Include session ID in metrics       |
+| OTEL_INCLUDE_VERSION    | Include CLI version in metrics      |
+
+### DSM Observability Integration
+
+```bash
+# Start local observability stack
+make -C ~/.claude/observability up
+
+# Run Claude Code with telemetry
+CLAUDE_CODE_ENABLE_TELEMETRY=1 claude
+
+# View dashboards
+open http://localhost:3000  # Grafana
+```
+
+## Custom MCP Tools Development
+
+Building custom tools for Claude Code via Model Context Protocol.
+
+### Transport Methods
+
+| Transport | Use Case              | Configuration               |
+| --------- | --------------------- | --------------------------- |
+| STDIO     | Local tools           | Default, runs in subprocess |
+| HTTP      | Remote/shared servers | URL endpoint                |
+| SSE       | Streaming tools       | Server-sent events          |
+
+### FastMCP Quick Start
+
+Create a custom tool with FastMCP:
+
+```python
+# tools/dice_server.py
+from fastmcp import FastMCP
+
+mcp = FastMCP("dice-tools")
+
+@mcp.tool
+def roll_dice(n_dice: int) -> list[int]:
+    """Roll n_dice 6-sided dice and return results."""
+    import random
+    return [random.randint(1, 6) for _ in range(n_dice)]
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+### Installation Methods
+
+**Automated (recommended)**:
+
+```bash
+fastmcp install claude-code tools/dice_server.py
+```
+
+**With dependencies**:
+
+```bash
+fastmcp install claude-code tools/server.py \
+    --with requests \
+    --with-requirements requirements.txt \
+    --env API_KEY=xxx
+```
+
+**Manual registration**:
+
+```bash
+claude mcp add dice-tools python tools/dice_server.py
+```
+
+### MCP Configuration
+
+Add to `.mcp.json` in project root:
+
+```json
+{
+  "mcpServers": {
+    "dice-tools": {
+      "command": "python",
+      "args": ["tools/dice_server.py"],
+      "env": {
+        "API_KEY": "${DICE_API_KEY}"
+      }
+    },
+    "remote-api": {
+      "url": "https://api.example.com/mcp",
+      "transport": "http"
+    }
+  }
+}
+```
+
+### Resource Access
+
+Reference MCP resources in prompts:
+
+```
+@server:protocol://resource/path
+```
+
+### Prompt Access
+
+MCP prompts available as slash commands:
+
+```
+/mcp__servername__promptname
+```
+
+### DSM Custom Tools
+
+DSM-specific MCP tools could include:
+
+| Tool                | Purpose                       |
+| ------------------- | ----------------------------- |
+| dsm-data-validator  | Validate DataFrame structures |
+| dsm-symbol-resolver | Resolve symbol formats        |
+| dsm-cache-inspector | Query FCP cache state         |
+| dsm-rate-limiter    | Check rate limit status       |
+
+### Tool Development Best Practices
+
+| Practice                 | Rationale                        |
+| ------------------------ | -------------------------------- |
+| Type all parameters      | Enables Tool Search optimization |
+| Include docstrings       | Shown in tool descriptions       |
+| Return structured data   | JSON-serializable for processing |
+| Handle errors gracefully | Return error info, don't crash   |
+| Log operations           | Debug via STDIO stderr           |
+
 ## Verification Checklist
 
 ### Infrastructure
