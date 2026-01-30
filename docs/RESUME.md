@@ -4,6 +4,25 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Commands vs Skills & CLAUDE.md Organization (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added Commands vs Skills comparison table
+- Added model selection guidance for commands (haiku, sonnet, opus)
+- Added CLAUDE.md organization recommended sections table
+- Added size guidance (~300 lines, ~2.5k tokens)
+- Added anti-patterns table with fixes
+
+**Sources**:
+
+- [Official Slash Commands Docs](https://code.claude.com/docs/en/slash-commands)
+- [Claude Code Commands Guide](https://www.eesel.ai/blog/slash-commands-claude-code)
+- [Gend.co Skills Guide](https://www.gend.co/blog/claude-skills-claude-md-guide)
+- [Dometrain CLAUDE.md Guide](https://dometrain.com/blog/creating-the-perfect-claudemd-for-claude-code/)
+
 ### Hooks & Permission Modes Enhancement (2026-01-30)
 
 **Status**: Complete

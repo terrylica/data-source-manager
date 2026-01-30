@@ -167,6 +167,19 @@ description: Reviews code for quality.
 
 ## Command Configuration
 
+Based on [Official Slash Commands Docs](https://code.claude.com/docs/en/slash-commands) and [Claude Code Guide](https://www.eesel.ai/blog/slash-commands-claude-code).
+
+### Commands vs Skills
+
+| Feature                | `.claude/commands/`           | `.claude/skills/`                   |
+| ---------------------- | ----------------------------- | ----------------------------------- |
+| File structure         | Single `.md` file             | Directory + SKILL.md                |
+| Supporting files       | No                            | scripts/, references/, examples/    |
+| Claude auto-invocation | No                            | Yes (configurable)                  |
+| Filename = command     | Yes (`commit.md` → `/commit`) | Yes (`review/SKILL.md` → `/review`) |
+
+If both exist with same name, they work identically. Use skills for complex workflows needing supporting files.
+
 ### Frontmatter Pattern
 
 ```yaml
@@ -175,9 +188,18 @@ name: command-name
 description: What this command does
 argument-hint: "[symbol] [--option value]" # Optional: help text for args
 allowed-tools: Bash, Read # Optional: restrict tool access
+model: haiku # Optional: faster model for simple tasks
 disable-model-invocation: true # For side-effect commands
 ---
 ```
+
+### Model Selection for Commands
+
+| Model    | Use Case                               |
+| -------- | -------------------------------------- |
+| `haiku`  | Quick fixes, simple formatting         |
+| `sonnet` | Standard development tasks (default)   |
+| `opus`   | Complex reasoning, architecture design |
 
 ### Command Tool Restrictions
 
@@ -709,6 +731,35 @@ Based on [Anthropic best practices](https://www.anthropic.com/engineering/claude
 - **Exclude**: Generic best practices, verbose explanations
 - **Test**: "Would removing this cause Claude to make mistakes?"
 - **Structure**: Project context → Code style → Commands → Gotchas
+
+### CLAUDE.md Organization
+
+Based on [Gend.co Guide](https://www.gend.co/blog/claude-skills-claude-md-guide) and [Dometrain Blog](https://dometrain.com/blog/creating-the-perfect-claudemd-for-claude-code/):
+
+**Recommended sections**:
+
+| Section          | Content                                         |
+| ---------------- | ----------------------------------------------- |
+| Project Summary  | Brief description and high-level directory tree |
+| Code Style       | Formatting, imports, naming conventions         |
+| Workflow         | Branch naming, PR process, deployment           |
+| Common Commands  | Build, test, lint commands                      |
+| Project-Specific | Gotchas, warnings, non-obvious conventions      |
+
+**Size guidance**:
+
+- Keep CLAUDE.md under 300 lines (Anthropic teams: ~2.5k tokens)
+- Ruthlessly prune: if Claude already does it correctly, delete the instruction
+- Convert repeated corrections to hooks instead of instructions
+
+**Anti-patterns to avoid**:
+
+| Anti-pattern       | Problem                             | Fix                       |
+| ------------------ | ----------------------------------- | ------------------------- |
+| Over-specified     | Important rules lost in noise       | Prune, use hooks          |
+| Mixed architecture | Claude copies inconsistent patterns | Explicitly choose one     |
+| Generic advice     | Adds tokens without value           | Remove, Claude knows this |
+| No workflows       | Inconsistent implementation         | Document team processes   |
 
 ## Project Settings Configuration
 
