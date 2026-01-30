@@ -129,8 +129,8 @@ user-invocable: true
 
 | Metric              | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
-| Design spec lines   | 5708                                                                             |
-| Sections            | 72                                                                               |
+| Design spec lines   | 6111                                                                             |
+| Sections            | 75                                                                               |
 | Agents              | 5 (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer) |
 | Commands            | 6 (debug-fcp, fetch-data, quick-test, review-dsm, validate-data, feature-dev)    |
 | Skills              | 4 (dsm-usage, dsm-testing, dsm-research, dsm-fcp-monitor)                        |
@@ -189,6 +189,9 @@ user-invocable: true
 - Context engineering (JIT loading, compaction, sub-agents, note-taking)
 - Team collaboration workflows (shared config, CLAUDE.md knowledge, parallel sessions)
 - Git worktree best practices (isolation, multi-agent, resource management)
+- Advanced debugging techniques (Plan Mode, visibility, Pointbreak integration)
+- Autonomous loop patterns (YOLO mode, safety, self-management emergence)
+- Plugin development guide (structure, manifest, skills, hooks, distribution)
 
 ## More Information
 

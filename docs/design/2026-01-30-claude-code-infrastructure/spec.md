@@ -5682,6 +5682,409 @@ cd ~/projects/data-source-manager
 git worktree remove ../worktrees/dsm/add-coinbase
 ```
 
+## Advanced Debugging Techniques
+
+Systematic debugging strategies for Claude Code.
+
+### Plan Mode for Complex Bugs
+
+Use Plan Mode for sensitive or production bugs:
+
+```
+1. Enter Plan Mode
+   > /plan
+
+2. Paste error and context
+   "This error started after adding authentication:
+   [stack trace]"
+
+3. Claude analyzes without making changes
+4. Review proposed investigation plan
+5. Approve and execute
+```
+
+Benefits:
+
+- Prevents accidental fixes breaking working code
+- Thorough investigation before action
+- Safe for production environments
+
+### Visibility-Based Debugging
+
+Claude fails when it lacks visibility, not intelligence:
+
+```bash
+# Instead of guessing, add logging
+> "Add logging that tracks the data flow through the FCP pipeline"
+
+# Run the test
+uv run pytest tests/test_fcp.py -v
+
+# Paste output back to Claude
+> "Here's the log output: [paste]"
+
+# One-shot fix now possible
+```
+
+### Debug Workflow Template
+
+Store in `.claude/commands/debug.md`:
+
+```markdown
+---
+description: Systematic debugging workflow
+---
+
+## Debug: $ARGUMENTS
+
+### 1. Reproduce
+
+- [ ] Error message captured
+- [ ] Stack trace available
+- [ ] Recent changes identified
+
+### 2. Isolate
+
+- [ ] Minimal reproduction case
+- [ ] Affected code path identified
+- [ ] Dependencies ruled out
+
+### 3. Understand
+
+- [ ] Root cause identified
+- [ ] Related code reviewed
+- [ ] Edge cases considered
+
+### 4. Fix
+
+- [ ] Solution implemented
+- [ ] Tests added/updated
+- [ ] No regressions introduced
+
+### 5. Prevent
+
+- [ ] CLAUDE.md updated
+- [ ] Error handling improved
+- [ ] Documentation added
+```
+
+### Debugging Pattern Reference
+
+| Bug Type       | Strategy                        | Claude Prompt                      |
+| -------------- | ------------------------------- | ---------------------------------- |
+| Runtime error  | Trace undefined values          | "Where does undefined originate?"  |
+| Logic bug      | Step through with sample data   | "Walk through this with input X"   |
+| Performance    | Analyze complexity, bottlenecks | "What's the time complexity here?" |
+| Race condition | Review timing, async flow       | "Identify race conditions in this" |
+| Integration    | Check auth, API contracts       | "Trace the integration flow"       |
+
+### Debugger Integration (Pointbreak)
+
+For step-through debugging with Claude:
+
+```bash
+# Start debugging session
+> /debug src/data_source_manager/core/fcp.py
+
+# Set breakpoints
+> /breakpoint src/fcp.py:145
+
+# Step through execution
+> /step        # Next line
+> /step into   # Into function
+> /step out    # Exit function
+
+# Inspect state
+> /inspect cache_status
+> /inspect locals
+```
+
+### DSM-Specific Debug Commands
+
+```bash
+# Debug FCP cache behavior
+> /debug-fcp BTCUSDT
+
+# Trace data flow
+> "Add logging to trace OHLCV data from API to DataFrame"
+
+# Investigate rate limits
+> "Log all Binance API responses with headers"
+```
+
+## Autonomous Loop Patterns
+
+Running Claude Code in autonomous mode for large tasks.
+
+### Basic YOLO Loop
+
+```bash
+#!/bin/bash
+# autonomous-loop.sh
+
+PROMPT_FILE="task.md"
+MAX_ITERATIONS=50
+
+for i in $(seq 1 $MAX_ITERATIONS); do
+    echo "=== Iteration $i of $MAX_ITERATIONS ==="
+    cat "$PROMPT_FILE" | claude -p --dangerously-skip-permissions
+    sleep 2
+done
+```
+
+### Safe Autonomous Configuration
+
+| Flag                             | Purpose                   |
+| -------------------------------- | ------------------------- |
+| `--dangerously-skip-permissions` | Enable unrestricted exec  |
+| `--verbose`                      | Increase observability    |
+| `--output-format=stream-json`    | Structured output parsing |
+
+### Safety Requirements
+
+1. **Sandboxed environment**: Docker or VM only
+2. **Version control**: Git as safety net
+3. **Rate limit awareness**: Max plan hits limits quickly
+4. **Iteration caps**: Start with 10, increase carefully
+5. **Output review**: Expect 25% discardable results
+
+### Prompt Optimization
+
+Keep prompts concise (3-5 sentences):
+
+```markdown
+# task.md
+
+Improve test coverage for the FCP module.
+Focus on edge cases in cache invalidation.
+Run tests after each change.
+```
+
+Better than lengthy instruction sets.
+
+### Use Cases for Autonomous Mode
+
+| Task                 | Loop Effectiveness |
+| -------------------- | ------------------ |
+| Framework migration  | High               |
+| Large-scale refactor | High               |
+| Documentation gen    | High               |
+| Test coverage        | High               |
+| Exploratory research | Medium             |
+| Precise bug fixes    | Low (use Plan)     |
+
+### Self-Management Emergence
+
+In autonomous mode, Claude develops its own workflow:
+
+- Writes tests for itself
+- Maintains scope awareness
+- "Gives up" when stuck
+- Creates notes for continuity
+
+### DSM Autonomous Tasks
+
+```markdown
+# autonomous-dsm.md
+
+Refactor all Binance adapter methods to use FCP.
+Each method should:
+
+1. Check cache first
+2. Fetch from API if miss
+3. Update cache on success
+4. Handle rate limits with backoff
+
+Run tests after each method refactor.
+Commit working changes incrementally.
+```
+
+## Plugin Development Guide
+
+Creating and distributing Claude Code plugins.
+
+### Plugin Structure
+
+```
+my-plugin/
+├── .claude-plugin/
+│   └── plugin.json      # Manifest (required)
+├── commands/            # Slash commands
+│   └── hello.md
+├── skills/              # Agent skills
+│   └── code-review/
+│       └── SKILL.md
+├── agents/              # Custom agents
+│   └── reviewer.md
+├── hooks/               # Event handlers
+│   └── hooks.json
+├── .mcp.json            # MCP server configs
+└── README.md            # Documentation
+```
+
+### Plugin Manifest
+
+<!-- SSoT-OK: Example manifest, version is illustrative -->
+
+```json
+{
+  "name": "dsm-tools",
+  "description": "DSM development tools and patterns",
+  "version": "<version>",
+  "author": {
+    "name": "DSM Team"
+  },
+  "repository": "https://github.com/org/dsm-tools",
+  "license": "MIT"
+}
+```
+
+### Standalone vs Plugin
+
+| Aspect     | Standalone (`.claude/`) | Plugin                   |
+| ---------- | ----------------------- | ------------------------ |
+| Scope      | Single project          | Multi-project, shareable |
+| Skill name | `/hello`                | `/plugin-name:hello`     |
+| Hooks      | `settings.json`         | `hooks/hooks.json`       |
+| Sharing    | Manual copy             | Marketplace install      |
+
+### Creating a Skill
+
+```markdown
+# skills/dsm-review/SKILL.md
+
+---
+
+name: dsm-review
+description: Reviews code for DSM patterns. Use when reviewing
+DataSourceManager implementations or FCP code.
+
+---
+
+When reviewing DSM code, check for:
+
+1. FCP protocol compliance
+2. Proper timestamp handling (UTC)
+3. Symbol format validation
+4. Silent failure patterns (bare except)
+5. DataFrame column naming
+```
+
+### Creating a Hook
+
+```json
+// hooks/hooks.json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run ruff check $FILE --select=E722,S110"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Testing Plugins
+
+```bash
+# Load plugin for testing
+claude --plugin-dir ./my-plugin
+
+# Load multiple plugins
+claude --plugin-dir ./plugin-one --plugin-dir ./plugin-two
+
+# Verify components
+> /help                    # See commands
+> /agents                  # See agents
+```
+
+### Plugin Best Practices
+
+1. **Structure**: Keep `.claude-plugin/` for manifest only
+2. **Naming**: Descriptive, lowercase, hyphenated
+3. **Version**: Use semantic versioning
+4. **Docs**: Include README with examples
+5. **Test**: Verify each component works
+
+### Converting Standalone to Plugin
+
+<!-- SSoT-OK: Example version placeholder -->
+
+```bash
+# 1. Create plugin structure
+mkdir -p my-plugin/.claude-plugin
+mkdir my-plugin/commands my-plugin/skills
+
+# 2. Create manifest
+cat > my-plugin/.claude-plugin/plugin.json << 'EOF'
+{
+  "name": "my-plugin",
+  "description": "Migrated from standalone",
+  "version": "<version>"
+}
+EOF
+
+# 3. Copy existing files
+cp -r .claude/commands/* my-plugin/commands/
+cp -r .claude/skills/* my-plugin/skills/
+
+# 4. Migrate hooks from settings.json to hooks/hooks.json
+
+# 5. Test
+claude --plugin-dir ./my-plugin
+```
+
+### DSM Plugin Example
+
+A complete DSM-focused plugin:
+
+<!-- SSoT-OK: Example plugin manifest -->
+
+```json
+// .claude-plugin/plugin.json
+{
+  "name": "dsm-dev",
+  "description": "DataSourceManager development tools",
+  "version": "<version>"
+}
+```
+
+```markdown
+## // commands/fetch-data.md
+
+## description: Fetch market data with validation
+
+Fetch $ARGUMENTS data:
+
+1. Validate symbol format
+2. Use FCP for cache/API logic
+3. Validate DataFrame columns
+4. Report data quality metrics
+```
+
+```markdown
+## // skills/fcp-expert/SKILL.md
+
+name: fcp-expert
+description: Expertise in FCP protocol implementation
+
+---
+
+FCP implementation rules:
+
+- Always check cache before API
+- Use open_time as cache key
+- Handle partial cache hits
+- Respect rate limits
+```
+
 ## Verification Checklist
 
 ### Infrastructure
