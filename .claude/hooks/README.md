@@ -8,12 +8,20 @@ Project-specific Claude Code hooks for data-source-manager.
 
 Detects silent failure patterns in Python code:
 
+**General Python Patterns:**
+
 - **E722**: Bare `except:` clause
 - **BLE001**: Generic `except Exception`
 - **S110**: Silent `except: pass`
 - **PLW1510**: subprocess without `check=True`
-- **DSM-specific**: Naive `datetime.now()` without timezone
-- **DSM-specific**: HTTP requests without explicit `timeout=`
+
+**DSM-Specific Patterns:**
+
+- Naive `datetime.now()` without timezone
+- HTTP requests without explicit `timeout=`
+- `DataSourceManager.create()` without `manager.close()`
+- Async functions using sync `DataSourceManager` (mixing patterns)
+- COIN-margined symbol format (`_PERP`) with wrong market type
 
 ## Installation
 

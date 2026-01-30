@@ -49,6 +49,26 @@ if echo "$CONTENT" | grep -qE '(requests|httpx)\.(get|post|put|delete|patch)\(' 
     WARNINGS+=("⚠️ HTTP request without explicit timeout parameter")
 fi
 
+# Check 7: DataSourceManager without close() (DSM-specific)
+# Detect manager creation without matching close() call
+if echo "$CONTENT" | grep -qE 'DataSourceManager\.create\(' && ! echo "$CONTENT" | grep -q '\.close()'; then
+    # Only warn if not using context manager pattern
+    if ! echo "$CONTENT" | grep -qE 'with\s+.*DataSourceManager'; then
+        WARNINGS+=("⚠️ DataSourceManager.create() without manager.close() - consider using context manager or explicit close")
+    fi
+fi
+
+# Check 8: Mixing sync and async patterns (DSM-specific)
+if echo "$CONTENT" | grep -qE 'async\s+def' && echo "$CONTENT" | grep -qE 'DataSourceManager\.create\('; then
+    WARNINGS+=("⚠️ Async function using sync DataSourceManager - consider async patterns for better performance")
+fi
+
+# Check 9: Hardcoded symbol format issues (DSM-specific)
+# Check for BTCUSD_PERP with SPOT/FUTURES_USDT market type
+if echo "$CONTENT" | grep -qE 'MarketType\.(SPOT|FUTURES_USDT)' && echo "$CONTENT" | grep -qE '"[A-Z]+USD_PERP"'; then
+    WARNINGS+=("⚠️ COIN-margined symbol format (_PERP) used with SPOT/FUTURES_USDT market type")
+fi
+
 # Output result
 if [[ ${#WARNINGS[@]} -gt 0 ]]; then
     MESSAGE=$(printf '%s\n' "${WARNINGS[@]}")
