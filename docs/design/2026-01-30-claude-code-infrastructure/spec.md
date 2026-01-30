@@ -13882,3 +13882,253 @@ tools = [
 | System prompt overhead   | 466-499                |
 | Computer tool definition | 735 per tool           |
 | Screenshots              | Vision pricing applies |
+
+---
+
+## Cost Management Reference
+
+Track usage, set spend limits, and optimize Claude Code costs through context management and model selection.
+
+### Pricing Overview
+
+**Average costs**:
+
+- ~$6 per developer per day (median)
+- <$12/day for 90% of users
+- ~$100-200/developer per month with Sonnet 4.5
+
+**Model pricing (per million tokens)**:
+
+| Model             | Input | Output |
+| ----------------- | ----- | ------ |
+| Claude Haiku 4.5  | $1    | $5     |
+| Claude Sonnet 4.5 | $3    | $15    |
+| Claude Opus 4.5   | $5    | $25    |
+
+### Track Usage
+
+**Using /cost command**:
+
+```
+Total cost:            $0.55
+Total duration (API):  6m 19.7s
+Total duration (wall): 6h 33m 10.2s
+Total code changes:    0 lines added, 0 lines removed
+```
+
+**Status line display**: Configure to show context usage continuously.
+
+### Team Rate Limit Recommendations
+
+| Team Size     | TPM per User | RPM per User |
+| ------------- | ------------ | ------------ |
+| 1-5 users     | 200k-300k    | 5-7          |
+| 5-20 users    | 100k-150k    | 2.5-3.5      |
+| 20-50 users   | 50k-75k      | 1.25-1.75    |
+| 50-100 users  | 25k-35k      | 0.62-0.87    |
+| 100-500 users | 15k-20k      | 0.37-0.47    |
+| 500+ users    | 10k-15k      | 0.25-0.35    |
+
+### Context Management
+
+**Auto-optimization features**:
+
+- **Prompt caching**: Reduces costs for repeated system prompts
+- **Auto-compaction**: Summarizes history at context limits
+
+**Clear between tasks**:
+
+```
+/rename "feature-auth"
+/clear
+# Work on new task
+/resume    # Return to previous session
+```
+
+**Custom compaction**:
+
+```
+/compact Focus on code samples and API usage
+```
+
+**CLAUDE.md compaction instructions**:
+
+```markdown
+# Compact instructions
+
+When you are using compact, please focus on test output and code changes
+```
+
+### Model Selection Strategy
+
+| Task Type             | Recommended Model |
+| --------------------- | ----------------- |
+| Daily development     | Sonnet 4.5        |
+| Complex architecture  | Opus 4.5          |
+| Simple subagent tasks | Haiku 4.5         |
+
+```
+/model sonnet    # Switch to Sonnet
+/model opus      # Switch to Opus
+/config          # Set default model
+```
+
+Subagent model selection:
+
+```yaml
+# .claude/agents/simple-task.md
+model: haiku
+```
+
+### Reduce MCP Overhead
+
+**Prefer CLI tools**:
+
+```bash
+# More efficient than MCP servers
+gh pr list          # GitHub CLI
+aws s3 ls           # AWS CLI
+gcloud compute list # GCloud CLI
+```
+
+**Disable unused servers**:
+
+```
+/mcp    # View and manage servers
+```
+
+**Lower tool search threshold**:
+
+```bash
+# Trigger at 5% instead of default 10%
+ENABLE_TOOL_SEARCH=auto:5 claude
+```
+
+### Extended Thinking Optimization
+
+**Default**: 31,999 tokens (improves complex reasoning)
+
+**Reduce for simple tasks**:
+
+```bash
+# Lower thinking budget
+MAX_THINKING_TOKENS=8000 claude
+```
+
+```
+/config    # Disable thinking entirely
+```
+
+Thinking tokens are billed as output tokens.
+
+### Preprocessing Hooks for Cost Reduction
+
+**Filter test output** (settings.json):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/filter-test-output.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Filter script** (filter-test-output.sh):
+
+```bash
+#!/bin/bash
+input=$(cat)
+cmd=$(echo "$input" | jq -r '.tool_input.command')
+
+# Filter test output to failures only
+if [[ "$cmd" =~ ^(npm test|pytest|go test) ]]; then
+  filtered_cmd="$cmd 2>&1 | grep -A 5 -E '(FAIL|ERROR|error:)' | head -100"
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","updatedInput":{"command":"'"$filtered_cmd"'"}}}'
+else
+  echo "{}"
+fi
+```
+
+### Skills vs CLAUDE.md
+
+| Content Type           | Location  | Loaded    |
+| ---------------------- | --------- | --------- |
+| Essential instructions | CLAUDE.md | Always    |
+| Specialized workflows  | Skills    | On-demand |
+
+**Goal**: Keep CLAUDE.md under ~500 lines.
+
+### Subagent Delegation
+
+Offload verbose operations:
+
+```yaml
+# .claude/agents/log-analyzer.md
+description: Analyze log files and return summary
+model: haiku
+tools:
+  - Read
+  - Grep
+```
+
+Verbose output stays in subagent context; only summary returns.
+
+### Efficient Work Habits
+
+1. **Plan mode**: Shift+Tab before complex implementation
+2. **Course-correct early**: Escape to stop wrong direction
+3. **Rewind**: /rewind or double-Escape to checkpoint
+4. **Verification targets**: Include test cases, screenshots
+5. **Incremental testing**: Write one file, test, continue
+
+### Background Token Usage
+
+| Operation                  | Cost           |
+| -------------------------- | -------------- |
+| Conversation summarization | ~$0.04/session |
+| Command processing         | Minimal        |
+
+### DSM Cost Optimization
+
+```yaml
+# .claude/agents/fcp-validator.md
+---
+description: Validate FCP behavior with minimal context
+model: haiku
+tools:
+  - Read
+  - Grep
+  - Bash
+---
+Check FCP cache state and return summary.
+Only report anomalies, not full cache contents.
+```
+
+**CLAUDE.md optimization**:
+
+```markdown
+# DSM Quick Reference
+
+## Essential Commands
+
+- `uv run pytest tests/unit/` - Unit tests
+- `uv run pytest tests/integration/` - Integration tests
+
+## Key Patterns
+
+- FCP: See @.claude/rules/fcp-protocol.md
+- Timestamps: Always UTC with timezone.utc
+- DataFrames: Use Polars, not pandas
+
+<!-- Detailed docs in skills, not here -->
+```
