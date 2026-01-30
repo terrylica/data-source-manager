@@ -35208,3 +35208,514 @@ Or in settings:
 - [MCP Protocol Specification](https://modelcontextprotocol.io/introduction)
 - [MCP Server Registry](https://api.anthropic.com/mcp-registry/docs)
 - [Plugin MCP Servers](/en/plugins-reference#mcp-servers)
+## Claude Agent SDK Reference
+
+Comprehensive reference for building AI agents with the Claude Agent SDK (Python and TypeScript).
+
+### Overview
+
+The Claude Agent SDK provides the same tools, agent loop, and context management that power Claude Code, programmable as a library. Build agents that autonomously read files, run commands, search the web, edit code, and more.
+
+### Installation
+
+```bash
+# TypeScript
+npm install @anthropic-ai/claude-agent-sdk
+
+# Python
+pip install claude-agent-sdk
+```
+
+**Prerequisites**: Claude Code must be installed as the runtime.
+
+### Basic Usage
+
+**Python**:
+
+```python
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def main():
+    async for message in query(
+        prompt="Find and fix the bug in auth.py",
+        options=ClaudeAgentOptions(allowed_tools=["Read", "Edit", "Bash"])
+    ):
+        print(message)
+
+asyncio.run(main())
+```
+
+**TypeScript**:
+
+```typescript
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Find and fix the bug in auth.py",
+  options: { allowedTools: ["Read", "Edit", "Bash"] },
+})) {
+  console.log(message);
+}
+```
+
+### Built-in Tools
+
+| Tool            | Description                           |
+| --------------- | ------------------------------------- |
+| Read            | Read any file in working directory    |
+| Write           | Create new files                      |
+| Edit            | Make precise edits to existing files  |
+| Bash            | Run terminal commands, scripts, git   |
+| Glob            | Find files by pattern (`**/*.ts`)     |
+| Grep            | Search file contents with regex       |
+| WebSearch       | Search the web                        |
+| WebFetch        | Fetch and parse web page content      |
+| AskUserQuestion | Ask clarifying questions with options |
+| Task            | Invoke subagents                      |
+
+### Subagents
+
+Subagents are separate agent instances for focused subtasks with isolated context.
+
+#### Benefits
+
+- **Context isolation**: Prevent information overload in main conversation
+- **Parallelization**: Run multiple analyses concurrently
+- **Specialized instructions**: Tailored prompts without bloating main agent
+- **Tool restrictions**: Limit tools per subagent for safety
+
+#### Defining Subagents
+
+**Python**:
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+async for message in query(
+    prompt="Review the authentication module for security issues",
+    options=ClaudeAgentOptions(
+        allowed_tools=["Read", "Grep", "Glob", "Task"],
+        agents={
+            "code-reviewer": AgentDefinition(
+                description="Expert code review specialist for quality and security.",
+                prompt="""You are a code review specialist with expertise in security.
+When reviewing code:
+- Identify security vulnerabilities
+- Check for performance issues
+- Suggest specific improvements""",
+                tools=["Read", "Grep", "Glob"],
+                model="sonnet"
+            ),
+            "test-runner": AgentDefinition(
+                description="Runs and analyzes test suites.",
+                prompt="Run tests and analyze results.",
+                tools=["Bash", "Read", "Grep"]
+            )
+        }
+    )
+):
+    if hasattr(message, "result"):
+        print(message.result)
+```
+
+**TypeScript**:
+
+```typescript
+for await (const message of query({
+  prompt: "Review the authentication module for security issues",
+  options: {
+    allowedTools: ["Read", "Grep", "Glob", "Task"],
+    agents: {
+      "code-reviewer": {
+        description: "Expert code review specialist.",
+        prompt: `You are a code review specialist...`,
+        tools: ["Read", "Grep", "Glob"],
+        model: "sonnet",
+      },
+    },
+  },
+})) {
+  if ("result" in message) console.log(message.result);
+}
+```
+
+#### AgentDefinition Fields
+
+| Field         | Type                                       | Required | Description                         |
+| ------------- | ------------------------------------------ | -------- | ----------------------------------- |
+| `description` | string                                     | Yes      | When to use this agent              |
+| `prompt`      | string                                     | Yes      | Agent's system prompt               |
+| `tools`       | string[]                                   | No       | Allowed tools (inherits if omitted) |
+| `model`       | 'sonnet' \| 'opus' \| 'haiku' \| 'inherit' | No       | Model override                      |
+
+**Note**: Subagents cannot spawn their own subagents. Don't include `Task` in subagent tools.
+
+### Hooks
+
+Hooks intercept agent execution at key points for validation, logging, security, and custom logic.
+
+#### Available Hook Events
+
+| Event              | Python | TypeScript | Description                              |
+| ------------------ | ------ | ---------- | ---------------------------------------- |
+| PreToolUse         | Yes    | Yes        | Before tool execution (can block/modify) |
+| PostToolUse        | Yes    | Yes        | After tool execution                     |
+| PostToolUseFailure | No     | Yes        | Tool execution failure                   |
+| UserPromptSubmit   | Yes    | Yes        | User prompt submission                   |
+| Stop               | Yes    | Yes        | Agent execution stop                     |
+| SubagentStart      | No     | Yes        | Subagent initialization                  |
+| SubagentStop       | Yes    | Yes        | Subagent completion                      |
+| PreCompact         | Yes    | Yes        | Before conversation compaction           |
+| PermissionRequest  | No     | Yes        | Permission dialog trigger                |
+| SessionStart       | No     | Yes        | Session initialization                   |
+| SessionEnd         | No     | Yes        | Session termination                      |
+| Notification       | No     | Yes        | Agent status messages                    |
+
+#### Hook Callback Structure
+
+**Python**:
+
+```python
+async def my_hook(input_data, tool_use_id, context):
+    # input_data: dict with hook details
+    # tool_use_id: str | None for correlation
+    # context: reserved for future use
+
+    if input_data['tool_name'] == 'Write':
+        file_path = input_data['tool_input'].get('file_path', '')
+        if file_path.endswith('.env'):
+            return {
+                'hookSpecificOutput': {
+                    'hookEventName': input_data['hook_event_name'],
+                    'permissionDecision': 'deny',
+                    'permissionDecisionReason': 'Cannot modify .env files'
+                }
+            }
+    return {}
+```
+
+**TypeScript**:
+
+```typescript
+const myHook: HookCallback = async (input, toolUseID, { signal }) => {
+  const preInput = input as PreToolUseHookInput;
+
+  if (preInput.tool_name === "Write") {
+    const filePath = preInput.tool_input?.file_path as string;
+    if (filePath?.endsWith(".env")) {
+      return {
+        hookSpecificOutput: {
+          hookEventName: input.hook_event_name,
+          permissionDecision: "deny",
+          permissionDecisionReason: "Cannot modify .env files",
+        },
+      };
+    }
+  }
+  return {};
+};
+```
+
+#### Hook Configuration
+
+```python
+options = ClaudeAgentOptions(
+    hooks={
+        'PreToolUse': [
+            HookMatcher(matcher='Write|Edit', hooks=[protect_files]),
+            HookMatcher(matcher='Bash', hooks=[block_dangerous])
+        ],
+        'PostToolUse': [
+            HookMatcher(hooks=[audit_logger])  # All tools
+        ]
+    }
+)
+```
+
+#### Matcher Options
+
+| Option    | Type           | Default   | Description                  |
+| --------- | -------------- | --------- | ---------------------------- |
+| `matcher` | string         | undefined | Regex pattern for tool names |
+| `hooks`   | HookCallback[] | -         | Callback functions           |
+| `timeout` | number         | 60        | Timeout in seconds           |
+
+#### Hook Output Fields
+
+**Top-level**:
+
+- `continue`: boolean - Whether to continue (default: true)
+- `stopReason`: string - Message when continue is false
+- `suppressOutput`: boolean - Hide stdout from transcript
+- `systemMessage`: string - Inject message for Claude
+
+**Inside `hookSpecificOutput`**:
+
+- `hookEventName`: string - Required, use `input.hook_event_name`
+- `permissionDecision`: 'allow' | 'deny' | 'ask'
+- `permissionDecisionReason`: string
+- `updatedInput`: object - Modified tool input (requires allow)
+- `additionalContext`: string - Context for conversation
+
+### Sessions
+
+Maintain context across multiple exchanges with session management.
+
+**Python**:
+
+```python
+session_id = None
+
+# First query: capture session ID
+async for message in query(
+    prompt="Read the authentication module",
+    options=ClaudeAgentOptions(allowed_tools=["Read", "Glob"])
+):
+    if hasattr(message, 'subtype') and message.subtype == 'init':
+        session_id = message.session_id
+
+# Resume with full context
+async for message in query(
+    prompt="Now find all places that call it",
+    options=ClaudeAgentOptions(resume=session_id)
+):
+    if hasattr(message, "result"):
+        print(message.result)
+```
+
+**TypeScript**:
+
+```typescript
+let sessionId: string | undefined;
+
+for await (const message of query({
+  prompt: "Read the authentication module",
+  options: { allowedTools: ["Read", "Glob"] },
+})) {
+  if (message.type === "system" && message.subtype === "init") {
+    sessionId = message.session_id;
+  }
+}
+
+for await (const message of query({
+  prompt: "Now find all places that call it",
+  options: { resume: sessionId },
+})) {
+  if ("result" in message) console.log(message.result);
+}
+```
+
+### Permissions
+
+Control tool access with permission modes:
+
+```python
+# Read-only agent
+options = ClaudeAgentOptions(
+    allowed_tools=["Read", "Glob", "Grep"],
+    permission_mode="bypassPermissions"
+)
+
+# Auto-accept file edits
+options = ClaudeAgentOptions(
+    permission_mode="acceptEdits",
+    hooks={
+        "PostToolUse": [HookMatcher(matcher="Edit|Write", hooks=[log_changes])]
+    }
+)
+```
+
+### MCP Integration
+
+Connect to external tools via Model Context Protocol:
+
+```python
+async for message in query(
+    prompt="Open example.com and describe what you see",
+    options=ClaudeAgentOptions(
+        mcp_servers={
+            "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]}
+        }
+    )
+):
+    if hasattr(message, "result"):
+        print(message.result)
+```
+
+### Authentication
+
+```bash
+# Anthropic API
+export ANTHROPIC_API_KEY=your-api-key
+
+# Amazon Bedrock
+export CLAUDE_CODE_USE_BEDROCK=1
+# + AWS credentials
+
+# Google Vertex AI
+export CLAUDE_CODE_USE_VERTEX=1
+# + Google Cloud credentials
+
+# Microsoft Foundry
+export CLAUDE_CODE_USE_FOUNDRY=1
+# + Azure credentials
+```
+
+### Claude Code Features via SDK
+
+Enable filesystem-based configuration:
+
+```python
+options = ClaudeAgentOptions(
+    setting_sources=["project"]  # Load .claude/ configurations
+)
+```
+
+| Feature  | Location                  | Description              |
+| -------- | ------------------------- | ------------------------ |
+| Skills   | `.claude/skills/SKILL.md` | Specialized capabilities |
+| Commands | `.claude/commands/*.md`   | Custom slash commands    |
+| Memory   | `CLAUDE.md`               | Project context          |
+| Plugins  | `plugins` option          | Extensions               |
+
+### DSM-Specific SDK Patterns
+
+#### DSM Data Fetcher Agent
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+async def fetch_market_data():
+    async for message in query(
+        prompt="Fetch BTC/USDT OHLCV data for the last 7 days from Binance",
+        options=ClaudeAgentOptions(
+            allowed_tools=["Read", "Bash", "Task"],
+            agents={
+                "data-fetcher": AgentDefinition(
+                    description="Fetch market data with proper FCP handling.",
+                    prompt="""You are a data fetcher specialist for DSM.
+
+Rules:
+- Always use UTC timestamps
+- Validate symbol format (uppercase, slash separator)
+- Handle FCP failover decisions
+- Return Polars DataFrame format""",
+                    tools=["Read", "Bash", "Grep"],
+                    model="sonnet"
+                )
+            }
+        )
+    ):
+        if hasattr(message, "result"):
+            print(message.result)
+```
+
+#### DSM Test Runner with Hooks
+
+```python
+import json
+from datetime import datetime
+
+async def log_dsm_operations(input_data, tool_use_id, context):
+    """Audit log for DSM operations."""
+    if input_data['hook_event_name'] == 'PostToolUse':
+        log_entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'tool': input_data['tool_name'],
+            'session': input_data['session_id']
+        }
+        with open('dsm-audit.jsonl', 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    return {}
+
+async def validate_dsm_patterns(input_data, tool_use_id, context):
+    """Block operations that violate DSM patterns."""
+    if input_data['hook_event_name'] != 'PreToolUse':
+        return {}
+
+    if input_data['tool_name'] == 'Bash':
+        command = input_data['tool_input'].get('command', '')
+        # Block naive datetime imports
+        if 'from datetime import datetime' in command:
+            return {
+                'hookSpecificOutput': {
+                    'hookEventName': input_data['hook_event_name'],
+                    'permissionDecision': 'deny',
+                    'permissionDecisionReason': 'Use pendulum for timezone-aware datetime'
+                }
+            }
+    return {}
+
+options = ClaudeAgentOptions(
+    hooks={
+        'PreToolUse': [HookMatcher(hooks=[validate_dsm_patterns])],
+        'PostToolUse': [HookMatcher(hooks=[log_dsm_operations])]
+    }
+)
+```
+
+#### DSM Multi-Agent Orchestration
+
+```python
+# Fan-out pattern: parallel data validation
+agents = {
+    "binance-validator": AgentDefinition(
+        description="Validate Binance data integrity.",
+        prompt="Check Binance OHLCV data for gaps and anomalies.",
+        tools=["Read", "Grep", "Glob"]
+    ),
+    "okx-validator": AgentDefinition(
+        description="Validate OKX data integrity.",
+        prompt="Check OKX OHLCV data for gaps and anomalies.",
+        tools=["Read", "Grep", "Glob"]
+    ),
+    "fcp-analyzer": AgentDefinition(
+        description="Analyze FCP decision logs.",
+        prompt="Review FCP logs for failover patterns.",
+        tools=["Read", "Grep"]
+    )
+}
+
+async for message in query(
+    prompt="""Run all validators in parallel:
+    1. Use binance-validator for Binance data
+    2. Use okx-validator for OKX data
+    3. Use fcp-analyzer for FCP logs
+    Summarize findings.""",
+    options=ClaudeAgentOptions(
+        allowed_tools=["Read", "Grep", "Glob", "Task"],
+        agents=agents
+    )
+):
+    if hasattr(message, "result"):
+        print(message.result)
+```
+
+### Best Practices
+
+1. **Use Task tool for subagents** - Include `Task` in `allowedTools` for delegation
+2. **Write clear descriptions** - Claude uses descriptions to decide when to invoke subagents
+3. **Restrict tools by role** - Read-only tools for analyzers, Bash for executors
+4. **Handle errors in hooks** - Catch exceptions, don't throw
+5. **Use signal for async** - Pass AbortSignal to fetch in TypeScript hooks
+6. **Log audit trails** - PostToolUse hooks for compliance
+7. **Session management** - Capture session_id for multi-turn workflows
+
+### Troubleshooting
+
+| Issue                      | Solution                                          |
+| -------------------------- | ------------------------------------------------- |
+| Hook not firing            | Check event name case sensitivity                 |
+| Matcher not filtering      | Matchers match tool names only, not paths         |
+| Modified input not applied | Include `permissionDecision: 'allow'`             |
+| Python hooks limited       | SessionStart/End/Notification are TypeScript-only |
+| Subagent not invoking      | Include `Task` in allowedTools                    |
+
+### References
+
+- [Agent SDK Overview](https://platform.claude.com/docs/en/agent-sdk/overview)
+- [Subagents Documentation](https://platform.claude.com/docs/en/agent-sdk/subagents)
+- [Hooks Reference](https://platform.claude.com/docs/en/agent-sdk/hooks)
+- [Python SDK](https://github.com/anthropics/claude-agent-sdk-python)
+- [TypeScript SDK](https://github.com/anthropics/claude-agent-sdk-typescript)
