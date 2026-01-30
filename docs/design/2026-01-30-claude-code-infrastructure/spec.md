@@ -28411,3 +28411,565 @@ async def safe_query():
 - **TypeScript SDK**: [github.com/anthropics/claude-agent-sdk-typescript](https://github.com/anthropics/claude-agent-sdk-typescript)
 - **Python SDK**: [github.com/anthropics/claude-agent-sdk-python](https://github.com/anthropics/claude-agent-sdk-python)
 - **Example agents**: [github.com/anthropics/claude-agent-sdk-demos](https://github.com/anthropics/claude-agent-sdk-demos)
+## Skills Architecture Reference
+
+### Overview
+
+Skills are structured prompt templates that Claude Code can invoke to perform specialized tasks. They provide progressive disclosure of domain knowledge, enabling Claude to load context on-demand rather than cluttering the main CLAUDE.md file.
+
+### SKILL.md Structure
+
+Every skill is defined by a `SKILL.md` file with YAML frontmatter:
+
+```markdown
+---
+name: dsm-usage
+description: DataSourceManager API usage patterns
+user-invocable: true
+---
+
+# DSM Usage Skill
+
+Instructions for using DataSourceManager...
+
+## References
+
+- @references/fcp-protocol.md
+- @examples/basic-fetch.md
+```
+
+### Skill Locations and Scopes
+
+Skills can be defined at multiple levels with different scopes:
+
+| Location   | Scope             | Discovery Path                      |
+| ---------- | ----------------- | ----------------------------------- |
+| Enterprise | Organization-wide | Managed settings                    |
+| Personal   | User-specific     | `~/.claude/skills/`                 |
+| Project    | Repository        | `docs/skills/` or `.claude/skills/` |
+| Plugin     | Marketplace       | `plugins/{name}/skills/`            |
+
+**Discovery priority** (highest to lowest):
+
+1. Enterprise managed skills
+2. Project skills (in working directory)
+3. Personal skills
+4. Plugin skills
+
+### Frontmatter Reference
+
+Complete YAML frontmatter options:
+
+```yaml
+---
+# Required
+name: skill-name # Unique identifier (kebab-case)
+description: Brief purpose # Shown in skill listings
+
+# Invocation Control
+user-invocable: true # Can user invoke with /skill-name
+disable-model-invocation: false # Prevent Claude from auto-invoking
+
+# Execution Context
+context: append # append (default) | fork
+agent: Explore # Subagent type for fork context
+
+# Tool Restrictions
+allowed-tools: # Limit available tools
+  - Read
+  - Grep
+  - Glob
+
+# Model Selection
+model: sonnet # opus | sonnet | haiku
+
+# Hooks Integration
+hooks: # Skill-specific hooks
+  pre-invoke: validate.sh
+  post-invoke: cleanup.sh
+---
+```
+
+### Context Modes
+
+**`context: append`** (default):
+
+- Skill content added to current conversation
+- Full tool access retained
+- State persists in main context
+
+**`context: fork`**:
+
+- Skill runs in isolated subagent
+- Dedicated context window
+- Results returned to main conversation
+- Ideal for research/exploration tasks
+
+```yaml
+---
+name: dsm-research
+context: fork
+agent: Explore
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - WebSearch
+---
+```
+
+### Auto-Discovery for Monorepos
+
+Claude Code auto-discovers skills from nested directories, enabling polyglot monorepo patterns:
+
+```
+monorepo/
+├── CLAUDE.md              # Root hub
+├── docs/skills/           # Shared skills
+│   └── shared-skill/
+│       └── SKILL.md
+├── packages/
+│   ├── api/
+│   │   └── docs/skills/   # Package-specific
+│   │       └── api-skill/
+│   │           └── SKILL.md
+│   └── web/
+│       └── docs/skills/
+│           └── web-skill/
+│               └── SKILL.md
+```
+
+**Discovery behavior**:
+
+- Skills discovered relative to working directory
+- Nested skills accessible when in subdirectory
+- Name conflicts resolved by proximity (closer = priority)
+
+### Dynamic Context Injection
+
+Use backtick-bang syntax to inject dynamic content:
+
+```markdown
+## Current State
+
+`!git status --short`
+
+## Recent Changes
+
+`!git log --oneline -5`
+```
+
+**Supported injections**:
+
+| Syntax           | Purpose              |
+| ---------------- | -------------------- |
+| `` `!command` `` | Shell command output |
+| `@file.md`       | File content import  |
+| `@directory/`    | Directory listing    |
+
+### @ File Imports
+
+Import external content into skills:
+
+```markdown
+## References
+
+- @references/api-guide.md # Relative import
+- @/docs/GLOSSARY.md # Repo-root import
+- @examples/basic-fetch.md # Example code
+```
+
+**Import resolution**:
+
+1. Relative to SKILL.md location
+2. Repo-root paths start with `@/`
+3. Supports glob patterns: `@examples/*.md`
+
+### Supporting Files Structure
+
+Organize skill assets in subdirectories:
+
+```
+skills/
+└── dsm-usage/
+    ├── SKILL.md           # Main skill definition
+    ├── references/        # Domain documentation
+    │   ├── fcp-protocol.md
+    │   └── timestamp-rules.md
+    ├── examples/          # Code examples
+    │   ├── basic-fetch.md
+    │   ├── multi-source.md
+    │   └── error-handling.md
+    ├── scripts/           # Runnable utilities
+    │   ├── validate-data.py
+    │   └── debug-fcp.sh
+    └── templates/         # Code templates
+        ├── new-source.py.tmpl
+        └── test-fixture.py.tmpl
+```
+
+### Skill Invocation Patterns
+
+**User invocation** (interactive):
+
+```
+/dsm-usage
+/dsm-testing --verbose
+```
+
+**Claude invocation** (automatic):
+
+- Claude detects relevant context from user query
+- Invokes skill matching domain need
+- Disabled with `disable-model-invocation: true`
+
+**Programmatic invocation** (SDK):
+
+```python
+from claude_code import Client
+
+client = Client()
+result = await client.invoke_skill("dsm-usage", args={"symbol": "BTC/USDT"})
+```
+
+### Tool Restrictions
+
+Limit skill capabilities for safety and focus:
+
+```yaml
+---
+name: code-reviewer
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  # No Edit, Write, Bash - read-only review
+---
+```
+
+**Common restriction patterns**:
+
+| Pattern   | Tools                       | Use Case            |
+| --------- | --------------------------- | ------------------- |
+| Read-only | Read, Grep, Glob            | Code review         |
+| Research  | Read, Grep, Glob, WebSearch | Investigation       |
+| Full dev  | All tools                   | Feature development |
+| Safe exec | Read, Write, Edit           | No bash access      |
+
+### Model Selection in Skills
+
+Override default model for specific skills:
+
+```yaml
+---
+name: quick-lookup
+model: haiku # Fast, cheap for simple tasks
+---
+```
+
+```yaml
+---
+name: complex-refactor
+model: opus # Best reasoning for complex tasks
+---
+```
+
+**Model selection guidelines**:
+
+| Task Type            | Recommended Model |
+| -------------------- | ----------------- |
+| Simple lookup        | haiku             |
+| Code generation      | sonnet            |
+| Complex reasoning    | opus              |
+| Research/exploration | sonnet            |
+| Critical decisions   | opus              |
+
+### Hooks in Skills
+
+Attach lifecycle hooks to skills:
+
+```yaml
+---
+name: deploy-skill
+hooks:
+  pre-invoke: scripts/validate-env.sh
+  post-invoke: scripts/notify-team.sh
+---
+```
+
+**Hook events**:
+
+- `pre-invoke`: Before skill execution
+- `post-invoke`: After skill completes
+- `on-error`: When skill fails
+
+### Visual Output Generation
+
+Skills can generate visual assets:
+
+```markdown
+## Generate Diagram
+
+Create architecture diagram and save to `output/diagram.png`.
+
+Use mermaid syntax:
+\`\`\`mermaid
+graph TD
+A[Client] --> B[DSM]
+B --> C[Source 1]
+B --> D[Source 2]
+\`\`\`
+```
+
+### DSM Skill Patterns
+
+#### dsm-usage Skill
+
+```yaml
+---
+name: dsm-usage
+description: DataSourceManager API usage patterns
+user-invocable: true
+context: append
+---
+
+# DataSourceManager Usage
+
+## Quick Start
+
+@examples/basic-fetch.md
+
+## FCP Protocol
+
+@references/fcp-protocol.md
+
+## Symbol Formats
+
+@references/symbol-formats.md
+```
+
+#### dsm-testing Skill
+
+```yaml
+---
+name: dsm-testing
+description: DSM testing patterns and fixtures
+user-invocable: true
+context: append
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Grep
+  - Glob
+---
+
+# DSM Testing Skill
+
+## Test Patterns
+
+@references/test-patterns.md
+
+## Fixture Generation
+
+`!python scripts/generate-fixtures.py --list`
+
+## Run Tests
+
+@scripts/run-tests.md
+```
+
+#### dsm-research Skill
+
+```yaml
+---
+name: dsm-research
+description: Codebase exploration and research
+user-invocable: true
+context: fork
+agent: Explore
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+---
+
+# DSM Research Skill
+
+Research the data-source-manager codebase to answer questions.
+
+## Codebase Structure
+
+@references/architecture.md
+
+## Key Components
+
+- `src/data_source_manager/` - Core DSM implementation
+- `src/data_source_manager/sources/` - Data source implementations
+- `tests/` - Test suite
+```
+
+#### dsm-fcp-monitor Skill
+
+```yaml
+---
+name: dsm-fcp-monitor
+description: Monitor and debug FCP behavior
+user-invocable: true
+context: fork
+agent: Explore
+---
+
+# FCP Monitor Skill
+
+## Current FCP State
+
+`!python -c "from data_source_manager import get_fcp_status; print(get_fcp_status())"`
+
+## Recent Failures
+
+`!grep -r "FCP" logs/ | tail -20`
+
+## FCP Protocol Reference
+
+@references/fcp-protocol.md
+```
+
+### Progressive Disclosure Pattern
+
+Skills enable progressive context loading:
+
+```
+CLAUDE.md (< 300 lines)
+    ↓ mentions skill
+/dsm-usage (invoked on demand)
+    ↓ imports reference
+@references/fcp-protocol.md (loaded when needed)
+    ↓ imports examples
+@examples/error-recovery.md (loaded when needed)
+```
+
+**Benefits**:
+
+- Main CLAUDE.md stays concise
+- Context loaded only when relevant
+- Reduces token usage
+- Improves response quality
+
+### Skill Discovery Commands
+
+```bash
+# List available skills
+claude skills list
+
+# Show skill details
+claude skills show dsm-usage
+
+# Invoke skill directly
+claude skill dsm-usage
+
+# Search skills
+claude skills search "testing"
+```
+
+### Enterprise Skills Management
+
+For team/enterprise deployments:
+
+```json
+{
+  "managedSkills": {
+    "enterprise-coding-standards": {
+      "source": "https://internal.company.com/skills/coding-standards",
+      "required": true,
+      "autoInvoke": ["*.py", "*.ts"]
+    }
+  }
+}
+```
+
+### Skill Versioning
+
+Track skill versions for compatibility:
+
+```yaml
+---
+name: dsm-usage
+version: "<version>" # SSoT: SKILL.md frontmatter
+min-claude-version: "<version>" # SSoT: Claude Code release notes
+deprecated: false
+deprecation-message: ""
+---
+```
+
+### Debugging Skills
+
+Enable skill debugging:
+
+```bash
+# Verbose skill execution
+CLAUDE_DEBUG_SKILLS=1 claude
+
+# Trace skill imports
+CLAUDE_TRACE_IMPORTS=1 claude
+```
+
+**Debug output includes**:
+
+- Skill discovery paths
+- Import resolution
+- Frontmatter parsing
+- Tool restriction application
+
+### Best Practices
+
+1. **Keep SKILL.md focused**: One skill per domain concern
+2. **Use @ imports**: Factor out reusable content
+3. **Set appropriate context**: Fork for research, append for tasks
+4. **Restrict tools**: Only grant necessary capabilities
+5. **Document examples**: Include runnable examples
+6. **Version skills**: Track breaking changes
+7. **Test skills**: Validate skill behavior before shipping
+
+### Common Mistakes
+
+| Mistake              | Problem           | Solution                  |
+| -------------------- | ----------------- | ------------------------- |
+| Giant SKILL.md       | Context pollution | Split into @ imports      |
+| No tool restrictions | Security risk     | Use allowed-tools         |
+| Always fork context  | Lost state        | Use append for most tasks |
+| Missing examples     | Poor adoption     | Add examples/ directory   |
+| Hardcoded paths      | Portability       | Use relative imports      |
+
+### Integration with Commands
+
+Skills can be invoked from commands:
+
+```yaml
+# .claude/commands/quick-test.md
+---
+name: quick-test
+description: Run quick verification tests
+---
+
+First load the testing skill:
+/dsm-testing
+
+Then run the quick test suite...
+```
+
+### Integration with Agents
+
+Skills inform agent behavior:
+
+```yaml
+# .claude/agents/test-writer.md
+---
+name: test-writer
+description: Writes tests following DSM patterns
+skills:
+  - dsm-testing
+  - dsm-usage
+---
+```
