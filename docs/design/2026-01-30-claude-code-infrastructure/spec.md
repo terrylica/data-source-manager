@@ -3870,6 +3870,131 @@ Focus on:
 - DataFrame column consistency
 ```
 
+## Performance & Large Codebase Optimization
+
+Strategies for scaling Claude Code to enterprise codebases.
+
+### Context Window Management
+
+Context is the most important resource to manage:
+
+| Issue                   | Consequence                        |
+| ----------------------- | ---------------------------------- |
+| Context fills up fast   | Performance degrades               |
+| Files + output = tokens | Single session can use 50k+ tokens |
+| Full context            | Claude "forgets" instructions      |
+| Context rot             | Quality degrades even before limit |
+
+### Context Commands
+
+| Command               | Usage                        |
+| --------------------- | ---------------------------- |
+| `/cost`               | Check current token usage    |
+| `/compact`            | Summarize and reduce context |
+| `/compact Focus on X` | Directed compaction          |
+| `/clear`              | Reset context entirely       |
+
+### Subagent Delegation
+
+Delegate research to subagents to preserve main context:
+
+```
+> Use subagents to investigate the authentication module
+```
+
+Benefits:
+
+- Explores in separate context
+- Reports findings only
+- Main conversation stays clean
+- No file content cluttering context
+
+### Chunking Strategies
+
+For large projects (>100k LOC):
+
+1. **Create specs**: 5k token markdown spec of key components
+2. **Focus scope**: One directory at a time
+3. **Use imports**: CLAUDE.md @ imports for modular context
+4. **Worktrees**: Parallel sessions with git worktrees
+
+### Pre-Computation Spec
+
+Before running Claude Code:
+
+```markdown
+# Project Spec (5k tokens max)
+
+## Core Module
+
+- Entry point: src/main.py
+- Key classes: DataSourceManager, CacheClient
+- Patterns: FCP, Repository pattern
+
+## Dependencies
+
+- polars for DataFrames
+- httpx for HTTP
+- tenacity for retries
+```
+
+Then prompt: "Here's the spec. How does the FCP module work?"
+
+### Context Window Sizes
+
+| Tier     | Token Limit |
+| -------- | ----------- |
+| Standard | 200k tokens |
+| Extended | 1M tokens   |
+
+1M tokens enables work across massive codebases without summarization.
+
+### Performance Variance
+
+| Factor         | Impact                    |
+| -------------- | ------------------------- |
+| Server demand  | Response time fluctuation |
+| Model choice   | Opus slower than Sonnet   |
+| Session length | Longer = more variance    |
+| Time of day    | Peak hours = slower       |
+
+### Model Selection for Performance
+
+| Task                 | Recommended Model   |
+| -------------------- | ------------------- |
+| Quick queries        | Haiku (fastest)     |
+| Standard coding      | Sonnet (balanced)   |
+| Complex architecture | Opus (most capable) |
+| Cost-sensitive       | Haiku               |
+| Quality-critical     | Opus                |
+
+### DSM Performance Patterns
+
+| Pattern                  | Recommendation             |
+| ------------------------ | -------------------------- |
+| FCP debugging            | Use fcp-debugger agent     |
+| Data exploration         | Subagent for reading files |
+| Test generation          | Chunk by module            |
+| Full codebase review     | Use api-reviewer agent     |
+| Rate limit investigation | Focus on single exchange   |
+
+### Memory Optimization
+
+Claude Code 2.1+ includes 3x memory improvement:
+
+- Better token efficiency
+- Smarter context summarization
+- Improved caching integration
+
+### Scaling Checklist
+
+- [ ] Check `/cost` every 30-45 minutes
+- [ ] Use `/compact` at 50k+ tokens
+- [ ] Delegate research to subagents
+- [ ] Create project spec for large codebases
+- [ ] Use worktrees for parallel work
+- [ ] Match model to task complexity
+
 ## Verification Checklist
 
 ### Infrastructure
