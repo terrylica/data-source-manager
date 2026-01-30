@@ -42,6 +42,7 @@ dev = [ # development dependencies using latest versions
     "twine>=6.0.0", # for uploading the package to PyPI
     "pytest>=8.0.0", # for testing
     "pytest-xdist>=3.6.0", # for parallel testing
+    "pytest-cov>=6.0.0", # for coverage reporting
     "pytest-profiling",
     "pyupgrade>=3.20.0", # for upgrading Python code syntax
     "ruff>=0.11.0", # for linting and formatting
@@ -91,3 +92,22 @@ reportMissingImports = "error"
 reportMissingTypeStubs = false
 pythonVersion = "3.13"
 typeCheckingMode = "basic"
+
+[tool.coverage.run]
+branch = true
+source = ["src/data_source_manager"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+show_missing = true

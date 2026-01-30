@@ -37,6 +37,14 @@ run = "uv run -p 3.13 ruff format ."
 description = "Run type checking with pyright"
 run = "uv run -p 3.13 pyright src/"
 
+[tasks."test:coverage"]
+description = "Run tests with coverage report"
+run = "uv run -p 3.13 pytest --cov=src/data_source_manager --cov-report=html --cov-report=term-missing tests/unit/"
+
+[tasks."check:all"]
+description = "Run all checks (lint, format, typecheck)"
+depends = ["lint", "format", "typecheck"]
+
 [tasks.build]
 description = "Build package distribution"
 run = "uv build"
