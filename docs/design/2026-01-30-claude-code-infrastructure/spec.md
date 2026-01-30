@@ -1935,6 +1935,78 @@ claude --resume
 | Test development     | Run tests in terminal, share results |
 | DataFrame operations | Review Polars/pandas diffs easily    |
 
+## Usage Analytics & Cost Tracking
+
+Based on [Official Analytics Docs](https://code.claude.com/docs/en/analytics) and [Analytics API](https://platform.claude.com/docs/en/build-with-claude/claude-code-analytics-api).
+
+### Console Dashboard Metrics
+
+| Metric                 | Description                               |
+| ---------------------- | ----------------------------------------- |
+| Lines of code accepted | Total lines written and accepted by users |
+| Suggestion accept rate | % of Edit/Write/NotebookEdit acceptances  |
+| Daily active users     | Unique users per day                      |
+| Sessions               | Total coding sessions                     |
+| Spend                  | Estimated daily API costs                 |
+
+### Analytics API (Teams/Enterprise)
+
+| Endpoint             | Data Returned                           |
+| -------------------- | --------------------------------------- |
+| Productivity metrics | Sessions, LOC, commits, PRs, tool usage |
+| Token/cost data      | Usage by model (Opus/Sonnet/Haiku)      |
+| User analytics       | DAU/WAU/MAU metrics                     |
+| Contribution metrics | PRs and LOC shipped with Claude assist  |
+
+**Data freshness**: Up to 1-hour delay for consistency.
+
+### CLI Usage Commands
+
+| Command    | Purpose                               |
+| ---------- | ------------------------------------- |
+| `/context` | Summary by category (current session) |
+| `/cost`    | Session cost estimate                 |
+| `ccusage`  | External tool for usage trends        |
+
+### Cost Optimization Strategies
+
+| Strategy              | Savings                                |
+| --------------------- | -------------------------------------- |
+| Use Sonnet by default | 5x cheaper than Opus                   |
+| Delegate to Haiku     | 3x cheaper than Sonnet for simple ops  |
+| Compact early         | Prevents expensive context overflow    |
+| Disable unused MCP    | Reduces tool definition token overhead |
+| Use model routing     | 60-80% savings vs Opus-only usage      |
+
+### OpenTelemetry Integration
+
+For advanced monitoring:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: "claude-code"
+    static_configs:
+      - targets: ["localhost:9090"]
+```
+
+| Metric            | Type      | Purpose                         |
+| ----------------- | --------- | ------------------------------- |
+| API latency       | histogram | Response time distribution      |
+| Token consumption | counter   | Usage tracking over time        |
+| Success rate      | gauge     | Tool/command success percentage |
+| Model usage       | counter   | Breakdown by Opus/Sonnet/Haiku  |
+
+### DSM Cost Considerations
+
+| Task Type               | Model  | Relative Cost | Justification            |
+| ----------------------- | ------ | ------------- | ------------------------ |
+| FCP architecture review | Opus   | High          | Complex reasoning needed |
+| Symbol validation       | Haiku  | Low           | Simple string ops        |
+| Test writing            | Sonnet | Medium        | Balanced quality/cost    |
+| Data fetching impl      | Sonnet | Medium        | Standard patterns        |
+| Quick lookups           | Haiku  | Low           | Fast, simple queries     |
+
 ## Verification Checklist
 
 ### Infrastructure

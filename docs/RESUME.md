@@ -4,6 +4,25 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Usage Analytics & Cost Tracking (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added console dashboard metrics table
+- Added analytics API endpoints table (Teams/Enterprise)
+- Added CLI usage commands table
+- Added cost optimization strategies table
+- Added OpenTelemetry integration example
+- Added monitoring metrics table
+- Added DSM cost considerations table
+
+**Sources**:
+
+- [Official Analytics Docs](https://code.claude.com/docs/en/analytics)
+- [Analytics API](https://platform.claude.com/docs/en/build-with-claude/claude-code-analytics-api)
+
 ### IDE Integration (2026-01-30)
 
 **Status**: Complete
