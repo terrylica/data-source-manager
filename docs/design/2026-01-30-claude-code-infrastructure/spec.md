@@ -16958,3 +16958,253 @@ Only report anomalies, not full cache contents.
 2. Keep OHLCV schema in skills, not CLAUDE.md
 3. Delegate cache inspection to subagents
 4. Use Explore for codebase questions
+---
+
+## Keyboard Shortcuts Reference
+
+Complete keyboard shortcuts for Claude Code interactive mode.
+
+### General Controls
+
+| Shortcut    | Description              | Context                  |
+| ----------- | ------------------------ | ------------------------ |
+| `Ctrl+C`    | Cancel input/generation  | Standard interrupt       |
+| `Ctrl+D`    | Exit session             | EOF signal               |
+| `Ctrl+G`    | Open in text editor      | Edit prompt externally   |
+| `Ctrl+L`    | Clear terminal           | Keeps conversation       |
+| `Ctrl+O`    | Toggle verbose output    | Show tool details        |
+| `Ctrl+R`    | Reverse history search   | Search previous commands |
+| `Ctrl+B`    | Background task          | Tmux: press twice        |
+| `Esc+Esc`   | Rewind conversation      | Restore previous state   |
+| `Shift+Tab` | Toggle permission mode   | Auto-Accept/Plan/Normal  |
+| `Alt+P`     | Switch model             | Keep current prompt      |
+| `Alt+T`     | Toggle extended thinking | After /terminal-setup    |
+
+### Image Paste
+
+| Platform | Shortcut                     |
+| -------- | ---------------------------- |
+| macOS    | `Ctrl+V` or `Cmd+V` (iTerm2) |
+| Windows  | `Alt+V`                      |
+| Linux    | `Ctrl+V`                     |
+
+### Text Editing
+
+| Shortcut | Description                        |
+| -------- | ---------------------------------- |
+| `Ctrl+K` | Delete to end of line              |
+| `Ctrl+U` | Delete entire line                 |
+| `Ctrl+Y` | Paste deleted text                 |
+| `Alt+Y`  | Cycle paste history (after Ctrl+Y) |
+| `Alt+B`  | Move back one word                 |
+| `Alt+F`  | Move forward one word              |
+
+### Multiline Input
+
+| Method           | Shortcut       | Terminal                        |
+| ---------------- | -------------- | ------------------------------- |
+| Quick escape     | `\` + Enter    | All                             |
+| macOS default    | `Option+Enter` | macOS                           |
+| Shift+Enter      | `Shift+Enter`  | iTerm2, WezTerm, Ghostty, Kitty |
+| Control sequence | `Ctrl+J`       | All                             |
+
+### Quick Commands
+
+| Prefix | Action                       |
+| ------ | ---------------------------- |
+| `/`    | Command or skill             |
+| `!`    | Bash mode (direct execution) |
+| `@`    | File path autocomplete       |
+
+### macOS Terminal Configuration
+
+**Option as Meta required for Alt shortcuts**:
+
+**iTerm2**: Settings → Profiles → Keys → Set Left/Right Option to "Esc+"
+
+**Terminal.app**: Settings → Profiles → Keyboard → Check "Use Option as Meta Key"
+
+**VS Code**: Settings → Profiles → Keys → Set Left/Right Option to "Esc+"
+
+### Vim Mode
+
+Enable with `/vim` or permanently via `/config`.
+
+**Mode Switching**:
+
+| Command | Action               | From Mode |
+| ------- | -------------------- | --------- |
+| `Esc`   | Enter NORMAL         | INSERT    |
+| `i`     | Insert before cursor | NORMAL    |
+| `I`     | Insert at line start | NORMAL    |
+| `a`     | Insert after cursor  | NORMAL    |
+| `A`     | Insert at line end   | NORMAL    |
+| `o`     | Open line below      | NORMAL    |
+| `O`     | Open line above      | NORMAL    |
+
+**Navigation (NORMAL mode)**:
+
+| Command   | Action                 |
+| --------- | ---------------------- |
+| `h/j/k/l` | Left/down/up/right     |
+| `w`       | Next word              |
+| `e`       | End of word            |
+| `b`       | Previous word          |
+| `0`       | Beginning of line      |
+| `$`       | End of line            |
+| `^`       | First non-blank        |
+| `gg`      | Beginning of input     |
+| `G`       | End of input           |
+| `f{char}` | Jump to character      |
+| `F{char}` | Jump back to character |
+| `t{char}` | Jump before character  |
+| `T{char}` | Jump after character   |
+| `;`       | Repeat f/F/t/T         |
+| `,`       | Repeat f/F/t/T reverse |
+
+**Editing (NORMAL mode)**:
+
+| Command    | Action                |
+| ---------- | --------------------- |
+| `x`        | Delete character      |
+| `dd`       | Delete line           |
+| `D`        | Delete to end of line |
+| `dw/de/db` | Delete word/end/back  |
+| `cc`       | Change line           |
+| `C`        | Change to end         |
+| `cw/ce/cb` | Change word/end/back  |
+| `yy/Y`     | Yank (copy) line      |
+| `yw/ye/yb` | Yank word/end/back    |
+| `p`        | Paste after cursor    |
+| `P`        | Paste before cursor   |
+| `>>`       | Indent line           |
+| `<<`       | Dedent line           |
+| `J`        | Join lines            |
+| `.`        | Repeat last change    |
+
+**Text Objects**:
+
+| Object  | Action                     |
+| ------- | -------------------------- |
+| `iw/aw` | Inner/around word          |
+| `iW/aW` | Inner/around WORD          |
+| `i"/a"` | Inner/around double quotes |
+| `i'/a'` | Inner/around single quotes |
+| `i(/a(` | Inner/around parentheses   |
+| `i[/a[` | Inner/around brackets      |
+| `i{/a{` | Inner/around braces        |
+
+### Built-in Commands
+
+| Command                   | Purpose                      |
+| ------------------------- | ---------------------------- |
+| `/clear`                  | Clear conversation history   |
+| `/compact [instructions]` | Compact with optional focus  |
+| `/config`                 | Open settings                |
+| `/context`                | Visualize context usage      |
+| `/cost`                   | Show token usage             |
+| `/doctor`                 | Check installation health    |
+| `/exit`                   | Exit REPL                    |
+| `/export [filename]`      | Export conversation          |
+| `/help`                   | Get usage help               |
+| `/init`                   | Initialize CLAUDE.md         |
+| `/mcp`                    | Manage MCP servers           |
+| `/memory`                 | Edit CLAUDE.md files         |
+| `/model`                  | Select AI model              |
+| `/permissions`            | View/update permissions      |
+| `/plan`                   | Enter plan mode              |
+| `/rename <name>`          | Rename session               |
+| `/resume [session]`       | Resume conversation          |
+| `/rewind`                 | Rewind conversation          |
+| `/stats`                  | Visualize daily usage        |
+| `/status`                 | Show version, model, account |
+| `/statusline`             | Set up status line           |
+| `/copy`                   | Copy last response           |
+| `/tasks`                  | Manage background tasks      |
+| `/theme`                  | Change color theme           |
+| `/todos`                  | List TODO items              |
+| `/usage`                  | Show plan limits             |
+| `/vim`                    | Enable vim mode              |
+
+### Reverse History Search
+
+1. Press `Ctrl+R` to start
+2. Type to search previous commands
+3. `Ctrl+R` again for older matches
+4. `Tab` or `Esc` to accept and edit
+5. `Enter` to accept and execute
+6. `Ctrl+C` to cancel
+
+### Background Tasks
+
+**Start background task**:
+
+- Ask Claude to run in background
+- Press `Ctrl+B` during execution
+- Tmux users: press `Ctrl+B` twice
+
+**Disable background tasks**:
+
+```bash
+export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1
+```
+
+### Bash Mode
+
+Run commands directly with `!` prefix:
+
+```bash
+! npm test
+! git status
+! ls -la
+```
+
+- Adds output to conversation context
+- Shows real-time progress
+- Supports `Ctrl+B` backgrounding
+- Tab completion from history
+
+### Task List
+
+- `Ctrl+T` toggles task list view
+- Shows up to 10 tasks
+- Persists across compactions
+- Named task lists:
+
+```bash
+CLAUDE_CODE_TASK_LIST_ID=my-project claude
+```
+
+### DSM Keyboard Workflow
+
+**Quick test cycle**:
+
+```bash
+! uv run pytest tests/unit/ -v
+```
+
+**Background test run**:
+
+```
+Run the full test suite in the background
+```
+
+Then press `Ctrl+B` if needed.
+
+**FCP debugging flow**:
+
+```bash
+! ls ~/.cache/dsm/          # Check cache state
+! mise run cache:clear      # Clear if needed
+```
+
+**Vim mode for prompts**:
+
+```
+/vim                        # Enable vim mode
+i                           # Insert mode
+[type prompt]
+Esc                         # Normal mode
+dd                          # Delete line if wrong
+i                           # Back to insert
+```
