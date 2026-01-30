@@ -227,6 +227,16 @@ Slash commands in `.claude/commands/`:
 
 ---
 
+## Link Conventions
+
+| Target         | Format          | Example                          |
+| -------------- | --------------- | -------------------------------- |
+| This repo docs | Repo-root (`/`) | `[ADR](/docs/adr/file.md)`       |
+| Skill-internal | Relative (`./`) | `[Guide](./references/guide.md)` |
+| External       | Full URL        | `[Docs](https://example.com)`    |
+
+---
+
 ## Related Documentation
 
 - @README.md - Installation and basic usage
