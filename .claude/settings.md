@@ -122,7 +122,8 @@ From [Anthropic best practices](https://platform.claude.com/docs/en/agents-and-t
 - [x] CLAUDE.md under 300 lines (currently 247)
 - [x] Side-effect commands have `disable-model-invocation: true`
 - [x] Skills have `user-invocable: true` and `$ARGUMENTS`
-- [x] Agents have `tools` field defined
+- [x] Agents have explicit `tools` field (prevents inheriting all tools)
+- [x] Domain-specific CLAUDE.md files (examples/, tests/) for lazy loading
 
 ### Testing
 
