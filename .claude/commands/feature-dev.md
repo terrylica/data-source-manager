@@ -1,6 +1,8 @@
 ---
 name: feature-dev
 description: Guided DSM feature development with FCP-aware architecture
+argument-hint: "[feature-description]"
+allowed-tools: Read, Grep, Glob, Bash, Write, Edit
 ---
 
 # DSM Feature Development Workflow

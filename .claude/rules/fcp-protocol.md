@@ -1,4 +1,5 @@
 ---
+adr: docs/adr/2025-01-30-failover-control-protocol.md
 paths:
   - "src/data_source_manager/core/sync/**/*.py"
   - "src/data_source_manager/core/providers/**/*.py"

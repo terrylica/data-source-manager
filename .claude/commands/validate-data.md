@@ -1,6 +1,8 @@
 ---
 name: validate-data
 description: Validate data integrity from a DataFrame
+argument-hint: "[--interval 1h|4h|1d] [--check-gaps] [--check-ohlcv]"
+allowed-tools: Bash, Read
 ---
 
 # Validate Data Integrity

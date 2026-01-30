@@ -1,6 +1,8 @@
 ---
 name: fetch-data
 description: Fetch market data using DataSourceManager
+argument-hint: "[symbol] [days] [interval: 1m|5m|15m|1h|4h|1d]"
+allowed-tools: Bash, Read
 disable-model-invocation: true
 ---
 

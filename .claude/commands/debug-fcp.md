@@ -1,6 +1,8 @@
 ---
 name: debug-fcp
 description: Debug Failover Control Protocol data retrieval issues
+argument-hint: "[symbol] [--market spot|futures-usdt|futures-coin] [--verbose]"
+allowed-tools: Bash, Read
 disable-model-invocation: true
 ---
 

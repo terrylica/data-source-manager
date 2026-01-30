@@ -4,6 +4,30 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Command & Rule Enhancements (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added `argument-hint` to all 6 commands for better help text
+- Added `allowed-tools` to all 6 commands for tool access control
+- Added `adr:` field to 4 FCP-related rules for ADR traceability
+- Updated design spec with command tool restrictions table
+
+**Commands Enhanced**:
+
+| Command        | argument-hint                               | allowed-tools            |
+| -------------- | ------------------------------------------- | ------------------------ | ----- | ---------- |
+| /debug-fcp     | `[symbol] [--market ...] [--verbose]`       | Bash, Read               |
+| /fetch-data    | `[symbol] [days] [interval: 1m              | 5m                       | ...]` | Bash, Read |
+| /quick-test    | `[test-pattern] [--coverage] [--fast-fail]` | Bash                     |
+| /validate-data | `[--interval ...] [--check-gaps]`           | Bash, Read               |
+| /review-dsm    | `[file-path] [--staged] [--all]`            | Bash, Read, Grep, Glob   |
+| /feature-dev   | `[feature-description]`                     | R, Grep, Glob, Bash, W,E |
+
+**Sources**: [cc-skills command patterns](https://github.com/terrylica/cc-skills)
+
 ### Stop Hook & Agent Visual Enhancements (2026-01-30)
 
 **Status**: Complete
@@ -13,16 +37,6 @@ Last updated: 2026-01-30
 - Added Stop hook (dsm-final-check.sh) for session-end validation
 - Added `color` field to all 5 agents for visual distinction in Claude Code UI
 - Total hooks: 4 (UserPromptSubmit + PreToolUse + PostToolUse + Stop)
-
-**Agent Colors**:
-
-| Agent                 | Color  | Purpose     |
-| --------------------- | ------ | ----------- |
-| api-reviewer          | red    | Review/warn |
-| silent-failure-hunter | red    | Review/warn |
-| fcp-debugger          | yellow | Debug       |
-| test-writer           | blue   | Testing     |
-| data-fetcher          | green  | Success/go  |
 
 **Sources**: [cc-skills agent patterns](https://github.com/terrylica/cc-skills)
 

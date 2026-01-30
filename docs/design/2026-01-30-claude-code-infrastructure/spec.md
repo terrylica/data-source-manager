@@ -116,17 +116,22 @@ description: Reviews code for quality.
 ---
 name: command-name
 description: What this command does
+argument-hint: "[symbol] [--option value]" # Optional: help text for args
+allowed-tools: Bash, Read # Optional: restrict tool access
 disable-model-invocation: true # For side-effect commands
 ---
 ```
 
-### Side-Effect Commands
+### Command Tool Restrictions
 
-Commands with `disable-model-invocation: true`:
-
-- `/quick-test` - Runs actual tests
-- `/fetch-data` - Fetches real market data
-- `/debug-fcp` - Runs diagnostic scripts
+| Command        | allowed-tools                | Side Effects |
+| -------------- | ---------------------------- | ------------ |
+| /debug-fcp     | Bash, Read                   | Yes          |
+| /fetch-data    | Bash, Read                   | Yes          |
+| /quick-test    | Bash                         | Yes          |
+| /validate-data | Bash, Read                   | No           |
+| /review-dsm    | Bash, Read, Grep, Glob       | No           |
+| /feature-dev   | Read, Grep, Glob, Bash, W, E | No           |
 
 ## Skill Configuration
 
@@ -223,10 +228,11 @@ Run operation for: $ARGUMENTS
 
 ### Path-Specific Frontmatter
 
-Rules use YAML frontmatter with `paths:` field for conditional loading:
+Rules use YAML frontmatter with `paths:` and optional `adr:` fields:
 
 ```yaml
 ---
+adr: docs/adr/2025-01-30-failover-control-protocol.md # Optional: link to ADR
 paths:
   - "src/data_source_manager/core/providers/binance/**/*.py"
   - "tests/integration/**/*.py"
@@ -235,6 +241,18 @@ paths:
 
 Guidelines for...
 ```
+
+### Rule ADR Traceability
+
+| Rule                    | ADR Reference                        |
+| ----------------------- | ------------------------------------ |
+| fcp-protocol.md         | 2025-01-30-failover-control-protocol |
+| binance-api.md          | 2025-01-30-failover-control-protocol |
+| caching-patterns.md     | 2025-01-30-failover-control-protocol |
+| symbol-formats.md       | 2025-01-30-failover-control-protocol |
+| timestamp-handling.md   | (general Python best practice)       |
+| dataframe-operations.md | (general Python best practice)       |
+| error-handling.md       | (general Python best practice)       |
 
 ### Rule Path Mappings
 

@@ -1,6 +1,8 @@
 ---
 name: review-dsm
 description: Review DSM code changes for common issues
+argument-hint: "[file-path] [--staged] [--all]"
+allowed-tools: Bash, Read, Grep, Glob
 ---
 
 # DSM Code Review
