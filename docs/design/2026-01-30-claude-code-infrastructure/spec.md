@@ -45705,3 +45705,262 @@ claude --add-dir ../ccxt ../polars-examples
 ```bash
 claude --append-system-prompt "Follow DSM patterns: Polars not pandas, UTC timestamps, BTCUSDT symbol format. Check CLAUDE.md for project rules."
 ```
+## Context Window and Cost Management
+
+This section provides comprehensive guidance on tracking token usage, managing costs, and optimizing context in Claude Code sessions.
+
+### Cost Overview
+
+**Average Costs**:
+
+- $6 per developer per day (average)
+- Under $12 daily for 90% of users
+- ~$100-200/developer per month with Sonnet 4.5
+
+Costs vary based on codebase size, query complexity, and conversation length.
+
+### Token Tracking
+
+#### The `/cost` Command
+
+Shows API token usage statistics for current session:
+
+```
+Total cost:            $0.55
+Total duration (API):  6m 19.7s
+Total duration (wall): 6h 33m 10.2s
+Total code changes:    0 lines added, 0 lines removed
+```
+
+Note: `/cost` is for API users. Subscribers use `/stats` for usage patterns.
+
+#### The `/context` Command
+
+Provides one-glance context view showing:
+
+- Which segments are in the window
+- How many tokens each consumes
+- How close you are to the limit
+
+### Context Window
+
+The total available context window is **200,000 tokens**, representing maximum capacity for conversation history and generating output.
+
+### Auto-Compaction
+
+Auto-compact keeps sessions running indefinitely by intelligently summarizing conversations when approaching context limits.
+
+**How It Works**:
+
+1. Analyzes conversation to identify key information
+2. Creates concise summary of interactions, decisions, and code changes
+3. Replaces old messages with the summary
+4. Continues seamlessly with preserved context
+
+**Trigger Thresholds**:
+
+- Auto-compaction triggers around ~80-95% context usage
+- Compacting is instant (no waiting) <!-- SSoT-OK: describing current behavior -->
+
+### Manual Compaction
+
+Use `/compact` with optional focus instructions:
+
+```
+/compact Focus on code samples and API usage
+```
+
+This tells Claude what to preserve during summarization.
+
+**In CLAUDE.md**:
+
+```markdown
+# Compact instructions
+
+When you are using compact, please focus on test output and code changes
+```
+
+### Cost Optimization Strategies
+
+#### Manage Context Proactively
+
+| Action                 | Benefit                                   |
+| ---------------------- | ----------------------------------------- |
+| `/clear` between tasks | Eliminates stale context                  |
+| `/rename` before clear | Enables easy session recovery             |
+| `/compact` with focus  | Preserves specific context during summary |
+
+#### Choose the Right Model
+
+| Model  | Use Case                                   | Cost   |
+| ------ | ------------------------------------------ | ------ |
+| Sonnet | Most coding tasks                          | Lower  |
+| Opus   | Complex architecture, multi-step reasoning | Higher |
+| Haiku  | Simple subagent tasks                      | Lowest |
+
+Use `/model` to switch mid-session, or set default in `/config`.
+
+#### Reduce MCP Server Overhead
+
+Each MCP server adds tool definitions to context, even when idle.
+
+| Strategy                    | Benefit                                  |
+| --------------------------- | ---------------------------------------- |
+| Prefer CLI tools            | No persistent tool definitions           |
+| Disable unused servers      | Reduces idle context consumption         |
+| Lower tool search threshold | `ENABLE_TOOL_SEARCH=auto:5` for 5% limit |
+
+**CLI tools are more context-efficient**: `gh`, `aws`, `gcloud`, `sentry-cli` run directly without MCP overhead.
+
+#### Install Code Intelligence Plugins
+
+Code intelligence plugins give Claude precise symbol navigation:
+
+- Single "go to definition" replaces grep + reading multiple files
+- Automatic type error reporting after edits
+- Reduces unnecessary file reads
+
+#### Offload Processing to Hooks
+
+Hooks can preprocess data before Claude sees it:
+
+```bash
+#!/bin/bash
+# filter-test-output.sh
+input=$(cat)
+cmd=$(echo "$input" | jq -r '.tool_input.command')
+
+# If running tests, filter to show only failures
+if [[ "$cmd" =~ ^(npm test|pytest|go test) ]]; then
+  filtered_cmd="$cmd 2>&1 | grep -A 5 -E '(FAIL|ERROR|error:)' | head -100"
+  echo "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"updatedInput\":{\"command\":\"$filtered_cmd\"}}}"
+else
+  echo "{}"
+fi
+```
+
+This reduces a 10,000-line log to only matching lines.
+
+#### Move Instructions to Skills
+
+| Location  | Loading Behavior            | Recommendation             |
+| --------- | --------------------------- | -------------------------- |
+| CLAUDE.md | Loaded at session start     | Keep under ~500 lines      |
+| Skills    | Load on-demand when invoked | Move specialized workflows |
+
+Move PR review, database migration, and other workflow-specific instructions to skills.
+
+#### Adjust Extended Thinking
+
+Extended thinking defaults to 31,999 tokens budget.
+
+| Scenario            | Action                                   |
+| ------------------- | ---------------------------------------- |
+| Complex planning    | Keep default budget                      |
+| Simple tasks        | Disable in `/config`                     |
+| Moderate complexity | Lower budget: `MAX_THINKING_TOKENS=8000` |
+
+Thinking tokens are billed as output tokens.
+
+#### Delegate to Subagents
+
+Delegate verbose operations (tests, docs, logs) to subagents:
+
+- Verbose output stays in subagent's context
+- Only summary returns to main conversation
+
+#### Write Specific Prompts
+
+| Vague (Expensive)       | Specific (Efficient)                       |
+| ----------------------- | ------------------------------------------ |
+| "improve this codebase" | "add input validation to login in auth.ts" |
+| "find issues"           | "check for timezone issues in fcp module"  |
+
+#### Work Efficiently on Complex Tasks
+
+- **Use plan mode**: Press Shift+Tab for complex tasks
+- **Course-correct early**: Press Escape to stop wrong direction
+- **Give verification targets**: Include test cases, expected output
+- **Test incrementally**: Write one file, test, then continue
+
+### Team Cost Management
+
+#### Rate Limit Recommendations
+
+| Team Size     | TPM per User | RPM per User |
+| ------------- | ------------ | ------------ |
+| 1-5 users     | 200k-300k    | 5-7          |
+| 5-20 users    | 100k-150k    | 2.5-3.5      |
+| 20-50 users   | 50k-75k      | 1.25-1.75    |
+| 50-100 users  | 25k-35k      | 0.62-0.87    |
+| 100-500 users | 15k-20k      | 0.37-0.47    |
+| 500+ users    | 10k-15k      | 0.25-0.35    |
+
+TPM per user decreases as team size grows due to expected lower concurrent usage in larger organizations.
+
+#### Workspace Spend Limits
+
+For Claude API users:
+
+- Set workspace spend limits in Console
+- View cost and usage reporting
+- "Claude Code" workspace created automatically on first auth
+
+For Bedrock/Vertex/Foundry:
+
+- Use LiteLLM for spend tracking by key
+- Claude Code doesn't send metrics from cloud
+
+### Background Token Usage
+
+Claude Code uses tokens for background functionality:
+
+| Background Process         | Typical Cost        |
+| -------------------------- | ------------------- |
+| Conversation summarization | Under $0.04/session |
+| Command processing (/cost) | Minimal             |
+
+### DSM-Specific Cost Optimization
+
+For data-source-manager development:
+
+**Context Management**:
+
+```bash
+# Clear between unrelated tasks
+/clear
+
+# Compact with DSM focus
+/compact Focus on FCP logic, timestamp handling, and symbol format patterns
+```
+
+**CLAUDE.md Optimization**:
+
+- Keep DSM-specific instructions focused
+- Move detailed FCP debugging workflows to skills
+- Use rules for domain knowledge (timestamp handling, symbol formats)
+
+**Model Selection for DSM**:
+
+| Task                          | Model  |
+| ----------------------------- | ------ |
+| General DSM development       | Sonnet |
+| FCP architecture decisions    | Opus   |
+| Simple data validation checks | Haiku  |
+
+**Subagent Delegation**:
+
+- Delegate test runs to test-writer subagent
+- Delegate log analysis to fcp-debugger subagent
+- Keep main context focused on implementation
+
+**Specific Prompts for DSM**:
+
+```
+# Expensive (vague)
+"Fix the caching issues"
+
+# Efficient (specific)
+"Fix timestamp comparison in fcp_control_status() where UTC naive
+datetime causes cache miss for BTCUSDT on Binance"
+```
