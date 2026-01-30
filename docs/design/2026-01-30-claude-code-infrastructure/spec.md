@@ -47099,3 +47099,349 @@ Look at the test failures in the terminal and fix them.
 ```
 
 The extension captures the pytest output and provides it to Claude for analysis.
+# Headless and Programmatic Usage Reference
+
+This section covers running Claude Code programmatically via the CLI (`-p` flag), the Agent SDK (Python/TypeScript), and automation patterns for CI/CD integration.
+
+## Overview
+
+The Agent SDK provides the same tools, agent loop, and context management that power Claude Code. It's available as:
+
+- **CLI** - For scripts and CI/CD (`claude -p`)
+- **Python SDK** - Full programmatic control with native message objects
+- **TypeScript SDK** - Full programmatic control with structured outputs
+
+The CLI was previously called "headless mode." The `-p` flag and all CLI options work the same way.
+
+## Basic CLI Usage
+
+Add the `-p` (or `--print`) flag to run Claude Code non-interactively:
+
+```bash
+claude -p "What does the auth module do?"
+```
+
+All CLI options work with `-p`, including:
+
+- `--continue` for continuing conversations
+- `--allowedTools` for auto-approving tools
+- `--output-format` for structured output
+
+## Output Formats
+
+### Plain Text (Default)
+
+```bash
+claude -p "Summarize this project"
+```
+
+Returns plain text output suitable for human reading or piping to other commands.
+
+### JSON Format
+
+Returns structured JSON with result, session ID, and metadata:
+
+```bash
+claude -p "Summarize this project" --output-format json
+```
+
+Response structure:
+
+```json
+{
+  "result": "The project is a...",
+  "session_id": "abc123",
+  "usage": {
+    "input_tokens": 1234,
+    "output_tokens": 567
+  }
+}
+```
+
+### JSON Schema (Structured Output)
+
+Use `--json-schema` with `--output-format json` to get output conforming to a specific schema:
+
+```bash
+claude -p "Extract the main function names from auth.py" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}'
+```
+
+The structured output appears in the `structured_output` field.
+
+### Stream JSON
+
+Newline-delimited JSON for real-time streaming:
+
+```bash
+claude -p "Explain recursion" --output-format stream-json --verbose --include-partial-messages
+```
+
+Each line is a JSON object representing an event.
+
+## Parsing Output with jq
+
+Use jq to extract specific fields:
+
+```bash
+# Extract text result
+claude -p "Summarize this project" --output-format json | jq -r '.result'
+
+# Extract structured output
+claude -p "Extract function names" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}}}' \
+  | jq '.structured_output'
+```
+
+### Streaming Text Display
+
+Filter for text deltas and display streaming text:
+
+```bash
+claude -p "Write a poem" --output-format stream-json --verbose --include-partial-messages | \
+  jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
+```
+
+## Auto-Approve Tools
+
+Use `--allowedTools` to let Claude use tools without prompting:
+
+```bash
+claude -p "Run the test suite and fix any failures" \
+  --allowedTools "Bash,Read,Edit"
+```
+
+### Permission Rule Syntax
+
+The `--allowedTools` flag uses permission rule syntax with prefix matching:
+
+```bash
+# Allow any git command
+--allowedTools "Bash(git *)"
+
+# Allow specific git commands
+--allowedTools "Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git commit *)"
+```
+
+The trailing `*` enables prefix matching. `Bash(git diff *)` allows any command starting with `git diff`. The space before `*` is important: `Bash(git diff*)` would also match `git diff-index`.
+
+## Create a Commit (Example)
+
+Review staged changes and create a commit:
+
+```bash
+claude -p "Look at my staged changes and create an appropriate commit" \
+  --allowedTools "Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git commit *)"
+```
+
+## System Prompt Customization
+
+### Append to Default Prompt
+
+Add instructions while keeping Claude Code's default behavior:
+
+```bash
+gh pr diff "$1" | claude -p \
+  --append-system-prompt "You are a security engineer. Review for vulnerabilities." \
+  --output-format json
+```
+
+### Replace Default Prompt
+
+Use `--system-prompt` to fully replace the default prompt:
+
+```bash
+claude -p "Analyze this code" --system-prompt "You are a code auditor. Focus only on security issues."
+```
+
+## Session Management
+
+### Continue Most Recent Conversation
+
+```bash
+# First request
+claude -p "Review this codebase for performance issues"
+
+# Continue the most recent conversation
+claude -p "Now focus on the database queries" --continue
+claude -p "Generate a summary of all issues found" --continue
+```
+
+### Resume Specific Session
+
+Capture session ID to resume a specific conversation:
+
+```bash
+session_id=$(claude -p "Start a review" --output-format json | jq -r '.session_id')
+claude -p "Continue that review" --resume "$session_id"
+```
+
+## CI/CD Integration Patterns
+
+### GitHub Actions
+
+```yaml
+name: Code Review
+on: [pull_request]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Review PR
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Review the changes in this PR for security issues" \
+            --allowedTools "Read,Grep,Glob" \
+            --output-format json > review.json
+```
+
+### GitLab CI/CD
+
+```yaml
+code-review:
+  stage: review
+  script:
+    - npm install -g @anthropic-ai/claude-code
+    - claude -p "Review this merge request" --allowedTools "Read" --output-format json
+```
+
+### Pre-Commit Hook
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+claude -p "Review staged changes for common issues" \
+  --allowedTools "Bash(git diff --staged)" \
+  --output-format json | jq -e '.result | contains("PASS")'
+```
+
+## Fan-Out Pattern
+
+Handle large migrations or analyses by generating a task list:
+
+```bash
+# Generate task list
+claude -p "List all files that need migration" --output-format json | jq -r '.result' > tasks.txt
+
+# Process each task
+while read file; do
+  claude -p "Migrate $file to the new API" --allowedTools "Read,Edit"
+done < tasks.txt
+```
+
+## Python SDK Usage
+
+```python
+from anthropic_agent_sdk import Agent
+
+agent = Agent()
+
+# Simple query
+result = agent.run("What does the auth module do?")
+print(result.text)
+
+# With tool approvals
+result = agent.run(
+    "Run tests and fix failures",
+    allowed_tools=["Bash", "Read", "Edit"]
+)
+
+# Structured output
+result = agent.run(
+    "Extract function names",
+    output_schema={"type": "object", "properties": {"functions": {"type": "array"}}}
+)
+print(result.structured_output)
+```
+
+## TypeScript SDK Usage
+
+```typescript
+import { Agent } from "@anthropic-ai/claude-agent-sdk";
+
+const agent = new Agent();
+
+// Simple query
+const result = await agent.run("What does the auth module do?");
+console.log(result.text);
+
+// With tool approvals
+const result = await agent.run("Run tests and fix failures", {
+  allowedTools: ["Bash", "Read", "Edit"],
+});
+
+// Streaming
+for await (const event of agent.stream("Explain this code")) {
+  if (event.type === "text_delta") {
+    process.stdout.write(event.text);
+  }
+}
+```
+
+## Important Notes
+
+- **Headless mode does not persist between sessions** - Use `--continue` or `--resume` for multi-turn workflows
+- **Skills not available** - User-invoked skills like `/commit` and built-in commands are only available in interactive mode. In `-p` mode, describe the task instead
+- **Verbose mode** - The `--verbose` flag helps debug invocations but should be disabled in production for cleaner output
+
+## DSM-Specific Headless Patterns
+
+For data-source-manager development, use headless mode for automation:
+
+### Run Tests with Fix
+
+```bash
+claude -p "Run pytest for the FCP module and fix any failures" \
+  --allowedTools "Bash(uv run pytest *),Read,Edit" \
+  --output-format json
+```
+
+### Data Validation Check
+
+```bash
+claude -p "Validate that the timestamp handling in src/data_source_manager/timestamp.py follows FCP protocol" \
+  --allowedTools "Read,Grep,Glob" \
+  --output-format json | jq -r '.result'
+```
+
+### Batch File Analysis
+
+```bash
+# Analyze all exchange-specific files
+for file in src/data_source_manager/exchanges/*.py; do
+  claude -p "Review $file for proper error handling patterns" \
+    --allowedTools "Read" \
+    --output-format json | jq -r ".result" > "reviews/$(basename $file .py)_review.md"
+done
+```
+
+### CI Pipeline Integration
+
+```yaml
+# mise.toml task for CI
+[tasks.ci-review]
+run = '''
+claude -p "Review changes since last tag for breaking changes" \
+  --allowedTools "Bash(git diff *),Read" \
+  --output-format json | jq -r '.result'
+'''
+description = "AI-assisted code review for CI"
+```
+
+### Pre-Merge Validation
+
+```bash
+# Validate before merging to main
+claude -p "Check if all FCP timestamps are properly validated before merge" \
+  --allowedTools "Read,Grep,Glob" \
+  --append-system-prompt "Focus on FCP protocol compliance and timestamp handling" \
+  --output-format json
+```
