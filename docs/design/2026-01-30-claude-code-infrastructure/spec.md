@@ -36847,3 +36847,359 @@ Tool(*)
 - [Settings Documentation](https://code.claude.com/docs/en/settings)
 - [Permissions Guide](https://platform.claude.com/docs/en/agent-sdk/permissions)
 - [Managed Settings](https://code.claude.com/docs/en/iam#managed-settings)
+## Agentic Coding Best Practices Reference
+
+Comprehensive reference for effective agentic coding patterns with Claude Code.
+
+### Core Constraint
+
+**Claude's context window fills up fast, and performance degrades as it fills.**
+
+The context window holds your entire conversation, every file Claude reads, and every command output. Managing context is the most important skill.
+
+### Explore-Plan-Code-Commit Workflow
+
+The recommended four-phase workflow:
+
+#### 1. Explore (Plan Mode)
+
+```txt
+read /src/auth and understand how we handle sessions and login.
+also look at how we manage environment variables for secrets.
+```
+
+Claude reads files and answers questions without making changes.
+
+#### 2. Plan (Plan Mode)
+
+```txt
+I want to add Google OAuth. What files need to change?
+What's the session flow? Create a plan.
+```
+
+Press `Ctrl+G` to open the plan in your text editor for editing.
+
+#### 3. Implement (Normal Mode)
+
+```txt
+implement the OAuth flow from your plan. write tests for the
+callback handler, run the test suite and fix any failures.
+```
+
+Switch back to Normal Mode and let Claude code.
+
+#### 4. Commit
+
+```txt
+commit with a descriptive message and open a PR
+```
+
+**When to skip planning**: For tasks where scope is clear and fix is small (typos, log lines, renaming). If you could describe the diff in one sentence, skip the plan.
+
+### Give Claude Verification
+
+**The single highest-leverage practice**: Include tests, screenshots, or expected outputs so Claude can check itself.
+
+| Strategy             | Before                             | After                                                                                                         |
+| -------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Provide verification | "implement validateEmail function" | "write validateEmail. test cases: <user@example.com> is true, invalid is false. run tests after implementing" |
+| Verify UI visually   | "make dashboard look better"       | "[paste screenshot] implement this design. take screenshot of result and compare. list differences and fix"   |
+| Address root causes  | "the build is failing"             | "build fails with this error: [paste]. fix it and verify build succeeds. address root cause, don't suppress"  |
+
+### Provide Specific Context
+
+| Strategy           | Before                                      | After                                                                                                    |
+| ------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Scope the task     | "add tests for foo.py"                      | "write a test for foo.py covering edge case where user is logged out. avoid mocks"                       |
+| Point to sources   | "why does ExecutionFactory have weird api?" | "look through ExecutionFactory's git history and summarize how its api came to be"                       |
+| Reference patterns | "add a calendar widget"                     | "look at how HotDogWidget.php is implemented. follow the pattern to implement a calendar widget"         |
+| Describe symptoms  | "fix the login bug"                         | "users report login fails after session timeout. check auth flow in src/auth/, especially token refresh" |
+
+### Rich Content Methods
+
+- **`@` references**: Reference files directly (`@src/auth/login.ts`)
+- **Paste images**: Copy/paste or drag screenshots
+- **Give URLs**: Documentation and API references
+- **Pipe data**: `cat error.log | claude`
+- **Let Claude fetch**: Tell Claude to pull context itself
+
+### Context Management Strategies
+
+#### Clear Between Tasks
+
+```bash
+/clear  # Reset context between unrelated tasks
+```
+
+#### Use Subagents for Investigation
+
+```txt
+Use subagents to investigate how our authentication system handles token
+refresh, and whether we have any existing OAuth utilities I should reuse.
+```
+
+Subagents explore in separate context and report summaries back.
+
+#### Auto Compaction
+
+When context fills, Claude automatically summarizes, preserving:
+
+- Code patterns
+- File states
+- Key decisions
+
+#### Manual Compaction
+
+```bash
+/compact Focus on the API changes
+```
+
+### CLAUDE.md Best Practices
+
+**Include**:
+
+- Bash commands Claude can't guess
+- Code style rules that differ from defaults
+- Testing instructions and test runners
+- Repository etiquette (branch naming, PR conventions)
+- Developer environment quirks
+- Common gotchas
+
+**Exclude**:
+
+- Anything Claude can figure out from code
+- Standard language conventions
+- Detailed API documentation (link instead)
+- Long explanations or tutorials
+- Self-evident practices
+
+**Imports**:
+
+```markdown
+See @README.md for project overview.
+
+- Git workflow: @docs/git-instructions.md
+- Personal overrides: @~/.claude/my-project-instructions.md
+```
+
+### Course Correction
+
+- **`Esc`**: Stop Claude mid-action
+- **`Esc + Esc` or `/rewind`**: Restore previous state
+- **`"Undo that"`**: Have Claude revert changes
+- **`/clear`**: Reset context
+
+**Rule**: If you've corrected Claude twice on the same issue, `/clear` and start fresh with better prompt.
+
+### Checkpoints and Rewind
+
+Every action creates a checkpoint. Double-tap `Escape` or `/rewind` to:
+
+- Restore conversation only (keep code)
+- Restore code only (keep conversation)
+- Restore both
+
+### Session Management
+
+```bash
+claude --continue    # Resume most recent conversation
+claude --resume      # Select from recent conversations
+```
+
+Use `/rename` to give sessions descriptive names.
+
+### Headless Mode for Automation
+
+```bash
+# One-off queries
+claude -p "Explain what this project does"
+
+# Structured output
+claude -p "List all API endpoints" --output-format json
+
+# Streaming for real-time processing
+claude -p "Analyze this log file" --output-format stream-json
+```
+
+### Parallel Sessions
+
+**Writer/Reviewer Pattern**:
+
+| Session A (Writer)                                           | Session B (Reviewer)                                                                          |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| "Implement a rate limiter for API endpoints"                 |                                                                                               |
+|                                                              | "Review rate limiter in @src/middleware/rateLimiter.ts. Look for edge cases, race conditions" |
+| "Here's feedback: [Session B output]. Address these issues." |                                                                                               |
+
+### Fan-Out Pattern
+
+```bash
+for file in $(cat files.txt); do
+  claude -p "Migrate $file from React to Vue. Return OK or FAIL." \
+    --allowedTools "Edit,Bash(git commit *)"
+done
+```
+
+### Common Failure Patterns
+
+| Pattern                  | Symptom                        | Fix                                           |
+| ------------------------ | ------------------------------ | --------------------------------------------- |
+| Kitchen sink session     | Multiple unrelated tasks       | `/clear` between tasks                        |
+| Repeated corrections     | Same issue, multiple fixes     | After 2 corrections, `/clear` + better prompt |
+| Over-specified CLAUDE.md | Claude ignores rules           | Ruthlessly prune                              |
+| Trust-then-verify gap    | Plausible but buggy code       | Always provide verification                   |
+| Infinite exploration     | Claude reads hundreds of files | Scope narrowly or use subagents               |
+
+### Skills for Workflows
+
+```markdown
+---
+name: fix-issue
+description: Fix a GitHub issue
+disable-model-invocation: true
+---
+
+Analyze and fix the GitHub issue: $ARGUMENTS.
+
+1. Use `gh issue view` to get the issue details
+2. Understand the problem described in the issue
+3. Search the codebase for relevant files
+4. Implement the necessary changes
+5. Write and run tests to verify
+6. Create a descriptive commit message
+7. Push and create a PR
+```
+
+Run with `/fix-issue 1234`.
+
+### Subagents for Specialized Tasks
+
+```markdown
+---
+name: security-reviewer
+description: Reviews code for security vulnerabilities
+tools: Read, Grep, Glob, Bash
+model: opus
+---
+
+You are a senior security engineer. Review code for:
+
+- Injection vulnerabilities (SQL, XSS, command injection)
+- Authentication and authorization flaws
+- Secrets or credentials in code
+- Insecure data handling
+
+Provide specific line references and suggested fixes.
+```
+
+Use with: "Use a subagent to review this code for security issues."
+
+### Safe Autonomous Mode
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+**Warning**: Use only in containers without internet access.
+
+Better alternative: Enable sandboxing with `/sandbox` for autonomy with security.
+
+### DSM-Specific Agentic Patterns
+
+#### DSM Explore-Plan-Code Workflow
+
+```txt
+# Explore (Plan Mode)
+read src/data_source_manager/ and understand how FCP handles failover.
+check the cache implementation and timestamp handling.
+
+# Plan
+I want to add a new data source for Bybit. What files need to change?
+How does it integrate with FCP? Create a plan.
+
+# Implement (Normal Mode)
+implement the Bybit data source from your plan. write tests using
+the existing test patterns. run pytest and fix any failures.
+
+# Commit
+commit with descriptive message following DSM conventions
+```
+
+#### DSM Verification Patterns
+
+```txt
+# Good: Specific verification
+write a test for BinanceClient.fetch_ohlcv covering the edge case where
+the API returns incomplete data. use sample_ohlcv_df fixture. run pytest
+tests/test_binance.py -v and fix any failures.
+
+# Good: FCP verification
+implement the failover logic. write a test that simulates primary source
+failure and verifies secondary source activation. check FCP log for
+correct decision entries.
+```
+
+#### DSM Subagent Usage
+
+```txt
+Use subagents to investigate:
+1. How the caching layer invalidates stale data
+2. What timestamp formats each data source uses
+3. Whether existing FCP logic handles network timeouts
+
+Report findings with file:line references.
+```
+
+#### DSM Context Management
+
+```txt
+# CLAUDE.md instruction for compaction
+When compacting, always preserve:
+- FCP decision logic in src/data_source_manager/fcp/
+- Current test file being modified
+- Symbol format validation rules
+- Timestamp handling patterns
+```
+
+### TDD Workflow
+
+1. Ask Claude to write tests based on expected input/output
+2. Have Claude write code to pass tests
+3. Verify tests pass
+4. Iterate
+
+```txt
+Write tests for a function that normalizes symbol formats:
+- "BTCUSDT" -> "BTC/USDT"
+- "btc/usdt" -> "BTC/USDT"
+- "BTC-USDT" -> "BTC/USDT"
+
+Then implement the function to pass the tests.
+```
+
+### Interview Pattern
+
+```txt
+I want to build [brief description]. Interview me in detail using the AskUserQuestion tool.
+
+Ask about technical implementation, UI/UX, edge cases, concerns, and tradeoffs. Don't ask obvious questions, dig into the hard parts I might not have considered.
+
+Keep interviewing until we've covered everything, then write a complete spec to SPEC.md.
+```
+
+### Best Practices Summary
+
+1. **Verify everything** - Tests, screenshots, expected outputs
+2. **Manage context aggressively** - `/clear` often
+3. **Use subagents for investigation** - Keep main context clean
+4. **Scope tasks narrowly** - Specific files, specific scenarios
+5. **Course-correct early** - Don't let Claude wander
+6. **Plan for complex tasks** - Skip for simple ones
+7. **Checkpoint enables experimentation** - Try risky things, rewind if needed
+
+### References
+
+- [Best Practices](https://code.claude.com/docs/en/best-practices)
+- [How Claude Code Works](https://code.claude.com/docs/en/how-claude-code-works)
+- [Common Workflows](https://code.claude.com/docs/en/common-workflows)
+- [Extend Claude Code](https://code.claude.com/docs/en/features-overview)
