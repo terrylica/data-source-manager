@@ -5,6 +5,7 @@ argument-hint: "[symbol] [market-type]"
 user-invocable: true
 context: fork
 allowed-tools: Read, Bash, Grep, Glob
+adr: docs/adr/2025-01-30-failover-control-protocol.md
 ---
 
 # FCP Monitor
@@ -150,3 +151,4 @@ with ThreadPoolExecutor(max_workers=3) as executor:
 - @.claude/rules/fcp-protocol.md - FCP decision logic
 - @.claude/rules/caching-patterns.md - Cache structure
 - @docs/skills/dsm-usage/references/debugging.md - General debugging
+- @./references/evolution-log.md - Skill improvement history

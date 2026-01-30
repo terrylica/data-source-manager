@@ -4,6 +4,24 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Skill Self-Evolution Pattern (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added `adr:` field to dsm-fcp-monitor skill for ADR traceability
+- Created `references/evolution-log.md` for tracking skill improvements
+- Updated design spec with Skill ADR Traceability and Self-Evolution Pattern sections
+
+**Pattern Source**: [cc-skills repository](https://github.com/terrylica/cc-skills) skill-architecture patterns
+
+**Files Modified**:
+
+- `docs/skills/dsm-fcp-monitor/SKILL.md` - Added adr field
+- `docs/skills/dsm-fcp-monitor/references/evolution-log.md` - Created
+- `docs/design/.../spec.md` - Skill ADR and Self-Evolution sections
+
 ### Context Optimization Best Practices (2026-01-30)
 
 **Status**: Complete

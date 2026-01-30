@@ -146,7 +146,29 @@ user-invocable: true
 allowed-tools: Read, Bash, Grep # Optional: tools allowed without permission
 context: fork # Optional: runs in separate context
 agent: Explore # Optional: uses specific agent
+adr: docs/adr/YYYY-MM-DD-related-decision.md # Optional: link to ADR
 ---
+```
+
+### Skill ADR Traceability
+
+| Skill           | ADR Reference                        | Purpose             |
+| --------------- | ------------------------------------ | ------------------- |
+| dsm-fcp-monitor | 2025-01-30-failover-control-protocol | FCP diagnostics     |
+| dsm-usage       | -                                    | General usage guide |
+| dsm-testing     | -                                    | Testing patterns    |
+| dsm-research    | -                                    | Codebase research   |
+
+### Skill Self-Evolution Pattern
+
+Skills with `adr:` field should include `references/evolution-log.md`:
+
+```
+skill-name/
+├── SKILL.md
+├── references/
+│   └── evolution-log.md    # Reverse-chronological improvement log
+└── scripts/
 ```
 
 ### Skill Tool Permissions
