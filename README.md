@@ -44,16 +44,14 @@ If you want to run the provided demos directly from the cloned repository or use
 git clone https://github.com/terrylica/data-source-manager.git
 cd data-source-manager
 
-# Install the core package in editable mode
-pip install -e .
-```
+# Install with uv (recommended, 10-100x faster than pip)
+uv sync --dev
 
-If you plan to contribute to the development, modify the source code, or run tests/linting, include the development dependencies:
-
-```bash
-# After cloning and changing directory, install the package with development dependencies
+# Or with pip (slower, not recommended)
 pip install -e ".[dev]"
 ```
+
+**Note**: This project uses [uv](https://docs.astral.sh/uv/) for package management. Install it via `curl -LsSf https://astral.sh/uv/install.sh | sh`.
 
 This method keeps all the source files in your workspace and includes necessary tools for development workflows.
 
