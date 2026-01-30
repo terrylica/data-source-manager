@@ -13358,3 +13358,272 @@ async for message in query(
     if hasattr(message, "result"):
         print(message.result)
 ```
+
+---
+
+## Prompt Engineering Best Practices
+
+Optimize Claude 4.x model interactions with proven prompt engineering techniques.
+
+### Be Explicit with Instructions
+
+```text
+# Less effective
+Create an analytics dashboard
+
+# More effective
+Create an analytics dashboard. Include as many relevant features
+and interactions as possible. Go beyond the basics to create
+a fully-featured implementation.
+```
+
+### Add Context for Better Performance
+
+```text
+# Less effective
+NEVER use ellipses
+
+# More effective
+Your response will be read aloud by a text-to-speech engine,
+so never use ellipses since the text-to-speech engine will
+not know how to pronounce them.
+```
+
+### XML Tags for Structure
+
+Claude pays special attention to XML tags:
+
+```text
+<instructions>
+Analyze the code for performance issues.
+</instructions>
+
+<context>
+This is a high-throughput trading application.
+</context>
+
+<output_format>
+Return findings as JSON with severity levels.
+</output_format>
+```
+
+### Context Management Prompt
+
+For Claude Code and agent harnesses:
+
+```text
+Your context window will be automatically compacted as it approaches
+its limit, allowing you to continue working indefinitely from where
+you left off. Therefore, do not stop tasks early due to token budget
+concerns. As you approach your token budget limit, save your current
+progress and state to memory before the context window refreshes.
+Always be as persistent and autonomous as possible and complete tasks
+fully, even if the end of your budget is approaching.
+```
+
+### Long-Horizon Task Management
+
+**Multi-context window workflows**:
+
+1. First context: Set up framework (tests, setup scripts)
+2. Subsequent contexts: Iterate on todo list
+3. Use structured state files (e.g., `tests.json`)
+4. Create setup scripts (e.g., `init.sh`) for graceful restarts
+
+**State tracking example**:
+
+```json
+// tests.json - structured state
+{
+  "tests": [
+    { "id": 1, "name": "authentication_flow", "status": "passing" },
+    { "id": 2, "name": "user_management", "status": "failing" }
+  ],
+  "total": 200,
+  "passing": 150,
+  "failing": 25
+}
+```
+
+```text
+// progress.txt - unstructured notes
+Session 3 progress:
+- Fixed authentication token validation
+- Next: investigate user_management test failures
+- Note: Do not remove tests
+```
+
+### Tool Usage Patterns
+
+**Proactive action prompt**:
+
+```text
+<default_to_action>
+By default, implement changes rather than only suggesting them.
+If the user's intent is unclear, infer the most useful likely
+action and proceed, using tools to discover any missing details
+instead of guessing.
+</default_to_action>
+```
+
+**Conservative action prompt**:
+
+```text
+<do_not_act_before_instructions>
+Do not jump into implementation unless clearly instructed.
+When the user's intent is ambiguous, default to providing
+information, doing research, and providing recommendations
+rather than taking action.
+</do_not_act_before_instructions>
+```
+
+### Parallel Tool Calling
+
+```text
+<use_parallel_tool_calls>
+If you intend to call multiple tools and there are no dependencies
+between the tool calls, make all of the independent tool calls in
+parallel. Maximize use of parallel tool calls where possible to
+increase speed and efficiency. However, if some tool calls depend
+on previous calls, call them sequentially. Never use placeholders
+or guess missing parameters.
+</use_parallel_tool_calls>
+```
+
+### Minimize Overengineering
+
+```text
+Avoid over-engineering. Only make changes that are directly
+requested or clearly necessary. Keep solutions simple and focused.
+
+Don't add features, refactor code, or make "improvements" beyond
+what was asked. Don't add error handling for scenarios that can't
+happen. Don't create helpers or abstractions for one-time operations.
+Don't design for hypothetical future requirements.
+
+The right amount of complexity is the minimum needed for the
+current task.
+```
+
+### Code Exploration Prompt
+
+```text
+ALWAYS read and understand relevant files before proposing code
+edits. Do not speculate about code you have not inspected. If the
+user references a specific file/path, you MUST open and inspect it
+before explaining or proposing fixes. Be rigorous and persistent
+in searching code for key facts.
+```
+
+### Minimize Hallucinations
+
+```text
+<investigate_before_answering>
+Never speculate about code you have not opened. If the user
+references a specific file, you MUST read the file before
+answering. Make sure to investigate and read relevant files
+BEFORE answering questions about the codebase. Never make any
+claims about code before investigating unless you are certain
+of the correct answer.
+</investigate_before_answering>
+```
+
+### Research and Information Gathering
+
+```text
+Search for this information in a structured way. As you gather
+data, develop several competing hypotheses. Track your confidence
+levels in your progress notes. Regularly self-critique your
+approach and plan. Update a hypothesis tree or research notes
+file to persist information and provide transparency.
+```
+
+### Subagent Orchestration
+
+```text
+# Conservative subagent usage
+Only delegate to subagents when the task clearly benefits from
+a separate agent with a new context window.
+```
+
+### Reduce Verbose Output
+
+```text
+<avoid_excessive_markdown_and_bullet_points>
+When writing reports or analyses, write in clear, flowing prose
+using complete paragraphs and sentences. Reserve markdown primarily
+for `inline code`, code blocks, and simple headings.
+
+DO NOT use ordered lists or unordered lists unless presenting
+truly discrete items or the user explicitly requests a list.
+
+Instead of listing items with bullets, incorporate them naturally
+into sentences. NEVER output a series of overly short bullet points.
+</avoid_excessive_markdown_and_bullet_points>
+```
+
+### Thinking Mode Tips
+
+When extended thinking is disabled, Claude Opus 4.5 is sensitive to "think":
+
+```text
+# Instead of "think", use:
+- "consider"
+- "believe"
+- "evaluate"
+- "analyze"
+- "reflect"
+```
+
+For interleaved thinking:
+
+```text
+After receiving tool results, carefully reflect on their quality
+and determine optimal next steps before proceeding. Use your
+thinking to plan and iterate based on this new information.
+```
+
+### DSM Prompt Engineering Patterns
+
+**FCP Analysis Prompt**:
+
+```text
+<dsm_fcp_analysis>
+When analyzing FCP (Failover Control Protocol) decisions:
+1. Check cache state in ~/.cache/dsm
+2. Verify API availability (rate limits, errors)
+3. Analyze data freshness requirements
+4. Consider symbol format (Binance: BTCUSDT, etc.)
+5. Report decision logic and recommendations
+
+Use structured state tracking:
+- fcp_state.json for decision history
+- progress.txt for analysis notes
+</dsm_fcp_analysis>
+```
+
+**Data Validation Prompt**:
+
+```text
+<dsm_data_validation>
+When validating OHLCV DataFrames:
+1. Check required columns: open_time, open, high, low, close, volume
+2. Verify UTC timestamps (all datetimes must be timezone-aware)
+3. Validate data continuity (no gaps > expected interval)
+4. Check OHLC relationships: high >= max(open, close), low <= min(open, close)
+5. Use Polars for DataFrame operations (not pandas)
+</dsm_data_validation>
+```
+
+### Best Practices Summary
+
+| Technique                 | Purpose                          |
+| ------------------------- | -------------------------------- |
+| Explicit instructions     | Better precision from Claude 4.x |
+| Context/motivation        | Improved understanding           |
+| XML tags                  | Clear section separation         |
+| Context management prompt | Long-running autonomous tasks    |
+| Structured state files    | Multi-context window workflows   |
+| Parallel tool calls       | Speed and efficiency             |
+| Investigation prompts     | Reduce hallucinations            |
+| Minimize overengineering  | Focused, simple solutions        |
