@@ -4,6 +4,22 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Documentation Standards (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added document size guidelines table
+- Added documentation slash commands table
+- Added best practices list
+- Added DSM documentation structure table
+
+**Sources**:
+
+- [Anthropic Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Builder.io Guide](https://www.builder.io/blog/claude-md-guide)
+
 ### Productivity Workflows (2026-01-30)
 
 **Status**: Complete

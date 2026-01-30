@@ -1279,6 +1279,47 @@ Based on [Claude Code Creator Workflow](https://www.infoq.com/news/2026/01/claud
 
 Evolving CLAUDE.md transforms the codebase into a self-learning system.
 
+## Documentation Standards
+
+Based on [Anthropic Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices) and [Builder.io Guide](https://www.builder.io/blog/claude-md-guide).
+
+### Document Size Guidelines
+
+| Document Type    | Target Length   | Purpose                         |
+| ---------------- | --------------- | ------------------------------- |
+| README           | 500-1000 words  | Essential information only      |
+| Feature spec     | 1500-3000 words | Detailed requirements, examples |
+| Task-specific MD | 300-800 words   | Single objective, focused       |
+| CLAUDE.md        | < 300 lines     | Project context and conventions |
+| SKILL.md         | < 500 lines     | Workflow instructions           |
+
+### Documentation Slash Commands
+
+| Command        | Purpose                                 |
+| -------------- | --------------------------------------- |
+| `/init`        | Generate starter CLAUDE.md from project |
+| `/docs`        | Generate comprehensive documentation    |
+| `/update-docs` | Sync documentation with implementation  |
+| `/release`     | Update changelogs, README for release   |
+
+### Best Practices
+
+- Split monolithic docs into focused files with cross-references
+- Update READMEs and changelogs when completing tasks
+- Define documentation standards in skills for consistency
+- Use headless mode for automated documentation updates
+
+### DSM Documentation Structure
+
+| Document                  | Purpose                        |
+| ------------------------- | ------------------------------ |
+| `README.md`               | Project overview, quick start  |
+| `CLAUDE.md`               | AI-friendly conventions        |
+| `docs/INDEX.md`           | Navigation hub                 |
+| `docs/RESUME.md`          | Session context for continuity |
+| `docs/GLOSSARY.md`        | Domain terminology             |
+| `docs/TROUBLESHOOTING.md` | Common issues and solutions    |
+
 ## Verification Checklist
 
 ### Infrastructure
