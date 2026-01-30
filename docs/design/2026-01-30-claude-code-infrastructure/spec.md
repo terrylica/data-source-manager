@@ -15820,3 +15820,294 @@ runner = client.beta.messages.tool_runner(
 for message in runner:
     print(message.content[0].text)
 ```
+---
+
+## Enterprise Deployment Reference
+
+Deploy Claude Code across teams with cloud providers and managed settings.
+
+### Deployment Options Comparison
+
+| Feature    | Teams/Enterprise        | Anthropic Console | AWS Bedrock     | Google Vertex   | Microsoft Foundry   |
+| ---------- | ----------------------- | ----------------- | --------------- | --------------- | ------------------- |
+| Best for   | Most orgs (recommended) | Individual devs   | AWS-native      | GCP-native      | Azure-native        |
+| Billing    | $150/seat (Premium)     | PAYG              | PAYG via AWS    | PAYG via GCP    | PAYG via Azure      |
+| Auth       | SSO or email            | API key           | AWS creds       | GCP creds       | Entra ID or API key |
+| Web Claude | Yes                     | No                | No              | No              | No                  |
+| Enterprise | SSO, usage monitoring   | None              | IAM, CloudTrail | IAM, Audit Logs | RBAC, Azure Monitor |
+
+### Claude for Teams
+
+Self-service with collaboration features:
+
+- Team management and billing
+- Usage analytics dashboard
+- Admin seat allocation
+- Shared CLAUDE.md configuration
+
+**Best for**: Smaller teams needing quick setup.
+
+### Claude for Enterprise
+
+Advanced controls for larger organizations:
+
+- SSO and domain capture
+- Role-based permissions
+- Compliance API access
+- Managed policy settings
+- Granular spend controls
+
+**Best for**: Organizations with security/compliance requirements.
+
+### Amazon Bedrock Configuration
+
+<!-- SSoT-OK: Environment variable examples for Claude Code documentation -->
+
+```bash
+# Enable Bedrock
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_REGION=us-east-1
+
+# AWS credentials (choose one method)
+# Option 1: Environment variables
+export AWS_ACCESS_KEY_ID=your-key-id
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+
+# Option 2: AWS SSO
+aws sso login --profile your-profile
+export AWS_PROFILE=your-profile
+
+# Option 3: IAM role (EC2/ECS)
+# Automatic via instance metadata
+
+# Corporate proxy (optional)
+export HTTPS_PROXY='https://proxy.example.com:8080'
+
+# LLM Gateway (optional)
+export ANTHROPIC_BEDROCK_BASE_URL='https://your-llm-gateway.com/bedrock'
+export CLAUDE_CODE_SKIP_BEDROCK_AUTH=1  # If gateway handles auth
+```
+
+**Benefits**: VPC integration, IAM policies, CloudTrail logging, regional deployment.
+
+### Google Vertex AI Configuration
+
+<!-- SSoT-OK: Environment variable examples for Claude Code documentation -->
+
+```bash
+# Enable Vertex
+export CLAUDE_CODE_USE_VERTEX=1
+export CLOUD_ML_REGION=us-east5
+export ANTHROPIC_VERTEX_PROJECT_ID=your-project-id
+
+# Authentication
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+# Corporate proxy (optional)
+export HTTPS_PROXY='https://proxy.example.com:8080'
+
+# LLM Gateway (optional)
+export ANTHROPIC_VERTEX_BASE_URL='https://your-llm-gateway.com/vertex'
+export CLAUDE_CODE_SKIP_VERTEX_AUTH=1  # If gateway handles auth
+```
+
+**Benefits**: GCP IAM, Cloud Audit Logs, regional compliance.
+
+### Microsoft Foundry Configuration
+
+<!-- SSoT-OK: Environment variable examples for Claude Code documentation -->
+
+```bash
+# Enable Microsoft Foundry
+export CLAUDE_CODE_USE_FOUNDRY=1
+export ANTHROPIC_FOUNDRY_RESOURCE=your-resource
+
+# Authentication (choose one)
+export ANTHROPIC_FOUNDRY_API_KEY=your-api-key  # API key
+# Or omit for Entra ID auth (automatic with Azure CLI login)
+
+# Corporate proxy (optional)
+export HTTPS_PROXY='https://proxy.example.com:8080'
+
+# LLM Gateway (optional)
+export ANTHROPIC_FOUNDRY_BASE_URL='https://your-llm-gateway.com'
+export CLAUDE_CODE_SKIP_FOUNDRY_AUTH=1  # If gateway handles auth
+```
+
+**Benefits**: Azure RBAC, Azure Monitor, Entra ID integration.
+
+### LLM Gateway Configuration
+
+Centralized routing for usage tracking and authentication:
+
+<!-- SSoT-OK: Environment variable examples for Claude Code documentation -->
+
+```bash
+# Direct Anthropic API with gateway
+export ANTHROPIC_BASE_URL='https://your-llm-gateway.com/anthropic'
+
+# Bedrock with gateway
+export ANTHROPIC_BEDROCK_BASE_URL='https://your-llm-gateway.com/bedrock'
+export CLAUDE_CODE_SKIP_BEDROCK_AUTH=1
+
+# Vertex with gateway
+export ANTHROPIC_VERTEX_BASE_URL='https://your-llm-gateway.com/vertex'
+export CLAUDE_CODE_SKIP_VERTEX_AUTH=1
+
+# Foundry with gateway
+export ANTHROPIC_FOUNDRY_BASE_URL='https://your-llm-gateway.com/foundry'
+export CLAUDE_CODE_SKIP_FOUNDRY_AUTH=1
+```
+
+**Use cases**:
+
+- Centralized usage tracking across teams
+- Custom rate limiting and budgets
+- Centralized authentication management
+- Cost allocation and chargeback
+
+### Managed Permissions
+
+Deploy organization-wide settings that cannot be overridden:
+
+**macOS**: `/Library/Application Support/ClaudeCode/`
+**Linux/WSL**: `/etc/claude-code/`
+**Windows**: `C:\Program Files\ClaudeCode\`
+
+<!-- SSoT-OK: JSON config example for Claude Code documentation -->
+
+**managed-settings.json**:
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Read(.env*)",
+      "Write(.env*)"
+    ],
+    "allow": ["Bash(git *)", "Bash(npm *)", "Bash(uv *)"]
+  },
+  "env": {
+    "CLAUDE_CODE_USE_BEDROCK": "true",
+    "AWS_REGION": "us-east-1"
+  }
+}
+```
+
+**managed-mcp.json** (organization MCP servers):
+
+```json
+{
+  "mcpServers": {
+    "company-docs": {
+      "command": "npx",
+      "args": ["@company/mcp-docs-server"],
+      "env": {
+        "DOCS_API_KEY": "${COMPANY_DOCS_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+### Admin Controls
+
+| Control         | Capability                            |
+| --------------- | ------------------------------------- |
+| Seat management | Purchase, allocate, provision users   |
+| Spend controls  | Organization and user-level limits    |
+| Usage analytics | Lines accepted, accept rate, patterns |
+| Policy settings | Tool permissions, file access, MCP    |
+
+### SSO and Domain Capture
+
+**Enterprise SSO flow**:
+
+1. Admin configures SSO in enterprise console
+2. User runs `claude` and is redirected to IdP
+3. IdP authenticates against corporate directory
+4. Claude Code receives token tied to org account
+5. Managed settings automatically applied
+
+**Domain capture**: Users with company email automatically join organization.
+
+### Onboarding Best Practices
+
+1. **One-click install**: Create internal installation script
+2. **Shared CLAUDE.md**: Deploy organization standards to repos
+3. **MCP configuration**: Central team maintains `.mcp.json`
+4. **Guided usage**: Start with Q&A and smaller tasks
+
+**Onboarding checklist**:
+
+```markdown
+- [ ] Admin provisions Claude Code premium seat
+- [ ] User installs Claude Code CLI
+- [ ] User authenticates via SSO
+- [ ] CLAUDE.md in repo provides project context
+- [ ] MCP servers configured for integrations
+- [ ] User completes intro training
+```
+
+### Compliance Features
+
+| Feature        | Description                             |
+| -------------- | --------------------------------------- |
+| Audit logs     | All tool calls logged with timestamps   |
+| Data residency | Regional deployment via cloud providers |
+| Access control | RBAC with IAM policies                  |
+| Encryption     | TLS in transit, at-rest encryption      |
+| Compliance API | Programmatic access to usage data       |
+
+### Verify Configuration
+
+```bash
+# Check current configuration
+/status
+
+# Verify Bedrock connection
+claude --version
+echo "BEDROCK: $CLAUDE_CODE_USE_BEDROCK"
+echo "REGION: $AWS_REGION"
+
+# Verify Vertex connection
+echo "VERTEX: $CLAUDE_CODE_USE_VERTEX"
+echo "PROJECT: $ANTHROPIC_VERTEX_PROJECT_ID"
+
+# Test proxy connectivity
+curl -x $HTTPS_PROXY https://api.anthropic.com/health
+```
+
+### DSM Enterprise Configuration
+
+<!-- SSoT-OK: mise.toml config example for Claude Code documentation -->
+
+```toml
+# .mise.toml for enterprise DSM deployment
+[env]
+CLAUDE_CODE_USE_BEDROCK = "true"
+AWS_REGION = "us-east-1"
+AWS_PROFILE = "dsm-production"
+
+# Or for Vertex
+# CLAUDE_CODE_USE_VERTEX = "true"
+# CLOUD_ML_REGION = "us-central1"
+# ANTHROPIC_VERTEX_PROJECT_ID = "dsm-prod-project"
+```
+
+**DSM managed permissions** (managed-settings.json):
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf ~/.cache/dsm/*)",
+      "Write(.env*)",
+      "Bash(pip install *)"
+    ],
+    "allow": ["Bash(uv run *)", "Bash(mise run *)", "Read(~/.cache/dsm/*)"]
+  }
+}
+```
