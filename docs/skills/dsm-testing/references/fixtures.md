@@ -2,6 +2,27 @@
 
 Common pytest fixtures for DataSourceManager testing.
 
+## Root Fixtures
+
+Located in `tests/conftest.py` (available to all tests):
+
+```python
+# Time fixtures
+utc_now                # Current UTC time (timezone-aware)
+one_week_range         # (start, end) tuple for 7 days
+one_day_range          # (start, end) tuple for 1 day
+
+# Mock fixtures
+mock_vision_handler    # Mock FSSpec Vision API
+mock_cache_manager     # Mock cache manager
+mock_all_sources       # Combined mocks for isolation
+
+# Data fixtures
+sample_ohlcv_data      # Sample OHLCV candle dict
+sample_symbol          # "BTCUSDT"
+sample_coin_symbol     # "BTCUSD_PERP"
+```
+
 ## OKX Fixtures
 
 Located in `tests/okx/conftest.py`:
