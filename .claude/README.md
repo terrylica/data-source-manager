@@ -55,6 +55,8 @@ Context rules that Claude loads on demand when relevant.
 | dataframe-operations.md | Polars preference, OHLCV       |
 | caching-patterns.md     | Cache structure, invalidation  |
 | symbol-formats.md       | Market-specific symbol formats |
+| error-handling.md       | Exception hierarchy, recovery  |
+| fcp-protocol.md         | FCP decision logic, debugging  |
 
 ## Hooks
 

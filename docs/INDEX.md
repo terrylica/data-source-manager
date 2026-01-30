@@ -123,3 +123,5 @@ Domain-specific rules Claude loads on demand (in `.claude/rules/`):
 - `dataframe-operations.md` - Polars/OHLCV patterns
 - `caching-patterns.md` - Cache structure
 - `symbol-formats.md` - Market-specific formats
+- `error-handling.md` - Exception hierarchy, recovery patterns
+- `fcp-protocol.md` - FCP decision logic, debugging

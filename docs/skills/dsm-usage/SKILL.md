@@ -76,6 +76,9 @@ uv run -p 3.13 python docs/skills/dsm-usage/scripts/validate_symbol.py BTCUSDT F
 
 # Check cache status
 uv run -p 3.13 python docs/skills/dsm-usage/scripts/check_cache.py BTCUSDT futures_usdt 1h
+
+# Diagnose FCP behavior (with debug logging)
+uv run -p 3.13 python docs/skills/dsm-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h --days 3
 ```
 
 ## Detailed References
