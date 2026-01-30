@@ -17932,3 +17932,650 @@ Checkpoints are stored in:
 # Remove checkpoints older than 7 days
 find ~/.claude/checkpoints -type d -mtime +7 -exec rm -rf {} +
 ```
+---
+
+<!-- SSoT-OK: Section added by autonomous Claude Code infrastructure improvement loop -->
+
+## Extended Thinking Reference
+
+Comprehensive guide to extended thinking for enhanced reasoning in Claude Code.
+
+### Overview
+
+Extended thinking gives Claude enhanced reasoning capabilities for complex tasks by allowing internal step-by-step reasoning before delivering a final answer.
+
+**Supported models**:
+
+- Claude Opus 4.5
+- Claude Opus 4.1
+- Claude Opus 4
+- Claude Sonnet 4.5
+- Claude Sonnet 4
+- Claude Haiku 4.5
+
+### Budget Tokens
+
+The `budget_tokens` parameter determines the maximum tokens Claude can use for internal reasoning:
+
+| Budget Range                 | Use Case           | Notes                                  |
+| ---------------------------- | ------------------ | -------------------------------------- |
+| 1,024 (minimum)              | Simple tasks       | Start here and increase as needed      |
+| 4,000-8,000                  | Standard reasoning | Good for most coding tasks             |
+| 10,000-16,000                | Complex analysis   | Architecture decisions, deep debugging |
+| 31,999 (Claude Code default) | Maximum depth      | Triggered by "ultrathink" keyword      |
+| 32,000+                      | Batch processing   | Use batch API to avoid timeouts        |
+
+**Key points**:
+
+- `budget_tokens` must be less than `max_tokens`
+- Claude may not use the entire budget
+- Higher budgets improve quality with diminishing returns
+- Increased budget = increased latency
+
+### UltraThink Keyword
+
+Add "ultrathink" to any prompt to trigger maximum reasoning depth (31,999 tokens):
+
+```
+User: "ultrathink: Design an optimal caching strategy for our FCP module"
+```
+
+**Best for**:
+
+- Complex architecture decisions
+- Debugging difficult issues
+- Deep code analysis
+- Multi-step algorithmic problems
+
+### API Usage
+
+**Basic request**:
+
+```json
+{
+  "model": "claude-sonnet-4-5",
+  "max_tokens": 16000,
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 10000
+  },
+  "messages": [{ "role": "user", "content": "Analyze this algorithm..." }]
+}
+```
+
+**Response format**:
+
+```json
+{
+  "content": [
+    {
+      "type": "thinking",
+      "thinking": "Let me analyze this step by step...",
+      "signature": "WaUjzkypQ2mUEVM36O2..."
+    },
+    {
+      "type": "text",
+      "text": "Based on my analysis..."
+    }
+  ]
+}
+```
+
+### Summarized Thinking (Claude 4)
+
+Claude 4 models return **summarized** thinking, not full output:
+
+| Aspect        | Behavior                                      |
+| ------------- | --------------------------------------------- |
+| Billing       | Charged for full thinking tokens, not summary |
+| Output tokens | Billed count won't match visible count        |
+| First lines   | More verbose for prompt engineering           |
+| Migration     | Easy migration from Claude 3.7                |
+
+### Streaming
+
+When streaming with thinking enabled:
+
+```python
+with client.messages.stream(
+    model="claude-sonnet-4-5",
+    thinking={"type": "enabled", "budget_tokens": 10000},
+    messages=[{"role": "user", "content": "Solve this..."}]
+) as stream:
+    for event in stream:
+        if event.type == "content_block_delta":
+            if event.delta.type == "thinking_delta":
+                print(f"Thinking: {event.delta.thinking}")
+            elif event.delta.type == "text_delta":
+                print(f"Response: {event.delta.text}")
+```
+
+### Tool Use with Thinking
+
+Extended thinking works with tool use but has constraints:
+
+**Limitations**:
+
+- Only `tool_choice: {"type": "auto"}` or `{"type": "none"}` supported
+- `tool_choice: {"type": "any"}` or `{"type": "tool"}` will error
+- Cannot toggle thinking mid-turn (during tool use loops)
+
+**Preserving thinking blocks**:
+
+```python
+# First request
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    thinking={"type": "enabled", "budget_tokens": 10000},
+    tools=[weather_tool],
+    messages=[{"role": "user", "content": "What's the weather?"}]
+)
+
+# Extract blocks
+thinking_block = next(b for b in response.content if b.type == 'thinking')
+tool_use_block = next(b for b in response.content if b.type == 'tool_use')
+
+# Continue with tool result - MUST include thinking block
+continuation = client.messages.create(
+    model="claude-sonnet-4-5",
+    thinking={"type": "enabled", "budget_tokens": 10000},
+    tools=[weather_tool],
+    messages=[
+        {"role": "user", "content": "What's the weather?"},
+        {"role": "assistant", "content": [thinking_block, tool_use_block]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool_use_block.id, "content": "72°F"}]}
+    ]
+)
+```
+
+### Interleaved Thinking
+
+Claude 4 supports thinking between tool calls with beta header:
+
+```python
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=16000,
+    thinking={"type": "enabled", "budget_tokens": 10000},
+    extra_headers={"anthropic-beta": "interleaved-thinking-2025-05-14"},
+    tools=[calculator, database],
+    messages=[{"role": "user", "content": "Calculate revenue and compare..."}]
+)
+```
+
+**Flow with interleaved thinking**:
+
+```
+Turn 1: [thinking] → [tool_use: calculator]
+  ↓ tool result
+Turn 2: [thinking about result] → [tool_use: database]
+  ↓ tool result
+Turn 3: [thinking before answer] → [text: final response]
+```
+
+### Prompt Caching Considerations
+
+| Scenario                         | Cache Behavior                          |
+| -------------------------------- | --------------------------------------- |
+| Same thinking parameters         | Cache hit expected                      |
+| Changed thinking budget          | Message cache invalidated               |
+| System prompt                    | Remains cached despite thinking changes |
+| Thinking blocks from prior turns | Stripped, don't count toward context    |
+
+**Recommendation**: Use 1-hour cache duration for extended thinking tasks.
+
+### Thinking Encryption
+
+Thinking content is encrypted and returned in `signature` field:
+
+```json
+{
+  "type": "thinking",
+  "thinking": "Step by step analysis...",
+  "signature": "EqQBCgIYAhIM1gbcDa9GJwZA2b3h..."
+}
+```
+
+**Important**:
+
+- `signature` is for verification only
+- Pass complete, unmodified blocks back to API
+- Signatures are compatible across platforms (API, Bedrock, Vertex)
+
+### Redacted Thinking
+
+Occasionally thinking is flagged by safety systems:
+
+```json
+{
+  "type": "redacted_thinking",
+  "data": "EmwKAhgBEgy3va3pzix/LafPsn4..."
+}
+```
+
+**Handling redacted blocks**:
+
+- Content is encrypted, not human-readable
+- Pass back to API unmodified
+- Claude can still use redacted reasoning
+- Consider explaining to users: "Some reasoning was encrypted for safety"
+
+### Feature Compatibility
+
+| Feature           | Compatible? | Notes                                                       |
+| ----------------- | ----------- | ----------------------------------------------------------- |
+| temperature       | No          | Cannot modify                                               |
+| top_k             | No          | Cannot modify                                               |
+| top_p             | Yes         | Values 0.95-1.0 only                                        |
+| Response pre-fill | No          | Cannot pre-fill                                             |
+| Forced tool use   | No          | Auto or none only                                           |
+| Prompt caching    | Partial     | System prompt cached, messages invalidated on budget change |
+
+### DSM Extended Thinking Patterns
+
+#### Pattern: Complex Debugging
+
+```
+User: "ultrathink: Debug why FCP is returning stale data despite cache invalidation"
+```
+
+#### Pattern: Architecture Review
+
+```
+User: "ultrathink: Review the DataSourceManager architecture and identify potential race conditions"
+```
+
+#### Pattern: Algorithm Design
+
+```
+User: "ultrathink: Design an optimal retry strategy with exponential backoff for rate-limited APIs"
+```
+
+### Best Practices
+
+1. **Start small**: Begin with 1,024-4,000 tokens and increase as needed
+2. **Use ultrathink sparingly**: Reserve for genuinely complex problems
+3. **Monitor token usage**: Track thinking tokens for cost optimization
+4. **Handle latency**: Extended thinking increases response time
+5. **Preserve blocks**: Always pass thinking blocks back unmodified
+6. **Use batch for large budgets**: Above 32k tokens, use batch API
+7. **Test different budgets**: Find optimal balance for your use case
+
+### Troubleshooting
+
+| Issue                        | Cause                      | Solution                                |
+| ---------------------------- | -------------------------- | --------------------------------------- |
+| Slow responses               | High thinking budget       | Reduce budget or use batch              |
+| Error with tool_choice       | Incompatible setting       | Use `auto` or `none` only               |
+| Cache misses                 | Changed thinking budget    | Keep budget consistent                  |
+| Missing thinking in response | Thinking disabled mid-turn | Plan thinking at turn start             |
+| Redacted thinking            | Safety system triggered    | Expected behavior, pass back unmodified |
+---
+
+<!-- SSoT-OK: Section added by autonomous Claude Code infrastructure improvement loop -->
+
+## MCP Configuration Reference
+
+Comprehensive guide to Model Context Protocol (MCP) server configuration in Claude Code.
+
+### Overview
+
+MCP (Model Context Protocol) allows Claude Code to connect to external tools, databases, and APIs through a standardized protocol.
+
+**Key capabilities**:
+
+- Connect to databases (PostgreSQL, MySQL, etc.)
+- Integrate with issue trackers (JIRA, GitHub Issues)
+- Access monitoring tools (Sentry, Datadog)
+- Query APIs and services
+- Automate workflows
+
+### Configuration Locations
+
+| Location                        | Scope      | Shared?                  | Use Case                       |
+| ------------------------------- | ---------- | ------------------------ | ------------------------------ |
+| `.mcp.json`                     | Project    | Yes (version controlled) | Team-shared servers            |
+| `.claude/settings.local.json`   | Local      | No                       | Personal project servers       |
+| `~/.claude/settings.local.json` | User       | No                       | Personal cross-project servers |
+| `~/.claude.json`                | User/Local | No                       | Legacy location                |
+
+**Precedence order** (highest to lowest):
+
+1. Local scope (project-specific, personal)
+2. Project scope (`.mcp.json`, team-shared)
+3. User scope (cross-project, personal)
+
+### Transport Types
+
+| Transport | Use Case                          | Command                                                |
+| --------- | --------------------------------- | ------------------------------------------------------ |
+| `http`    | Remote HTTP servers (recommended) | `claude mcp add --transport http <name> <url>`         |
+| `sse`     | Server-Sent Events (deprecated)   | `claude mcp add --transport sse <name> <url>`          |
+| `stdio`   | Local process servers             | `claude mcp add --transport stdio <name> -- <command>` |
+
+### Adding MCP Servers
+
+**HTTP server (remote)**:
+
+```bash
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+
+# With authentication header
+claude mcp add --transport http secure-api https://api.example.com/mcp \
+  --header "Authorization: Bearer your-token"
+```
+
+**Stdio server (local)**:
+
+```bash
+claude mcp add --transport stdio --env API_KEY=YOUR_KEY airtable \
+  -- npx -y airtable-mcp-server
+```
+
+**From JSON configuration**:
+
+```bash
+claude mcp add-json weather-api '{"type":"http","url":"https://api.weather.com/mcp"}'
+```
+
+**Import from Claude Desktop**:
+
+```bash
+claude mcp add-from-claude-desktop
+```
+
+### Managing Servers
+
+```bash
+# List all configured servers
+claude mcp list
+
+# Get details for specific server
+claude mcp get github
+
+# Remove a server
+claude mcp remove github
+
+# Check status (within Claude Code)
+/mcp
+```
+
+### Configuration Scopes
+
+**Local scope** (default):
+
+```bash
+claude mcp add --transport http stripe https://mcp.stripe.com
+# or explicitly:
+claude mcp add --transport http stripe --scope local https://mcp.stripe.com
+```
+
+**Project scope** (team-shared):
+
+```bash
+claude mcp add --transport http paypal --scope project https://mcp.paypal.com/mcp
+```
+
+Creates `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "paypal": {
+      "type": "http",
+      "url": "https://mcp.paypal.com/mcp"
+    }
+  }
+}
+```
+
+**User scope** (cross-project):
+
+```bash
+claude mcp add --transport http hubspot --scope user https://mcp.hubspot.com/anthropic
+```
+
+### .mcp.json Configuration
+
+**Basic structure**:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "local-db": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@bytebase/dbhub", "--dsn", "postgresql://..."],
+      "env": {
+        "DB_PASSWORD": "${DB_PASSWORD}"
+      }
+    }
+  }
+}
+```
+
+**Environment variable expansion**:
+
+```json
+{
+  "mcpServers": {
+    "api-server": {
+      "type": "http",
+      "url": "${API_BASE_URL:-https://api.example.com}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${API_KEY}"
+      }
+    }
+  }
+}
+```
+
+Supported syntax:
+
+- `${VAR}` - Required variable
+- `${VAR:-default}` - With default value
+
+### Tool Permissions
+
+Control which MCP tools Claude can use in `settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["MCP(github)", "MCP(database:read_*)"],
+    "deny": ["MCP(database:delete_*)", "MCP(filesystem)"]
+  }
+}
+```
+
+### MCP Tool Search
+
+When many MCP servers are configured, Tool Search dynamically loads tools on-demand:
+
+**Auto-activation**: Triggers when MCP tools exceed 10% of context window
+
+**Configuration**:
+
+```bash
+# Custom threshold (5%)
+ENABLE_TOOL_SEARCH=auto:5 claude
+
+# Always enabled
+ENABLE_TOOL_SEARCH=true claude
+
+# Disabled
+ENABLE_TOOL_SEARCH=false claude
+```
+
+**Requirements**: Sonnet 4+, Opus 4+ (Haiku not supported)
+
+### MCP Resources
+
+Reference MCP resources with @ mentions:
+
+```
+> Analyze @github:issue://123 and suggest a fix
+> Compare @postgres:schema://users with @docs:file://database/user-model
+```
+
+### MCP Prompts as Commands
+
+MCP servers can expose prompts as commands:
+
+```
+> /mcp__github__list_prs
+> /mcp__github__pr_review 456
+> /mcp__jira__create_issue "Bug in login" high
+```
+
+### Output Limits
+
+| Setting           | Default       | Purpose          |
+| ----------------- | ------------- | ---------------- |
+| Warning threshold | 10,000 tokens | Displays warning |
+| Maximum output    | 25,000 tokens | Hard limit       |
+
+**Increase limit**:
+
+```bash
+MAX_MCP_OUTPUT_TOKENS=50000 claude
+```
+
+### Authentication
+
+**OAuth 2.0 authentication**:
+
+1. Add server: `claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`
+2. Authenticate: `/mcp` in Claude Code
+3. Follow browser flow
+
+**Clear authentication**: Use `/mcp` menu → "Clear authentication"
+
+### Enterprise Managed Configuration
+
+**Exclusive control** with `managed-mcp.json`:
+
+Locations:
+
+- macOS: `/Library/Application Support/ClaudeCode/managed-mcp.json`
+- Linux/WSL: `/etc/claude-code/managed-mcp.json`
+- Windows: `C:\Program Files\ClaudeCode\managed-mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "company-internal": {
+      "type": "stdio",
+      "command": "/usr/local/bin/company-mcp-server",
+      "args": ["--config", "/etc/company/mcp-config.json"]
+    }
+  }
+}
+```
+
+**Policy-based control** with allowlists/denylists:
+
+```json
+{
+  "allowedMcpServers": [
+    { "serverName": "github" },
+    { "serverCommand": ["npx", "-y", "approved-package"] },
+    { "serverUrl": "https://mcp.company.com/*" }
+  ],
+  "deniedMcpServers": [
+    { "serverName": "dangerous-server" },
+    { "serverUrl": "https://*.untrusted.com/*" }
+  ]
+}
+```
+
+### DSM MCP Configuration
+
+Example configuration for data-source-manager:
+
+```json
+{
+  "mcpServers": {
+    "dsm-database": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@bytebase/dbhub", "--dsn", "${DSM_DATABASE_URL}"],
+      "env": {}
+    },
+    "dsm-sentry": {
+      "type": "http",
+      "url": "https://mcp.sentry.dev/mcp"
+    }
+  }
+}
+```
+
+### Plugin MCP Servers
+
+Plugins can bundle MCP servers:
+
+**In `.mcp.json` at plugin root**:
+
+```json
+{
+  "database-tools": {
+    "command": "${CLAUDE_PLUGIN_ROOT}/servers/db-server",
+    "args": ["--config", "${CLAUDE_PLUGIN_ROOT}/config.json"]
+  }
+}
+```
+
+**Or inline in `plugin.json`**:
+
+```json
+{
+  "name": "my-plugin",
+  "mcpServers": {
+    "plugin-api": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/servers/api-server"
+    }
+  }
+}
+```
+
+### Windows Considerations
+
+On native Windows (not WSL), use `cmd /c` wrapper:
+
+```bash
+claude mcp add --transport stdio my-server -- cmd /c npx -y @some/package
+```
+
+### Troubleshooting
+
+| Issue                  | Cause                             | Solution                               |
+| ---------------------- | --------------------------------- | -------------------------------------- |
+| "Connection closed"    | npx without cmd wrapper (Windows) | Use `cmd /c npx ...`                   |
+| Server not found       | Wrong scope                       | Check with `claude mcp list`           |
+| Authentication failed  | Token expired                     | Use `/mcp` to re-authenticate          |
+| Tool not appearing     | Tool Search active                | Tools load on-demand                   |
+| Large output warning   | Output exceeds 10k tokens         | Increase `MAX_MCP_OUTPUT_TOKENS`       |
+| Project server blocked | Not approved                      | Run `claude mcp reset-project-choices` |
+
+### Best Practices
+
+1. **Use project scope** for team-shared servers (`.mcp.json`)
+2. **Use local scope** for personal/sensitive configurations
+3. **Use environment variables** for secrets in `.mcp.json`
+4. **Prefer HTTP transport** over SSE for remote servers
+5. **Enable Tool Search** for many MCP servers
+6. **Review servers** before approving from `.mcp.json`
+7. **Set appropriate output limits** for data-heavy servers
+
+### Security Considerations
+
+- MCP servers can run arbitrary code
+- Only add servers from trusted sources
+- Review server configurations before starting
+- All actions require explicit approval
+- Use enterprise managed settings for organizational control
+- Store secrets in environment variables, not config files
