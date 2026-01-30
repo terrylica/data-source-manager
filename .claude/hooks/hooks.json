@@ -2,6 +2,17 @@
   "$schema": "https://code.claude.com/hooks/schema.json",
   "description": "DSM-specific hooks for data-source-manager",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_ROOT}/.claude/hooks/dsm-session-start.sh",
+            "timeout": 2000
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "matcher": ".*",

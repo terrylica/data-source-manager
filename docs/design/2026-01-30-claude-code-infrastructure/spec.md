@@ -211,6 +211,7 @@ Run operation for: $ARGUMENTS
 {
   "description": "DSM-specific hooks",
   "hooks": {
+    "SessionStart": [{ "hooks": [{ "command": "dsm-session-start.sh" }] }],
     "UserPromptSubmit": [
       { "matcher": ".*", "hooks": [{ "command": "dsm-skill-suggest.sh" }] }
     ],
@@ -219,7 +220,8 @@ Run operation for: $ARGUMENTS
     ],
     "PostToolUse": [
       { "matcher": "Write|Edit", "hooks": [{ "command": "dsm-code-guard.sh" }] }
-    ]
+    ],
+    "Stop": [{ "hooks": [{ "command": "dsm-final-check.sh" }] }]
   }
 }
 ```
@@ -228,6 +230,7 @@ Run operation for: $ARGUMENTS
 
 | Event            | Purpose                    | Blocking | DSM Hook             |
 | ---------------- | -------------------------- | -------- | -------------------- |
+| SessionStart     | Load FCP context on start  | No       | dsm-session-start.sh |
 | UserPromptSubmit | Suggest skills on prompt   | No       | dsm-skill-suggest.sh |
 | PreToolUse       | Validate before execution  | Yes (2)  | dsm-bash-guard.sh    |
 | PostToolUse      | Validate after file writes | No       | dsm-code-guard.sh    |

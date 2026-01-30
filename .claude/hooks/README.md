@@ -4,6 +4,18 @@ Project-specific Claude Code hooks for data-source-manager.
 
 ## Available Hooks
 
+### dsm-session-start.sh (SessionStart)
+
+Loads FCP context at session start for immediate awareness.
+
+**Context Injected:**
+
+- FCP priority (Cache → Vision → REST)
+- Key code patterns (UTC, timeouts, symbol formats)
+- Quick command references
+
+**Behavior**: Adds context to Claude's initial state (stdout → context).
+
 ### dsm-skill-suggest.sh (UserPromptSubmit)
 
 Analyzes user prompts and suggests relevant DSM skills based on keywords.
@@ -65,6 +77,7 @@ The hooks are configured in `hooks.json`:
 ```json
 {
   "hooks": {
+    "SessionStart": [{ "hooks": [{ "command": "dsm-session-start.sh" }] }],
     "UserPromptSubmit": [
       { "matcher": ".*", "hooks": [{ "command": "dsm-skill-suggest.sh" }] }
     ],
@@ -73,7 +86,8 @@ The hooks are configured in `hooks.json`:
     ],
     "PostToolUse": [
       { "matcher": "Write|Edit", "hooks": [{ "command": "dsm-code-guard.sh" }] }
-    ]
+    ],
+    "Stop": [{ "hooks": [{ "command": "dsm-final-check.sh" }] }]
   }
 }
 ```

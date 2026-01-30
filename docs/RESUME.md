@@ -4,6 +4,24 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### SessionStart Hook for FCP Context (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added SessionStart hook (dsm-session-start.sh) to load FCP context at session start
+- Now 5 hooks total: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop
+- Updated hooks.json, README.md, and design spec
+
+**Context Injected**:
+
+- FCP priority (Cache → Vision → REST)
+- Key code patterns (UTC, timeouts, symbol formats)
+- Quick command references (/dsm-usage, /dsm-fcp-monitor, /quick-test)
+
+**Source**: [Official hooks reference](https://code.claude.com/docs/en/hooks) SessionStart pattern
+
 ### Skill Self-Evolution Pattern (2026-01-30)
 
 **Status**: Complete
