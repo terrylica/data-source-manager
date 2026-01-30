@@ -8701,6 +8701,480 @@ claude mcp add desktop-commander npx -- -y @wonderwhy-er/desktop-commander-mcp
 | Error tracking        | Sentry              | Medium   |
 | Project management    | Linear/Notion       | Low      |
 
+## Claude Agent SDK
+
+### Overview
+
+The Claude Agent SDK (formerly Claude Code SDK) enables building AI agents programmatically with the same tools, agent loop, and context management that power Claude Code.
+
+### Installation
+
+**Python:**
+
+```bash
+pip install claude-agent-sdk
+```
+
+**TypeScript:**
+
+```bash
+npm install @anthropic-ai/claude-agent-sdk
+```
+
+### Basic Usage
+
+```python
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def main():
+    async for message in query(
+        prompt="Find and fix the bug in auth.py",
+        options=ClaudeAgentOptions(allowed_tools=["Read", "Edit", "Bash"])
+    ):
+        print(message)
+
+asyncio.run(main())
+```
+
+```typescript
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Find and fix the bug in auth.py",
+  options: { allowedTools: ["Read", "Edit", "Bash"] },
+})) {
+  console.log(message);
+}
+```
+
+### Built-in Tools
+
+| Tool            | Description                                    |
+| --------------- | ---------------------------------------------- |
+| Read            | Read any file in working directory             |
+| Write           | Create new files                               |
+| Edit            | Make precise edits to existing files           |
+| Bash            | Run terminal commands, scripts, git operations |
+| Glob            | Find files by pattern                          |
+| Grep            | Search file contents with regex                |
+| WebSearch       | Search the web                                 |
+| WebFetch        | Fetch and parse web content                    |
+| AskUserQuestion | Ask clarifying questions                       |
+
+### Hooks
+
+Run custom code at key points in agent lifecycle:
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, HookMatcher
+
+async def log_file_change(input_data, tool_use_id, context):
+    file_path = input_data.get('tool_input', {}).get('file_path', 'unknown')
+    with open('./audit.log', 'a') as f:
+        f.write(f"{datetime.now()}: modified {file_path}\n")
+    return {}
+
+async def main():
+    async for message in query(
+        prompt="Refactor utils.py",
+        options=ClaudeAgentOptions(
+            permission_mode="acceptEdits",
+            hooks={
+                "PostToolUse": [HookMatcher(matcher="Edit|Write", hooks=[log_file_change])]
+            }
+        )
+    ):
+        print(message)
+```
+
+**Available hooks:**
+
+- `PreToolUse`: Before tool execution
+- `PostToolUse`: After tool execution
+- `Stop`: When agent stops
+- `SessionStart`: At session start
+- `SessionEnd`: At session end
+- `UserPromptSubmit`: On user prompt
+
+### Subagents
+
+Define specialized agents for delegation:
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+async for message in query(
+    prompt="Use the code-reviewer agent to review this codebase",
+    options=ClaudeAgentOptions(
+        allowed_tools=["Read", "Glob", "Grep", "Task"],
+        agents={
+            "code-reviewer": AgentDefinition(
+                description="Expert code reviewer for quality and security",
+                prompt="Analyze code quality and suggest improvements",
+                tools=["Read", "Glob", "Grep"]
+            )
+        }
+    )
+):
+    print(message)
+```
+
+### MCP Integration
+
+Connect external systems via Model Context Protocol:
+
+```python
+async for message in query(
+    prompt="Open example.com and describe what you see",
+    options=ClaudeAgentOptions(
+        mcp_servers={
+            "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]}
+        }
+    )
+):
+    print(message)
+```
+
+### Session Management
+
+Maintain context across exchanges:
+
+```python
+session_id = None
+
+# First query: capture session ID
+async for message in query(
+    prompt="Read the authentication module",
+    options=ClaudeAgentOptions(allowed_tools=["Read", "Glob"])
+):
+    if hasattr(message, 'subtype') and message.subtype == 'init':
+        session_id = message.session_id
+
+# Resume with full context
+async for message in query(
+    prompt="Now find all places that call it",
+    options=ClaudeAgentOptions(resume=session_id)
+):
+    print(message.result)
+```
+
+### Permission Modes
+
+| Mode                | Description                |
+| ------------------- | -------------------------- |
+| `bypassPermissions` | Skip all permission checks |
+| `acceptEdits`       | Auto-approve file edits    |
+| `askForPermission`  | Prompt for each action     |
+
+### Authentication
+
+Environment variables for cloud providers:
+
+- **Anthropic API**: `ANTHROPIC_API_KEY`
+- **AWS Bedrock**: `CLAUDE_CODE_USE_BEDROCK=1` + AWS credentials
+- **Google Vertex**: `CLAUDE_CODE_USE_VERTEX=1` + GCP credentials
+- **Microsoft Foundry**: `CLAUDE_CODE_USE_FOUNDRY=1` + Azure credentials
+
+### Claude Code Features in SDK
+
+Enable filesystem-based configuration:
+
+```python
+options = ClaudeAgentOptions(
+    setting_sources=["project"]  # Load .claude/ config
+)
+```
+
+| Feature        | Location                          |
+| -------------- | --------------------------------- |
+| Skills         | `.claude/skills/SKILL.md`         |
+| Slash commands | `.claude/commands/*.md`           |
+| Memory         | `CLAUDE.md`                       |
+| Plugins        | Programmatic via `plugins` option |
+
+### SDK vs CLI Comparison
+
+| Use Case                | Best Choice |
+| ----------------------- | ----------- |
+| Interactive development | CLI         |
+| CI/CD pipelines         | SDK         |
+| Custom applications     | SDK         |
+| One-off tasks           | CLI         |
+| Production automation   | SDK         |
+
+### DSM Agent Example
+
+```python
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+async def fetch_market_data():
+    async for message in query(
+        prompt="Fetch BTCUSDT data for the last 7 days and validate the result",
+        options=ClaudeAgentOptions(
+            allowed_tools=["Read", "Edit", "Bash", "Glob", "Task"],
+            agents={
+                "data-validator": AgentDefinition(
+                    description="Validates OHLCV data quality",
+                    prompt="Check for gaps, outliers, and data integrity",
+                    tools=["Read", "Bash"]
+                )
+            },
+            mcp_servers={
+                "filesystem": {
+                    "command": "npx",
+                    "args": ["-y", "@anthropic/mcp-server-filesystem", "."]
+                }
+            }
+        )
+    ):
+        if hasattr(message, "result"):
+            return message.result
+
+asyncio.run(fetch_market_data())
+```
+
+## Prompt Engineering Best Practices
+
+### Overview
+
+Claude 4.x models (Sonnet 4.5, Haiku 4.5, Opus 4.5) are trained for precise instruction following. These best practices optimize Claude's performance.
+
+### General Principles
+
+#### Be Explicit
+
+Claude 4.x responds well to clear, explicit instructions.
+
+**Less effective:**
+
+```
+Create an analytics dashboard
+```
+
+**More effective:**
+
+```
+Create an analytics dashboard. Include as many relevant features and
+interactions as possible. Go beyond the basics to create a fully-featured
+implementation.
+```
+
+#### Provide Context
+
+Explain why the behavior matters:
+
+**Less effective:**
+
+```
+NEVER use ellipses
+```
+
+**More effective:**
+
+```
+Your response will be read aloud by a text-to-speech engine, so never
+use ellipses since the engine cannot pronounce them.
+```
+
+#### Long-Horizon Reasoning
+
+Claude 4.5 excels at extended sessions with state tracking:
+
+```
+Your context window will be automatically compacted as it approaches its
+limit, allowing you to continue working indefinitely. Do not stop tasks
+early due to token budget concerns. Save progress before context refreshes.
+Always be persistent and autonomous. Never artificially stop any task
+early regardless of context remaining.
+```
+
+### Multi-Context Window Workflows
+
+1. **Use different prompt for first window**: Set up framework (tests, scripts)
+2. **Write tests in structured format**: Keep in `tests.json`
+3. **Create quality-of-life tools**: Setup scripts like `init.sh`
+4. **Starting fresh vs compacting**: Let Claude discover state from filesystem
+
+```
+Call pwd; you can only read and write files in this directory.
+Review progress.txt, tests.json, and the git logs.
+Run through integration test before implementing new features.
+```
+
+### State Management
+
+**Structured formats for state data:**
+
+```json
+{
+  "tests": [
+    { "id": 1, "name": "authentication_flow", "status": "passing" },
+    { "id": 2, "name": "user_management", "status": "failing" }
+  ],
+  "total": 200,
+  "passing": 150,
+  "failing": 25
+}
+```
+
+**Unstructured for progress notes:**
+
+```
+Session 3 progress:
+- Fixed authentication token validation
+- Updated user model for edge cases
+- Next: investigate user_management test failures
+```
+
+### Tool Usage Patterns
+
+Claude 4.5 benefits from explicit direction:
+
+**Less effective (suggests only):**
+
+```
+Can you suggest some changes to improve this function?
+```
+
+**More effective (takes action):**
+
+```
+Change this function to improve its performance.
+```
+
+**Prompt for proactive action:**
+
+```xml
+<default_to_action>
+By default, implement changes rather than only suggesting them. If intent
+is unclear, infer the most useful action and proceed using tools to
+discover missing details instead of guessing.
+</default_to_action>
+```
+
+**Prompt for conservative action:**
+
+```xml
+<do_not_act_before_instructions>
+Do not jump into implementation unless clearly instructed. When intent is
+ambiguous, default to providing information and recommendations rather
+than taking action.
+</do_not_act_before_instructions>
+```
+
+### Output Formatting
+
+1. **Tell Claude what to do, not what not to do**
+2. **Use XML format indicators**: `<smoothly_flowing_prose_paragraphs>`
+3. **Match prompt style to desired output**
+4. **Detailed prompts for formatting preferences**
+
+```xml
+<avoid_excessive_markdown_and_bullet_points>
+When writing reports or analyses, write in clear, flowing prose using
+complete paragraphs. Reserve markdown for `inline code`, code blocks,
+and simple headings. Avoid **bold** and *italics*.
+
+DO NOT use lists unless: a) presenting truly discrete items, or
+b) user explicitly requests a list.
+
+Your goal is readable, flowing text that guides the reader naturally.
+</avoid_excessive_markdown_and_bullet_points>
+```
+
+### Parallel Tool Calling
+
+Claude 4.x excels at parallel execution:
+
+```xml
+<use_parallel_tool_calls>
+If calling multiple tools with no dependencies, make all independent calls
+in parallel. Prioritize simultaneous actions over sequential. For example,
+reading 3 files should be 3 parallel tool calls. Maximize parallel use
+for speed. However, if some calls depend on previous results, call them
+sequentially. Never use placeholders or guess missing parameters.
+</use_parallel_tool_calls>
+```
+
+### Minimize Over-Engineering
+
+```
+Avoid over-engineering. Only make changes that are directly requested or
+clearly necessary. Keep solutions simple and focused.
+
+Don't add features, refactor code, or make "improvements" beyond what was
+asked. A bug fix doesn't need surrounding code cleaned up.
+
+Don't create helpers, utilities, or abstractions for one-time operations.
+The right amount of complexity is the minimum needed for the current task.
+```
+
+### Code Exploration
+
+```
+ALWAYS read and understand relevant files before proposing code edits.
+Do not speculate about code you have not inspected. If the user references
+a specific file/path, you MUST open and inspect it before explaining or
+proposing fixes. Be rigorous and persistent in searching code for key facts.
+```
+
+### Minimize Hallucinations
+
+```xml
+<investigate_before_answering>
+Never speculate about code you have not opened. If the user references a
+specific file, you MUST read it before answering. Investigate and read
+relevant files BEFORE answering questions about the codebase. Never make
+claims about code before investigating - give grounded, hallucination-free
+answers.
+</investigate_before_answering>
+```
+
+### Extended Thinking
+
+Guide Claude's reasoning:
+
+```
+After receiving tool results, carefully reflect on their quality and
+determine optimal next steps before proceeding. Use thinking to plan
+and iterate based on new information.
+```
+
+### Frontend Design
+
+```xml
+<frontend_aesthetics>
+Avoid generic "AI slop" aesthetic. Make creative, distinctive frontends.
+
+Focus on:
+- Typography: Choose beautiful, unique fonts. Avoid Arial, Inter.
+- Color & Theme: Commit to cohesive aesthetic. Use CSS variables.
+- Motion: Use animations for micro-interactions. CSS-only for HTML.
+- Backgrounds: Create atmosphere and depth, not solid colors.
+
+Avoid: overused fonts, clichéd purple gradients, predictable layouts.
+</frontend_aesthetics>
+```
+
+### DSM-Specific Prompting
+
+```xml
+<dsm_development_context>
+This is a financial data management library. Key patterns:
+
+- Always use UTC timestamps (datetime.now(timezone.utc))
+- Never use bare except clauses
+- Validate symbol formats before API calls
+- Check DataFrame structure (open_time, open, high, low, close, volume)
+- Use Polars for DataFrames, not pandas
+- FCP (Failover Control Protocol) handles data source fallback
+
+When implementing features, follow these domain patterns strictly.
+</dsm_development_context>
+```
+
 ## Verification Checklist
 
 ### Infrastructure

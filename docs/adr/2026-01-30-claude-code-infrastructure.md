@@ -125,12 +125,12 @@ user-invocable: true
 
 **Completed**: 2026-01-30
 
-**Summary**: Comprehensive Claude Code infrastructure implemented with 170 commits.
+**Summary**: Comprehensive Claude Code infrastructure implemented with 171 commits.
 
 | Metric              | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
-| Design spec lines   | 8727                                                                             |
-| Sections            | 93                                                                               |
+| Design spec lines   | 9201                                                                             |
+| Sections            | 95                                                                               |
 | Agents              | 5 (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer) |
 | Commands            | 6 (debug-fcp, fetch-data, quick-test, review-dsm, validate-data, feature-dev)    |
 | Skills              | 4 (dsm-usage, dsm-testing, dsm-research, dsm-fcp-monitor)                        |
@@ -210,6 +210,8 @@ user-invocable: true
 - DevContainer configuration (Docker isolation, firewall rules, autonomous mode)
 - Structured outputs (JSON schema, Pydantic, Zod, strict tool use, combined usage)
 - MCP server ecosystem (Context7, Sequential Thinking, Playwright, cloud providers)
+- Claude Agent SDK (Python/TypeScript, hooks, subagents, MCP, sessions, permissions)
+- Prompt engineering best practices (Claude 4.x, tool usage, formatting, state management)
 
 ## More Information
 
