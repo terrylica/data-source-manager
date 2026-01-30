@@ -4,6 +4,25 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Hooks & Permission Modes Enhancement (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added hook exit codes table (0, 2, other) with output channels
+- Added hook JSON output structure for sophisticated control
+- Added matcher patterns table with examples
+- Added permission modes table with use cases
+- Added best practices for read-only vs write agents
+
+**Sources**:
+
+- [Official Hooks Docs](https://code.claude.com/docs/en/hooks)
+- [DataCamp Tutorial](https://www.datacamp.com/tutorial/claude-code-hooks)
+- [Official Subagents Docs](https://code.claude.com/docs/en/sub-agents)
+- [Claude Code Permissions Guide](https://www.eesel.ai/blog/claude-code-permissions)
+
 ### CLAUDE.md Imports & MCP Tool Search (2026-01-30)
 
 **Status**: Complete

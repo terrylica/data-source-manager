@@ -106,6 +106,24 @@ hooks: # Optional: lifecycle hooks scoped to agent
 | `hooks`           | No       | Lifecycle hooks (PreToolUse, PostToolUse, Stop)  |
 | `color`           | No       | Visual identifier in UI                          |
 
+### Permission Modes
+
+Based on [Official Subagents Docs](https://code.claude.com/docs/en/sub-agents) and [Claude Code Permissions Guide](https://www.eesel.ai/blog/claude-code-permissions):
+
+| Mode                | Behavior                                             | Use Case               |
+| ------------------- | ---------------------------------------------------- | ---------------------- |
+| `default`           | Prompt for approval on file writes                   | Most agents            |
+| `acceptEdits`       | Accept all edits, prompt for bash                    | Trusted edit agents    |
+| `plan`              | Read-only, no file writes allowed                    | Analysis/review agents |
+| `bypassPermissions` | Skip all permission checks (requires explicit allow) | CI/automation only     |
+
+**Best practices**:
+
+- Use `plan` for read-only agents (api-reviewer, silent-failure-hunter)
+- Use `default` or `acceptEdits` for agents that write files
+- Avoid `bypassPermissions` unless in controlled CI environments
+- Use `disallowedTools` (not `tools`) for reliable tool restrictions
+
 ### Agent Features
 
 | Agent                 | Color  | Tools              | Mode | Skills       |
@@ -362,6 +380,43 @@ Following [cc-skills hooks pattern](https://github.com/terrylica/cc-skills) with
 | PreToolUse       | Validate before execution  | Yes (2)  | dsm-bash-guard.sh    |
 | PostToolUse      | Validate after file writes | No       | dsm-code-guard.sh    |
 | Stop             | Final validation at end    | No       | dsm-final-check.sh   |
+
+### Hook Exit Codes
+
+Based on [Official Hooks Docs](https://code.claude.com/docs/en/hooks) and [DataCamp Tutorial](https://www.datacamp.com/tutorial/claude-code-hooks):
+
+| Exit Code | Behavior                                             | Output Channel  |
+| --------- | ---------------------------------------------------- | --------------- |
+| 0         | Success, execution continues                         | stdout → user   |
+| 2         | Blocking error, halts action (PreToolUse)            | stderr → Claude |
+| Other     | Non-blocking error, execution continues with warning | stderr → user   |
+
+### Hook JSON Output
+
+Hooks can return structured JSON for sophisticated control:
+
+```json
+{
+  "continue": true, // Whether Claude continues after hook
+  "stopReason": "string", // Message shown when continue is false
+  "suppressOutput": true, // Hide stdout from transcript mode
+  "systemMessage": "string" // Warning message shown to user
+}
+```
+
+**Priority order**: `continue: false` > JSON `"decision": "block"` > exit code 2
+
+### Matcher Patterns
+
+| Pattern           | Matches                    |
+| ----------------- | -------------------------- |
+| `Write`           | Exact tool match           |
+| `Write\|Edit`     | Multiple tools (OR)        |
+| `*` or empty      | All tools                  |
+| `Bash(npm test*)` | Tool with argument pattern |
+| `mcp__memory__.*` | MCP tools with regex       |
+
+Note: Matchers are case-sensitive. `bash` won't match `Bash`.
 
 ### DSM Code Guard Checks
 
