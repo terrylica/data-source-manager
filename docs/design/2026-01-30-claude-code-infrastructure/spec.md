@@ -46797,3 +46797,305 @@ endpoint, and summarize the rate limits and response format.
 Record a GIF demonstrating the data validation error messages when
 invalid timestamps are provided to the FCP module.
 ```
+# IDE Integration Reference
+
+This section covers IDE extensions and plugins that enhance Claude Code workflows, particularly the VS Code extension and JetBrains plugin integrations.
+
+## VS Code Extension
+
+The official Claude Code VS Code extension provides deep IDE integration with plan review, inline diffs, and enhanced context sharing.
+
+### Installation
+
+**From VS Code Marketplace**:
+
+1. Open VS Code
+2. Go to Extensions (Cmd+Shift+X)
+3. Search for "Claude Code"
+4. Click Install
+
+**From Command Line**:
+
+```bash
+code --install-extension anthropic.claude-code
+```
+
+### Key Features
+
+#### Plan Mode Integration
+
+When Claude Code enters Plan Mode, the VS Code extension provides:
+
+- **Plan viewer panel** - Visual representation of planned changes
+- **File tree diff preview** - See which files will be created/modified/deleted
+- **Inline annotations** - Hover over file names to see planned changes
+- **One-click approval** - Approve plan directly from VS Code
+
+#### Inline Diff Viewer
+
+The extension shows Claude's proposed changes with:
+
+- **Side-by-side diffs** - Compare original and proposed code
+- **Accept/reject buttons** - Approve changes per-hunk or per-file
+- **Syntax highlighting** - Full language support in diff view
+- **Line-by-line navigation** - Jump between changes
+
+#### @-Mentions Integration
+
+Reference files directly from VS Code:
+
+```
+# In Claude Code prompt
+@src/data_source_manager.py - Review this class
+@tests/ - Run all tests in this directory
+```
+
+The extension provides autocomplete for file paths when typing `@`.
+
+### Terminal Reference
+
+Claude Code can reference terminal output displayed in VS Code:
+
+```
+Look at the error in the terminal output and fix it.
+```
+
+The extension captures terminal content and makes it available to Claude.
+
+### Commands and Shortcuts
+
+| Command                          | Shortcut      | Description                        |
+| -------------------------------- | ------------- | ---------------------------------- |
+| Claude Code: Open Chat           | Cmd+Shift+C   | Open Claude Code panel             |
+| Claude Code: Review Plan         | Cmd+Shift+P   | Open plan review panel             |
+| Claude Code: Accept Changes      | Cmd+Enter     | Accept current diff                |
+| Claude Code: Reject Changes      | Cmd+Backspace | Reject current diff                |
+| Claude Code: Toggle Inline Diffs | Cmd+Shift+D   | Show/hide inline change indicators |
+| Claude Code: Reference File      | Cmd+Shift+@   | Insert @-mention for current file  |
+
+### Configuration
+
+VS Code settings for Claude Code (`settings.json`):
+
+```json
+{
+  "claudeCode.enabled": true,
+  "claudeCode.showInlineDiffs": true,
+  "claudeCode.autoOpenPlanReview": true,
+  "claudeCode.terminalCapture": true,
+  "claudeCode.diffViewMode": "sideBySide",
+  "claudeCode.theme": "auto"
+}
+```
+
+### Conversation History
+
+The extension maintains conversation history in VS Code:
+
+- **History panel** - Browse past conversations
+- **Search conversations** - Find specific discussions
+- **Resume sessions** - Continue from previous context
+- **Export conversations** - Save as markdown
+
+### Plugin Management
+
+Manage Claude Code plugins directly from VS Code:
+
+1. Open Command Palette (Cmd+Shift+P)
+2. Type "Claude Code: Manage Plugins"
+3. View installed plugins, enable/disable, configure
+
+### Workspace Integration
+
+The extension respects VS Code workspace settings:
+
+- **Multi-root workspaces** - Claude understands workspace structure
+- **Workspace-specific CLAUDE.md** - Per-workspace instructions
+- **Git integration** - Leverages VS Code's git state
+
+## JetBrains Plugin
+
+Claude Code integration for IntelliJ IDEA, PyCharm, WebStorm, and other JetBrains IDEs.
+
+### Installation
+
+1. Open Settings (Cmd+,)
+2. Go to Plugins > Marketplace
+3. Search for "Claude Code"
+4. Click Install and restart IDE
+
+### Features
+
+| Feature            | Description                                  |
+| ------------------ | -------------------------------------------- |
+| Tool window        | Dedicated Claude Code panel                  |
+| Diff integration   | Changes shown in JetBrains diff viewer       |
+| Code inspection    | Claude suggestions in inspection results     |
+| Run configurations | Launch Claude Code sessions from run configs |
+| Terminal capture   | Reference terminal output in prompts         |
+
+### Comparison: VS Code vs JetBrains
+
+| Feature                 | VS Code Extension  | JetBrains Plugin      |
+| ----------------------- | ------------------ | --------------------- |
+| Plan mode integration   | Full visual review | Basic support         |
+| Inline diffs            | Native diff view   | JetBrains diff viewer |
+| @-mentions autocomplete | Yes                | Yes                   |
+| Terminal capture        | Yes                | Yes                   |
+| Plugin management       | Built-in UI        | Settings panel        |
+| Conversation history    | Dedicated panel    | Tool window           |
+| Update frequency        | More frequent      | Quarterly releases    |
+
+## Context Sharing
+
+Both extensions support context sharing between IDE and Claude Code:
+
+### Automatic Context
+
+The extension automatically provides:
+
+- **Open files** - Currently open editor tabs
+- **Cursor position** - Line and column in active file
+- **Selection** - Highlighted text
+- **Git state** - Branch, uncommitted changes
+- **Project structure** - Workspace/project layout
+
+### Manual Context
+
+Explicitly share context via:
+
+```
+# Reference current file
+@currentFile - Review this file
+
+# Reference selection
+@selection - Explain this code
+
+# Reference workspace
+@workspace - Overview of project structure
+```
+
+## Checkpointing Integration
+
+IDE extensions integrate with Claude Code's checkpoint system:
+
+### Checkpoint Viewer
+
+- **Timeline view** - Visual history of checkpoints
+- **Diff preview** - See changes between checkpoints
+- **Restore button** - One-click restore to checkpoint
+- **Branch creation** - Create git branch from checkpoint
+
+### Auto-Checkpointing
+
+Configure when checkpoints are created:
+
+```json
+{
+  "claudeCode.autoCheckpoint": true,
+  "claudeCode.checkpointOnPlanApproval": true,
+  "claudeCode.checkpointOnError": true
+}
+```
+
+## Troubleshooting
+
+### Extension Not Connecting
+
+1. Verify Claude Code is running: `claude --version`
+2. Check extension output panel for errors
+3. Restart VS Code/JetBrains IDE
+4. Reinstall extension if needed
+
+### Diffs Not Showing
+
+1. Ensure `showInlineDiffs` is enabled
+2. Check file is within workspace
+3. Verify Claude Code has made changes
+4. Toggle diff view with keyboard shortcut
+
+### Slow Performance
+
+1. Disable unused features (terminal capture, etc.)
+2. Reduce conversation history limit
+3. Close unused editor tabs
+4. Check system resources
+
+## DSM-Specific IDE Integration
+
+For data-source-manager development, optimize IDE integration:
+
+### Recommended VS Code Settings
+
+```json
+{
+  "claudeCode.enabled": true,
+  "claudeCode.showInlineDiffs": true,
+  "claudeCode.autoOpenPlanReview": true,
+  "claudeCode.terminalCapture": true,
+  "claudeCode.workspaceGlobs": [
+    "src/**/*.py",
+    "tests/**/*.py",
+    "*.toml",
+    "CLAUDE.md"
+  ],
+  "claudeCode.excludePatterns": [
+    "**/__pycache__/**",
+    "**/.pytest_cache/**",
+    "**/dist/**",
+    "**/*.egg-info/**"
+  ]
+}
+```
+
+### DSM Workspace Layout
+
+Configure VS Code workspace for DSM development:
+
+```json
+{
+  "folders": [
+    { "path": ".", "name": "DSM Root" },
+    { "path": "src/data_source_manager", "name": "Source" },
+    { "path": "tests", "name": "Tests" }
+  ],
+  "settings": {
+    "claudeCode.enabled": true
+  }
+}
+```
+
+### PyCharm Professional Settings
+
+For PyCharm users:
+
+1. Enable Claude Code plugin
+2. Configure Python interpreter (3.13)
+3. Set up pytest as test runner
+4. Enable terminal capture for test output
+
+### Reference Files Quickly
+
+Create keybindings for common DSM files:
+
+```json
+{
+  "key": "cmd+shift+m",
+  "command": "claudeCode.referenceFile",
+  "args": { "path": "CLAUDE.md" }
+}
+```
+
+### Terminal Integration for Tests
+
+Run tests and let Claude analyze failures:
+
+```bash
+# In VS Code terminal
+uv run pytest tests/ -v
+
+# Then in Claude Code
+Look at the test failures in the terminal and fix them.
+```
+
+The extension captures the pytest output and provides it to Claude for analysis.
