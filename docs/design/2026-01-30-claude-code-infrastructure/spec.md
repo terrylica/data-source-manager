@@ -22324,3 +22324,738 @@ Example `.mcp.json` for data-source-manager:
 - Use user scope for personal utilities
 - Use project scope for team-shared tools
 - Document server purposes in README
+<!-- SSoT-OK: This section is authoritative for common workflows patterns -->
+
+## Common Workflows Reference
+
+Practical workflows for everyday Claude Code development tasks.
+
+### Codebase Exploration Workflows
+
+**Quick Overview Pattern**:
+
+```
+# Step 1: Get high-level overview
+> give me an overview of this codebase
+
+# Step 2: Dive into architecture
+> explain the main architecture patterns used here
+
+# Step 3: Understand specifics
+> what are the key data models?
+> how is authentication handled?
+```
+
+**Finding Relevant Code**:
+
+```
+# Find files
+> find the files that handle user authentication
+
+# Understand interactions
+> how do these authentication files work together?
+
+# Trace execution
+> trace the login process from front-end to database
+```
+
+**DSM-Specific Exploration**:
+
+```
+# FCP exploration
+> find files that implement FCP decision logic
+
+# Symbol handling
+> trace symbol format conversion from API to cache
+
+# Cache structure
+> explain the cache directory hierarchy
+```
+
+| Tip                 | Description                                  |
+| ------------------- | -------------------------------------------- |
+| Start broad         | Begin with overview, narrow to specifics     |
+| Use domain language | Reference FCP, symbols, OHLCV in DSM context |
+| Install LSP plugin  | Enables "go to definition" navigation        |
+
+### Bug Fixing Workflows
+
+**Error Diagnosis Pattern**:
+
+```
+# Step 1: Share error
+> I'm seeing an error when I run uv run pytest
+
+# Step 2: Get recommendations
+> suggest a few ways to fix the TypeError in fetcher.py
+
+# Step 3: Apply fix
+> update fetcher.py with the null check you suggested
+```
+
+**DSM Bug Patterns**:
+
+```
+# FCP debugging
+> why is FCP returning SKIP for this symbol?
+
+# Cache issues
+> the cache shows stale data, trace the invalidation logic
+
+# Symbol format bugs
+> trace symbol format conversion for BTC-USDT
+```
+
+| Approach           | When to Use                        |
+| ------------------ | ---------------------------------- |
+| Stack trace        | Share complete error output        |
+| Reproduction steps | Include exact command to reproduce |
+| Intermittent bugs  | Note frequency and conditions      |
+
+### Refactoring Workflows
+
+**Legacy Code Update Pattern**:
+
+```
+# Step 1: Find deprecated usage
+> find deprecated API usage in our codebase
+
+# Step 2: Get recommendations
+> suggest how to refactor utils.py to use modern patterns
+
+# Step 3: Apply safely
+> refactor utils.py while maintaining same behavior
+
+# Step 4: Verify
+> run tests for the refactored code
+```
+
+**DSM Refactoring Patterns**:
+
+```
+# Fetcher modernization
+> refactor BinanceFetcher to use async/await
+
+# Error handling improvement
+> add proper exception handling to the FCP module
+
+# Cache optimization
+> refactor cache layer to use connection pooling
+```
+
+| Principle           | Description                              |
+| ------------------- | ---------------------------------------- |
+| Small increments    | Test each change before next             |
+| Backward compatible | Maintain existing behavior when needed   |
+| Explain benefits    | Understand why modern approach is better |
+
+### Test Writing Workflows
+
+**Test Coverage Pattern**:
+
+```
+# Step 1: Identify gaps
+> find functions in fetcher.py that are not covered by tests
+
+# Step 2: Generate scaffolding
+> add tests for the fetcher module
+
+# Step 3: Add edge cases
+> add test cases for edge conditions in the fetcher
+
+# Step 4: Run and fix
+> run the new tests and fix any failures
+```
+
+**DSM Test Patterns**:
+
+```
+# Integration tests
+> add integration tests for BinanceFetcher with mocked responses
+
+# FCP tests
+> add tests for FCP decision logic edge cases
+
+# Cache tests
+> add tests for cache invalidation scenarios
+```
+
+**Test Generation Best Practices**:
+
+| Practice                   | Description                        |
+| -------------------------- | ---------------------------------- |
+| Follow existing patterns   | Claude matches project conventions |
+| Be specific about behavior | State what to verify               |
+| Request edge cases         | Ask for boundary, error conditions |
+
+### Plan Mode Workflow
+
+Plan Mode restricts Claude to read-only operations for safe exploration.
+
+**When to Use Plan Mode**:
+
+| Scenario                  | Description                        |
+| ------------------------- | ---------------------------------- |
+| Multi-step implementation | Features requiring many file edits |
+| Code exploration          | Research before any changes        |
+| Interactive development   | Iterate on direction with Claude   |
+
+**Starting Plan Mode**:
+
+```bash
+# Start session in Plan Mode
+claude --permission-mode plan
+
+# Run headless query in Plan Mode
+claude --permission-mode plan -p "Analyze the authentication system"
+```
+
+**During Session**:
+
+- Press `Shift+Tab` to cycle modes (Normal → Auto-Accept → Plan)
+- `⏸ plan mode on` indicator shows active Plan Mode
+- Press `Ctrl+G` to open plan in text editor
+
+**Example: Planning Complex Refactor**:
+
+```bash
+claude --permission-mode plan
+```
+
+```
+> I need to refactor our caching system to use Redis. Create a detailed migration plan.
+```
+
+Follow-up refinements:
+
+```
+> What about backward compatibility?
+> How should we handle the migration?
+```
+
+**Configure as Default**:
+
+```json
+// .claude/settings.json
+{
+  "permissions": {
+    "defaultMode": "plan"
+  }
+}
+```
+
+### Pull Request Workflow
+
+**Quick PR Creation**:
+
+```
+> /commit-push-pr
+```
+
+Creates commit, pushes branch, and opens PR in one step.
+
+**Step-by-Step PR**:
+
+```
+# Step 1: Summarize changes
+> summarize the changes I've made to the caching module
+
+# Step 2: Create PR
+> create a pr
+
+# Step 3: Enhance description
+> enhance the PR description with more context
+```
+
+**DSM PR Patterns**:
+
+```
+# Feature PR
+> create a pr for the new OKX fetcher implementation
+
+# Bug fix PR
+> create a pr for the FCP cache invalidation fix
+
+# Refactor PR
+> create a pr for the async fetcher migration
+```
+
+| Tip                      | Description                         |
+| ------------------------ | ----------------------------------- |
+| Review before submitting | Always review Claude's PR           |
+| Highlight risks          | Ask Claude to note potential issues |
+| Use Slack integration    | Configure MCP for auto-posting      |
+
+### Documentation Workflow
+
+**Documentation Pattern**:
+
+```
+# Step 1: Find gaps
+> find functions without proper docstrings in the fetcher module
+
+# Step 2: Generate docs
+> add docstrings to the undocumented functions in fetcher.py
+
+# Step 3: Enhance
+> improve the documentation with more context and examples
+
+# Step 4: Verify standards
+> check if the documentation follows our project standards
+```
+
+**DSM Documentation Patterns**:
+
+```
+# API documentation
+> document the public API for DataSourceManager
+
+# ADR updates
+> update the FCP ADR with the new decision logic
+
+# README updates
+> update README with new installation instructions
+```
+
+| Tip                  | Description                             |
+| -------------------- | --------------------------------------- |
+| Specify style        | Request JSDoc, docstrings, etc.         |
+| Request examples     | Include usage examples in docs          |
+| Focus on public APIs | Prioritize interfaces and complex logic |
+
+### Image and Visual Workflow
+
+**Adding Images to Conversation**:
+
+| Method         | How                                                    |
+| -------------- | ------------------------------------------------------ |
+| Drag and drop  | Drag image into Claude Code window                     |
+| Paste          | Copy image, paste with `Ctrl+V` (not `Cmd+V`)          |
+| Path reference | Provide path: `Analyze this image: /path/to/image.png` |
+
+**Image Analysis Prompts**:
+
+```
+# General analysis
+> What does this image show?
+
+# UI analysis
+> Describe the UI elements in this screenshot
+
+# Error context
+> Here's a screenshot of the error. What's causing it?
+
+# Code from visuals
+> Generate CSS to match this design mockup
+```
+
+**DSM Visual Patterns**:
+
+```
+# Architecture diagram
+> Here's our current architecture. How should we modify it?
+
+# Error screenshot
+> This is the FCP debug output. What's wrong?
+
+# Chart analysis
+> Analyze this OHLCV chart for anomalies
+```
+
+### File Reference Workflow
+
+Use `@` to quickly include files without waiting for reads.
+
+**Reference Types**:
+
+```
+# Single file
+> Explain the logic in @src/fetchers/binance.py
+
+# Directory
+> What's the structure of @src/fetchers?
+
+# MCP resources
+> Show me the data from @github:repos/owner/repo/issues
+```
+
+**DSM File References**:
+
+```
+# Fetcher analysis
+> Review @src/fetchers/binance.py for error handling
+
+# Cache structure
+> Explain @src/cache/ directory organization
+
+# Test review
+> Check @tests/fetchers/test_binance.py coverage
+```
+
+| Tip                  | Description                      |
+| -------------------- | -------------------------------- |
+| Relative or absolute | Both path formats work           |
+| Context loading      | @ loads parent CLAUDE.md files   |
+| Multiple files       | Reference several in one message |
+
+### Extended Thinking Workflow
+
+Extended thinking reserves tokens for step-by-step reasoning.
+
+**Configuration**:
+
+| Scope          | Method                                       |
+| -------------- | -------------------------------------------- |
+| Toggle         | `Option+T` (macOS) / `Alt+T` (Windows/Linux) |
+| Global default | `/config` to toggle                          |
+| Token limit    | `MAX_THINKING_TOKENS` environment variable   |
+
+**View Thinking Process**:
+
+Press `Ctrl+O` to toggle verbose mode, showing reasoning as gray italic text.
+
+**When to Use Extended Thinking**:
+
+| Scenario             | Benefit                       |
+| -------------------- | ----------------------------- |
+| Complex architecture | Explore multiple approaches   |
+| Challenging bugs     | Analyze edge cases thoroughly |
+| Multi-step planning  | Evaluate tradeoffs            |
+
+**Token Budget**:
+
+- **Enabled**: Up to 31,999 tokens for reasoning
+- **Disabled**: 0 tokens for thinking
+- **Charged**: All thinking tokens count toward cost
+
+### Session Management Workflow
+
+**Resume Previous Sessions**:
+
+```bash
+# Continue most recent
+claude --continue
+
+# Open session picker
+claude --resume
+
+# Resume by name
+claude --resume auth-refactor
+```
+
+**During Session**:
+
+```
+# Switch to different session
+> /resume
+
+# Rename current session
+> /rename auth-refactor
+```
+
+**Session Picker Shortcuts**:
+
+| Shortcut | Action                   |
+| -------- | ------------------------ |
+| `↑`/`↓`  | Navigate sessions        |
+| `→`/`←`  | Expand/collapse groups   |
+| `Enter`  | Resume selected          |
+| `P`      | Preview session          |
+| `R`      | Rename session           |
+| `/`      | Search filter            |
+| `A`      | Toggle all projects      |
+| `B`      | Filter by current branch |
+| `Esc`    | Exit picker              |
+
+**Best Practices**:
+
+| Practice              | Description                                |
+| --------------------- | ------------------------------------------ |
+| Name early            | Use `/rename` when starting distinct tasks |
+| Use `--continue`      | Quick access to most recent                |
+| Preview before resume | Press `P` to check content                 |
+
+### Git Worktree Workflow
+
+Run parallel Claude sessions with isolated code.
+
+**Create Worktree**:
+
+```bash
+# New worktree with new branch
+git worktree add ../project-feature-a -b feature-a
+
+# Worktree with existing branch
+git worktree add ../project-bugfix bugfix-123
+```
+
+**Run Parallel Sessions**:
+
+```bash
+# Terminal 1: Feature work
+cd ../project-feature-a
+claude
+
+# Terminal 2: Bug fix
+cd ../project-bugfix
+claude
+```
+
+**Manage Worktrees**:
+
+```bash
+# List all
+git worktree list
+
+# Remove when done
+git worktree remove ../project-feature-a
+```
+
+**DSM Worktree Patterns**:
+
+```bash
+# Feature development
+git worktree add ../dsm-okx-fetcher -b feature/okx-fetcher
+
+# FCP debugging
+git worktree add ../dsm-fcp-debug -b debug/fcp-cache-issue
+```
+
+| Tip                    | Description                          |
+| ---------------------- | ------------------------------------ |
+| Independent file state | Changes don't affect other worktrees |
+| Shared Git history     | All worktrees share commits/remotes  |
+| Initialize environment | Run `uv sync` in each new worktree   |
+
+### Unix Utility Workflow
+
+Use Claude as a command-line utility.
+
+**Build Script Integration**:
+
+```json
+// package.json
+{
+  "scripts": {
+    "lint:claude": "claude -p 'you are a linter. look at changes vs. main and report issues.'"
+  }
+}
+```
+
+**Pipe Data Through Claude**:
+
+```bash
+# Analyze build error
+cat build-error.txt | claude -p 'explain the root cause' > output.txt
+
+# Code review
+git diff | claude -p 'review these changes for bugs'
+```
+
+**Output Formats**:
+
+| Format        | Usage                         | Description              |
+| ------------- | ----------------------------- | ------------------------ |
+| `text`        | Default                       | Plain text response      |
+| `json`        | `--output-format json`        | JSON array with metadata |
+| `stream-json` | `--output-format stream-json` | Real-time JSON objects   |
+
+**DSM Unix Patterns**:
+
+```bash
+# Analyze test failures
+uv run pytest 2>&1 | claude -p 'explain test failures'
+
+# Review FCP logs
+cat logs/fcp-debug.log | claude -p 'identify FCP decision anomalies'
+```
+
+### Subagent Workflow
+
+Use specialized subagents for specific tasks.
+
+**View Available Subagents**:
+
+```
+> /agents
+```
+
+**Automatic Delegation**:
+
+Claude automatically delegates to appropriate subagents:
+
+```
+> review my recent code changes for security issues
+> run all tests and fix any failures
+```
+
+**Explicit Subagent Request**:
+
+```
+> use the code-reviewer subagent to check the auth module
+> have the debugger subagent investigate the login issue
+```
+
+**Create Custom Subagents**:
+
+```
+> /agents
+```
+
+Select "Create New subagent" and define:
+
+- Unique identifier (e.g., `fcp-debugger`)
+- When Claude should use it
+- Tool access permissions
+- System prompt for behavior
+
+**DSM Subagent Usage**:
+
+```
+# FCP debugging
+> use the fcp-debugger agent to investigate cache miss
+
+# API review
+> use the api-reviewer agent to check the new fetcher
+
+# Test writing
+> use the test-writer agent to add cache tests
+```
+
+| Tip                     | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| Project-specific        | Create in `.claude/agents/` for team sharing |
+| Descriptive description | Enables automatic delegation                 |
+| Minimal tools           | Limit to what subagent needs                 |
+
+### Self-Documentation Workflow
+
+Claude can answer questions about its own capabilities.
+
+**Example Queries**:
+
+```
+> can Claude Code create pull requests?
+> how does Claude Code handle permissions?
+> what skills are available?
+> how do I use MCP with Claude Code?
+> how do I configure Claude Code for Amazon Bedrock?
+```
+
+Claude has built-in access to current documentation regardless of version.
+
+| Tip                | Description                                  |
+| ------------------ | -------------------------------------------- |
+| Specific questions | Get detailed, accurate answers               |
+| Latest docs        | Always current documentation                 |
+| Complex features   | Explains MCP, enterprise, advanced workflows |
+
+### DSM-Specific Workflow Patterns
+
+**FCP Debugging Workflow**:
+
+```
+# Step 1: Check FCP state
+> /debug-fcp BTCUSDT
+
+# Step 2: Trace decision logic
+> trace FCP decision for BTCUSDT from cache to API
+
+# Step 3: Validate data
+> validate the OHLCV data returned for BTCUSDT
+```
+
+**Data Fetching Workflow**:
+
+```
+# Step 1: Fetch with validation
+> /fetch-data BTCUSDT 1h
+
+# Step 2: Validate structure
+> /validate-data
+
+# Step 3: Check cache state
+> verify cache was updated correctly
+```
+
+**Feature Development Workflow**:
+
+```
+# Step 1: Start guided development
+> /feature-dev
+
+# Step 2: Follow prompts for requirements
+# Step 3: Implement with DSM patterns
+# Step 4: Run quick tests
+> /quick-test
+```
+
+**Code Review Workflow**:
+
+```
+# Step 1: Review against DSM patterns
+> /review-dsm
+
+# Step 2: Check specific concerns
+> review error handling in the new fetcher
+
+# Step 3: Validate integration
+> check FCP integration for the new data source
+```
+
+### Workflow Composition Patterns
+
+**TDD Workflow**:
+
+```
+# Step 1: Write failing test
+> add a test for the new fetch_historical method
+
+# Step 2: Implement feature
+> implement fetch_historical to make the test pass
+
+# Step 3: Refactor
+> refactor fetch_historical for better readability
+
+# Step 4: Verify
+> run all tests to ensure no regressions
+```
+
+**Code Review + Fix Workflow**:
+
+```
+# Step 1: Get review
+> review the changes in src/fetchers/
+
+# Step 2: Address issues
+> fix the issues you identified
+
+# Step 3: Verify fixes
+> run tests to confirm fixes work
+```
+
+**Research + Implement Workflow**:
+
+```
+# Step 1: Plan Mode research
+claude --permission-mode plan
+> analyze how we should implement rate limiting
+
+# Step 2: Exit Plan Mode (Shift+Tab)
+# Step 3: Implement based on plan
+> implement rate limiting following the plan
+```
+
+### Workflow Best Practices
+
+| Practice                      | Description                                |
+| ----------------------------- | ------------------------------------------ |
+| Start with exploration        | Understand before modifying                |
+| Use Plan Mode for research    | Safe read-only analysis                    |
+| Name sessions                 | Easy resume with `/rename`                 |
+| Leverage subagents            | Delegate specialized tasks                 |
+| Small increments              | Test each change before next               |
+| Verify with tests             | Always run tests after changes             |
+| Use DSM commands              | `/debug-fcp`, `/fetch-data`, `/quick-test` |
+| Reference files with @        | Fast context loading                       |
+| Extended thinking for complex | Enable for architecture decisions          |
