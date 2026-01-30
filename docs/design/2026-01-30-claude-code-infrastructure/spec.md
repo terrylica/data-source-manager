@@ -2007,6 +2007,100 @@ scrape_configs:
 | Data fetching impl      | Sonnet | Medium        | Standard patterns        |
 | Quick lookups           | Haiku  | Low           | Fast, simple queries     |
 
+## Plugin & Marketplace Patterns
+
+Based on [Official Plugin Docs](https://code.claude.com/docs/en/discover-plugins) and [Plugin Blog Post](https://claude.com/blog/claude-code-plugins).
+
+### Plugin Components
+
+| Component      | Purpose                                     |
+| -------------- | ------------------------------------------- |
+| Slash commands | Custom shortcuts for frequent operations    |
+| Subagents      | Purpose-built agents for specialized tasks  |
+| MCP servers    | Connect to tools via Model Context Protocol |
+| Hooks          | Customize behavior at key workflow points   |
+
+### Plugin Discovery Commands
+
+| Command                    | Purpose                       |
+| -------------------------- | ----------------------------- |
+| `/plugin`                  | Install plugins interactively |
+| `/plugin search <query>`   | Find plugins by keyword       |
+| `/plugin install <name>`   | Install a specific plugin     |
+| `/plugin list`             | Show installed plugins        |
+| `/plugin uninstall <name>` | Remove a plugin               |
+
+### Marketplace Structure
+
+```json
+// .claude-plugin/marketplace.json
+{
+  "name": "my-marketplace",
+  "description": "Custom plugins for team",
+  "plugins": [
+    {
+      "name": "my-plugin",
+      "description": "What it does",
+      "repository": "org/repo"
+    }
+  ]
+}
+```
+
+### Plugin Architecture Pattern
+
+```
+Slash command → Agent → Subagent (haiku) → External tool
+```
+
+**Design principles**:
+
+- Claude orchestrates, external tools execute
+- CLI or script-based integrations (curl, gemini-cli, codex)
+- No MCP servers, no background processes, no daemons
+- Plugin loads, runs, exits
+
+### Creating a Plugin
+
+```
+my-plugin/
+├── .claude-plugin/
+│   └── plugin.json          # Plugin metadata
+├── .claude/
+│   ├── agents/              # Subagent definitions
+│   ├── commands/            # Slash commands
+│   ├── hooks/               # Lifecycle hooks
+│   └── rules/               # Context rules
+└── README.md                # Documentation
+```
+
+### Marketplace Sources
+
+| Marketplace             | Type        | Purpose                      |
+| ----------------------- | ----------- | ---------------------------- |
+| claude-plugins-official | Official    | Anthropic-maintained plugins |
+| Community marketplaces  | Third-party | User-contributed plugins     |
+| Team marketplace        | Private     | Internal organization tools  |
+
+### DSM Plugin Considerations
+
+| Plugin Opportunity   | Benefit                           |
+| -------------------- | --------------------------------- |
+| dsm-data-validator   | Automated OHLCV validation        |
+| dsm-fcp-diagnostics  | FCP debugging workflow            |
+| dsm-symbol-formatter | Market-specific symbol conversion |
+| dsm-cache-inspector  | Cache state visualization         |
+
+### Adding Custom Marketplace
+
+In `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": ["github.com/your-org/your-marketplace"]
+}
+```
+
 ## Verification Checklist
 
 ### Infrastructure
