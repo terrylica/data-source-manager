@@ -100,7 +100,34 @@ Run infrastructure validation:
 ```bash
 # Verify Claude Code setup
 uv run -p 3.13 python docs/skills/dsm-usage/scripts/validate_infrastructure.py
+
+# Or via mise
+mise run claude:validate
 ```
+
+## Authoring Checklist
+
+From [Anthropic best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices):
+
+### Core Quality
+
+- [x] Descriptions include what skill does AND when to use it
+- [x] SKILL.md body under 500 lines (largest: 150 lines)
+- [x] Consistent terminology throughout
+- [x] File references one level deep
+- [x] Third-person descriptions (not "I" or "You")
+
+### Structure
+
+- [x] CLAUDE.md under 300 lines (currently 247)
+- [x] Side-effect commands have `disable-model-invocation: true`
+- [x] Skills have `user-invocable: true` and `$ARGUMENTS`
+- [x] Agents have `tools` field defined
+
+### Testing
+
+- [x] Unit tests pass (19/19)
+- [x] Infrastructure validation passes (23/23 checks)
 
 ## Related
 
