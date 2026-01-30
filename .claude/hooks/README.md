@@ -72,25 +72,35 @@ Detects silent failure patterns in Python code AFTER file writes.
 
 ## Hook Configuration
 
-The hooks are configured in `hooks.json`:
+The hooks are configured in `hooks.json` with descriptions and notes:
 
 ```json
 {
+  "description": "DSM-specific hooks - enforces FCP patterns, silent failure detection",
+  "notes": [
+    "SessionStart: Loads FCP context into every session",
+    "PreToolUse: BLOCKS dangerous operations",
+    "PostToolUse: WARNS about silent failure patterns"
+  ],
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "command": "dsm-session-start.sh" }] }],
-    "UserPromptSubmit": [
-      { "matcher": ".*", "hooks": [{ "command": "dsm-skill-suggest.sh" }] }
+    "SessionStart": [
+      {
+        "description": "Load FCP context at session start",
+        "hooks": [{ "command": "dsm-session-start.sh" }]
+      }
     ],
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "command": "dsm-bash-guard.sh" }] }
-    ],
-    "PostToolUse": [
-      { "matcher": "Write|Edit", "hooks": [{ "command": "dsm-code-guard.sh" }] }
-    ],
-    "Stop": [{ "hooks": [{ "command": "dsm-final-check.sh" }] }]
+      {
+        "description": "Block dangerous Bash commands",
+        "matcher": "Bash",
+        "hooks": [{ "command": "dsm-bash-guard.sh" }]
+      }
+    ]
   }
 }
 ```
+
+Each hook entry supports a `description` field for documentation purposes.
 
 ## Exit Codes
 

@@ -266,24 +266,50 @@ From [Anthropic skill authoring best practices](https://platform.claude.com/docs
 
 ### hooks.json Pattern
 
+Following [cc-skills hooks pattern](https://github.com/terrylica/cc-skills) with descriptions and notes:
+
 ```json
 {
-  "description": "DSM-specific hooks",
+  "description": "DSM-specific hooks - enforces FCP patterns, silent failure detection",
+  "notes": [
+    "SessionStart: Loads FCP context into every session",
+    "PreToolUse: BLOCKS dangerous operations (cache deletion, wrong Python)",
+    "PostToolUse: WARNS about silent failure patterns (bare except, no timeout)"
+  ],
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "command": "dsm-session-start.sh" }] }],
-    "UserPromptSubmit": [
-      { "matcher": ".*", "hooks": [{ "command": "dsm-skill-suggest.sh" }] }
+    "SessionStart": [
+      {
+        "description": "Load FCP context at session start",
+        "hooks": [{ "command": "dsm-session-start.sh", "timeout": 2000 }]
+      }
     ],
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "command": "dsm-bash-guard.sh" }] }
+      {
+        "description": "Block dangerous Bash commands",
+        "matcher": "Bash",
+        "hooks": [{ "command": "dsm-bash-guard.sh", "timeout": 3000 }]
+      }
     ],
     "PostToolUse": [
-      { "matcher": "Write|Edit", "hooks": [{ "command": "dsm-code-guard.sh" }] }
-    ],
-    "Stop": [{ "hooks": [{ "command": "dsm-final-check.sh" }] }]
+      {
+        "description": "Detect silent failure patterns",
+        "matcher": "Write|Edit",
+        "hooks": [{ "command": "dsm-code-guard.sh", "timeout": 5000 }]
+      }
+    ]
   }
 }
 ```
+
+### hooks.json Fields
+
+| Field         | Purpose                                 |
+| ------------- | --------------------------------------- |
+| `description` | Top-level: overall hook purpose         |
+| `notes`       | Array of quick-reference behavior notes |
+| `description` | Per-hook: what this specific hook does  |
+| `matcher`     | Regex pattern to match tools/events     |
+| `timeout`     | Max execution time in milliseconds      |
 
 ### Hook Events Summary
 

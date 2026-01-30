@@ -1,9 +1,17 @@
 {
   "$schema": "https://code.claude.com/hooks/schema.json",
-  "description": "DSM-specific hooks for data-source-manager",
+  "description": "DSM-specific hooks for data-source-manager - enforces FCP patterns, silent failure detection, and code quality",
+  "notes": [
+    "SessionStart: Loads FCP context into every session",
+    "UserPromptSubmit: Suggests relevant skills based on prompt keywords",
+    "PreToolUse: BLOCKS dangerous operations (cache deletion, wrong Python)",
+    "PostToolUse: WARNS about silent failure patterns (bare except, no timeout)",
+    "Stop: Final validation and summary at session end"
+  ],
   "hooks": {
     "SessionStart": [
       {
+        "description": "Load FCP context (cache → Vision → REST priority) at session start",
         "hooks": [
           {
             "type": "command",
@@ -15,6 +23,7 @@
     ],
     "UserPromptSubmit": [
       {
+        "description": "Suggest relevant DSM skills based on prompt keywords",
         "matcher": ".*",
         "hooks": [
           {
@@ -27,6 +36,7 @@
     ],
     "PreToolUse": [
       {
+        "description": "Block dangerous Bash commands: cache deletion, pip install, force push, wrong Python",
         "matcher": "Bash",
         "hooks": [
           {
@@ -39,6 +49,7 @@
     ],
     "PostToolUse": [
       {
+        "description": "Detect silent failure patterns: bare except, no timeout, naive datetime",
         "matcher": "Write|Edit",
         "hooks": [
           {
@@ -51,6 +62,7 @@
     ],
     "Stop": [
       {
+        "description": "Final validation: summarize session changes and verify code quality",
         "hooks": [
           {
             "type": "command",

@@ -4,6 +4,26 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### CC-Skills Patterns Integration (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Enhanced hooks.json with `description` and `notes` fields (cc-skills pattern)
+- Added per-hook descriptions for all 5 hooks
+- Added top-level notes array for quick reference
+- Updated design spec with hooks.json field documentation
+- Updated hooks README with enhanced configuration example
+
+**Pattern Applied**: From cc-skills, hooks.json now includes:
+
+- Top-level `description` and `notes` for documentation
+- Per-hook `description` fields explaining purpose
+- Explicit `timeout` values for all hooks
+
+**Source**: [cc-skills hooks pattern](https://github.com/terrylica/cc-skills)
+
 ### Official Documentation Integration (2026-01-30)
 
 **Status**: Complete
