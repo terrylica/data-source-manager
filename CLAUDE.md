@@ -178,9 +178,22 @@ For detailed usage guidance, see [docs/skills/](docs/skills/):
 
 ---
 
+## Context Rules
+
+Domain-specific rules for Claude Code are in `.claude/rules/`:
+
+- `binance-api.md` - Rate limits, symbol formats, error codes
+- `timestamp-handling.md` - UTC requirements, open_time semantics
+- `dataframe-operations.md` - Polars preference, OHLCV validation
+- `caching-patterns.md` - Cache structure, invalidation rules
+
+---
+
 ## Related Documentation
 
 - @README.md - Installation and basic usage
 - @docs/INDEX.md - Documentation navigation hub
+- @docs/TROUBLESHOOTING.md - Common issues and solutions
+- @docs/GLOSSARY.md - Domain terminology
 - @examples/sync/README.md - CLI demo documentation
 - @examples/lib_module/README.md - Library usage examples
