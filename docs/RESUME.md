@@ -4,6 +4,24 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Context Rules Enhancement (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Enhanced design spec with comprehensive rules directory documentation
+- Added three organization patterns (flat, stack-based, domain-based)
+- Added symlink support documentation with usage examples
+- Added user-level rules (`~/.claude/rules/`) documentation
+- Added glob pattern support table with brace expansion
+- Added rules best practices table from official docs
+
+**Sources**:
+
+- [Official Memory Docs](https://code.claude.com/docs/en/memory)
+- [Modular Rules Guide](https://claude-blog.setec.rs/blog/claude-code-rules-directory)
+
 ### Official Skills Documentation Integration (2026-01-30)
 
 **Status**: Complete

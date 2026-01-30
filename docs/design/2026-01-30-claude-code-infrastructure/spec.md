@@ -378,6 +378,75 @@ Following [cc-skills hooks pattern](https://github.com/terrylica/cc-skills) with
 
 ## Context Rules
 
+Based on [Official Memory Docs](https://code.claude.com/docs/en/memory) and [Modular Rules Guide](https://claude-blog.setec.rs/blog/claude-code-rules-directory).
+
+### Rules Directory Organization
+
+**Flat Organization** (small/medium projects):
+
+```
+.claude/rules/
+├── code-style.md    # Formatting and naming
+├── testing.md       # Test requirements
+├── security.md      # Security best practices
+└── api-design.md    # API conventions
+```
+
+**Stack-Based Organization** (full-stack projects):
+
+```
+.claude/rules/
+├── frontend/
+│   ├── react-patterns.md
+│   └── styling.md
+├── backend/
+│   ├── api-design.md
+│   └── database.md
+└── shared/
+    └── typescript.md
+```
+
+**Domain-Based Organization** (DSM approach):
+
+```
+.claude/rules/
+├── binance-api.md          # Exchange-specific
+├── fcp-protocol.md         # Core protocol
+├── caching-patterns.md     # Data layer
+├── symbol-formats.md       # Domain types
+├── timestamp-handling.md   # General patterns
+├── dataframe-operations.md # Data processing
+└── error-handling.md       # Exception patterns
+```
+
+### Symlink Support
+
+Rules directory supports symlinks for sharing common rules across projects:
+
+```bash
+# Symlink a shared rules directory
+ln -s ~/shared-claude-rules .claude/rules/shared
+
+# Symlink individual rule files
+ln -s ~/company-standards/security.md .claude/rules/security.md
+```
+
+Symlinks are resolved and their contents are loaded normally. Circular symlinks are detected and handled gracefully.
+
+**Note**: The Glob tool does not traverse symlinks to directories. Use Read tool for symlinked content.
+
+### User-Level Rules
+
+Personal rules that apply to all projects in `~/.claude/rules/`:
+
+```
+~/.claude/rules/
+├── preferences.md    # Personal coding preferences
+└── workflows.md      # Preferred workflows
+```
+
+User-level rules are loaded before project rules, giving project rules higher priority.
+
 ### Path-Specific Frontmatter
 
 Rules use YAML frontmatter with `paths:` and optional `adr:` fields:
@@ -393,6 +462,18 @@ paths:
 
 Guidelines for...
 ```
+
+### Glob Pattern Support
+
+| Pattern             | Matches                               |
+| ------------------- | ------------------------------------- |
+| `**/*.ts`           | All TypeScript files in any directory |
+| `src/**/*`          | All files under `src/` directory      |
+| `*.md`              | Markdown files in the project root    |
+| `src/**/*.{ts,tsx}` | TypeScript and TSX files under src    |
+| `{src,lib}/**/*.py` | Python files in src or lib            |
+
+Brace expansion is supported for matching multiple extensions or directories.
 
 ### Rule ADR Traceability
 
@@ -417,6 +498,18 @@ Guidelines for...
 | symbol-formats.md       | `providers/binance/**`, `market_constraints` |
 | error-handling.md       | `src/**`, `tests/**`                         |
 | fcp-protocol.md         | `core/sync/**`, `core/providers/**`          |
+
+### Rules Best Practices
+
+From [Official Memory Docs](https://code.claude.com/docs/en/memory):
+
+| Practice                        | Guidance                                                  |
+| ------------------------------- | --------------------------------------------------------- |
+| Keep rules focused              | Each file should cover one topic (testing.md, api.md)     |
+| Use descriptive filenames       | Filename should indicate what rules cover                 |
+| Use conditional rules sparingly | Only add `paths` when rules truly apply to specific files |
+| Organize with subdirectories    | Group related rules (frontend/, backend/)                 |
+| Be specific                     | "Use 2-space indentation" > "Format code properly"        |
 
 ### When Rules Load
 
