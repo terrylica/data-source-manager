@@ -88,3 +88,4 @@ For deeper information, see:
 - @references/market-types.md - Detailed market type documentation
 - @references/intervals.md - Complete interval reference
 - @references/fcp-protocol.md - FCP architecture and debugging
+- @references/debugging.md - Debugging techniques and troubleshooting

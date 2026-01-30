@@ -119,3 +119,4 @@ For deeper information, see:
 - @references/fixtures.md - Pytest fixtures and auto-cleanup patterns
 - @references/coverage.md - Coverage configuration and thresholds
 - @references/mocking-patterns.md - DSM-specific mocking patterns
+- @references/markers.md - Pytest markers and test categorization
