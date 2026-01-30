@@ -1081,7 +1081,99 @@ Based on [Claude 4 Best Practices](https://platform.claude.com/docs/en/build-wit
 
 **Research finding**: +10% boost on SWE Bench possible through CLAUDE.md optimization alone.
 
+## Security Best Practices
+
+Based on [Official Security Docs](https://code.claude.com/docs/en/security) and [Backslash Security Guide](https://www.backslash.security/blog/claude-code-security-best-practices).
+
+### Secrets Protection
+
+| Method               | Implementation                              |
+| -------------------- | ------------------------------------------- |
+| Deny rules           | `Read(**/.env*)` in settings.json           |
+| Vaults               | Use Doppler, HashiCorp Vault, not plaintext |
+| File permissions     | chmod 600 for sensitive files               |
+| Network restrictions | Deny curl, wget for data exfiltration       |
+
+### DSM settings.json Security Rules
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(.env*)",
+      "Read(.mise.local.toml)",
+      "Read(**/credentials*)",
+      "Read(**/.secrets/**)",
+      "Bash(curl:*)",
+      "Bash(wget:*)"
+    ]
+  }
+}
+```
+
+### Key Principle
+
+> Treat Claude like an untrusted but powerful intern. Give only minimum permissions needed, sandbox it, audit it.
+
+### Security Checklist
+
+- [ ] `.env*` files in deny rules
+- [ ] Credentials directories blocked
+- [ ] Network exfiltration commands blocked
+- [ ] API keys in vault, not plaintext
+- [ ] Regular key rotation (90 days)
+- [ ] CLAUDE.local.md gitignored
+
+## Testing Patterns
+
+Based on [TDD with Claude Code](https://stevekinney.com/courses/ai-development/test-driven-development-with-claude) and [Developer Toolkit](https://developertoolkit.ai/en/claude-code/productivity-patterns/testing-integration/).
+
+### TDD Workflow with Claude
+
+| Phase    | Claude Action                         |
+| -------- | ------------------------------------- |
+| Red      | Write failing tests, verify they fail |
+| Green    | Implement code until tests pass       |
+| Refactor | Clean up while keeping tests green    |
+
+Claude enters autonomous loop: write → run → analyze failures → adjust → repeat.
+
+### DSM Test Configuration
+
+```bash
+# Unit tests (fast, no network)
+uv run -p 3.13 pytest tests/unit/ -v
+
+# Integration tests (network required)
+uv run -p 3.13 pytest tests/integration/ -v --tb=short
+
+# With coverage
+uv run -p 3.13 pytest --cov=src/data_source_manager --cov-report=term-missing
+```
+
+### Test Automation via Hooks
+
+PostToolUse hooks can automatically run tests after file edits:
+
+```json
+{
+  "matcher": "Write|Edit",
+  "hooks": [{ "command": "pytest tests/unit/ -q --maxfail=1" }]
+}
+```
+
+### AI Test Generation Best Practices
+
+| Practice             | Benefit                                   |
+| -------------------- | ----------------------------------------- |
+| Context in CLAUDE.md | Tests follow project conventions          |
+| Edge cases           | AI catches cases developers overlook      |
+| Framework matching   | Generates pytest/jest/junit appropriately |
+| Deterministic tests  | Avoid sleeps, mock network and time       |
+
 ## Verification Checklist
+
+### Infrastructure
 
 - [ ] CLAUDE.md is under 300 lines
 - [ ] All agents have tools field
@@ -1089,6 +1181,17 @@ Based on [Claude 4 Best Practices](https://platform.claude.com/docs/en/build-wit
 - [ ] Skills have user-invocable and $ARGUMENTS
 - [ ] hooks.json uses ${CLAUDE_PROJECT_ROOT}
 - [ ] All @ imports point to existing files
+
+### Context & Navigation
+
 - [ ] Context rules cover all DSM domains
-- [ ] Domain-specific CLAUDE.md in examples/, tests/, src/
+- [ ] Domain-specific CLAUDE.md in examples/, tests/, src/, docs/
+- [ ] Hub-spoke navigation in nested CLAUDE.md files
 - [ ] CLAUDE.local.md in .gitignore
+
+### Security
+
+- [ ] .env\* files in deny rules
+- [ ] Credentials directories blocked
+- [ ] Network exfiltration commands blocked
+- [ ] settings.json committed (not settings.local.json)

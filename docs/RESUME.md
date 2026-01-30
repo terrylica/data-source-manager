@@ -4,6 +4,25 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Security & Testing Patterns (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added Security Best Practices section (secrets protection, deny rules, key principle)
+- Added DSM settings.json security rules example
+- Added security checklist items
+- Added Testing Patterns section (TDD workflow, test configuration, hooks)
+- Added AI test generation best practices table
+- Updated Verification Checklist with security items
+
+**Sources**:
+
+- [Official Security Docs](https://code.claude.com/docs/en/security)
+- [Backslash Security Guide](https://www.backslash.security/blog/claude-code-security-best-practices)
+- [TDD with Claude Code](https://stevekinney.com/courses/ai-development/test-driven-development-with-claude)
+
 ### Hub-Spoke Navigation Pattern (2026-01-30)
 
 **Status**: Complete
