@@ -66,22 +66,28 @@ Project hooks are in `.claude/hooks/hooks.json`:
 ```json
 {
   "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "command": "dsm-bash-guard.sh" }] }
+    ],
     "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PROJECT_ROOT}/.claude/hooks/dsm-code-guard.sh"
-          }
-        ]
-      }
+      { "matcher": "Write|Edit", "hooks": [{ "command": "dsm-code-guard.sh" }] }
     ]
   }
 }
 ```
 
-### Code Guard Checks
+### Bash Guard (PreToolUse)
+
+The `dsm-bash-guard.sh` blocks dangerous operations:
+
+| Blocked               | Reason                     |
+| --------------------- | -------------------------- |
+| Cache deletion        | Use `mise run cache:clear` |
+| Python version change | DSM requires 3.13 ONLY     |
+| Force push to main    | Use feature branches       |
+| Direct pip install    | Use `uv add`               |
+
+### Code Guard (PostToolUse)
 
 The `dsm-code-guard.sh` hook validates:
 
