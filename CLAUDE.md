@@ -139,9 +139,9 @@ uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; pri
 
 ---
 
-## Verification (IMPORTANT)
+## Verification (CRITICAL)
 
-Before considering any task complete, verify your work:
+**YOU MUST verify work before considering any task complete.**
 
 ```bash
 # 1. Lint check (must pass)
@@ -154,7 +154,11 @@ uv run -p 3.13 pytest tests/unit/ -v
 uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"
 ```
 
-For data-related changes, also verify timestamp handling and FCP fallback behavior.
+For data-related changes, also verify:
+
+- Timestamps are UTC (`datetime.now(timezone.utc)`)
+- Symbol format matches market type
+- FCP fallback behavior works as expected
 
 ---
 
@@ -171,22 +175,22 @@ For data-related changes, also verify timestamp handling and FCP fallback behavi
 
 ## Claude Code Skills
 
-For detailed usage guidance, see [docs/skills/](docs/skills/):
+For detailed usage guidance, see @docs/skills/:
 
-- **dsm-usage** - DataSourceManager API usage with FCP
-- **dsm-testing** - Testing patterns and pytest markers
+- @docs/skills/dsm-usage/SKILL.md - DataSourceManager API usage with FCP
+- @docs/skills/dsm-testing/SKILL.md - Testing patterns and pytest markers
 
 ---
 
 ## Context Rules
 
-Domain-specific rules for Claude Code are in `.claude/rules/`:
+Domain-specific rules in `.claude/rules/` (Claude loads on demand):
 
-- `binance-api.md` - Rate limits, error codes, API endpoints
-- `timestamp-handling.md` - UTC requirements, open_time semantics
-- `dataframe-operations.md` - Polars preference, OHLCV validation
-- `caching-patterns.md` - Cache structure, invalidation rules
-- `symbol-formats.md` - Market-specific symbol format requirements
+- @.claude/rules/binance-api.md - Rate limits, error codes, API endpoints
+- @.claude/rules/timestamp-handling.md - UTC requirements, open_time semantics
+- @.claude/rules/dataframe-operations.md - Polars preference, OHLCV validation
+- @.claude/rules/caching-patterns.md - Cache structure, invalidation rules
+- @.claude/rules/symbol-formats.md - Market-specific symbol format requirements
 
 ---
 
