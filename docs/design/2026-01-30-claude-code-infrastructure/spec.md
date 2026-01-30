@@ -42262,3 +42262,575 @@ Claude Code automatically refreshes available tools without reconnection.
 | FastMCP     | Python MCP server framework            |
 | Security    | Least privilege, short-lived tokens    |
 | DSM servers | Data tools, FCP monitor patterns       |
+## Claude Agent SDK Reference
+
+### Overview
+
+The Claude Agent SDK provides programmatic access to Claude Code's tools, agent loop, and context management in Python and TypeScript. This enables building production AI agents that autonomously handle complex tasks.
+
+### Installation
+
+```bash
+# TypeScript
+npm install @anthropic-ai/claude-agent-sdk
+
+# Python
+pip install claude-agent-sdk
+```
+
+Requires Claude Code runtime:
+
+```bash
+# macOS/Linux
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Homebrew
+brew install --cask claude-code
+
+# Windows
+winget install Anthropic.ClaudeCode
+```
+
+### Basic Usage
+
+```python
+# Python
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def main():
+    async for message in query(
+        prompt="Find and fix the bug in auth.py",
+        options=ClaudeAgentOptions(allowed_tools=["Read", "Edit", "Bash"])
+    ):
+        print(message)
+
+asyncio.run(main())
+```
+
+```typescript
+// TypeScript
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Find and fix the bug in auth.py",
+  options: { allowedTools: ["Read", "Edit", "Bash"] },
+})) {
+  console.log(message);
+}
+```
+
+### Built-in Tools
+
+| Tool            | Purpose                              |
+| --------------- | ------------------------------------ |
+| Read            | Read any file in working directory   |
+| Write           | Create new files                     |
+| Edit            | Make precise edits to existing files |
+| Bash            | Run terminal commands, scripts, git  |
+| Glob            | Find files by pattern                |
+| Grep            | Search file contents with regex      |
+| WebSearch       | Search the web for current info      |
+| WebFetch        | Fetch and parse web page content     |
+| AskUserQuestion | Ask clarifying questions             |
+| Task            | Spawn subagents for subtasks         |
+
+### Authentication Options
+
+| Provider          | Environment Variable        |
+| ----------------- | --------------------------- |
+| Anthropic API     | `ANTHROPIC_API_KEY`         |
+| Amazon Bedrock    | `CLAUDE_CODE_USE_BEDROCK=1` |
+| Google Vertex     | `CLAUDE_CODE_USE_VERTEX=1`  |
+| Microsoft Foundry | `CLAUDE_CODE_USE_FOUNDRY=1` |
+
+### Permission Modes
+
+| Mode                | Behavior                        |
+| ------------------- | ------------------------------- |
+| `bypassPermissions` | No confirmation prompts         |
+| `acceptEdits`       | Auto-approve file modifications |
+| (default)           | Prompt for sensitive operations |
+
+```python
+options = ClaudeAgentOptions(
+    allowed_tools=["Read", "Glob", "Grep"],
+    permission_mode="bypassPermissions"
+)
+```
+
+### Hooks
+
+Hooks intercept agent execution at key points for validation, logging, security, or custom logic.
+
+#### Available Hook Events
+
+| Event              | Python | TypeScript | Trigger                    |
+| ------------------ | ------ | ---------- | -------------------------- |
+| PreToolUse         | Yes    | Yes        | Before tool execution      |
+| PostToolUse        | Yes    | Yes        | After tool execution       |
+| PostToolUseFailure | No     | Yes        | Tool execution failure     |
+| UserPromptSubmit   | Yes    | Yes        | User prompt submission     |
+| Stop               | Yes    | Yes        | Agent execution stop       |
+| SubagentStart      | No     | Yes        | Subagent initialization    |
+| SubagentStop       | Yes    | Yes        | Subagent completion        |
+| PreCompact         | Yes    | Yes        | Context compaction request |
+| PermissionRequest  | No     | Yes        | Permission dialog trigger  |
+| SessionStart       | No     | Yes        | Session initialization     |
+| SessionEnd         | No     | Yes        | Session termination        |
+| Notification       | No     | Yes        | Agent status messages      |
+
+#### Hook Callback Structure
+
+```python
+async def my_hook(input_data, tool_use_id, context):
+    """
+    Args:
+        input_data: Event details (tool_name, tool_input, etc.)
+        tool_use_id: Correlate PreToolUse/PostToolUse events
+        context: Reserved (TypeScript has AbortSignal)
+
+    Returns:
+        {}: Allow operation
+        {'hookSpecificOutput': {...}}: Block/modify operation
+    """
+    return {}
+```
+
+#### Callback Input Fields
+
+Common fields in all hooks:
+
+| Field           | Type   | Description                     |
+| --------------- | ------ | ------------------------------- |
+| hook_event_name | string | Hook type (PreToolUse, etc.)    |
+| session_id      | string | Current session identifier      |
+| transcript_path | string | Path to conversation transcript |
+| cwd             | string | Current working directory       |
+
+Tool-specific fields:
+
+| Field         | Type   | Hooks                   |
+| ------------- | ------ | ----------------------- |
+| tool_name     | string | PreToolUse, PostToolUse |
+| tool_input    | object | PreToolUse, PostToolUse |
+| tool_response | any    | PostToolUse             |
+| prompt        | string | UserPromptSubmit        |
+
+#### Callback Output Fields
+
+```python
+return {
+    # Top-level fields
+    'continue': True,           # Whether agent continues
+    'stopReason': 'message',    # If continue=False
+    'suppressOutput': False,    # Hide stdout from transcript
+    'systemMessage': 'text',    # Inject into conversation
+
+    # Hook-specific output
+    'hookSpecificOutput': {
+        'hookEventName': input_data['hook_event_name'],
+        'permissionDecision': 'allow|deny|ask',
+        'permissionDecisionReason': 'explanation',
+        'updatedInput': {},     # Modified tool input
+        'additionalContext': 'text'
+    }
+}
+```
+
+#### Permission Decision Flow
+
+1. **Deny** rules checked first (any match = immediate denial)
+2. **Ask** rules checked second
+3. **Allow** rules checked third
+4. **Default to Ask** if nothing matches
+
+#### Example: Block Dangerous Commands
+
+```python
+async def block_dangerous_commands(input_data, tool_use_id, context):
+    if input_data['hook_event_name'] != 'PreToolUse':
+        return {}
+
+    command = input_data['tool_input'].get('command', '')
+    if 'rm -rf /' in command:
+        return {
+            'hookSpecificOutput': {
+                'hookEventName': input_data['hook_event_name'],
+                'permissionDecision': 'deny',
+                'permissionDecisionReason': 'Dangerous command blocked'
+            }
+        }
+    return {}
+
+options = ClaudeAgentOptions(
+    hooks={
+        'PreToolUse': [HookMatcher(matcher='Bash', hooks=[block_dangerous_commands])]
+    }
+)
+```
+
+#### Example: Audit Logging
+
+```python
+from datetime import datetime
+
+async def log_file_changes(input_data, tool_use_id, context):
+    if input_data['hook_event_name'] != 'PostToolUse':
+        return {}
+
+    file_path = input_data['tool_input'].get('file_path', 'unknown')
+    with open('./audit.log', 'a') as f:
+        f.write(f"{datetime.now()}: modified {file_path}\n")
+    return {}
+
+options = ClaudeAgentOptions(
+    permission_mode="acceptEdits",
+    hooks={
+        'PostToolUse': [HookMatcher(matcher='Edit|Write', hooks=[log_file_changes])]
+    }
+)
+```
+
+#### Hook Matchers
+
+| Option  | Type           | Description                      |
+| ------- | -------------- | -------------------------------- |
+| matcher | string (regex) | Pattern to match tool names      |
+| hooks   | HookCallback[] | Callback functions to execute    |
+| timeout | number         | Timeout in seconds (default: 60) |
+
+```python
+# Match file modification tools
+HookMatcher(matcher='Write|Edit|Delete', hooks=[file_hook])
+
+# Match all MCP tools
+HookMatcher(matcher='^mcp__', hooks=[mcp_hook])
+
+# Match everything (no matcher)
+HookMatcher(hooks=[global_logger])
+```
+
+### Subagents
+
+Subagents handle focused subtasks in isolated context windows.
+
+#### Programmatic Definition
+
+```python
+from claude_agent_sdk import AgentDefinition
+
+options = ClaudeAgentOptions(
+    allowed_tools=["Read", "Glob", "Grep", "Task"],
+    agents={
+        "code-reviewer": AgentDefinition(
+            description="Expert code reviewer",
+            prompt="Analyze code quality and suggest improvements.",
+            tools=["Read", "Glob", "Grep"]
+        )
+    }
+)
+```
+
+#### Filesystem-Based Agents
+
+Define agents as markdown in `.claude/agents/`:
+
+```markdown
+---
+name: fcp-debugger
+description: Debug FCP cache behavior
+tools: [Read, Grep, Glob, Bash]
+---
+
+# FCP Debugger
+
+Diagnose FCP cache issues by:
+
+1. Reading fcp_control_status() implementation
+2. Checking cache file timestamps
+3. Verifying timestamp comparisons use UTC
+```
+
+#### Tracking Subagent Activity
+
+```python
+async def subagent_tracker(input_data, tool_use_id, context):
+    if input_data['hook_event_name'] == 'SubagentStop':
+        print(f"Subagent completed: {tool_use_id}")
+    return {}
+
+options = ClaudeAgentOptions(
+    hooks={
+        'SubagentStop': [HookMatcher(hooks=[subagent_tracker])]
+    }
+)
+```
+
+### MCP Integration
+
+Connect external tools via Model Context Protocol:
+
+```python
+options = ClaudeAgentOptions(
+    mcp_servers={
+        "playwright": {
+            "command": "npx",
+            "args": ["@playwright/mcp@latest"]
+        },
+        "database": {
+            "command": "npx",
+            "args": ["-y", "@bytebase/dbhub", "--dsn", "postgresql://..."]
+        }
+    }
+)
+```
+
+MCP tool naming: `mcp__<server>__<action>`
+
+### Sessions
+
+Maintain context across multiple exchanges:
+
+```python
+session_id = None
+
+# First query: capture session ID
+async for message in query(
+    prompt="Read the authentication module",
+    options=ClaudeAgentOptions(allowed_tools=["Read", "Glob"])
+):
+    if hasattr(message, 'subtype') and message.subtype == 'init':
+        session_id = message.session_id
+
+# Resume with full context
+async for message in query(
+    prompt="Now find all places that call it",
+    options=ClaudeAgentOptions(resume=session_id)
+):
+    if hasattr(message, "result"):
+        print(message.result)
+```
+
+### Configuration Sources
+
+| Source  | Location                      | When to Use                |
+| ------- | ----------------------------- | -------------------------- |
+| user    | `~/.claude/`                  | Personal settings          |
+| project | `.claude/` in project         | Team-shared settings       |
+| local   | `.claude/settings.local.json` | Personal project overrides |
+
+```python
+options = ClaudeAgentOptions(
+    setting_sources=["project"]  # Load .claude/ configuration
+)
+```
+
+### DSM-Specific Agent Patterns
+
+#### Data Validation Agent
+
+```python
+data_validator = AgentDefinition(
+    description="Validate market data DataFrames",
+    prompt="""
+    Validate DataFrames for:
+    1. Required columns: open_time, open, high, low, close, volume
+    2. UTC timezone-aware timestamps
+    3. No gaps in time series
+    4. Numeric ranges: prices > 0, volume >= 0
+    Report any data quality issues found.
+    """,
+    tools=["Read", "Grep", "Bash"]
+)
+```
+
+#### FCP Debugger Agent
+
+```python
+fcp_debugger = AgentDefinition(
+    description="Debug FCP cache behavior",
+    prompt="""
+    Debug FCP issues by:
+    1. Read fcp_control_status() implementation
+    2. Check FcpDataFrame.is_complete() logic
+    3. Trace cache hit/miss path
+    4. Verify timestamp comparisons use UTC
+    5. Check symbol format consistency
+    Never assume FCP behavior - investigate actual code flow.
+    """,
+    tools=["Read", "Grep", "Glob", "Bash"]
+)
+```
+
+#### Exchange API Research Agent
+
+```python
+api_researcher = AgentDefinition(
+    description="Research exchange API patterns",
+    prompt="""
+    Research exchange APIs for:
+    1. Rate limit specifications
+    2. Error code handling
+    3. Symbol format requirements
+    4. Timestamp precision
+    Document findings in structured format.
+    """,
+    tools=["Read", "WebSearch", "WebFetch", "Grep"]
+)
+```
+
+### DSM Hook Patterns
+
+#### Silent Failure Detection
+
+```python
+async def detect_silent_failures(input_data, tool_use_id, context):
+    if input_data['hook_event_name'] != 'PostToolUse':
+        return {}
+
+    if input_data['tool_name'] not in ['Write', 'Edit']:
+        return {}
+
+    file_path = input_data['tool_input'].get('file_path', '')
+    if not file_path.endswith('.py'):
+        return {}
+
+    content = input_data['tool_input'].get('content', '')
+
+    patterns = [
+        ('except:', 'Bare except clause'),
+        ('except Exception:', 'Catching broad Exception'),
+        ('subprocess.run(', 'subprocess without check=True'),
+        ('datetime.now()', 'Naive datetime without timezone'),
+    ]
+
+    for pattern, description in patterns:
+        if pattern in content and 'check=True' not in content:
+            return {
+                'systemMessage': f'Warning: {description} detected in {file_path}'
+            }
+
+    return {}
+```
+
+#### FCP Cache Validation
+
+```python
+async def validate_fcp_operations(input_data, tool_use_id, context):
+    if input_data['hook_event_name'] != 'PreToolUse':
+        return {}
+
+    if input_data['tool_name'] != 'Bash':
+        return {}
+
+    command = input_data['tool_input'].get('command', '')
+
+    # Block direct cache deletion
+    if 'rm -rf' in command and '/cache/' in command:
+        return {
+            'hookSpecificOutput': {
+                'hookEventName': input_data['hook_event_name'],
+                'permissionDecision': 'deny',
+                'permissionDecisionReason': 'Use mise run cache:clear instead'
+            }
+        }
+
+    return {}
+```
+
+### Multi-Agent Orchestration
+
+#### Fan-Out Pattern
+
+```python
+async def parallel_analysis():
+    agents = {
+        "security-reviewer": AgentDefinition(
+            description="Security analysis",
+            prompt="Analyze for security vulnerabilities",
+            tools=["Read", "Grep"]
+        ),
+        "performance-reviewer": AgentDefinition(
+            description="Performance analysis",
+            prompt="Analyze for performance issues",
+            tools=["Read", "Grep"]
+        ),
+        "style-reviewer": AgentDefinition(
+            description="Style analysis",
+            prompt="Check code style and conventions",
+            tools=["Read", "Grep"]
+        )
+    }
+
+    async for message in query(
+        prompt="Review this codebase using all reviewer agents in parallel",
+        options=ClaudeAgentOptions(
+            allowed_tools=["Read", "Glob", "Grep", "Task"],
+            agents=agents
+        )
+    ):
+        print(message)
+```
+
+#### Pipeline Pattern
+
+```python
+agents = {
+    "analyzer": AgentDefinition(
+        description="Analyze code structure",
+        prompt="Identify refactoring opportunities",
+        tools=["Read", "Grep", "Glob"]
+    ),
+    "implementer": AgentDefinition(
+        description="Implement refactoring",
+        prompt="Apply identified refactoring changes",
+        tools=["Read", "Edit", "Write"]
+    ),
+    "validator": AgentDefinition(
+        description="Validate changes",
+        prompt="Run tests and verify refactoring",
+        tools=["Read", "Bash"]
+    )
+}
+```
+
+### Error Handling
+
+```python
+async def main():
+    try:
+        async for message in query(
+            prompt="Fix the bug",
+            options=ClaudeAgentOptions(allowed_tools=["Read", "Edit"])
+        ):
+            if hasattr(message, "error"):
+                print(f"Error: {message.error}")
+            elif hasattr(message, "result"):
+                print(f"Result: {message.result}")
+    except Exception as e:
+        print(f"Query failed: {e}")
+```
+
+### SDK vs Client SDK Comparison
+
+| Feature            | Client SDK            | Agent SDK             |
+| ------------------ | --------------------- | --------------------- |
+| Tool execution     | You implement         | Built-in              |
+| Agent loop         | You implement         | Automatic             |
+| File operations    | Manual implementation | Read/Write/Edit tools |
+| Session management | Manual                | Built-in resume/fork  |
+| Hooks              | Not available         | Full lifecycle hooks  |
+| MCP integration    | Manual                | Native support        |
+
+### Summary
+
+| Feature       | Pattern                            |
+| ------------- | ---------------------------------- |
+| Basic usage   | `query(prompt, options)`           |
+| Permissions   | `bypassPermissions`, `acceptEdits` |
+| Hooks         | PreToolUse, PostToolUse, Stop      |
+| Subagents     | Programmatic or filesystem-based   |
+| MCP           | `mcp_servers` configuration        |
+| Sessions      | `resume` with session_id           |
+| Configuration | `setting_sources=["project"]`      |
