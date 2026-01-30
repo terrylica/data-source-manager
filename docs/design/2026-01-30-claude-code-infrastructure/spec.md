@@ -39665,3 +39665,269 @@ For DSM, pyright provides:
 - Import error detection
 
 Monitor memory and disable if process storms occur.
+## Chrome Browser Integration
+
+Connect Claude Code to your browser to test web apps, debug with console logs, and automate browser tasks. Chrome integration is in beta and currently works with Google Chrome only.
+
+### What the Integration Enables
+
+With Chrome connected, chain browser actions with terminal commands in a single workflow.
+
+**Key capabilities**:
+
+| Capability          | Description                                                       |
+| ------------------- | ----------------------------------------------------------------- |
+| Live debugging      | Read console errors and DOM state, fix code that caused them      |
+| Design verification | Build UI from Figma mock, verify it matches in browser            |
+| Web app testing     | Test form validation, check visual regressions, verify user flows |
+| Authenticated apps  | Interact with Google Docs, Gmail, Notion without API connectors   |
+| Data extraction     | Pull structured information from web pages, save locally          |
+| Task automation     | Automate data entry, form filling, multi-site workflows           |
+| Session recording   | Record browser interactions as GIFs                               |
+
+### Prerequisites
+
+| Requirement                | Version                  |
+| -------------------------- | ------------------------ |
+| Google Chrome              | Latest                   |
+| Claude in Chrome extension | Recent version           |
+| Claude Code CLI            | Recent version           |
+| Claude plan                | Pro, Team, or Enterprise |
+
+### How It Works
+
+Claude Code communicates through the Claude in Chrome extension using Chrome's Native Messaging API to:
+
+- Control browser tabs
+- Read page content
+- Perform actions
+
+**Key behaviors**:
+
+- Opens new tabs rather than taking over existing ones
+- Shares browser's login state (no re-authentication needed)
+- Pauses for login pages, CAPTCHAs - you handle, then continue
+- Requires visible browser window (no headless mode)
+
+### Setup
+
+#### 1. Update Claude Code
+
+```bash
+claude update
+```
+
+#### 2. Start with Chrome Enabled
+
+```bash
+claude --chrome
+```
+
+#### 3. Verify Connection
+
+```bash
+/chrome
+```
+
+Enable from existing session with `/chrome` command.
+
+### Available Browser Actions
+
+| Action                | Description                   |
+| --------------------- | ----------------------------- |
+| Navigate pages        | Open URLs, follow links       |
+| Click and type        | Interact with elements        |
+| Fill forms            | Enter data in form fields     |
+| Scroll                | Scroll pages and elements     |
+| Read console logs     | Debug with console output     |
+| Read network requests | Monitor API calls             |
+| Manage tabs           | Create, switch, close tabs    |
+| Resize windows        | Change browser dimensions     |
+| Record GIFs           | Capture interaction sequences |
+
+View full tool list: `/mcp` → click `claude-in-chrome`
+
+### Example Workflows
+
+#### Test a Local Web Application
+
+```
+I just updated the login form validation. Can you open localhost:3000,
+try submitting the form with invalid data, and check if the error
+messages appear correctly?
+```
+
+#### Debug with Console Logs
+
+```
+Open the dashboard page and check the console for any errors when
+the page loads.
+```
+
+#### Automate Form Filling
+
+```
+I have a spreadsheet of customer contacts in contacts.csv. For each row,
+go to our CRM at crm.example.com, click "Add Contact", and fill in the
+name, email, and phone fields.
+```
+
+#### Draft Content in Google Docs
+
+```
+Draft a project update based on our recent commits and add it to my
+Google Doc at docs.google.com/document/d/abc123
+```
+
+Works with any app you're logged into: Gmail, Notion, Sheets, etc.
+
+#### Extract Data from Web Pages
+
+```
+Go to the product listings page and extract the name, price, and
+availability for each item. Save the results as a CSV file.
+```
+
+#### Multi-Site Workflows
+
+```
+Check my calendar for meetings tomorrow, then for each meeting with
+an external attendee, look up their company on LinkedIn and add a
+note about what they do.
+```
+
+#### Record a Demo GIF
+
+```
+Record a GIF showing how to complete the checkout flow, from adding
+an item to the cart through to the confirmation page.
+```
+
+### GIF Recording
+
+Claude records interaction sequences and saves as GIF files. Useful for:
+
+- Documenting workflows
+- Creating demo videos
+- Sharing what happened during debugging
+- Test evidence
+
+### Best Practices
+
+| Guideline                   | Reason                                                    |
+| --------------------------- | --------------------------------------------------------- |
+| Modal dialogs can interrupt | JavaScript alerts block events; dismiss manually          |
+| Use fresh tabs              | If tab becomes unresponsive, ask Claude to create new one |
+| Filter console output       | Tell Claude what patterns to look for, not all output     |
+
+### Troubleshooting
+
+#### Extension Not Detected
+
+1. Verify Chrome extension is installed (recent version)
+2. Verify Claude Code is recent version: `claude --version`
+3. Check Chrome is running
+4. Run `/chrome` → "Reconnect extension"
+5. Restart both Claude Code and Chrome
+
+#### Browser Not Responding
+
+1. Check for modal dialog blocking the page
+2. Ask Claude to create a new tab
+3. Disable and re-enable Chrome extension
+
+#### First-Time Setup
+
+Claude Code installs a native messaging host on first use. If permission errors occur, restart Chrome.
+
+### Enable by Default
+
+To enable Chrome integration by default:
+
+```bash
+/chrome
+# Select "Enabled by default"
+```
+
+**Note**: Increases context usage since browser tools always loaded. Use `--chrome` flag when needed for optimal context management.
+
+### Permission Management
+
+Site-level permissions inherited from Chrome extension. Manage in extension settings to control which sites Claude can:
+
+- Browse
+- Click
+- Type
+
+Run `/chrome` to see current permission settings.
+
+### Chrome vs Playwright Comparison
+
+| Aspect        | Chrome Integration                | Playwright MCP                    |
+| ------------- | --------------------------------- | --------------------------------- |
+| Browser       | Your actual Chrome                | Isolated browser instance         |
+| Login state   | Uses existing sessions            | Requires authentication each time |
+| Multi-browser | Chrome only                       | Chrome, Firefox, Safari           |
+| Headless mode | No (visible window required)      | Yes                               |
+| Use case      | Day-to-day tasks with your logins | Comprehensive test automation     |
+| Setup         | Uses existing Chrome              | Fresh install each project        |
+
+**When to use Chrome Integration**:
+
+- Leveraging existing authenticated sessions
+- Automating day-to-day tasks across multiple services
+- Workflows that need your cookies/logins
+- Quick debugging of web apps
+- Recording demos as GIFs
+
+**When to use Playwright MCP**:
+
+- Cross-browser testing
+- CI/CD test automation
+- Isolated test environments
+- Headless testing
+- Comprehensive test suites
+
+### DSM-Specific Chrome Patterns
+
+Chrome integration for data-source-manager development.
+
+#### API Documentation Extraction
+
+```
+Go to the Binance API documentation at binance-docs.github.io,
+find the section on Kline/Candlestick data, and extract the
+endpoint details, parameters, and rate limits.
+```
+
+#### Exchange Status Monitoring
+
+```
+Open the Binance system status page and check if there are any
+ongoing maintenance or issues affecting the spot API.
+```
+
+#### Testing Data Validation UI
+
+```
+Open localhost:8000/validate, upload the sample OHLCV CSV,
+and verify the validation results show correct symbol format
+detection.
+```
+
+#### Recording FCP Demo
+
+```
+Record a GIF showing the FCP decision flow when fetching BTCUSDT
+data with a cache miss, then cache hit on retry.
+```
+
+### Not Supported
+
+| Feature                           | Status        |
+| --------------------------------- | ------------- |
+| Brave browser                     | Not supported |
+| Arc browser                       | Not supported |
+| Other Chromium browsers           | Not supported |
+| WSL (Windows Subsystem for Linux) | Not supported |
+| Headless mode                     | Not supported |
