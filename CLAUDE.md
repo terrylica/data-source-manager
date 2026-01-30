@@ -179,6 +179,7 @@ For detailed usage guidance, see @docs/skills/:
 
 - @docs/skills/dsm-usage/SKILL.md - DataSourceManager API usage with FCP
 - @docs/skills/dsm-testing/SKILL.md - Testing patterns and pytest markers
+- @docs/skills/dsm-research/SKILL.md - Codebase research (runs in subagent)
 
 ---
 
@@ -191,6 +192,37 @@ Domain-specific rules in `.claude/rules/` (Claude loads on demand):
 - @.claude/rules/dataframe-operations.md - Polars preference, OHLCV validation
 - @.claude/rules/caching-patterns.md - Cache structure, invalidation rules
 - @.claude/rules/symbol-formats.md - Market-specific symbol format requirements
+- @.claude/rules/error-handling.md - Exception hierarchy, recovery patterns
+- @.claude/rules/fcp-protocol.md - FCP decision logic, debugging
+
+---
+
+## Custom Agents
+
+Specialized subagents for delegation (in `.claude/agents/`):
+
+| Agent                 | Purpose                                |
+| --------------------- | -------------------------------------- |
+| silent-failure-hunter | Finds silent failures and bare excepts |
+| fcp-debugger          | Diagnoses FCP issues                   |
+| api-reviewer          | Reviews code for API consistency       |
+| test-writer           | Writes tests following DSM patterns    |
+| data-fetcher          | Fetches data with proper FCP handling  |
+
+---
+
+## Custom Commands
+
+Slash commands in `.claude/commands/`:
+
+| Command        | Purpose                           |
+| -------------- | --------------------------------- |
+| /debug-fcp     | Debug FCP behavior for a symbol   |
+| /quick-test    | Run quick verification tests      |
+| /review-dsm    | Review code against DSM patterns  |
+| /fetch-data    | Fetch market data with validation |
+| /validate-data | Validate DataFrame structure      |
+| /feature-dev   | Guided feature development        |
 
 ---
 
