@@ -4,6 +4,23 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Code Review Patterns (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added Code Review Patterns section with review types table
+- Added local review best practices table
+- Added multi-agent review pattern diagram
+- Added auto-review via Stop hook example
+- Added review confidence scoring table
+
+**Sources**:
+
+- [Anthropic Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)
+- [Code Review Plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/README.md)
+
 ### Architecture Pattern Documentation (2026-01-30)
 
 **Status**: Complete

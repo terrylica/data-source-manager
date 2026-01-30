@@ -1171,6 +1171,62 @@ PostToolUse hooks can automatically run tests after file edits:
 | Framework matching   | Generates pytest/jest/junit appropriately |
 | Deterministic tests  | Avoid sleeps, mock network and time       |
 
+## Code Review Patterns
+
+Based on [Anthropic Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices) and [Code Review Plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/README.md).
+
+### Review Types
+
+| Type         | Focus                                     | Prompt Example                         |
+| ------------ | ----------------------------------------- | -------------------------------------- |
+| Quality      | Error handling, validation, edge cases    | "Review for error handling patterns"   |
+| Security     | Token leakage, access controls, injection | "Check for security vulnerabilities"   |
+| Architecture | Separation of concerns, coupling          | "Assess architecture patterns"         |
+| Legacy       | Technical debt, deprecated patterns       | "Identify tech debt and modernization" |
+
+### Local Review Best Practices
+
+| Practice           | Benefit                                  |
+| ------------------ | ---------------------------------------- |
+| Review before PR   | Catch issues earlier, save review cycles |
+| Focused reviews    | Target specific aspects (tests, docs)    |
+| Manual approval    | Never auto-accept all proposed changes   |
+| Targeted re-review | Confirm fixes resolved original issues   |
+
+### Multi-Agent Review Pattern
+
+```
+Claude 1 (Coder)  →  Writes implementation
+         ↓
+Claude 2 (Reviewer)  →  Reviews code quality
+         ↓
+Claude 3 (Tester)  →  Writes/runs tests
+```
+
+Running multiple Claude instances in parallel provides comprehensive coverage.
+
+### Auto-Review via Stop Hook
+
+Configure Stop hook to trigger code review on modified files:
+
+```bash
+# Return exit code 2 to block and force review feedback
+if [[ -n "$(git diff --name-only)" ]]; then
+    echo "Modified files need review" >&2
+    exit 2
+fi
+```
+
+### Review Confidence Scoring
+
+Official code-review plugin outputs issues with 80+ confidence (adjustable 0-100).
+
+| Confidence | Action                              |
+| ---------- | ----------------------------------- |
+| 80-100     | High confidence - likely real issue |
+| 50-79      | Medium - requires human judgment    |
+| < 50       | Low - may be false positive         |
+
 ## Verification Checklist
 
 ### Infrastructure
