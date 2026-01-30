@@ -65,6 +65,18 @@ Practical code examples:
 - @examples/basic-fetch.md - Single/multiple symbols, market types
 - @examples/error-handling.md - Exception patterns, validation, retries
 
+## Helper Scripts
+
+Utility scripts for common operations:
+
+```bash
+# Validate symbol format
+uv run -p 3.13 python docs/skills/dsm-usage/scripts/validate_symbol.py BTCUSDT FUTURES_COIN
+
+# Check cache status
+uv run -p 3.13 python docs/skills/dsm-usage/scripts/check_cache.py BTCUSDT futures_usdt 1h
+```
+
 ## Detailed References
 
 For deeper information, see:

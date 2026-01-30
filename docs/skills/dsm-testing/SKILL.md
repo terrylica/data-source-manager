@@ -99,6 +99,18 @@ Practical test examples:
 - @examples/unit-test-patterns.md - Basic tests, fixtures, mocking
 - @examples/integration-test-patterns.md - API tests, markers, FCP testing
 
+## Helper Scripts
+
+Quick test runner:
+
+```bash
+# Run all quick checks (lint + unit tests + import)
+./docs/skills/dsm-testing/scripts/run_quick_tests.sh
+
+# Run with test pattern filter
+./docs/skills/dsm-testing/scripts/run_quick_tests.sh test_timestamp
+```
+
 ## Detailed References
 
 For deeper information, see:
