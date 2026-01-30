@@ -35719,3 +35719,339 @@ async for message in query(
 - [Hooks Reference](https://platform.claude.com/docs/en/agent-sdk/hooks)
 - [Python SDK](https://github.com/anthropics/claude-agent-sdk-python)
 - [TypeScript SDK](https://github.com/anthropics/claude-agent-sdk-typescript)
+## Prompt Engineering Reference
+
+Comprehensive prompt engineering best practices for Claude 4.x models (Sonnet 4.5, Opus 4.5, Haiku 4.5).
+
+### General Principles
+
+#### Be Explicit with Instructions
+
+Claude 4.x models respond well to clear, explicit instructions. Being specific about desired output enhances results.
+
+**Less effective**:
+
+```text
+Create an analytics dashboard
+```
+
+**More effective**:
+
+```text
+Create an analytics dashboard. Include as many relevant features and interactions as possible. Go beyond the basics to create a fully-featured implementation.
+```
+
+#### Add Context for Performance
+
+Providing context or motivation behind instructions helps Claude understand goals better.
+
+**Less effective**:
+
+```text
+NEVER use ellipses
+```
+
+**More effective**:
+
+```text
+Your response will be read aloud by a text-to-speech engine, so never use ellipses since the text-to-speech engine will not know how to pronounce them.
+```
+
+#### Be Vigilant with Examples
+
+Claude 4.x models pay close attention to details and examples. Ensure examples align with desired behaviors.
+
+### State Management
+
+Claude 4.5 models excel at long-horizon reasoning with exceptional state tracking. They maintain orientation across extended sessions by focusing on incremental progress.
+
+#### Context Awareness
+
+Claude 4.5 can track remaining context window throughout conversation. For agent harnesses with compaction:
+
+```text
+Your context window will be automatically compacted as it approaches its limit, allowing you to continue working indefinitely from where you left off. Therefore, do not stop tasks early due to token budget concerns. As you approach your token budget limit, save your current progress and state to memory before the context window refreshes. Always be as persistent and autonomous as possible and complete tasks fully, even if the end of your budget is approaching. Never artificially stop any task early regardless of the context remaining.
+```
+
+#### Multi-Context Window Workflows
+
+1. **Use different prompts for first vs subsequent windows**: First window sets up framework (tests, scripts), future windows iterate on todo-list
+
+2. **Write tests in structured format**: Create tests before work, keep in `tests.json`
+
+```json
+{
+  "tests": [
+    { "id": 1, "name": "authentication_flow", "status": "passing" },
+    { "id": 2, "name": "user_management", "status": "failing" },
+    { "id": 3, "name": "api_endpoints", "status": "not_started" }
+  ],
+  "total": 200,
+  "passing": 150,
+  "failing": 25,
+  "not_started": 25
+}
+```
+
+1. **Set up quality of life tools**: Create `init.sh` to start servers, run tests, linters
+
+2. **Starting fresh vs compacting**: Fresh context windows can be better than compaction - Claude 4.5 discovers state from filesystem effectively
+
+3. **Provide verification tools**: Playwright MCP or computer use for UI testing
+
+4. **Encourage complete context usage**:
+
+```text
+This is a very long task, so it may be beneficial to plan out your work clearly. It's encouraged to spend your entire output context working on the task - just make sure you don't run out of context with significant uncommitted work. Continue working systematically until you have completed this task.
+```
+
+#### State Management Best Practices
+
+- **Structured formats for state data**: JSON for test results, task status
+- **Unstructured text for progress**: Freeform notes for general progress
+- **Git for state tracking**: Provides checkpoints and history
+- **Incremental progress**: Explicitly ask Claude to track progress
+
+```text
+// Progress notes (progress.txt)
+Session 3 progress:
+- Fixed authentication token validation
+- Updated user model to handle edge cases
+- Next: investigate user_management test failures (test #2)
+- Note: Do not remove tests as this could lead to missing functionality
+```
+
+### Tool Usage Patterns
+
+Claude 4.5 follows instructions precisely - saying "suggest changes" may only suggest, not implement.
+
+**Less effective (will only suggest)**:
+
+```text
+Can you suggest some changes to improve this function?
+```
+
+**More effective (will implement)**:
+
+```text
+Change this function to improve its performance.
+```
+
+#### Proactive Action Prompt
+
+```text
+<default_to_action>
+By default, implement changes rather than only suggesting them. If the user's intent is unclear, infer the most useful likely action and proceed, using tools to discover any missing details instead of guessing. Try to infer the user's intent about whether a tool call (e.g., file edit or read) is intended or not, and act accordingly.
+</default_to_action>
+```
+
+#### Conservative Action Prompt
+
+```text
+<do_not_act_before_instructions>
+Do not jump into implementation or changes files unless clearly instructed to make changes. When the user's intent is ambiguous, default to providing information, doing research, and providing recommendations rather than taking action. Only proceed with edits, modifications, or implementations when the user explicitly requests them.
+</do_not_act_before_instructions>
+```
+
+#### Tool Triggering
+
+Claude Opus 4.5 is more responsive to system prompts. Where you previously said "CRITICAL: You MUST use this tool", use "Use this tool when...".
+
+### Parallel Tool Calling
+
+Claude 4.x excels at parallel execution. Sonnet 4.5 is particularly aggressive at simultaneous operations.
+
+```text
+<use_parallel_tool_calls>
+If you intend to call multiple tools and there are no dependencies between the tool calls, make all of the independent tool calls in parallel. Prioritize calling tools simultaneously whenever the actions can be done in parallel rather than sequentially. For example, when reading 3 files, run 3 tool calls in parallel to read all 3 files into context at the same time. Maximize use of parallel tool calls where possible to increase speed and efficiency. However, if some tool calls depend on previous calls to inform dependent values like the parameters, do NOT call these tools in parallel and instead call them sequentially. Never use placeholders or guess missing parameters in tool calls.
+</use_parallel_tool_calls>
+```
+
+**To reduce parallel execution**:
+
+```text
+Execute operations sequentially with brief pauses between each step to ensure stability.
+```
+
+### XML Tags Usage
+
+Modern Claude 4.x models understand structure without XML tags, but they remain useful for:
+
+- Multiple prompt components (context, instructions, examples)
+- Format indicators for responses
+- Layered/nested content
+
+**Best practices**:
+
+- Be consistent with tag names
+- Nest tags for layered detail
+- Combine with other techniques (multishot, chain-of-thought)
+
+### Output Formatting
+
+1. **Tell Claude what to do, not what not to do**:
+   - Instead of: "Do not use markdown"
+   - Use: "Your response should be composed of smoothly flowing prose paragraphs."
+
+2. **Use XML format indicators**:
+   - "Write prose in \<smoothly_flowing_prose_paragraphs\> tags."
+
+3. **Match prompt style to desired output**: Removing markdown from prompt reduces markdown in output
+
+4. **Minimize markdown prompt**:
+
+```text
+<avoid_excessive_markdown_and_bullet_points>
+When writing reports, documents, technical explanations, analyses, or any long-form content, write in clear, flowing prose using complete paragraphs and sentences. Use standard paragraph breaks for organization and reserve markdown primarily for `inline code`, code blocks, and simple headings (###). Avoid using **bold** and *italics*.
+
+DO NOT use ordered lists (1. ...) or unordered lists (*) unless: a) you're presenting truly discrete items where a list format is the best option, or b) the user explicitly requests a list or ranking
+
+Instead of listing items with bullets or numbers, incorporate them naturally into sentences. Using prose instead of excessive formatting will improve user satisfaction. NEVER output a series of overly short bullet points.
+
+Your goal is readable, flowing text that guides the reader naturally through ideas rather than fragmenting information into isolated points.
+</avoid_excessive_markdown_and_bullet_points>
+```
+
+### Research and Information Gathering
+
+Claude 4.5 has exceptional agentic search capabilities:
+
+1. **Clear success criteria**: Define what constitutes successful answer
+2. **Source verification**: Ask to verify across multiple sources
+3. **Structured research**:
+
+```text
+Search for this information in a structured way. As you gather data, develop several competing hypotheses. Track your confidence levels in your progress notes to improve calibration. Regularly self-critique your approach and plan. Update a hypothesis tree or research notes file to persist information and provide transparency. Break down this complex research task systematically.
+```
+
+### Subagent Orchestration
+
+Claude 4.5 recognizes when tasks benefit from subagent delegation without explicit instruction.
+
+1. **Well-defined subagent tools**: Have subagent tools described in definitions
+2. **Let Claude orchestrate naturally**: Delegates appropriately without instruction
+3. **Adjust if needed**:
+
+```text
+Only delegate to subagents when the task clearly benefits from a separate agent with a new context window.
+```
+
+### Agentic Coding Best Practices
+
+#### Code Exploration Prompt
+
+```text
+ALWAYS read and understand relevant files before proposing code edits. Do not speculate about code you have not inspected. If the user references a specific file/path, you MUST open and inspect it before explaining or proposing fixes. Be rigorous and persistent in searching code for key facts. Thoroughly review the style, conventions, and abstractions of the codebase before implementing new features or abstractions.
+```
+
+#### Minimize Hallucinations
+
+```text
+<investigate_before_answering>
+Never speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.
+</investigate_before_answering>
+```
+
+#### Minimize Overengineering
+
+```text
+Avoid over-engineering. Only make changes that are directly requested or clearly necessary. Keep solutions simple and focused.
+
+Don't add features, refactor code, or make "improvements" beyond what was asked. A bug fix doesn't need surrounding code cleaned up. A simple feature doesn't need extra configurability.
+
+Don't add error handling, fallbacks, or validation for scenarios that can't happen. Trust internal code and framework guarantees. Only validate at system boundaries (user input, external APIs). Don't use backwards-compatibility shims when you can just change the code.
+
+Don't create helpers, utilities, or abstractions for one-time operations. Don't design for hypothetical future requirements. The right amount of complexity is the minimum needed for the current task. Reuse existing abstractions where possible and follow the DRY principle.
+```
+
+#### Robust Solutions (Not Test-Focused)
+
+```text
+Please write a high-quality, general-purpose solution using the standard tools available. Do not create helper scripts or workarounds to accomplish the task more efficiently. Implement a solution that works correctly for all valid inputs, not just the test cases. Do not hard-code values or create solutions that only work for specific test inputs. Instead, implement the actual logic that solves the problem generally.
+
+Focus on understanding the problem requirements and implementing the correct algorithm. Tests are there to verify correctness, not to define the solution. Provide a principled implementation that follows best practices and software design principles.
+
+If the task is unreasonable or infeasible, or if any of the tests are incorrect, please inform me rather than working around them. The solution should be robust, maintainable, and extendable.
+```
+
+### Thinking Capabilities
+
+Guide Claude's interleaved thinking for better results:
+
+```text
+After receiving tool results, carefully reflect on their quality and determine optimal next steps before proceeding. Use your thinking to plan and iterate based on this new information, and then take the best next action.
+```
+
+**Note**: When extended thinking is disabled, Claude Opus 4.5 is sensitive to "think" - use alternatives like "consider," "believe," "evaluate."
+
+### Communication Style
+
+Claude 4.5 has more concise, natural communication:
+
+- More direct and grounded
+- More conversational, less machine-like
+- Less verbose (may skip summaries)
+
+**For visibility into reasoning**:
+
+```text
+After completing a task that involves tool use, provide a quick summary of the work you've done.
+```
+
+### DSM-Specific Prompting Patterns
+
+#### DSM Data Validation Prompt
+
+```text
+<dsm_data_validation>
+When working with DataSourceManager:
+- Always validate symbol format: uppercase, slash separator (e.g., BTC/USDT)
+- Use UTC timestamps exclusively - never naive datetime
+- Validate OHLCV data structure: open, high, low, close, volume, open_time
+- Check for data gaps and anomalies before analysis
+- Handle FCP failover decisions appropriately
+- Use Polars for DataFrame operations, not pandas
+</dsm_data_validation>
+```
+
+#### DSM FCP Debugging Prompt
+
+```text
+<fcp_debugging>
+When debugging FCP (Failover Control Protocol) issues:
+1. Check FCP log for recent decisions: ~/.cache/dsm/fcp.log
+2. Verify data source availability
+3. Review failover threshold configuration
+4. Check cache validity and timestamps
+5. Validate symbol format consistency across sources
+Report findings with specific timestamps and decision reasoning.
+</fcp_debugging>
+```
+
+#### DSM Research Prompt
+
+```text
+<dsm_research>
+When researching DSM codebase:
+- Start with src/data_source_manager/ for core logic
+- Check tests/ for expected behavior patterns
+- Review examples/ for usage patterns
+- Consult docs/ for architecture decisions
+- Use incremental discovery - read related files before proposing changes
+</dsm_research>
+```
+
+### Model-Specific Considerations
+
+| Model      | Characteristic                   | Prompt Adjustment          |
+| ---------- | -------------------------------- | -------------------------- |
+| Opus 4.5   | Most steerable, may overengineer | Add minimization prompts   |
+| Sonnet 4.5 | Aggressive parallel execution    | Reduce if stability needed |
+| Haiku 4.5  | Efficient, concise               | Good for quick tasks       |
+
+### References
+
+- [Claude 4.x Best Practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices)
+- [XML Tags Guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/use-xml-tags)
+- [Extended Thinking](https://platform.claude.com/docs/en/build-with-claude/extended-thinking)
+- [Context Windows](https://platform.claude.com/docs/en/build-with-claude/context-windows)
