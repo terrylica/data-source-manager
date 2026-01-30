@@ -31905,3 +31905,383 @@ printf "[$MODEL] 📁 ${CURRENT_DIR##*/}$GIT_BRANCH | ${COLOR}${PERCENT_USED}%%$
 4. **Test manually** - With mock JSON input
 5. **Cache expensive ops** - Like git status if needed
 6. **Color code context** - Green < 60%, Yellow < 80%, Red > 80%
+## Plugin Marketplace Reference
+
+### Overview
+
+Plugin marketplaces are catalogs that help discover and install Claude Code extensions without building them yourself. Plugins extend Claude Code with skills, agents, hooks, and MCP servers.
+
+### How Marketplaces Work
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Marketplace Workflow                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Step 1: Add Marketplace          Step 2: Install Plugins      │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐   │
+│  │ Registers catalog with  │ ──▶ │ Browse and install      │   │
+│  │ Claude Code (no plugins │     │ individual plugins      │   │
+│  │ installed yet)          │     │ you want                │   │
+│  └─────────────────────────┘     └─────────────────────────┘   │
+│                                                                 │
+│  Like adding an app store: gives access to browse, but you     │
+│  still choose which apps to download individually.             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Official Anthropic Marketplace
+
+The official Anthropic marketplace (`claude-plugins-official`) is automatically available when you start Claude Code.
+
+**Browse available plugins:**
+
+```bash
+/plugin  # Go to Discover tab
+```
+
+**Install a plugin:**
+
+```bash
+/plugin install plugin-name@claude-plugins-official
+```
+
+### Plugin Categories
+
+#### Code Intelligence Plugins
+
+Enable Claude Code's built-in LSP tool for jump-to-definition, find-references, and type error detection.
+
+| Language   | Plugin              | Binary Required              |
+| ---------- | ------------------- | ---------------------------- |
+| C/C++      | `clangd-lsp`        | `clangd`                     |
+| C#         | `csharp-lsp`        | `csharp-ls`                  |
+| Go         | `gopls-lsp`         | `gopls`                      |
+| Java       | `jdtls-lsp`         | `jdtls`                      |
+| Kotlin     | `kotlin-lsp`        | `kotlin-language-server`     |
+| Lua        | `lua-lsp`           | `lua-language-server`        |
+| PHP        | `php-lsp`           | `intelephense`               |
+| Python     | `pyright-lsp`       | `pyright-langserver`         |
+| Rust       | `rust-analyzer-lsp` | `rust-analyzer`              |
+| Swift      | `swift-lsp`         | `sourcekit-lsp`              |
+| TypeScript | `typescript-lsp`    | `typescript-language-server` |
+
+**What Claude gains from code intelligence:**
+
+1. **Automatic diagnostics** - After every file edit, language server reports errors/warnings. Claude sees type errors, missing imports, syntax issues without running compiler.
+
+2. **Code navigation** - Jump to definitions, find references, get type info on hover, list symbols, find implementations, trace call hierarchies.
+
+#### External Integrations
+
+Pre-configured MCP servers for external services:
+
+| Category           | Plugins                                                    |
+| ------------------ | ---------------------------------------------------------- |
+| Source control     | `github`, `gitlab`                                         |
+| Project management | `atlassian` (Jira/Confluence), `asana`, `linear`, `notion` |
+| Design             | `figma`                                                    |
+| Infrastructure     | `vercel`, `firebase`, `supabase`                           |
+| Communication      | `slack`                                                    |
+| Monitoring         | `sentry`                                                   |
+
+#### Development Workflows
+
+| Plugin              | Purpose                                 |
+| ------------------- | --------------------------------------- |
+| `commit-commands`   | Git commit workflows (commit, push, PR) |
+| `pr-review-toolkit` | Specialized agents for reviewing PRs    |
+| `agent-sdk-dev`     | Tools for Claude Agent SDK development  |
+| `plugin-dev`        | Toolkit for creating your own plugins   |
+
+#### Output Styles
+
+| Plugin                     | Purpose                                   |
+| -------------------------- | ----------------------------------------- |
+| `explanatory-output-style` | Educational insights about implementation |
+| `learning-output-style`    | Interactive learning mode                 |
+
+### Adding Marketplaces
+
+#### From GitHub
+
+```bash
+# owner/repo format
+/plugin marketplace add anthropics/claude-code
+/plugin marketplace add terrylica/cc-skills
+```
+
+#### From Other Git Hosts
+
+<!-- SSoT-OK: Example git URL syntax with tag reference -->
+
+```bash
+# HTTPS
+/plugin marketplace add https://gitlab.com/company/plugins.git
+
+# SSH
+/plugin marketplace add git@gitlab.com:company/plugins.git
+
+# Specific branch/tag (append #ref)
+/plugin marketplace add https://gitlab.com/company/plugins.git#main
+/plugin marketplace add https://gitlab.com/company/plugins.git#v1
+```
+
+#### From Local Paths
+
+```bash
+# Directory with .claude-plugin/marketplace.json
+/plugin marketplace add ./my-marketplace
+
+# Direct path to marketplace.json
+/plugin marketplace add ./path/to/marketplace.json
+```
+
+#### From Remote URLs
+
+```bash
+/plugin marketplace add https://example.com/marketplace.json
+```
+
+### Installation Scopes
+
+| Scope   | Description                                | Config File                   |
+| ------- | ------------------------------------------ | ----------------------------- |
+| User    | Install for yourself across all projects   | `~/.claude/settings.json`     |
+| Project | Install for all collaborators on this repo | `.claude/settings.json`       |
+| Local   | Install for yourself in this repo only     | `.claude/settings.local.json` |
+| Managed | Installed by administrators (read-only)    | Managed settings              |
+
+**Install with specific scope:**
+
+```bash
+claude plugin install formatter@your-org --scope project
+```
+
+### Plugin Manager Interface
+
+```bash
+/plugin  # Opens tabbed interface
+```
+
+| Tab          | Purpose                                    |
+| ------------ | ------------------------------------------ |
+| Discover     | Browse available plugins from marketplaces |
+| Installed    | View and manage installed plugins          |
+| Marketplaces | Add, remove, update marketplaces           |
+| Errors       | View plugin loading errors                 |
+
+**Navigation:**
+
+- `Tab` / `Shift+Tab` - Cycle through tabs
+- `Enter` - Select plugin or action
+- Type to filter by name/description
+
+### Managing Plugins
+
+**Disable without uninstalling:**
+
+```bash
+/plugin disable plugin-name@marketplace-name
+```
+
+**Re-enable:**
+
+```bash
+/plugin enable plugin-name@marketplace-name
+```
+
+**Uninstall:**
+
+```bash
+/plugin uninstall plugin-name@marketplace-name
+```
+
+### Managing Marketplaces
+
+**List all marketplaces:**
+
+```bash
+/plugin marketplace list
+```
+
+**Update marketplace listings:**
+
+```bash
+/plugin marketplace update marketplace-name
+```
+
+**Remove marketplace:**
+
+```bash
+/plugin marketplace remove marketplace-name
+```
+
+**Shortcut:** Use `/plugin market` instead of `/plugin marketplace`, and `rm` instead of `remove`.
+
+### Auto-Updates
+
+Toggle auto-update for individual marketplaces:
+
+1. Run `/plugin`
+2. Select **Marketplaces**
+3. Choose a marketplace
+4. Select **Enable auto-update** or **Disable auto-update**
+
+**Defaults:**
+
+- Official Anthropic marketplaces: auto-update enabled
+- Third-party/local marketplaces: auto-update disabled
+
+**Disable all auto-updates:**
+
+```bash
+export DISABLE_AUTOUPDATER=true
+```
+
+**Keep plugin auto-updates while disabling Claude Code auto-updates:**
+
+```bash
+export DISABLE_AUTOUPDATER=true
+export FORCE_AUTOUPDATE_PLUGINS=true
+```
+
+### Team Marketplace Configuration
+
+Configure automatic marketplace installation in `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": [
+    {
+      "name": "team-plugins",
+      "source": "github:your-org/team-plugins"
+    }
+  ],
+  "enabledPlugins": {
+    "formatter@team-plugins": true,
+    "linter@team-plugins": true
+  }
+}
+```
+
+When team members trust the repository folder, Claude Code prompts them to install these marketplaces and plugins.
+
+### DSM Plugin Configuration
+
+**cc-skills marketplace configured in `.claude/settings.json`:**
+
+```json
+{
+  "extraKnownMarketplaces": [
+    {
+      "name": "cc-skills",
+      "source": "github:terrylica/cc-skills"
+    }
+  ]
+}
+```
+
+**Usage patterns:**
+
+1. **Install project-wide plugins:**
+
+   ```bash
+   /plugin install dsm-tools@cc-skills --scope project
+   ```
+
+2. **Personal development plugins:**
+
+   ```bash
+   /plugin install debug-helpers@cc-skills --scope user
+   ```
+
+3. **Local experimentation:**
+
+   ```bash
+   /plugin install experimental@cc-skills --scope local
+   ```
+
+### Troubleshooting
+
+#### /plugin Command Not Recognized
+
+<!-- SSoT-OK: Claude Code CLI troubleshooting -->
+
+```bash
+# Check version (see claude --version output)
+claude --version
+
+# Update via Homebrew
+brew upgrade claude-code
+
+# Update via npm
+npm update -g @anthropic-ai/claude-code
+```
+
+#### Common Issues
+
+| Issue                     | Solution                                                        |
+| ------------------------- | --------------------------------------------------------------- |
+| Marketplace not loading   | Verify URL accessible, `.claude-plugin/marketplace.json` exists |
+| Plugin installation fails | Check source URLs accessible, repos public (or have access)     |
+| Files not found           | Plugins copied to cache; paths outside plugin dir won't work    |
+| Skills not appearing      | `rm -rf ~/.claude/plugins/cache`, restart, reinstall            |
+
+#### Code Intelligence Issues
+
+| Issue                        | Solution                                                          |
+| ---------------------------- | ----------------------------------------------------------------- |
+| Language server not starting | Verify binary installed and in `$PATH`, check Errors tab          |
+| High memory usage            | Disable plugin with `/plugin disable <name>`, use built-in search |
+| False positive diagnostics   | Workspace config issue in monorepos; doesn't affect editing       |
+
+### Plugin Development Quick Reference
+
+**Create a new plugin:**
+
+```bash
+/plugin-dev:create
+```
+
+**Plugin structure:**
+
+```
+my-plugin/
+├── .claude-plugin/
+│   └── manifest.json
+├── SKILL.md           # Optional: skill definition
+├── agents/            # Optional: agent definitions
+├── hooks/             # Optional: hook scripts
+└── mcp/               # Optional: MCP server config
+```
+
+<!-- SSoT-OK: Example plugin manifest structure -->
+
+**manifest.json example:**
+
+```json
+{
+  "name": "my-plugin",
+  "version": "<version>",
+  "description": "Plugin description",
+  "skills": ["SKILL.md"],
+  "agents": ["agents/my-agent.md"],
+  "hooks": ["hooks/my-hook.sh"]
+}
+```
+
+### Best Practices
+
+1. **Trust verification** - Always verify plugin source before installing. Anthropic doesn't control third-party plugins.
+
+2. **Scope selection** - Use project scope for team-wide plugins, user scope for personal tools, local for experiments.
+
+3. **Binary dependencies** - Ensure language server binaries are installed before LSP plugins.
+
+4. **Memory management** - Monitor memory with heavy plugins like `rust-analyzer` on large projects.
+
+5. **Team coordination** - Use `extraKnownMarketplaces` in `.claude/settings.json` for consistent team setup.
+
+6. **Version control** - Commit `.claude/settings.json` for project-scope plugins, exclude `settings.local.json`.
