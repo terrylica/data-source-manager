@@ -39332,3 +39332,336 @@ This shows:
 - Git branch
 - Context usage with color-coded warning at 80%
 - Session cost
+## Plugin Marketplace Reference
+
+Discover, install, and manage Claude Code plugins through marketplaces. Plugins extend Claude Code with skills, agents, hooks, and MCP servers.
+
+### How Marketplaces Work
+
+A marketplace is a catalog of plugins that someone else has created and shared. Using a marketplace is a two-step process:
+
+1. **Add the marketplace** - Registers the catalog with Claude Code for browsing
+2. **Install individual plugins** - Browse and install the plugins you want
+
+Think of it like adding an app store: adding the store gives you access to browse its collection, but you still choose which apps to download individually.
+
+### Official Anthropic Marketplace
+
+The official Anthropic marketplace (`claude-plugins-official`) is automatically available when you start Claude Code.
+
+```bash
+# Browse available plugins
+/plugin
+
+# Install from official marketplace
+/plugin install plugin-name@claude-plugins-official
+```
+
+### Plugin Categories
+
+#### Code Intelligence Plugins
+
+Enable Claude Code's built-in LSP tool for precise code navigation.
+
+| Language   | Plugin              | Binary Required              |
+| ---------- | ------------------- | ---------------------------- |
+| C/C++      | `clangd-lsp`        | `clangd`                     |
+| C#         | `csharp-lsp`        | `csharp-ls`                  |
+| Go         | `gopls-lsp`         | `gopls`                      |
+| Java       | `jdtls-lsp`         | `jdtls`                      |
+| Kotlin     | `kotlin-lsp`        | `kotlin-language-server`     |
+| Lua        | `lua-lsp`           | `lua-language-server`        |
+| PHP        | `php-lsp`           | `intelephense`               |
+| Python     | `pyright-lsp`       | `pyright-langserver`         |
+| Rust       | `rust-analyzer-lsp` | `rust-analyzer`              |
+| Swift      | `swift-lsp`         | `sourcekit-lsp`              |
+| TypeScript | `typescript-lsp`    | `typescript-language-server` |
+
+**What Claude gains**:
+
+1. **Automatic diagnostics**: After every file edit, language server reports errors and warnings. Claude sees type errors, missing imports, syntax issues without running compiler.
+
+2. **Code navigation**: Jump to definitions, find references, get type info on hover, list symbols, find implementations, trace call hierarchies.
+
+View diagnostics inline: Press **Ctrl+O** when "diagnostics found" indicator appears.
+
+#### External Integrations
+
+Pre-configured MCP servers for external services:
+
+| Category           | Plugins                                                    |
+| ------------------ | ---------------------------------------------------------- |
+| Source control     | `github`, `gitlab`                                         |
+| Project management | `atlassian` (Jira/Confluence), `asana`, `linear`, `notion` |
+| Design             | `figma`                                                    |
+| Infrastructure     | `vercel`, `firebase`, `supabase`                           |
+| Communication      | `slack`                                                    |
+| Monitoring         | `sentry`                                                   |
+
+#### Development Workflows
+
+| Plugin              | Purpose                                 |
+| ------------------- | --------------------------------------- |
+| `commit-commands`   | Git commit workflows (commit, push, PR) |
+| `pr-review-toolkit` | PR review agents                        |
+| `agent-sdk-dev`     | Claude Agent SDK tools                  |
+| `plugin-dev`        | Plugin creation toolkit                 |
+
+#### Output Styles
+
+| Plugin                     | Purpose                                   |
+| -------------------------- | ----------------------------------------- |
+| `explanatory-output-style` | Educational insights about implementation |
+| `learning-output-style`    | Interactive learning mode                 |
+
+### Add Marketplaces
+
+#### From GitHub
+
+```bash
+# owner/repo format
+/plugin marketplace add anthropics/claude-code
+```
+
+#### From Other Git Hosts
+
+```bash
+# HTTPS
+/plugin marketplace add https://gitlab.com/company/plugins.git
+
+# SSH
+/plugin marketplace add git@gitlab.com:company/plugins.git
+
+# Specific branch or tag
+/plugin marketplace add https://gitlab.com/company/plugins.git#v1
+```
+
+#### From Local Paths
+
+```bash
+# Directory with .claude-plugin/marketplace.json
+/plugin marketplace add ./my-marketplace
+
+# Direct path to marketplace.json
+/plugin marketplace add ./path/to/marketplace.json
+```
+
+#### From Remote URLs
+
+```bash
+/plugin marketplace add https://example.com/marketplace.json
+```
+
+### Install Plugins
+
+#### Direct Installation
+
+```bash
+# Install to user scope (default)
+/plugin install plugin-name@marketplace-name
+
+# Install with specific scope
+claude plugin install formatter@your-org --scope project
+```
+
+#### Interactive Installation
+
+1. Run `/plugin`
+2. Go to **Discover** tab
+3. Press **Enter** on a plugin
+4. Choose installation scope
+
+### Installation Scopes
+
+| Scope   | Description                                        | Shared    |
+| ------- | -------------------------------------------------- | --------- |
+| User    | For yourself across all projects                   | No        |
+| Project | For all collaborators (in `.claude/settings.json`) | Yes       |
+| Local   | For yourself in this repo only                     | No        |
+| Managed | Installed by administrators                        | Read-only |
+
+View installed plugins grouped by scope in the **Installed** tab.
+
+### Manage Plugins
+
+#### Disable/Enable
+
+```bash
+# Disable without uninstalling
+/plugin disable plugin-name@marketplace-name
+
+# Re-enable
+/plugin enable plugin-name@marketplace-name
+```
+
+#### Uninstall
+
+```bash
+/plugin uninstall plugin-name@marketplace-name
+
+# With scope
+claude plugin uninstall formatter@your-org --scope project
+```
+
+### Manage Marketplaces
+
+#### List Marketplaces
+
+```bash
+/plugin marketplace list
+```
+
+#### Update Marketplace
+
+```bash
+/plugin marketplace update marketplace-name
+```
+
+#### Remove Marketplace
+
+```bash
+/plugin marketplace remove marketplace-name
+```
+
+Removing a marketplace uninstalls any plugins installed from it.
+
+**Shortcuts**: Use `/plugin market` instead of `/plugin marketplace`, `rm` instead of `remove`.
+
+### Auto-Updates
+
+Claude Code can automatically update marketplaces and plugins at startup.
+
+#### Configure Auto-Update
+
+1. Run `/plugin`
+2. Select **Marketplaces**
+3. Choose a marketplace
+4. Select **Enable auto-update** or **Disable auto-update**
+
+**Defaults**:
+
+- Official Anthropic marketplaces: auto-update enabled
+- Third-party/local marketplaces: auto-update disabled
+
+#### Environment Variables
+
+```bash
+# Disable all auto-updates
+export DISABLE_AUTOUPDATER=true
+
+# Keep plugin updates while disabling Claude Code updates
+export DISABLE_AUTOUPDATER=true
+export FORCE_AUTOUPDATE_PLUGINS=true
+```
+
+### Team Configuration
+
+Configure automatic marketplace installation for team projects.
+
+#### Project Settings
+
+Add to `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": ["your-org/team-plugins"],
+  "enabledPlugins": [
+    "code-review@your-org-team-plugins",
+    "deploy-tools@your-org-team-plugins"
+  ]
+}
+```
+
+When team members trust the repository folder, Claude Code prompts them to install these marketplaces and plugins.
+
+#### Benefits
+
+- Standardized tooling for all team members
+- Same configurations and shortcuts
+- No additional setup required
+
+### Plugin Interface Tabs
+
+Run `/plugin` to open the plugin manager with four tabs:
+
+| Tab              | Purpose                              |
+| ---------------- | ------------------------------------ |
+| **Discover**     | Browse plugins from all marketplaces |
+| **Installed**    | View and manage installed plugins    |
+| **Marketplaces** | Add, remove, update marketplaces     |
+| **Errors**       | View plugin loading errors           |
+
+Navigate tabs with **Tab** / **Shift+Tab**.
+
+### Troubleshooting
+
+#### /plugin Command Not Recognized
+
+1. Check version: `claude --version` (plugins require recent Claude Code version)
+2. Update Claude Code:
+   - Homebrew: `brew upgrade claude-code`
+   - npm: `npm update -g @anthropic-ai/claude-code`
+3. Restart Claude Code
+
+#### Common Issues
+
+| Issue                        | Solution                                                          |
+| ---------------------------- | ----------------------------------------------------------------- |
+| Marketplace not loading      | Verify URL accessible, `.claude-plugin/marketplace.json` exists   |
+| Plugin installation failures | Check source URLs accessible, repos public                        |
+| Files not found              | Plugins cached; external paths won't work                         |
+| Skills not appearing         | Clear cache: `rm -rf ~/.claude/plugins/cache`, restart, reinstall |
+
+#### Code Intelligence Issues
+
+| Issue                        | Solution                                                     |
+| ---------------------------- | ------------------------------------------------------------ |
+| Language server not starting | Verify binary in `$PATH`, check `/plugin` Errors tab         |
+| High memory usage            | Disable with `/plugin disable <plugin>`, use built-in search |
+| False positive diagnostics   | Configure workspace correctly for monorepos                  |
+
+### DSM-Specific Plugin Configuration
+
+Plugin configuration for data-source-manager development.
+
+#### Recommended Plugins
+
+```json
+{
+  "enabledPlugins": [
+    "pyright-lsp@claude-plugins-official",
+    "commit-commands@claude-plugins-official"
+  ]
+}
+```
+
+#### Team Marketplace
+
+```json
+{
+  "extraKnownMarketplaces": ["terrylica/cc-skills"],
+  "enabledPlugins": [
+    "itp-hooks@terrylica-cc-skills",
+    "gh-tools@terrylica-cc-skills"
+  ]
+}
+```
+
+#### Python LSP Considerations
+
+The `pyright-lsp` plugin can cause high memory usage. If experiencing issues:
+
+```bash
+# Disable LSP
+/plugin disable pyright-lsp@claude-plugins-official
+
+# Rely on built-in search tools instead
+```
+
+For DSM, pyright provides:
+
+- Polars DataFrame type checking
+- Optional type validation
+- Import error detection
+
+Monitor memory and disable if process storms occur.
