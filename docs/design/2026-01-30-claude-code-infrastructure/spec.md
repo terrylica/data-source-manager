@@ -7182,6 +7182,191 @@ code ../dsm-feature-a
 7. Use /rewind if needed
 ```
 
+## Headless & Batch Processing
+
+Running Claude Code programmatically without interactive prompts.
+
+### Headless Mode Basics
+
+```bash
+# Non-interactive execution with -p flag
+claude -p "Analyze this codebase and list potential issues"
+
+# Output format control
+claude -p "Generate changelog" --output-format stream-json
+
+# Skip permissions (use with caution)
+claude -p "Refactor all tests" --dangerously-skip-permissions
+```
+
+### CI/CD Integration
+
+```yaml
+# GitHub Actions example
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | bash
+      - name: Run Code Review
+        run: claude -p "Review this PR for security issues" --output-format json
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+### Batch Processing Patterns
+
+```bash
+# Process multiple files
+for file in src/**/*.py; do
+    claude -p "Add docstrings to $file" --dangerously-skip-permissions
+done
+
+# Parallel processing with xargs
+find . -name "*.py" | xargs -P 4 -I {} claude -p "Review {}"
+```
+
+### Output Formats
+
+| Format        | Use Case                |
+| ------------- | ----------------------- |
+| `text`        | Human-readable output   |
+| `json`        | Structured data parsing |
+| `stream-json` | Real-time progress      |
+
+### Message Batches API
+
+For large-scale processing:
+
+- Submit batches of requests asynchronously
+- Most complete within 1 hour
+- Results accessible for 24 hours
+- Cost-effective for bulk operations
+
+### DSM Headless Tasks
+
+```bash
+# Batch refactor all providers
+for provider in binance okx coinbase; do
+    claude -p "Add FCP support to ${provider} adapter" \
+           --dangerously-skip-permissions
+done
+
+# CI code review
+claude -p "Review changes against DSM patterns:
+- FCP compliance
+- Timestamp handling
+- Symbol format validation
+- Silent failure patterns"
+```
+
+## Troubleshooting Guide
+
+Common issues and solutions for Claude Code.
+
+### Quick Diagnostics
+
+```bash
+# Run health check
+claude doctor
+
+# Show detailed logs
+claude --verbose
+
+# Debug MCP issues
+claude --mcp-debug
+```
+
+### Common Issues
+
+| Issue             | Solution                                  |
+| ----------------- | ----------------------------------------- |
+| Node not found    | Install via nvm, ensure PATH correct      |
+| Permission denied | Fix npm permissions or use native install |
+| Auth failures     | `/logout`, restart, re-authenticate       |
+| High CPU/memory   | Use `/compact`, restart between tasks     |
+| Slow search       | Install system ripgrep                    |
+| IDE not detected  | Configure firewall (WSL2) or PATH         |
+
+### Installation Fixes
+
+**Native install (recommended):**
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+**npm permission fix:**
+
+```bash
+sudo chown -R $(whoami) ~/.npm
+```
+
+**PATH fix:**
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Authentication Reset
+
+```bash
+# Full authentication reset
+rm -rf ~/.config/claude-code/auth.json
+claude  # Re-authenticate
+```
+
+### Configuration Reset
+
+```bash
+# Reset user settings
+rm ~/.claude.json
+rm -rf ~/.claude/
+
+# Reset project settings
+rm -rf .claude/
+rm .mcp.json
+```
+
+### Performance Issues
+
+1. **Context saturation**: Use `/compact` regularly
+2. **Large codebases**: Add build dirs to `.gitignore`
+3. **WSL slow search**: Move project to Linux filesystem
+
+### Diagnostic Checklist
+
+```
+□ Internet connection OK?
+□ API key valid?
+□ Node.js ≥18 installed?
+□ Claude Code up to date?
+□ File permissions OK?
+□ Context not saturated?
+□ Hooks configured correctly?
+□ MCP servers responding?
+```
+
+### Getting Help
+
+1. **In-app**: `/bug` to report with context
+2. **Diagnostics**: `/doctor` for health check
+3. **GitHub**: File issues with environment details
+4. **Ask Claude**: Built-in documentation access
+
+### DSM-Specific Troubleshooting
+
+| Issue                  | Solution                              |
+| ---------------------- | ------------------------------------- |
+| FCP cache issues       | Use `/debug-fcp SYMBOL` command       |
+| Rate limit errors      | Check Binance API response headers    |
+| DataFrame validation   | Print schema with `df.schema`         |
+| Symbol format mismatch | Log normalized vs raw symbols         |
+| Timestamp issues       | Verify UTC, check open_time alignment |
+
 ## Verification Checklist
 
 ### Infrastructure

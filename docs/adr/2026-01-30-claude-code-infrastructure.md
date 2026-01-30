@@ -129,8 +129,8 @@ user-invocable: true
 
 | Metric              | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
-| Design spec lines   | 7208                                                                             |
-| Sections            | 85                                                                               |
+| Design spec lines   | 7393                                                                             |
+| Sections            | 87                                                                               |
 | Agents              | 5 (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer) |
 | Commands            | 6 (debug-fcp, fetch-data, quick-test, review-dsm, validate-data, feature-dev)    |
 | Skills              | 4 (dsm-usage, dsm-testing, dsm-research, dsm-fcp-monitor)                        |
@@ -202,6 +202,8 @@ user-invocable: true
 - Status line configuration (JSON input, scripts, DSM status line)
 - Extended thinking mode (budget tokens, use cases, prompting tips)
 - IDE integration (VS Code extension, JetBrains plugin, shared config)
+- Headless & batch processing (CI/CD, automation, output formats)
+- Troubleshooting guide (diagnostics, common issues, DSM-specific fixes)
 
 ## More Information
 
