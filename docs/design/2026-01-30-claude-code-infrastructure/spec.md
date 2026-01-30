@@ -13049,3 +13049,312 @@ jobs:
 | CI not running on commits | Use GitHub App, not Actions user  |
 | Authentication errors     | Verify API key/OIDC configuration |
 | @claude not triggering    | Ensure comment contains `@claude` |
+
+---
+
+## Claude Agent SDK Reference
+
+Build production AI agents with Claude Code as a library for Python and TypeScript.
+
+### Installation
+
+```bash
+# Python
+pip install claude-agent-sdk
+
+# TypeScript
+npm install @anthropic-ai/claude-agent-sdk
+
+# Claude Code runtime (required)
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+### Basic Usage
+
+**Python**:
+
+```python
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def main():
+    async for message in query(
+        prompt="Find and fix the bug in auth.py",
+        options=ClaudeAgentOptions(allowed_tools=["Read", "Edit", "Bash"])
+    ):
+        print(message)
+
+asyncio.run(main())
+```
+
+**TypeScript**:
+
+```typescript
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Find and fix the bug in auth.py",
+  options: { allowedTools: ["Read", "Edit", "Bash"] },
+})) {
+  console.log(message);
+}
+```
+
+### Built-in Tools
+
+| Tool            | Description                          |
+| --------------- | ------------------------------------ |
+| Read            | Read files in working directory      |
+| Write           | Create new files                     |
+| Edit            | Make precise edits to existing files |
+| Bash            | Run terminal commands, scripts, git  |
+| Glob            | Find files by pattern                |
+| Grep            | Search file contents with regex      |
+| WebSearch       | Search the web                       |
+| WebFetch        | Fetch and parse web pages            |
+| AskUserQuestion | Ask clarifying questions             |
+| Task            | Invoke subagents                     |
+
+### Permission Modes
+
+| Mode              | Description                            |
+| ----------------- | -------------------------------------- |
+| bypassPermissions | No approval needed (fully autonomous)  |
+| acceptEdits       | Auto-approve file edits                |
+| default           | Require approval for sensitive actions |
+
+```python
+options = ClaudeAgentOptions(
+    allowed_tools=["Read", "Glob", "Grep"],
+    permission_mode="bypassPermissions"
+)
+```
+
+### Hooks
+
+Run custom code at key points in the agent lifecycle:
+
+**Available events**: `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Notification`, `UserPromptSubmit`, `SessionStart`, `SessionEnd`, `Stop`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PermissionRequest`
+
+**Python example**:
+
+```python
+from datetime import datetime
+from claude_agent_sdk import query, ClaudeAgentOptions, HookMatcher
+
+async def log_file_change(input_data, tool_use_id, context):
+    file_path = input_data.get('tool_input', {}).get('file_path', 'unknown')
+    with open('./audit.log', 'a') as f:
+        f.write(f"{datetime.now()}: modified {file_path}\n")
+    return {}
+
+async def main():
+    async for message in query(
+        prompt="Refactor utils.py",
+        options=ClaudeAgentOptions(
+            permission_mode="acceptEdits",
+            hooks={
+                "PostToolUse": [HookMatcher(matcher="Edit|Write", hooks=[log_file_change])]
+            }
+        )
+    ):
+        print(message)
+```
+
+**TypeScript example**:
+
+```typescript
+import { query, HookCallback } from "@anthropic-ai/claude-agent-sdk";
+import { appendFileSync } from "fs";
+
+const logFileChange: HookCallback = async (input) => {
+  const filePath = (input as any).tool_input?.file_path ?? "unknown";
+  appendFileSync(
+    "./audit.log",
+    `${new Date().toISOString()}: modified ${filePath}\n`,
+  );
+  return {};
+};
+
+for await (const message of query({
+  prompt: "Refactor utils.py",
+  options: {
+    permissionMode: "acceptEdits",
+    hooks: {
+      PostToolUse: [{ matcher: "Edit|Write", hooks: [logFileChange] }],
+    },
+  },
+})) {
+  console.log(message);
+}
+```
+
+### Subagents
+
+Define specialized agents for focused subtasks:
+
+**Python**:
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+async for message in query(
+    prompt="Use the code-reviewer agent to review this codebase",
+    options=ClaudeAgentOptions(
+        allowed_tools=["Read", "Glob", "Grep", "Task"],
+        agents={
+            "code-reviewer": AgentDefinition(
+                description="Expert code reviewer for quality and security.",
+                prompt="Analyze code quality and suggest improvements.",
+                tools=["Read", "Glob", "Grep"]
+            )
+        }
+    )
+):
+    print(message)
+```
+
+**TypeScript**:
+
+```typescript
+for await (const message of query({
+  prompt: "Use the code-reviewer agent to review this codebase",
+  options: {
+    allowedTools: ["Read", "Glob", "Grep", "Task"],
+    agents: {
+      "code-reviewer": {
+        description: "Expert code reviewer for quality and security.",
+        prompt: "Analyze code quality and suggest improvements.",
+        tools: ["Read", "Glob", "Grep"],
+      },
+    },
+  },
+})) {
+  console.log(message);
+}
+```
+
+### MCP Server Integration
+
+Connect to external systems via Model Context Protocol:
+
+```python
+async for message in query(
+    prompt="Open example.com and describe what you see",
+    options=ClaudeAgentOptions(
+        mcp_servers={
+            "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]}
+        }
+    )
+):
+    print(message)
+```
+
+### Session Management
+
+Maintain context across multiple exchanges:
+
+```python
+session_id = None
+
+# First query: capture session ID
+async for message in query(
+    prompt="Read the authentication module",
+    options=ClaudeAgentOptions(allowed_tools=["Read", "Glob"])
+):
+    if hasattr(message, 'subtype') and message.subtype == 'init':
+        session_id = message.session_id
+
+# Resume with full context
+async for message in query(
+    prompt="Now find all places that call it",
+    options=ClaudeAgentOptions(resume=session_id)
+):
+    print(message)
+```
+
+### Authentication Options
+
+```bash
+# Direct Anthropic API (default)
+export ANTHROPIC_API_KEY=your-api-key
+
+# Amazon Bedrock
+export CLAUDE_CODE_USE_BEDROCK=1
+# + AWS credentials
+
+# Google Vertex AI
+export CLAUDE_CODE_USE_VERTEX=1
+# + Google Cloud credentials
+
+# Microsoft Foundry
+export CLAUDE_CODE_USE_FOUNDRY=1
+# + Azure credentials
+```
+
+### Filesystem Configuration
+
+Enable Claude Code's filesystem-based configuration:
+
+```python
+options = ClaudeAgentOptions(
+    setting_sources=["project"]
+)
+```
+
+```typescript
+options: {
+  settingSources: ["project"];
+}
+```
+
+This enables:
+
+| Feature        | Location                           |
+| -------------- | ---------------------------------- |
+| Skills         | `.claude/skills/SKILL.md`          |
+| Slash commands | `.claude/commands/*.md`            |
+| Memory         | `CLAUDE.md` or `.claude/CLAUDE.md` |
+| Plugins        | Programmatic via `plugins` option  |
+
+### SDK vs CLI Comparison
+
+| Use Case              | Best Choice |
+| --------------------- | ----------- |
+| Interactive dev       | CLI         |
+| CI/CD pipelines       | SDK         |
+| Custom applications   | SDK         |
+| One-off tasks         | CLI         |
+| Production automation | SDK         |
+
+### DSM Agent SDK Integration
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+# FCP debugger agent
+async for message in query(
+    prompt="Debug the FCP cache miss for BTCUSDT",
+    options=ClaudeAgentOptions(
+        allowed_tools=["Read", "Glob", "Grep", "Bash", "Task"],
+        agents={
+            "fcp-debugger": AgentDefinition(
+                description="FCP protocol debugging expert.",
+                prompt="""Analyze FCP issues:
+                - Check cache state in ~/.cache/dsm
+                - Verify API availability
+                - Analyze decision logic
+                - Report root cause""",
+                tools=["Read", "Grep", "Bash"]
+            ),
+            "silent-failure-hunter": AgentDefinition(
+                description="Find silent failure patterns.",
+                prompt="Search for bare except, except Exception, subprocess without check=True",
+                tools=["Read", "Grep", "Glob"]
+            )
+        }
+    )
+):
+    if hasattr(message, "result"):
+        print(message.result)
+```
