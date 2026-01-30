@@ -14132,3 +14132,252 @@ Only report anomalies, not full cache contents.
 
 <!-- Detailed docs in skills, not here -->
 ```
+---
+
+## Troubleshooting Reference
+
+Diagnose and resolve common Claude Code issues.
+
+### Diagnostic Commands
+
+```bash
+# Check installation health
+claude doctor
+
+# Report bug with context
+/bug
+
+# View current context usage
+/context
+
+# Check API key
+echo $ANTHROPIC_API_KEY
+
+# Check version
+claude --version
+```
+
+**What /doctor checks**:
+
+- Installation type and version
+- Auto-update status
+- Invalid settings files (malformed JSON)
+- MCP server configuration errors
+- Keybinding problems
+- Context usage warnings (large CLAUDE.md, high MCP tokens)
+- Plugin and agent loading errors
+
+### Configuration File Locations
+
+| File                        | Purpose                             |
+| --------------------------- | ----------------------------------- |
+| ~/.claude/settings.json     | User settings                       |
+| .claude/settings.json       | Project settings (committed)        |
+| .claude/settings.local.json | Local project settings (gitignored) |
+| ~/.claude.json              | Global state (theme, OAuth, MCP)    |
+| .mcp.json                   | Project MCP servers (committed)     |
+| managed-settings.json       | Managed settings (admin)            |
+| managed-mcp.json            | Managed MCP servers (admin)         |
+
+**Managed file locations**:
+
+- macOS: `/Library/Application Support/ClaudeCode/`
+- Linux/WSL: `/etc/claude-code/`
+- Windows: `C:\Program Files\ClaudeCode\`
+
+### Installation Issues
+
+**Native installation (recommended)**:
+
+```bash
+# macOS, Linux, WSL
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Windows PowerShell
+irm https://claude.ai/install.ps1 | iex
+
+# Specific version
+curl -fsSL https://claude.ai/install.sh | bash -s <version>
+```
+
+<!-- SSoT-OK: Version placeholder in Claude Code documentation -->
+
+**PATH not found** (Windows):
+
+1. Open Environment Variables (Win+R → sysdm.cpl → Advanced)
+2. Edit User PATH, add: `%USERPROFILE%\.local\bin`
+3. Restart terminal
+
+### WSL-Specific Issues
+
+**OS detection problems**:
+
+```bash
+npm config set os linux
+npm install -g @anthropic-ai/claude-code --force --no-os-check
+```
+
+**Node not found**:
+
+```bash
+# Check if using Windows paths
+which npm   # Should start with /usr/, not /mnt/c/
+which node
+
+# Install via nvm (see https://github.com/nvm-sh/nvm for latest version)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/<version>/install.sh | bash
+source ~/.nvm/nvm.sh
+nvm install --lts
+```
+
+<!-- SSoT-OK: Version placeholder for nvm in Claude Code documentation -->
+
+**nvm version conflicts**:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+```
+
+**Sandbox requirements** (WSL2):
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install bubblewrap socat
+
+# Fedora
+sudo dnf install bubblewrap socat
+```
+
+### Authentication Issues
+
+```bash
+# Reset authentication
+/logout
+# Close and restart Claude Code
+
+# Force clean login
+rm -rf ~/.config/claude-code/auth.json
+claude
+```
+
+**Browser doesn't open**: Press `c` to copy OAuth URL to clipboard.
+
+### Performance Issues
+
+**High CPU/memory**:
+
+1. Use `/compact` regularly
+2. Close and restart between major tasks
+3. Add build directories to `.gitignore`
+
+**Command hangs**:
+
+1. Press Ctrl+C to cancel
+2. If unresponsive, close terminal and restart
+
+### Search Issues
+
+**Search not working**:
+
+```bash
+# Install system ripgrep
+brew install ripgrep          # macOS
+sudo apt install ripgrep      # Ubuntu/Debian
+winget install BurntSushi.ripgrep.MSVC  # Windows
+
+# Set environment variable
+export USE_BUILTIN_RIPGREP=0
+```
+
+**Slow search on WSL**:
+
+1. Submit more specific searches
+2. Move project to Linux filesystem (`/home/` not `/mnt/c/`)
+3. Consider native Windows instead
+
+### IDE Integration Issues
+
+**JetBrains not detected (WSL2)**:
+
+```bash
+# Find WSL2 IP
+wsl hostname -I
+
+# Create firewall rule (PowerShell Admin)
+New-NetFirewallRule -DisplayName "Allow WSL2 Internal Traffic" \
+  -Direction Inbound -Protocol TCP -Action Allow \
+  -RemoteAddress 172.21.0.0/16 -LocalAddress 172.21.0.0/16
+```
+
+**Escape key not working (JetBrains)**:
+
+1. Settings → Tools → Terminal
+2. Uncheck "Move focus to the editor with Escape"
+3. Apply changes
+
+### Reset Configuration
+
+```bash
+# Reset all user settings
+rm ~/.claude.json
+rm -rf ~/.claude/
+
+# Reset project settings
+rm -rf .claude/
+rm .mcp.json
+```
+
+### Common Error Solutions
+
+| Error                         | Solution                               |
+| ----------------------------- | -------------------------------------- |
+| "installMethod is native..."  | Add ~/.local/bin to PATH               |
+| "requires git-bash" (Windows) | Install Git for Windows                |
+| "Sandbox requires WSL2"       | Upgrade WSL or run without sandboxing  |
+| Permission denied             | Check npm prefix or use native install |
+| MCP server not connecting     | Run claude --mcp-debug                 |
+| Context limit exceeded        | Use /compact or /clear                 |
+
+### Getting Help
+
+1. **Built-in docs**: Ask Claude about its capabilities
+2. **Report bugs**: Use `/bug` command
+3. **GitHub issues**: <https://github.com/anthropics/claude-code/issues>
+4. **Run diagnostics**: `/doctor`
+
+### DSM-Specific Troubleshooting
+
+**FCP cache issues**:
+
+```bash
+# Check cache state
+ls -la ~/.cache/dsm/
+
+# Clear cache
+mise run cache:clear
+
+# Verify API connectivity
+uv run python -c "from data_source_manager import DataSourceManager; print('OK')"
+```
+
+**Python version issues**:
+
+```bash
+# Verify Python 3.13
+uv run -p 3.13 python --version
+
+# Check mise configuration
+mise current python
+```
+
+**Test failures**:
+
+```bash
+# Run with verbose output
+uv run pytest tests/ -v --tb=long
+
+# Run specific test
+uv run pytest tests/unit/test_manager.py -v
+```
