@@ -25631,3 +25631,671 @@ When pyright reports type errors, Claude sees them automatically:
 1. Check internet connection
 2. Start new conversation
 3. Try CLI for detailed errors
+## Headless and Programmatic Usage Reference
+
+Reference for running Claude Code non-interactively via CLI, Python SDK, and TypeScript SDK.
+
+### Overview
+
+The Agent SDK provides the same tools, agent loop, and context management that power Claude Code. Available as:
+
+- CLI (`claude -p`) for scripts and CI/CD
+- Python package for full programmatic control
+- TypeScript package for full programmatic control
+
+### Basic CLI Usage
+
+Add `-p` (or `--print`) flag for non-interactive execution:
+
+```bash
+# Simple question
+claude -p "What does the auth module do?"
+
+# With tool permissions
+claude -p "Find and fix the bug in auth.py" --allowedTools "Read,Edit,Bash"
+```
+
+### Output Formats
+
+Control response format with `--output-format`:
+
+| Format        | Description                           | Use Case                |
+| ------------- | ------------------------------------- | ----------------------- |
+| `text`        | Plain text output (default)           | Simple scripts          |
+| `json`        | Structured JSON with session metadata | Parsing, automation     |
+| `stream-json` | Newline-delimited JSON for real-time  | Live streaming, CI logs |
+
+**JSON output example**:
+
+```bash
+# Get project summary as JSON
+claude -p "Summarize this project" --output-format json
+
+# Extract just the result with jq
+claude -p "Summarize this project" --output-format json | jq -r '.result'
+```
+
+### Structured Output with JSON Schema
+
+Use `--json-schema` to enforce specific output structure:
+
+```bash
+claude -p "Extract the main function names from auth.py" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}'
+```
+
+Response includes metadata with structured output in `structured_output` field:
+
+```bash
+# Extract structured output
+claude -p "Extract function names" \
+  --output-format json \
+  --json-schema '...' \
+  | jq '.structured_output'
+```
+
+### Streaming Responses
+
+Stream tokens as they're generated:
+
+```bash
+# Full streaming with verbose output
+claude -p "Explain recursion" --output-format stream-json --verbose --include-partial-messages
+
+# Filter for text deltas only
+claude -p "Write a poem" --output-format stream-json --verbose --include-partial-messages | \
+  jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
+```
+
+### Auto-Approve Tools
+
+Use `--allowedTools` with permission rule syntax:
+
+```bash
+# Run tests and fix failures
+claude -p "Run the test suite and fix any failures" \
+  --allowedTools "Bash,Read,Edit"
+
+# Git operations with prefix matching
+claude -p "Look at my staged changes and create an appropriate commit" \
+  --allowedTools "Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git commit *)"
+```
+
+**Important**: The trailing `*` enables prefix matching. Space before `*` is important - without it, `Bash(git diff*)` would also match `git diff-index`.
+
+### Customizing System Prompt
+
+```bash
+# Append to default system prompt
+gh pr diff "$1" | claude -p \
+  --append-system-prompt "You are a security engineer. Review for vulnerabilities." \
+  --output-format json
+
+# Fully replace system prompt
+claude -p "Analyze this code" --system-prompt "You are a code reviewer..."
+```
+
+### Continue Conversations
+
+```bash
+# Continue most recent conversation
+claude -p "Review this codebase for performance issues"
+claude -p "Now focus on the database queries" --continue
+claude -p "Generate a summary of all issues found" --continue
+
+# Resume specific session by ID
+session_id=$(claude -p "Start a review" --output-format json | jq -r '.session_id')
+claude -p "Continue that review" --resume "$session_id"
+```
+
+### CI/CD Integration Patterns
+
+**GitHub Actions example**:
+
+```yaml
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review PR
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} | \
+          claude -p --append-system-prompt "Review for security issues" \
+            --output-format json \
+            --allowedTools "Read,Grep,Glob"
+```
+
+**GitLab CI example**:
+
+```yaml
+code-review:
+  script:
+    - git diff origin/main...HEAD | claude -p "Review these changes" --output-format json
+```
+
+### Permission Flags for CI/CD
+
+| Flag                             | Purpose                     | Use Case              |
+| -------------------------------- | --------------------------- | --------------------- |
+| `--allowedTools "Read,Grep"`     | Limit to read-only tools    | Code review           |
+| `--allowedTools "Bash,Edit"`     | Allow modifications         | Auto-fix              |
+| `--max-turns N`                  | Limit execution turns       | Cost control          |
+| `--dangerously-skip-permissions` | Skip all permission prompts | Isolated CI container |
+
+**Warning**: Only use `--dangerously-skip-permissions` in isolated environments (CI containers).
+
+### Python SDK Usage
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+# Basic message
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=16000,
+    messages=[{"role": "user", "content": "Analyze this code"}]
+)
+
+# With extended thinking
+response = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=16000,
+    thinking={"type": "enabled", "budget_tokens": 10000},
+    messages=[{"role": "user", "content": "Complex analysis task"}]
+)
+
+# Process response blocks
+for block in response.content:
+    if block.type == "thinking":
+        print(f"Thinking: {block.thinking}")
+    elif block.type == "text":
+        print(f"Response: {block.text}")
+```
+
+### TypeScript SDK Usage
+
+```typescript
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+// Basic message
+const response = await client.messages.create({
+  model: "claude-sonnet-4-5",
+  max_tokens: 16000,
+  messages: [{ role: "user", content: "Analyze this code" }],
+});
+
+// With extended thinking
+const response = await client.messages.create({
+  model: "claude-sonnet-4-5",
+  max_tokens: 16000,
+  thinking: { type: "enabled", budget_tokens: 10000 },
+  messages: [{ role: "user", content: "Complex analysis task" }],
+});
+
+// Process response blocks
+for (const block of response.content) {
+  if (block.type === "thinking") {
+    console.log(`Thinking: ${block.thinking}`);
+  } else if (block.type === "text") {
+    console.log(`Response: ${block.text}`);
+  }
+}
+```
+
+### Streaming with SDKs
+
+**Python streaming**:
+
+```python
+with client.messages.stream(
+    model="claude-sonnet-4-5",
+    max_tokens=16000,
+    thinking={"type": "enabled", "budget_tokens": 10000},
+    messages=[{"role": "user", "content": "Explain recursion"}],
+) as stream:
+    for event in stream:
+        if event.type == "content_block_delta":
+            if event.delta.type == "thinking_delta":
+                print(event.delta.thinking, end="", flush=True)
+            elif event.delta.type == "text_delta":
+                print(event.delta.text, end="", flush=True)
+```
+
+**TypeScript streaming**:
+
+```typescript
+const stream = await client.messages.stream({
+  model: "claude-sonnet-4-5",
+  max_tokens: 16000,
+  thinking: { type: "enabled", budget_tokens: 10000 },
+  messages: [{ role: "user", content: "Explain recursion" }],
+});
+
+for await (const event of stream) {
+  if (event.type === "content_block_delta") {
+    if (event.delta.type === "thinking_delta") {
+      process.stdout.write(event.delta.thinking);
+    } else if (event.delta.type === "text_delta") {
+      process.stdout.write(event.delta.text);
+    }
+  }
+}
+```
+
+### DSM-Specific Headless Patterns
+
+**Batch FCP validation**:
+
+```bash
+# Validate FCP behavior across symbols
+claude -p "Test FCP failover for BTCUSDT, ETHUSDT, SOLUSDT" \
+  --allowedTools "Bash(uv run *),Read,Grep" \
+  --output-format json \
+  | jq '.result'
+```
+
+**Data integrity check**:
+
+```bash
+# Run DataFrame validation
+claude -p "Validate OHLCV data integrity for the past 24 hours" \
+  --allowedTools "Bash(uv run pytest *),Read" \
+  --max-turns 10
+```
+
+**Automated test generation**:
+
+```bash
+# Generate tests for new module
+claude -p "Generate pytest tests for src/datasourcemanager/new_module.py following DSM patterns" \
+  --allowedTools "Read,Write,Edit,Bash(uv run pytest *)" \
+  --output-format json
+```
+
+### Environment Variables for Headless Mode
+
+| Variable                    | Purpose                          |
+| --------------------------- | -------------------------------- |
+| `ANTHROPIC_API_KEY`         | API authentication               |
+| `CLAUDE_CODE_USE_BEDROCK=1` | Use AWS Bedrock instead of API   |
+| `CLAUDE_CODE_USE_VERTEX=1`  | Use Google Vertex AI instead     |
+| `MAX_THINKING_TOKENS`       | Override default thinking budget |
+| `USE_BUILTIN_RIPGREP=0`     | Use system ripgrep instead       |
+
+### Best Practices for CI/CD
+
+1. **Use specific tool permissions** - Don't use `--dangerously-skip-permissions` unless in isolated container
+2. **Set `--max-turns`** - Prevent runaway execution in automation
+3. **Use JSON output** - Parse results programmatically
+4. **Capture session IDs** - Enable continuation and debugging
+5. **Handle streaming** - For long operations, use `stream-json` format
+6. **Check exit codes** - Claude returns non-zero on errors
+## Troubleshooting Reference
+
+Comprehensive troubleshooting guide for Claude Code installation, configuration, and runtime issues.
+
+### Quick Diagnostic Commands
+
+```bash
+# Check installation health
+claude doctor
+
+# Check version
+claude --version
+
+# Verify authentication
+claude config
+
+# Debug MCP servers
+claude --mcp-debug
+```
+
+### The `/doctor` Command
+
+Running `/doctor` within Claude Code checks:
+
+- Installation type, version, and search functionality
+- Auto-update status and available versions
+- Invalid settings files (malformed JSON, incorrect types)
+- MCP server configuration errors
+- Keybinding configuration problems
+- Context usage warnings (large CLAUDE.md files, high MCP token usage)
+- Plugin and agent loading errors
+
+### Configuration File Locations
+
+| File                          | Purpose                                  |
+| ----------------------------- | ---------------------------------------- |
+| `~/.claude/settings.json`     | User settings (permissions, hooks)       |
+| `.claude/settings.json`       | Project settings (committed)             |
+| `.claude/settings.local.json` | Local project settings (not committed)   |
+| `~/.claude.json`              | Global state (theme, OAuth, MCP servers) |
+| `.mcp.json`                   | Project MCP servers (committed)          |
+| `managed-settings.json`       | Managed settings (enterprise)            |
+| `managed-mcp.json`            | Managed MCP servers (enterprise)         |
+
+**Managed file locations**:
+
+| Platform  | Location                                   |
+| --------- | ------------------------------------------ |
+| macOS     | `/Library/Application Support/ClaudeCode/` |
+| Linux/WSL | `/etc/claude-code/`                        |
+| Windows   | `C:\Program Files\ClaudeCode\`             |
+
+### Resetting Configuration
+
+```bash
+# Reset all user settings and state
+rm ~/.claude.json
+rm -rf ~/.claude/
+
+# Reset project-specific settings
+rm -rf .claude/
+rm .mcp.json
+```
+
+**Warning**: This removes all settings, MCP server configurations, and session history.
+
+### Common Installation Issues
+
+#### Windows Installation Issues (WSL)
+
+**OS/platform detection issues**:
+
+```bash
+# Fix: Set npm config before installation
+npm config set os linux
+
+# Install with force flags (do NOT use sudo)
+npm install -g @anthropic-ai/claude-code --force --no-os-check
+```
+
+**Node not found errors** (`exec: node: not found`):
+
+```bash
+# Check if using Windows npm
+which npm
+which node
+# Should show Linux paths (/usr/) not Windows paths (/mnt/c/)
+
+# Fix: Install Node via nvm in WSL
+# SSoT-OK: nvm install script URL is canonical source
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
+source ~/.nvm/nvm.sh
+nvm install --lts
+```
+
+**nvm version conflicts** (WSL imports Windows PATH):
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# Or explicitly prepend Linux paths
+export PATH="$HOME/.nvm/versions/node/$(node -v)/bin:$PATH"
+```
+
+**Warning**: Avoid disabling Windows PATH importing (`appendWindowsPath = false`) - breaks calling Windows executables from WSL.
+
+#### WSL2 Sandbox Setup
+
+```bash
+# Install sandbox dependencies
+# Ubuntu/Debian
+sudo apt-get install bubblewrap socat
+
+# Fedora
+sudo dnf install bubblewrap socat
+
+# Alpine
+apk add ripgrep
+```
+
+**Note**: WSL1 does not support sandboxing.
+
+#### Native Installation (Recommended)
+
+```bash
+# macOS, Linux, WSL - stable version
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Specific version (replace with desired version)
+curl -fsSL https://claude.ai/install.sh | bash -s <version>
+
+# Windows PowerShell - stable version
+irm https://claude.ai/install.ps1 | iex
+```
+
+Installation creates symlink at `~/.local/bin/claude`.
+
+#### Windows: Git Bash Not Found
+
+```powershell
+# Set Git Bash path in PowerShell
+$env:CLAUDE_CODE_GIT_BASH_PATH="C:\Program Files\Git\bin\bash.exe"
+
+# Or add to system environment variables permanently
+```
+
+#### Windows: Command Not Found After Installation
+
+1. Press `Win + R`, type `sysdm.cpl`, press Enter
+2. Click **Advanced** → **Environment Variables**
+3. Under "User variables", select **Path** → **Edit**
+4. Click **New** and add: `%USERPROFILE%\.local\bin`
+5. Restart terminal
+
+### Authentication Issues
+
+**Repeated permission prompts**:
+
+```bash
+# Use /permissions command to allow specific tools
+/permissions
+```
+
+**Authentication problems**:
+
+```bash
+# 1. Sign out completely
+/logout
+
+# 2. Close Claude Code
+
+# 3. Restart and re-authenticate
+claude
+
+# If browser doesn't open, press 'c' to copy OAuth URL
+```
+
+**Force clean login**:
+
+```bash
+rm -rf ~/.config/claude-code/auth.json
+claude
+```
+
+### Performance and Stability
+
+#### High CPU or Memory Usage
+
+1. Use `/compact` regularly to reduce context size
+2. Close and restart between major tasks
+3. Add large build directories to `.gitignore`
+
+#### Command Hangs or Freezes
+
+1. Press `Ctrl+C` to cancel current operation
+2. If unresponsive, close terminal and restart
+
+#### Search and Discovery Issues
+
+If Search tool, `@file` mentions, agents, and skills aren't working:
+
+```bash
+# Install system ripgrep
+# macOS
+brew install ripgrep
+
+# Windows
+winget install BurntSushi.ripgrep.MSVC
+
+# Ubuntu/Debian
+sudo apt install ripgrep
+
+# Then set environment variable
+export USE_BUILTIN_RIPGREP=0
+```
+
+#### Slow Search Results on WSL
+
+Disk read performance penalties when working across file systems on WSL.
+
+**Solutions**:
+
+1. Submit more specific searches - specify directories or file types
+2. Move project to Linux filesystem (`/home/`) instead of Windows (`/mnt/c/`)
+3. Run Claude Code natively on Windows instead of WSL
+
+### IDE Integration Issues
+
+#### JetBrains IDE Not Detected on WSL2
+
+Likely due to WSL2 networking or Windows Firewall.
+
+**Option 1: Configure Windows Firewall** (recommended):
+
+```bash
+# 1. Find WSL2 IP
+wsl hostname -I
+# Example: 172.21.123.456
+
+# 2. Create firewall rule (PowerShell as Admin)
+New-NetFirewallRule -DisplayName "Allow WSL2 Internal Traffic" -Direction Inbound -Protocol TCP -Action Allow -RemoteAddress 172.21.0.0/16 -LocalAddress 172.21.0.0/16
+
+# 3. Restart IDE and Claude Code
+```
+
+**Option 2: Switch to mirrored networking**:
+
+Add to `.wslconfig` in Windows user directory:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+Then restart WSL: `wsl --shutdown`
+
+#### Escape Key Not Working in JetBrains
+
+1. Go to Settings → Tools → Terminal
+2. Either:
+   - Uncheck "Move focus to the editor with Escape", or
+   - Click "Configure terminal keybindings" → delete "Switch focus to Editor"
+3. Apply changes
+
+### Markdown Formatting Issues
+
+#### Missing Language Tags on Code Blocks
+
+**Solutions**:
+
+1. Ask Claude to add language tags: "Add appropriate language tags to all code blocks"
+2. Use post-processing hooks for automatic formatting
+3. Manual verification after generation
+
+#### Inconsistent Spacing
+
+1. Request formatting corrections
+2. Set up hooks to run `prettier` on generated markdown
+3. Specify formatting preferences in CLAUDE.md
+
+### DSM-Specific Troubleshooting
+
+#### FCP-Related Issues
+
+**Cache miss debugging**:
+
+```bash
+# Use fcp-debugger agent
+/debug-fcp BTCUSDT
+
+# Check cache integrity
+mise run cache:clear
+uv run python -c "from datasourcemanager import DataSourceManager; dsm = DataSourceManager(); print(dsm.cache_status())"
+```
+
+**Failover not triggering**:
+
+1. Check rate limit status on primary source
+2. Verify backup sources are configured
+3. Review FCP decision log
+
+#### DataFrame Validation Failures
+
+```bash
+# Use validate-data command
+/validate-data
+
+# Manual validation
+uv run pytest tests/test_dataframe_validation.py -v
+```
+
+#### Symbol Format Errors
+
+Check symbol format matches exchange requirements:
+
+| Exchange | Format           | Example    |
+| -------- | ---------------- | ---------- |
+| Binance  | `{base}{quote}`  | `BTCUSDT`  |
+| OKX      | `{base}-{quote}` | `BTC-USDT` |
+| Bybit    | `{base}{quote}`  | `BTCUSDT`  |
+
+#### Timestamp Issues
+
+DSM requires UTC timestamps. Common issues:
+
+1. **Naive datetime** - Always use timezone-aware datetimes
+2. **Wrong timezone** - Convert to UTC before passing to DSM
+3. **Milliseconds vs seconds** - DSM uses milliseconds
+
+```python
+# Correct timestamp handling
+from datetime import datetime, timezone
+
+# Get current UTC time
+now = datetime.now(timezone.utc)
+
+# Convert from naive to UTC
+naive_dt = datetime(2024, 1, 1)
+utc_dt = naive_dt.replace(tzinfo=timezone.utc)
+```
+
+### Getting More Help
+
+1. **Use `/bug` command** - Report problems directly to Anthropic with full context
+2. **Check GitHub issues** - [github.com/anthropics/claude-code/issues](https://github.com/anthropics/claude-code/issues)
+3. **Run `/doctor`** - Diagnose common issues
+4. **Ask Claude** - Claude has built-in access to its documentation
+
+### Environment Variable Reference
+
+| Variable                    | Purpose                            |
+| --------------------------- | ---------------------------------- |
+| `ANTHROPIC_API_KEY`         | API authentication                 |
+| `CLAUDE_CODE_USE_BEDROCK`   | Use AWS Bedrock (set to 1)         |
+| `CLAUDE_CODE_USE_VERTEX`    | Use Google Vertex AI (set to 1)    |
+| `CLAUDE_CODE_GIT_BASH_PATH` | Git Bash path on Windows           |
+| `USE_BUILTIN_RIPGREP`       | Use system ripgrep (set to 0)      |
+| `MAX_THINKING_TOKENS`       | Override thinking budget           |
+| `ENABLE_LSP_TOOL`           | Enable/disable LSP (set to 0/1)    |
+| `MCP_TIMEOUT`               | MCP server timeout in milliseconds |
