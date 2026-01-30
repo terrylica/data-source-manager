@@ -14998,3 +14998,416 @@ Week 4: + Playwright (E2E tests)
 # Combined workflow
 "Plan the FCP refactoring approach, then fetch current Polars best practices"
 ```
+
+---
+
+## Claude Agent SDK Reference
+
+Build custom agents programmatically with Python and TypeScript SDKs.
+
+### Installation
+
+**Python**:
+
+```bash
+pip install claude-agent-sdk
+export ANTHROPIC_API_KEY=your-api-key
+```
+
+**TypeScript**:
+
+```bash
+npm install @anthropic-ai/claude-agent-sdk
+export ANTHROPIC_API_KEY=your-api-key
+```
+
+### Basic Usage
+
+**Python**:
+
+```python
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def main():
+    async for message in query(
+        prompt="Analyze this codebase and suggest improvements",
+        options=ClaudeAgentOptions(
+            max_turns=10,
+            setting_sources=["project"]  # Enable MCP, hooks, permissions
+        )
+    ):
+        print(message)
+
+asyncio.run(main())
+```
+
+**TypeScript**:
+
+```typescript
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "Analyze this codebase and suggest improvements",
+  options: {
+    maxTurns: 10,
+    settingSources: ["project"], // Enable MCP, hooks, permissions
+  },
+})) {
+  console.log(message);
+}
+```
+
+### Available Hooks
+
+| Hook Event           | Python | TypeScript | Trigger               | Use Case                 |
+| -------------------- | ------ | ---------- | --------------------- | ------------------------ |
+| `PreToolUse`         | Yes    | Yes        | Before tool executes  | Block dangerous commands |
+| `PostToolUse`        | Yes    | Yes        | After tool returns    | Audit logging            |
+| `PostToolUseFailure` | No     | Yes        | Tool execution fails  | Error handling           |
+| `UserPromptSubmit`   | Yes    | Yes        | User prompt submitted | Inject context           |
+| `Stop`               | Yes    | Yes        | Agent execution ends  | Save state               |
+| `SubagentStart`      | No     | Yes        | Subagent spawned      | Track parallel tasks     |
+| `SubagentStop`       | Yes    | Yes        | Subagent completes    | Aggregate results        |
+| `PreCompact`         | Yes    | Yes        | Compaction requested  | Archive transcript       |
+| `PermissionRequest`  | No     | Yes        | Permission prompt     | Custom approval          |
+| `SessionStart`       | No     | Yes        | Session begins        | Initialize telemetry     |
+| `SessionEnd`         | No     | Yes        | Session ends          | Cleanup resources        |
+| `Notification`       | No     | Yes        | Agent status message  | Slack/PagerDuty alerts   |
+
+### Hook Configuration
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, HookMatcher
+
+async def protect_env_files(input_data, tool_use_id, context):
+    file_path = input_data['tool_input'].get('file_path', '')
+    if file_path.endswith('.env'):
+        return {
+            'hookSpecificOutput': {
+                'hookEventName': input_data['hook_event_name'],
+                'permissionDecision': 'deny',
+                'permissionDecisionReason': 'Cannot modify .env files'
+            }
+        }
+    return {}
+
+async def main():
+    async for message in query(
+        prompt="Update configuration",
+        options=ClaudeAgentOptions(
+            hooks={
+                'PreToolUse': [
+                    HookMatcher(matcher='Write|Edit', hooks=[protect_env_files])
+                ]
+            }
+        )
+    ):
+        print(message)
+```
+
+### Hook Callback Inputs
+
+**Common fields** (all hooks):
+
+| Field             | Type   | Description                  |
+| ----------------- | ------ | ---------------------------- |
+| `hook_event_name` | string | Hook type (PreToolUse, etc.) |
+| `session_id`      | string | Current session ID           |
+| `transcript_path` | string | Path to transcript           |
+| `cwd`             | string | Current working directory    |
+
+**PreToolUse/PostToolUse fields**:
+
+| Field           | Type   | Description                    |
+| --------------- | ------ | ------------------------------ |
+| `tool_name`     | string | Name of the tool               |
+| `tool_input`    | object | Tool arguments                 |
+| `tool_response` | any    | Tool result (PostToolUse only) |
+
+### Hook Callback Outputs
+
+**Top-level fields**:
+
+| Field            | Type    | Description                        |
+| ---------------- | ------- | ---------------------------------- |
+| `continue`       | boolean | Continue execution (default: true) |
+| `stopReason`     | string  | Message when continue=false        |
+| `suppressOutput` | boolean | Hide stdout from transcript        |
+| `systemMessage`  | string  | Message injected for Claude        |
+
+**hookSpecificOutput fields**:
+
+| Field                      | Type                       | Description                         |
+| -------------------------- | -------------------------- | ----------------------------------- |
+| `hookEventName`            | string                     | Required. Use input.hook_event_name |
+| `permissionDecision`       | 'allow' \| 'deny' \| 'ask' | Tool execution control              |
+| `permissionDecisionReason` | string                     | Explanation for decision            |
+| `updatedInput`             | object                     | Modified tool input                 |
+| `additionalContext`        | string                     | Context added to conversation       |
+
+### Hook Patterns
+
+**Block dangerous commands**:
+
+```python
+async def block_dangerous(input_data, tool_use_id, context):
+    command = input_data['tool_input'].get('command', '')
+    if 'rm -rf /' in command or 'drop database' in command.lower():
+        return {
+            'hookSpecificOutput': {
+                'hookEventName': input_data['hook_event_name'],
+                'permissionDecision': 'deny',
+                'permissionDecisionReason': 'Dangerous command blocked'
+            }
+        }
+    return {}
+```
+
+**Auto-approve read-only tools**:
+
+```python
+async def auto_approve_readonly(input_data, tool_use_id, context):
+    read_only = ['Read', 'Glob', 'Grep', 'LS']
+    if input_data['tool_name'] in read_only:
+        return {
+            'hookSpecificOutput': {
+                'hookEventName': input_data['hook_event_name'],
+                'permissionDecision': 'allow',
+                'permissionDecisionReason': 'Read-only auto-approved'
+            }
+        }
+    return {}
+```
+
+**Redirect to sandbox**:
+
+```python
+async def redirect_sandbox(input_data, tool_use_id, context):
+    if input_data['tool_name'] == 'Write':
+        original = input_data['tool_input'].get('file_path', '')
+        return {
+            'hookSpecificOutput': {
+                'hookEventName': input_data['hook_event_name'],
+                'permissionDecision': 'allow',
+                'updatedInput': {
+                    **input_data['tool_input'],
+                    'file_path': f'/sandbox{original}'
+                }
+            }
+        }
+    return {}
+```
+
+**Webhook notifications** (TypeScript):
+
+```typescript
+const webhookNotifier: HookCallback = async (input, toolUseID, { signal }) => {
+  if (input.hook_event_name !== "PostToolUse") return {};
+
+  await fetch("https://api.example.com/webhook", {
+    method: "POST",
+    body: JSON.stringify({
+      tool: (input as PostToolUseHookInput).tool_name,
+      timestamp: new Date().toISOString(),
+    }),
+    signal, // Cancel on hook timeout
+  });
+
+  return {};
+};
+```
+
+### Permission Decision Flow
+
+Evaluation order:
+
+1. **Deny** rules checked first (any match = blocked)
+2. **Ask** rules checked second
+3. **Allow** rules checked third
+4. **Default to Ask** if nothing matches
+
+Multiple hooks: If any hook returns `deny`, operation blocked.
+
+### Subagents
+
+Define specialized subagents with isolated context:
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, Subagent
+
+# Read-only analysis agent
+analysis_agent = Subagent(
+    name="analyzer",
+    instructions="Analyze code patterns without making changes",
+    tools=['Read', 'Glob', 'Grep']  # Restricted tool access
+)
+
+async def main():
+    async for message in query(
+        prompt="Use the analyzer agent to review this codebase",
+        options=ClaudeAgentOptions(
+            subagents=[analysis_agent]
+        )
+    ):
+        print(message)
+```
+
+**Subagent characteristics**:
+
+- Isolated context window
+- Can have restricted tools
+- Transcripts persist (default 30 days)
+- Can be resumed via session ID
+- Do NOT inherit parent permissions automatically
+
+### Sessions
+
+**Resume a session**:
+
+```python
+# First query - capture session ID
+session_id = None
+async for message in query(prompt="Start analysis"):
+    if hasattr(message, 'session_id'):
+        session_id = message.session_id
+    print(message)
+
+# Second query - resume session
+async for message in query(
+    prompt="Continue the analysis",
+    options=ClaudeAgentOptions(resume=session_id)
+):
+    print(message)
+```
+
+### MCP Integration
+
+MCP tools follow naming pattern: `mcp__<server>__<action>`
+
+```python
+# Match all Playwright MCP tools
+HookMatcher(matcher='^mcp__playwright__', hooks=[playwright_hook])
+
+# Match specific MCP action
+HookMatcher(matcher='mcp__github__create_pr', hooks=[pr_hook])
+```
+
+### Custom Tools
+
+Implement in-process MCP servers:
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, CustomTool
+
+def fetch_weather(location: str) -> dict:
+    """Fetch current weather for a location."""
+    return {"temp": 72, "conditions": "sunny", "location": location}
+
+weather_tool = CustomTool(
+    name="get_weather",
+    description="Get current weather for a location",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "location": {"type": "string", "description": "City name"}
+        },
+        "required": ["location"]
+    },
+    handler=fetch_weather
+)
+
+async for message in query(
+    prompt="What's the weather in San Francisco?",
+    options=ClaudeAgentOptions(custom_tools=[weather_tool])
+):
+    print(message)
+```
+
+### Permission Modes
+
+```python
+# Bypass all permissions (dangerous!)
+options = ClaudeAgentOptions(bypass_permissions=True)
+
+# Note: bypassPermissions inherited by all subagents
+# Cannot be overridden by subagents
+```
+
+### Third-Party API Providers
+
+**Amazon Bedrock**:
+
+```bash
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_REGION=us-east-1
+```
+
+**Google Vertex AI**:
+
+```bash
+export CLAUDE_CODE_USE_VERTEX=1
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+export VERTEX_PROJECT_ID=your-project
+export VERTEX_REGION=us-central1
+```
+
+### Configuration Options
+
+| Option               | Python               | TypeScript          | Default   | Description                |
+| -------------------- | -------------------- | ------------------- | --------- | -------------------------- |
+| `max_turns`          | `max_turns`          | `maxTurns`          | unlimited | Maximum API round-trips    |
+| `setting_sources`    | `setting_sources`    | `settingSources`    | []        | Enable project settings    |
+| `hooks`              | `hooks`              | `hooks`             | {}        | Hook configurations        |
+| `subagents`          | `subagents`          | `subagents`         | []        | Subagent definitions       |
+| `custom_tools`       | `custom_tools`       | `customTools`       | []        | Custom tool definitions    |
+| `resume`             | `resume`             | `resume`            | None      | Session ID to resume       |
+| `bypass_permissions` | `bypass_permissions` | `bypassPermissions` | false     | Skip all permission checks |
+
+### DSM Agent SDK Integration
+
+```python
+from claude_agent_sdk import query, ClaudeAgentOptions, HookMatcher, Subagent
+
+# FCP validation subagent
+fcp_validator = Subagent(
+    name="fcp-validator",
+    instructions="""
+    Validate FCP cache behavior:
+    1. Check cache state in ~/.cache/dsm/
+    2. Verify staleness thresholds
+    3. Report any anomalies
+    """,
+    tools=['Read', 'Glob', 'Grep', 'Bash']
+)
+
+# Hook to prevent accidental cache deletion
+async def protect_cache(input_data, tool_use_id, context):
+    command = input_data['tool_input'].get('command', '')
+    if 'rm' in command and '.cache/dsm' in command:
+        return {
+            'hookSpecificOutput': {
+                'hookEventName': input_data['hook_event_name'],
+                'permissionDecision': 'deny',
+                'permissionDecisionReason': 'Use mise run cache:clear instead'
+            }
+        }
+    return {}
+
+async def main():
+    async for message in query(
+        prompt="Validate FCP cache state for BTCUSDT",
+        options=ClaudeAgentOptions(
+            subagents=[fcp_validator],
+            hooks={
+                'PreToolUse': [
+                    HookMatcher(matcher='Bash', hooks=[protect_cache])
+                ]
+            },
+            setting_sources=['project']
+        )
+    ):
+        print(message)
+```
