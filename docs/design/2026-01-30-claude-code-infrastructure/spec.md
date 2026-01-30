@@ -3089,6 +3089,216 @@ When Claude references images (e.g., `[Image #1]`):
 | API response viewing  | Analyze JSON viewer screenshots |
 | Architecture diagrams | Review FCP flow diagrams        |
 
+## @ File Reference Syntax
+
+Efficiently include file content in conversations without tool calls.
+
+### Basic Syntax
+
+```
+@path/to/file.js          # Include file content
+@src/components/          # List directory contents
+@README.md                # Project root file
+```
+
+### Tab Completion
+
+Type `@` followed by partial path, then Tab to autocomplete:
+
+```
+@src/comp<Tab>   # Completes to @src/components/
+@pack<Tab>       # Completes to @package.json
+```
+
+### CLAUDE.md Imports
+
+Import files into memory with @ syntax:
+
+```markdown
+See @README.md for project overview
+See @docs/api-patterns.md for API conventions
+See @package.json for available npm scripts
+
+# Personal preferences
+
+- @~/.claude/my-project-instructions.md
+```
+
+### Import Characteristics
+
+| Property    | Behavior                        |
+| ----------- | ------------------------------- |
+| Paths       | Relative or absolute allowed    |
+| Max depth   | 5 hops recursive                |
+| Code blocks | Not evaluated inside code spans |
+| View loaded | Use `/memory` command           |
+
+### Nested Directory Discovery
+
+```
+project/
+├── CLAUDE.md              # Loaded at launch
+├── src/
+│   └── CLAUDE.md          # Loaded when reading src/ files
+└── tests/
+    └── CLAUDE.md          # Loaded when reading tests/ files
+```
+
+### MCP Resource References
+
+```
+@github:repos/owner/repo/issues      # GitHub MCP
+@server:protocol://resource/path     # Generic MCP
+```
+
+### Rules vs Imports
+
+| Approach                | Use Case                   |
+| ----------------------- | -------------------------- |
+| `.claude/rules/`        | Auto-loaded modular rules  |
+| `@imports` in CLAUDE.md | Explicit referenced files  |
+| CLAUDE.local.md         | Personal local preferences |
+
+### Best Practices
+
+| Practice                    | Rationale                     |
+| --------------------------- | ----------------------------- |
+| Use sparingly               | Avoid creating reference maze |
+| Consistent @ prefix         | Deterministic loading         |
+| Critical instructions first | More prominent in CLAUDE.md   |
+| Tab completion              | Faster than typing full paths |
+
+### DSM @ Reference Examples
+
+```markdown
+# In CLAUDE.md
+
+See @docs/GLOSSARY.md for domain terminology
+See @src/core/errors.py for exception hierarchy
+See @.claude/rules/fcp-protocol.md for FCP details
+```
+
+## Chrome Browser Integration
+
+Web automation directly from Claude Code terminal.
+
+### Prerequisites
+
+| Requirement       | Version                                       |
+| ----------------- | --------------------------------------------- |
+| Google Chrome     | Latest stable                                 |
+| Claude for Chrome | See [Chrome Web Store][chrome-ext] for latest |
+| Claude Code CLI   | Run `claude update` for latest                |
+| Plan              | Pro, Team, or Enterprise                      |
+
+[chrome-ext]: https://chromewebstore.google.com/detail/claude/fcoeoabgfenejglbffodgkkbkcdhcgfn
+
+### Enable Chrome Integration
+
+```bash
+# Start with Chrome flag
+claude --chrome
+
+# Or enable during session
+> /chrome
+```
+
+### Capabilities
+
+| Capability          | Description                        |
+| ------------------- | ---------------------------------- |
+| Live debugging      | Read console errors, fix code      |
+| Design verification | Compare UI to Figma mocks          |
+| Web app testing     | Form validation, visual regression |
+| Authenticated apps  | Google Docs, Gmail, Notion, etc.   |
+| Data extraction     | Scrape structured information      |
+| Task automation     | Data entry, form filling           |
+| Session recording   | Record GIFs of interactions        |
+
+### Example Workflows
+
+**Test local web app:**
+
+```
+I updated login form validation. Open localhost:3000, submit with
+invalid data, and check error messages appear correctly.
+```
+
+**Debug with console logs:**
+
+```
+Open the dashboard and check console for errors on page load.
+```
+
+**Automate form filling:**
+
+```
+Read contacts.csv and for each row, go to crm.example.com,
+click "Add Contact", fill name, email, phone fields.
+```
+
+**Extract data:**
+
+```
+Go to product listings, extract name, price, availability
+for each item. Save as CSV.
+```
+
+**Record demo GIF:**
+
+```
+Record a GIF showing checkout flow from cart to confirmation.
+```
+
+### Browser Commands
+
+Check available tools with `/mcp` → `claude-in-chrome`:
+
+- Navigate pages
+- Click and type
+- Fill forms
+- Scroll
+- Read console logs
+- Monitor network requests
+- Manage tabs
+- Resize windows
+- Record GIFs
+
+### Best Practices
+
+| Practice                | Rationale                       |
+| ----------------------- | ------------------------------- |
+| Dismiss modal dialogs   | JS alerts block Claude commands |
+| Use fresh tabs          | Avoid unresponsive tab issues   |
+| Filter console output   | Reduce verbose logging noise    |
+| Enable only when needed | Reduces context usage           |
+
+### Troubleshooting
+
+| Issue                  | Solution                       |
+| ---------------------- | ------------------------------ |
+| Extension not found    | Check versions, restart Chrome |
+| Browser not responding | Dismiss modals, use new tab    |
+| Permission errors      | Restart Chrome after install   |
+
+### Enable by Default
+
+```
+> /chrome
+> Select "Enabled by default"
+```
+
+Note: Increases context usage since browser tools always loaded.
+
+### Limitations
+
+| Limitation        | Details                       |
+| ----------------- | ----------------------------- |
+| Chrome only       | No Brave, Arc, other Chromium |
+| WSL not supported | Windows Subsystem for Linux   |
+| Visible window    | No headless mode              |
+| Modal blocking    | JS alerts pause commands      |
+
 ## Verification Checklist
 
 ### Infrastructure
