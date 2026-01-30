@@ -27,10 +27,10 @@ When fetching data, always verify:
 
 ```python
 from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
-end_time = datetime.now()
+end_time = datetime.now(timezone.utc)
 start_time = end_time - timedelta(days=7)
 
 df = manager.get_data(
