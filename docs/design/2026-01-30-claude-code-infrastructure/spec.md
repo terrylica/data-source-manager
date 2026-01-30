@@ -7367,6 +7367,231 @@ rm .mcp.json
 | Symbol format mismatch | Log normalized vs raw symbols         |
 | Timestamp issues       | Verify UTC, check open_time alignment |
 
+## MCP Server Configuration
+
+Model Context Protocol servers for external tool integration.
+
+### Server Types
+
+| Transport | Use Case                    | Example                        |
+| --------- | --------------------------- | ------------------------------ |
+| HTTP      | Remote cloud services       | GitHub, Sentry, Notion         |
+| SSE       | Server-sent events (legacy) | Asana (deprecated)             |
+| stdio     | Local process execution     | Database tools, custom scripts |
+
+### Adding Servers
+
+```bash
+# HTTP server (recommended for remote)
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/
+
+# SSE server (legacy)
+claude mcp add --transport sse asana https://mcp.asana.com/sse
+
+# stdio server (local process)
+claude mcp add --transport stdio db -- npx -y @bytebase/dbhub \
+  --dsn "postgresql://readonly:pass@host:5432/db"
+```
+
+### Scopes
+
+| Scope   | Storage            | Visibility        |
+| ------- | ------------------ | ----------------- |
+| local   | `~/.claude.json`   | You, this project |
+| project | `.mcp.json` (repo) | Team (committed)  |
+| user    | `~/.claude.json`   | You, all projects |
+
+### Management Commands
+
+```bash
+# List all servers
+claude mcp list
+
+# Get server details
+claude mcp get github
+
+# Remove server
+claude mcp remove github
+
+# In-session management
+> /mcp
+```
+
+### Authentication
+
+For OAuth-enabled servers:
+
+```
+> /mcp
+# Select server → Authenticate
+# Follow browser flow
+```
+
+### Tool Search
+
+When MCP tools exceed 10% context, tool search activates:
+
+```bash
+# Configure threshold
+ENABLE_TOOL_SEARCH=auto:5 claude  # 5% threshold
+
+# Always enable
+ENABLE_TOOL_SEARCH=true claude
+
+# Disable
+ENABLE_TOOL_SEARCH=false claude
+```
+
+### Best Practices
+
+1. **Use HTTP for remote**: Most widely supported
+2. **Trust verification**: Only install trusted servers
+3. **Scope appropriately**: Project for team, user for personal
+4. **Monitor context**: Disable unused servers in long sessions
+5. **Debug with flag**: `claude --mcp-debug`
+
+### DSM MCP Configuration
+
+For data-source-manager:
+
+```json
+// .mcp.json (committed)
+{
+  "mcpServers": {
+    "db": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@bytebase/dbhub", "--dsn", "${DSM_DB_URL}"]
+    }
+  }
+}
+```
+
+## Sandboxing & Security
+
+OS-level isolation for safer autonomous execution.
+
+### Sandbox Overview
+
+Sandboxing provides:
+
+- **Filesystem isolation**: Restrict file access
+- **Network isolation**: Control domain access
+- **Reduced prompts**: 84% fewer permission requests
+- **OS enforcement**: macOS Seatbelt, Linux bubblewrap
+
+### Enabling Sandbox
+
+```
+> /sandbox
+# Select mode:
+# - Auto-allow: Sandboxed commands run automatically
+# - Regular: All commands need permission
+```
+
+### Filesystem Boundaries
+
+| Access  | Default                           |
+| ------- | --------------------------------- |
+| Write   | Current directory + subdirs       |
+| Read    | Entire computer (with exclusions) |
+| Blocked | System files, config dirs         |
+
+### Network Boundaries
+
+- Only approved domains accessible
+- New domains require permission
+- All child processes inherit restrictions
+
+### Security Benefits
+
+**Protection against:**
+
+- Prompt injection attacks
+- Malicious dependencies
+- Data exfiltration
+- Unauthorized API calls
+
+**Filesystem protection:**
+
+```
+Cannot modify:
+- ~/.bashrc, ~/.zshrc
+- /bin/, /usr/bin/
+- ~/.ssh/
+```
+
+**Network protection:**
+
+```
+Cannot access:
+- Unapproved domains
+- Attacker-controlled servers
+```
+
+### Configuration
+
+In `settings.json`:
+
+```json
+{
+  "sandbox": {
+    "network": {
+      "allowedHosts": ["api.binance.com", "api.github.com"]
+    },
+    "filesystem": {
+      "allowedPaths": ["${CLAUDE_PROJECT_ROOT}", "/tmp"]
+    }
+  }
+}
+```
+
+### Permission Deny Rules
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(.env*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Bash(curl * | sh)",
+      "Bash(rm -rf /)"
+    ]
+  }
+}
+```
+
+### Best Practices
+
+1. **Start restrictive**: Expand permissions as needed
+2. **Monitor violations**: Review blocked attempts
+3. **Combine with permissions**: Defense in depth
+4. **Test configurations**: Verify workflow compatibility
+5. **Use managed settings**: Enterprise policy enforcement
+
+### DSM Security Configuration
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(.env*)",
+      "Read(.mise.local.toml)",
+      "Read(~/.doppler/**)",
+      "Bash(pip install *)",
+      "Bash(git push --force *)"
+    ],
+    "allow": ["Bash(uv run *)", "Bash(mise run *)"]
+  },
+  "sandbox": {
+    "network": {
+      "allowedHosts": ["api.binance.com", "fapi.binance.com", "api.okx.com"]
+    }
+  }
+}
+```
+
 ## Verification Checklist
 
 ### Infrastructure
