@@ -3,6 +3,7 @@ name: dsm-testing
 description: Run tests for data-source-manager with proper markers and coverage. TRIGGERS - write tests, run tests, pytest, test coverage, unit tests, integration tests, mocking patterns.
 argument-hint: "[test-pattern]"
 user-invocable: true
+allowed-tools: Read, Bash, Grep, Glob
 ---
 
 # Testing Data Source Manager

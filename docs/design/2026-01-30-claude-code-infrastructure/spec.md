@@ -134,13 +134,23 @@ Commands with `disable-model-invocation: true`:
 ```yaml
 ---
 name: skill-name
-description: When Claude should use this skill
+description: When Claude should use this skill. TRIGGERS - keyword1, keyword2.
 argument-hint: "[arg1] [arg2]"
 user-invocable: true
+allowed-tools: Read, Bash, Grep # Optional: tools allowed without permission
 context: fork # Optional: runs in separate context
 agent: Explore # Optional: uses specific agent
 ---
 ```
+
+### Skill Tool Permissions
+
+| Skill           | allowed-tools          | Purpose                    |
+| --------------- | ---------------------- | -------------------------- |
+| dsm-usage       | Read, Bash             | Read docs, run scripts     |
+| dsm-testing     | Read, Bash, Grep, Glob | Full test workflow access  |
+| dsm-research    | (inherits from agent)  | Uses Explore agent's tools |
+| dsm-fcp-monitor | Read, Bash, Grep, Glob | Diagnostic and monitoring  |
 
 ### $ARGUMENTS Usage
 

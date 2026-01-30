@@ -3,6 +3,7 @@ name: dsm-usage
 description: Fetch market data using DataSourceManager with Failover Control Protocol (cache → Vision API → REST API). TRIGGERS - fetch market data, use DSM, access Binance, get klines, OHLCV data, DataSourceManager API.
 argument-hint: "[symbol] [market-type]"
 user-invocable: true
+allowed-tools: Read, Bash
 ---
 
 # DataSourceManager Usage
