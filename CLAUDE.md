@@ -266,6 +266,10 @@ Slash commands in `.claude/commands/`:
 
 **2026-01-30**: PreToolUse hooks validate commands BEFORE execution (exit 2 blocks). [Hooks README](/.claude/hooks/README.md)
 
+**2026-01-30**: Stop hooks run at session end for final validation. 4 hooks total: UserPromptSubmit, PreToolUse, PostToolUse, Stop.
+
+**2026-01-30**: Agent `color` field provides visual distinction in Claude Code UI (red=warning, yellow=debug, blue=test, green=data).
+
 **2026-01-30**: Domain-specific CLAUDE.md files (examples/, tests/) load lazily for context isolation.
 
 **2025-01-30**: FCP priority is Cache → Vision → REST. Vision has ~48h delay for new data. [FCP ADR](/docs/adr/2025-01-30-failover-control-protocol.md)
