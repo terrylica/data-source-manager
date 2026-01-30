@@ -107,8 +107,51 @@ Project-specific hooks for code quality and safety (5 total).
 - Naive datetime, HTTP without timeout
 - DSM-specific patterns (symbol format, DataFrame validation)
 
+## Architecture Pattern
+
+This infrastructure follows the **DSM Claude Code Infrastructure Pattern**, which can be adopted by other projects.
+
+### Component Hierarchy
+
+```
+.claude/                    # Claude Code extensions (team-shared)
+├── settings.json           # Permission rules (committed)
+├── settings.local.json     # Personal overrides (gitignored)
+├── agents/                 # 5 specialized subagents
+│   ├── {name}.md           # YAML frontmatter + instructions
+│   └── ...
+├── commands/               # 6 slash commands
+│   ├── {name}.md           # YAML frontmatter + workflow
+│   └── ...
+├── hooks/                  # 5 lifecycle hooks
+│   ├── hooks.json          # Configuration with descriptions
+│   ├── {name}.sh           # Executable scripts
+│   └── README.md           # Hook documentation
+└── rules/                  # 7 context rules
+    ├── {domain}.md         # YAML paths: frontmatter
+    └── ...
+```
+
+### Adoption Checklist
+
+| Component     | Required | Purpose                         |
+| ------------- | -------- | ------------------------------- |
+| settings.json | Yes      | Team permission rules           |
+| agents/       | Optional | Specialized task delegation     |
+| commands/     | Optional | Repeatable workflows            |
+| hooks/        | Optional | Automation and guards           |
+| rules/        | Optional | Domain-specific context loading |
+
+### Design Principles
+
+1. **Separation of concerns**: Each component has single responsibility
+2. **Team-shareable**: Commit settings.json, gitignore settings.local.json
+3. **Progressive disclosure**: Rules load on-demand via paths: frontmatter
+4. **Safety first**: Deny rules for secrets, dangerous operations
+
 ## Related Documentation
 
 - [CLAUDE.md](/CLAUDE.md) - Main project instructions
 - [docs/INDEX.md](/docs/INDEX.md) - Documentation navigation
 - [docs/skills/](/docs/skills/) - Progressive disclosure skills
+- [Design Spec](/docs/design/2026-01-30-claude-code-infrastructure/spec.md) - Full implementation reference

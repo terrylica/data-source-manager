@@ -4,6 +4,20 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Architecture Pattern Documentation (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added Architecture Pattern section to .claude/README.md
+- Added component hierarchy diagram
+- Added adoption checklist table
+- Added design principles list
+- Added link to full design spec
+
+**Pattern**: DSM Claude Code Infrastructure Pattern - reusable by other projects.
+
 ### Security & Testing Patterns (2026-01-30)
 
 **Status**: Complete
