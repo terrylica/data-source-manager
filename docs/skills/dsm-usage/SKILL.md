@@ -32,17 +32,14 @@ print(f"Loaded {len(df)} bars")
 manager.close()
 ```
 
-## Market Types
+## Key Concepts
 
-| MarketType     | Description                     |
-| -------------- | ------------------------------- |
-| `SPOT`         | Spot market                     |
-| `FUTURES_USDT` | USDT-margined perpetual futures |
-| `FUTURES_COIN` | Coin-margined futures           |
-
-## Intervals
-
-Common intervals: `MINUTE_1`, `MINUTE_5`, `MINUTE_15`, `HOUR_1`, `HOUR_4`, `DAY_1`
+| Concept       | Quick Reference                                     |
+| ------------- | --------------------------------------------------- |
+| Market Types  | SPOT, FUTURES_USDT, FUTURES_COIN                    |
+| Intervals     | MINUTE_1, MINUTE_5, HOUR_1, HOUR_4, DAY_1           |
+| FCP Priority  | Cache (~1ms) → Vision (~1-5s) → REST (~100-500ms)   |
+| Symbol Format | BTCUSDT (spot/futures), BTCUSD_PERP (coin-margined) |
 
 ## High-Level API
 
@@ -61,12 +58,10 @@ df = fetch_market_data(
 )
 ```
 
-## Failover Control Protocol
+## Detailed References
 
-Data retrieval follows this priority:
+For deeper information, see:
 
-1. **Cache** - Local Arrow files (~1ms)
-2. **Vision API** - Binance S3 bulk data (~1-5s)
-3. **REST API** - Real-time fallback (~100-500ms)
-
-Recent data (~48h) typically not in Vision API, falls through to REST.
+- @references/market-types.md - Detailed market type documentation
+- @references/intervals.md - Complete interval reference
+- @references/fcp-protocol.md - FCP architecture and debugging
