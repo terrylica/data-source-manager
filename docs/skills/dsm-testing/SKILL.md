@@ -91,3 +91,11 @@ def test_with_mocks(self, mock_cache, mock_handler):
     mock_cache.return_value = MagicMock()
     # Test logic...
 ```
+
+## Detailed References
+
+For deeper information, see:
+
+- @references/fixtures.md - Pytest fixtures and auto-cleanup patterns
+- @references/coverage.md - Coverage configuration and thresholds
+- @references/mocking-patterns.md - DSM-specific mocking patterns
