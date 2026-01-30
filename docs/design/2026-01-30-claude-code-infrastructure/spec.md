@@ -4397,6 +4397,151 @@ Claude Code can:
 | Monitoring     | Prometheus, Datadog, Grafana |
 | Security       | Vault, SOPS, AWS Secrets     |
 
+## Monorepo & Multi-Package Patterns
+
+Optimizing Claude Code for polyglot monorepos with multiple packages.
+
+### CLAUDE.md Hierarchy for Monorepos
+
+```
+monorepo/
+├── CLAUDE.md              # Root: 300 lines max, navigation hub
+├── packages/
+│   ├── core/
+│   │   └── CLAUDE.md      # Core-specific context
+│   ├── api/
+│   │   └── CLAUDE.md      # API-specific context
+│   └── web/
+│       └── CLAUDE.md      # Web-specific context
+├── .claude/
+│   ├── rules/             # Shared rules (auto-loaded)
+│   ├── agents/            # Shared agents
+│   └── commands/          # Shared commands
+└── docs/
+    └── CLAUDE.md          # Docs-specific context
+```
+
+### Context Optimization
+
+| Metric            | Target                    |
+| ----------------- | ------------------------- |
+| Root CLAUDE.md    | < 300 lines               |
+| Package CLAUDE.md | < 10k words each          |
+| Fresh session     | ~20k tokens (10% of 200k) |
+| Available context | 180k for actual work      |
+
+### Splitting Strategy
+
+| Don't                      | Do                          |
+| -------------------------- | --------------------------- |
+| 47k word single file       | Split into package contexts |
+| Load all contexts          | Load only relevant context  |
+| Frontend guides in backend | Domain-specific separation  |
+
+### Hub-Spoke Navigation
+
+Root CLAUDE.md as navigation hub:
+
+```markdown
+# Monorepo Navigation
+
+**Packages**: [core](packages/core/CLAUDE.md) | [api](packages/api/CLAUDE.md) | [web](packages/web/CLAUDE.md)
+
+**Docs**: [INDEX](docs/INDEX.md) | [GLOSSARY](docs/GLOSSARY.md)
+
+## Quick Reference
+
+- Build: `mise run build`
+- Test: `mise run test`
+- Lint: `mise run lint`
+```
+
+### Cross-Package Dependencies
+
+Track with workspace tools:
+
+| Tool  | Detection                     |
+| ----- | ----------------------------- |
+| npm   | package.json workspaces       |
+| Lerna | lerna.json packages           |
+| Rush  | rush.json projects            |
+| Nx    | nx.json implicit dependencies |
+| uv    | uv.lock workspace resolution  |
+
+### Monorepo MCP Configuration
+
+Root `.mcp.json` for shared tools:
+
+```json
+{
+  "mcpServers": {
+    "workspace": {
+      "command": "npx",
+      "args": ["@anthropics/mcp-workspace"]
+    }
+  }
+}
+```
+
+### Context Check Command
+
+Monitor context usage during sessions:
+
+```
+> /context
+```
+
+Shows:
+
+- Current token usage
+- Loaded CLAUDE.md files
+- Active rules
+- Available headroom
+
+### Best Practices
+
+| Practice                   | Benefit                      |
+| -------------------------- | ---------------------------- |
+| Package-specific CLAUDE.md | Focused context per domain   |
+| Shared .claude/ directory  | Reusable agents and commands |
+| Hub-spoke navigation       | Easy cross-package discovery |
+| @ imports for shared docs  | Modular loading              |
+| mise tasks at root         | Unified command interface    |
+
+### DSM Monorepo Structure
+
+DSM follows monorepo patterns even as a single package:
+
+```
+data-source-manager/
+├── CLAUDE.md              # Root: Quick reference
+├── src/
+│   └── CLAUDE.md          # Source code context
+├── tests/
+│   └── CLAUDE.md          # Testing context
+├── docs/
+│   └── CLAUDE.md          # Documentation context
+├── examples/
+│   └── CLAUDE.md          # Examples context
+└── .claude/
+    ├── agents/            # 5 specialized agents
+    ├── commands/          # 6 slash commands
+    ├── rules/             # 7 context rules
+    └── hooks/             # 5 lifecycle hooks
+```
+
+### Scaling to True Monorepo
+
+If DSM becomes a monorepo:
+
+| Future Package | CLAUDE.md Focus           |
+| -------------- | ------------------------- |
+| @dsm/core      | FCP, caching, core types  |
+| @dsm/binance   | Binance-specific patterns |
+| @dsm/okx       | OKX-specific patterns     |
+| @dsm/cli       | CLI commands, arguments   |
+| @dsm/mcp       | MCP server implementation |
+
 ## Verification Checklist
 
 ### Infrastructure
