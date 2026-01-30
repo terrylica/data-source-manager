@@ -32562,3 +32562,303 @@ export CLAUDE_CHROME_ENABLED=true
 3. **Session isolation** - Claude uses new tabs, but shares your browser's session state
 
 4. **Network visibility** - Claude can monitor network requests including headers and bodies
+## Headless and Programmatic Usage Reference
+
+### Overview
+
+The Agent SDK enables running Claude Code programmatically from CLI, Python, or TypeScript. Available as CLI for scripts and CI/CD, or as SDK packages for full programmatic control.
+
+Note: The CLI was previously called "headless mode." The `-p` flag and all CLI options work the same way.
+
+### Basic Usage
+
+Add `-p` (or `--print`) flag to any `claude` command to run non-interactively:
+
+```bash
+claude -p "What does the auth module do?"
+```
+
+**With specific tools:**
+
+```bash
+claude -p "Find and fix the bug in auth.py" --allowedTools "Read,Edit,Bash"
+```
+
+### Output Formats
+
+| Format      | Flag                          | Description                          |
+| ----------- | ----------------------------- | ------------------------------------ |
+| text        | `--output-format text`        | Plain text output (default)          |
+| json        | `--output-format json`        | Structured JSON with metadata        |
+| stream-json | `--output-format stream-json` | Newline-delimited JSON for streaming |
+
+#### JSON Output
+
+```bash
+# Get JSON with session metadata
+claude -p "Summarize this project" --output-format json
+```
+
+Response includes `result` (text), `session_id`, and usage metadata.
+
+#### JSON Schema (Structured Output)
+
+```bash
+claude -p "Extract the main function names from auth.py" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}'
+```
+
+Structured output in `structured_output` field.
+
+#### Parsing with jq
+
+```bash
+# Extract text result
+claude -p "Summarize this project" --output-format json | jq -r '.result'
+
+# Extract structured output
+claude -p "Extract function names" \
+  --output-format json \
+  --json-schema '...' \
+  | jq '.structured_output'
+```
+
+### Streaming Responses
+
+```bash
+claude -p "Explain recursion" \
+  --output-format stream-json \
+  --verbose \
+  --include-partial-messages
+```
+
+**Filter for text deltas:**
+
+```bash
+claude -p "Write a poem" \
+  --output-format stream-json \
+  --verbose \
+  --include-partial-messages | \
+  jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
+```
+
+### Auto-Approve Tools
+
+Use `--allowedTools` to permit tools without prompting:
+
+```bash
+claude -p "Run the test suite and fix any failures" \
+  --allowedTools "Bash,Read,Edit"
+```
+
+**Permission rule syntax with prefix matching:**
+
+```bash
+claude -p "Review staged changes and create commit" \
+  --allowedTools "Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git commit *)"
+```
+
+Note: The space before `*` is important. `Bash(git diff *)` allows commands starting with `git diff`. Without space, `Bash(git diff*)` would also match `git diff-index`.
+
+### Session Management
+
+#### Continue Most Recent Conversation
+
+```bash
+# First request
+claude -p "Review this codebase for performance issues"
+
+# Continue most recent
+claude -p "Now focus on the database queries" --continue
+claude -p "Generate a summary of all issues found" --continue
+```
+
+#### Resume Specific Session
+
+```bash
+# Capture session ID
+session_id=$(claude -p "Start a review" --output-format json | jq -r '.session_id')
+
+# Resume that session
+claude -p "Continue that review" --resume "$session_id"
+```
+
+### System Prompt Customization
+
+**Append to default prompt:**
+
+```bash
+gh pr diff "$1" | claude -p \
+  --append-system-prompt "You are a security engineer. Review for vulnerabilities." \
+  --output-format json
+```
+
+**Replace default prompt:**
+
+```bash
+claude -p "Analyze this code" \
+  --system-prompt "You are a code reviewer focused on performance."
+```
+
+### CI/CD Integration Patterns
+
+#### Fan-Out Pattern
+
+For large migrations or analyses (thousands of files):
+
+```bash
+#!/bin/bash
+# Generate task list
+claude -p "List all files needing migration from framework A to B" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"files":{"type":"array","items":{"type":"string"}}}}' \
+  | jq -r '.structured_output.files[]' > tasks.txt
+
+# Process each task
+while read -r file; do
+  claude -p "Migrate $file from framework A to B" \
+    --allowedTools "Read,Edit" \
+    --output-format json
+done < tasks.txt
+```
+
+#### Pipeline Pattern
+
+Integrate Claude into data/processing pipelines:
+
+```bash
+claude -p "<your prompt>" --json | your_command
+```
+
+**Example: Code analysis pipeline**
+
+```bash
+# Analyze → Format → Store
+claude -p "Analyze security issues in src/" \
+  --output-format json | \
+  jq '.result' | \
+  tee analysis.txt | \
+  curl -X POST -d @- https://api.example.com/reports
+```
+
+### GitHub Actions Integration
+
+```yaml
+name: AI Code Review
+on: [pull_request]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Review PR
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} | \
+          claude -p "Review this PR for issues" \
+            --append-system-prompt "Focus on security and performance" \
+            --output-format json > review.json
+
+      - name: Post Comment
+        run: |
+          comment=$(jq -r '.result' review.json)
+          gh pr comment ${{ github.event.pull_request.number }} --body "$comment"
+```
+
+### Third-Party Provider Authentication
+
+| Provider       | Environment Variable        |
+| -------------- | --------------------------- |
+| Amazon Bedrock | `CLAUDE_CODE_USE_BEDROCK=1` |
+| Google Vertex  | `CLAUDE_CODE_USE_VERTEX=1`  |
+| MS Foundry     | `CLAUDE_CODE_USE_FOUNDRY=1` |
+
+```bash
+# Use with Bedrock
+CLAUDE_CODE_USE_BEDROCK=1 claude -p "Analyze this code"
+```
+
+### SDK Packages
+
+#### Python SDK
+
+```python
+from claude_agent_sdk import Agent
+
+agent = Agent()
+result = agent.run("Analyze the auth module")
+print(result.text)
+```
+
+#### TypeScript SDK
+
+```typescript
+import { Agent } from "@anthropic-ai/claude-agent-sdk";
+
+const agent = new Agent();
+const result = await agent.run("Analyze the auth module");
+console.log(result.text);
+```
+
+### DSM Headless Patterns
+
+**Batch data validation:**
+
+```bash
+# Validate all data source configs
+for config in configs/*.json; do
+  claude -p "Validate this DSM config for FCP compliance: $(cat $config)" \
+    --allowedTools "Read" \
+    --output-format json \
+    --json-schema '{"type":"object","properties":{"valid":{"type":"boolean"},"issues":{"type":"array","items":{"type":"string"}}}}' \
+    | jq '.structured_output' >> validation_results.jsonl
+done
+```
+
+**Automated test generation:**
+
+```bash
+# Generate tests for new data source
+claude -p "Generate pytest tests for src/data_sources/new_source.py following DSM patterns" \
+  --allowedTools "Read,Write,Glob" \
+  --output-format json
+```
+
+**FCP compliance check:**
+
+```bash
+# Check FCP implementation
+claude -p "Verify FCP protocol compliance in src/fcp/" \
+  --allowedTools "Read,Grep,Glob" \
+  --append-system-prompt "Check for: proper timeout handling, fallback order, cache invalidation" \
+  --output-format json
+```
+
+### Best Practices
+
+1. **Use JSON output for automation** - Enables reliable parsing and pipeline integration
+
+2. **Capture session IDs** - Allows resuming multi-step workflows
+
+3. **Limit tool permissions** - Only allow tools needed for the specific task
+
+4. **Use prefix matching carefully** - Include space before `*` to avoid unintended matches
+
+5. **Stream for long operations** - Use `stream-json` for real-time feedback on lengthy tasks
+
+6. **Add context via system prompt** - Use `--append-system-prompt` for task-specific instructions
+
+7. **Handle errors in pipelines** - Check exit codes and parse JSON for error fields
+
+### Limitations
+
+- User-invocable skills (`/commit`, `/review`) only work in interactive mode
+- Built-in commands (`/help`, `/clear`) not available in `-p` mode
+- Describe tasks directly instead of using slash commands
