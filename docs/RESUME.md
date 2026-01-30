@@ -4,6 +4,19 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Hub-Spoke Navigation Pattern (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added Hub + Siblings links to src/CLAUDE.md
+- Added Hub + Siblings links to tests/CLAUDE.md
+- Added Hub + Siblings links to examples/CLAUDE.md
+- Updated docs/CLAUDE.md to include src/ sibling
+
+**Pattern Applied**: cc-skills monorepo navigation convention with consistent cross-linking.
+
 ### Extended Thinking & Prompt Engineering (2026-01-30)
 
 **Status**: Complete
