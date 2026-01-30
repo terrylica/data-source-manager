@@ -4,6 +4,28 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Monorepo CLAUDE.md Hierarchy Enhancement (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added `src/CLAUDE.md` for source code navigation and patterns
+- Updated root CLAUDE.md navigation to include src/
+- Now 5 hierarchical CLAUDE.md files for lazy-loading context
+
+**File Hierarchy**:
+
+| File               | Purpose                       | Loads When           |
+| ------------------ | ----------------------------- | -------------------- |
+| CLAUDE.md          | Project-wide conventions      | Always (root)        |
+| src/CLAUDE.md      | Source code patterns, classes | Working in src/      |
+| docs/CLAUDE.md     | Documentation guide           | Working in docs/     |
+| examples/CLAUDE.md | Example patterns              | Working in examples/ |
+| tests/CLAUDE.md    | Test fixtures, mocking        | Working in tests/    |
+
+**Sources**: [DEV.to monorepo article](https://dev.to/anvodev/how-i-organized-my-claudemd-in-a-monorepo-with-too-many-contexts-37k7)
+
 ### Command & Rule Enhancements (2026-01-30)
 
 **Status**: Complete

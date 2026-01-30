@@ -303,6 +303,8 @@ Subdirectory CLAUDE.md files load lazily when working with files in those direct
 | File Location        | Contains                        |
 | -------------------- | ------------------------------- |
 | `CLAUDE.md`          | Project-wide conventions, FCP   |
+| `src/CLAUDE.md`      | Source code patterns, classes   |
+| `docs/CLAUDE.md`     | Documentation guide             |
 | `examples/CLAUDE.md` | Example patterns, quick start   |
 | `tests/CLAUDE.md`    | Test fixtures, mocking patterns |
 
