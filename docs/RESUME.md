@@ -4,6 +4,22 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### CI/CD & Headless Mode Section (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added headless mode usage with -p flag
+- Added automation patterns table (Fan-Out, Pipelining, Review)
+- Added CI/CD best practices table (staging, quality gates, human review)
+- Added security considerations for AI-assisted CI/CD
+
+**Sources**:
+
+- [Claude Code GitLab CI/CD](https://code.claude.com/docs/en/gitlab-ci-cd)
+- [Headless Mode Guide](https://dev.to/rajeshroyal/headless-mode-unleash-ai-in-your-cicd-pipeline-1imm)
+
 ### Polyglot Monorepo & Multi-Agent Orchestration (2026-01-30)
 
 **Status**: Complete

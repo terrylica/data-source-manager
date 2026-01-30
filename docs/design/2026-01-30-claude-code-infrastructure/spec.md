@@ -919,6 +919,48 @@ From [Official Plugin Marketplace Docs](https://code.claude.com/docs/en/plugin-m
 
 Team members are automatically prompted to install the marketplace when they trust the project folder.
 
+## CI/CD & Headless Mode
+
+Based on [Claude Code GitLab CI/CD](https://code.claude.com/docs/en/gitlab-ci-cd) and [Headless Mode Guide](https://dev.to/rajeshroyal/headless-mode-unleash-ai-in-your-cicd-pipeline-1imm).
+
+### Headless Mode
+
+Use `-p` flag for non-interactive automation:
+
+```bash
+# Basic headless execution
+claude -p "analyze this file" --output-format stream-json
+
+# Pipeline integration
+claude -p "<prompt>" --json | next_command
+```
+
+### Automation Patterns
+
+| Pattern    | Use Case                         | Example                        |
+| ---------- | -------------------------------- | ------------------------------ |
+| Fan-Out    | Large migrations, batch analysis | Process 2k files in parallel   |
+| Pipelining | Integrate into data pipelines    | Claude output → next processor |
+| Review     | Automated code review on PRs     | Label issues, flag code smells |
+
+### CI/CD Best Practices
+
+| Practice        | Implementation                                 |
+| --------------- | ---------------------------------------------- |
+| Stage gradually | Start with single repo/team, baseline metrics  |
+| Quality gates   | Require build, lint, tests after AI changes    |
+| Human review    | Include review steps for production changes    |
+| Version control | Version all CI/CD configurations               |
+| Latency targets | Review jobs ≤ 3-5 minutes                      |
+| Token limits    | Cap max turns/output tokens for predictability |
+
+### Security Considerations
+
+- AI can introduce subtle bugs or misunderstand objectives
+- Start with supervised tasks
+- Human review before production changes
+- Integrate security scanning at every pipeline stage
+
 ## Debugging & Troubleshooting
 
 Based on [Official Best Practices](https://code.claude.com/docs/en/best-practices) and [ClaudeLog Troubleshooting](https://claudelog.com/troubleshooting/).
