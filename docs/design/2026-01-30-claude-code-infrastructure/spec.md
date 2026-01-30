@@ -34481,3 +34481,276 @@ uv run pytest tests/test_fcp.py -v
 
 **Data source integration:**
 When adding new exchanges, add their domains to `allowedDomains` before testing connectivity.
+## GitHub Actions Integration Reference
+
+### Overview
+
+Claude Code GitHub Actions brings AI-powered automation to your workflow. With a simple `@claude` mention in any PR or issue, Claude can analyze code, create pull requests, implement features, and fix bugs while following your project's standards.
+
+### Key Capabilities
+
+| Capability               | Description                                |
+| ------------------------ | ------------------------------------------ |
+| Instant PR creation      | Describe needs, Claude creates complete PR |
+| Automated implementation | Turn issues into working code              |
+| Standards compliance     | Respects CLAUDE.md guidelines and patterns |
+| Simple setup             | Get started in minutes                     |
+| Secure by default        | Code stays on GitHub's runners             |
+
+### Quick Setup
+
+```
+/install-github-app
+```
+
+This guides you through GitHub app and secrets setup.
+
+**Requirements:**
+
+- Must be repository admin
+- GitHub app requests read/write for Contents, Issues, Pull requests
+
+### Manual Setup
+
+1. **Install GitHub app:** <https://github.com/apps/claude>
+
+2. **Add ANTHROPIC_API_KEY** to repository secrets
+
+3. **Copy workflow file** from examples/claude.yml to `.github/workflows/`
+
+### Basic Workflow
+
+```yaml
+name: Claude Code
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Responds to @claude mentions in comments
+```
+
+### @claude Mentions
+
+In issue or PR comments:
+
+```
+@claude implement this feature based on the issue description
+@claude how should I implement user authentication for this endpoint?
+@claude fix the TypeError in the user dashboard component
+```
+
+Claude automatically analyzes context and responds appropriately.
+
+### Using Skills
+
+```yaml
+name: Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "/review"
+          claude_args: "--max-turns 5"
+```
+
+### Custom Automation
+
+```yaml
+name: Daily Report
+on:
+  schedule:
+    - cron: "0 9 * * *"
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Generate a summary of yesterday's commits and open issues"
+          claude_args: "--model claude-opus-4-5-20251101"
+```
+
+### Action Parameters
+
+| Parameter           | Description                                 | Required |
+| ------------------- | ------------------------------------------- | -------- |
+| `prompt`            | Instructions (text or skill like `/review`) | No\*     |
+| `claude_args`       | CLI arguments passed to Claude Code         | No       |
+| `anthropic_api_key` | Claude API key                              | Yes\*\*  |
+| `github_token`      | GitHub token for API access                 | No       |
+| `trigger_phrase`    | Custom trigger (default: "@claude")         | No       |
+| `use_bedrock`       | Use AWS Bedrock instead                     | No       |
+| `use_vertex`        | Use Google Vertex AI instead                | No       |
+
+\*Prompt optional for issue/PR comments (responds to trigger phrase)
+\*\*Required for direct Claude API, not for Bedrock/Vertex
+
+### CLI Arguments
+
+```yaml
+claude_args: "--max-turns 5 --model claude-sonnet-4-5-20250929 --mcp-config /path/to/config.json"
+```
+
+| Argument          | Purpose                       |
+| ----------------- | ----------------------------- |
+| `--max-turns`     | Maximum conversation turns    |
+| `--model`         | Model to use                  |
+| `--mcp-config`    | Path to MCP configuration     |
+| `--allowed-tools` | Comma-separated allowed tools |
+| `--debug`         | Enable debug output           |
+
+### Cloud Provider Authentication
+
+#### AWS Bedrock
+
+```yaml
+- name: Configure AWS Credentials (OIDC)
+  uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+    aws-region: us-west-2
+
+- uses: anthropics/claude-code-action@v1
+  with:
+    github_token: ${{ steps.app-token.outputs.token }}
+    use_bedrock: "true"
+    claude_args: "--model us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+```
+
+#### Google Vertex AI
+
+```yaml
+- name: Authenticate to Google Cloud
+  uses: google-github-actions/auth@v2
+  with:
+    workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+    service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+- uses: anthropics/claude-code-action@v1
+  with:
+    github_token: ${{ steps.app-token.outputs.token }}
+    use_vertex: "true"
+    claude_args: "--model claude-sonnet-4@20250514"
+  env:
+    ANTHROPIC_VERTEX_PROJECT_ID: ${{ steps.auth.outputs.project_id }}
+    CLOUD_ML_REGION: us-east5
+```
+
+### Best Practices
+
+1. **CLAUDE.md configuration** - Define code style, review criteria, project rules
+
+2. **Security** - Never commit API keys; use GitHub Secrets
+
+3. **Performance** - Use issue templates for context, keep CLAUDE.md concise
+
+4. **Cost optimization:**
+   - Use specific @claude commands
+   - Configure appropriate `--max-turns`
+   - Set workflow-level timeouts
+   - Use GitHub's concurrency controls
+
+### Troubleshooting
+
+| Issue                            | Solution                                           |
+| -------------------------------- | -------------------------------------------------- |
+| Not responding to @claude        | Check app installation, workflows enabled, API key |
+| CI not running on Claude commits | Use GitHub App (not Actions user)                  |
+| Authentication errors            | Verify API key validity and permissions            |
+
+### DSM GitHub Actions Patterns
+
+**FCP review on PR:**
+
+```yaml
+name: FCP Review
+on:
+  pull_request:
+    paths:
+      - "src/fcp/**"
+      - "src/data_sources/**"
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this PR for FCP compliance:
+            - Check timeout handling
+            - Verify cache invalidation patterns
+            - Ensure error handling follows DSM hierarchy
+          claude_args: "--max-turns 5"
+```
+
+**Data source validation:**
+
+```yaml
+name: Data Source Check
+on:
+  pull_request:
+    paths:
+      - "src/data_sources/**"
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Validate data source implementation:
+            - Symbol format matches exchange patterns
+            - Timestamps are UTC
+            - DataFrames use polars
+            - Rate limits respected
+```
+
+**Issue implementation:**
+
+```yaml
+name: Implement Issue
+on:
+  issues:
+    types: [assigned]
+jobs:
+  implement:
+    if: contains(github.event.issue.labels.*.name, 'claude-implement')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Implement the feature described in this issue.
+            Follow DSM patterns in CLAUDE.md.
+            Create tests following existing test patterns.
+          claude_args: "--max-turns 15"
+```
+
+### Migration from Beta
+
+| Old Beta Input        | New v1.0 Input                        |
+| --------------------- | ------------------------------------- |
+| `mode`                | Removed (auto-detected)               |
+| `direct_prompt`       | `prompt`                              |
+| `custom_instructions` | `claude_args: --append-system-prompt` |
+| `max_turns`           | `claude_args: --max-turns`            |
+| `model`               | `claude_args: --model`                |
+| `allowed_tools`       | `claude_args: --allowedTools`         |
