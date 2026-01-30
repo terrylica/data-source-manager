@@ -17208,3 +17208,727 @@ Esc                         # Normal mode
 dd                          # Delete line if wrong
 i                           # Back to insert
 ```
+
+---
+
+<!-- SSoT-OK: Section added by autonomous Claude Code infrastructure improvement loop -->
+
+## File Exclusion & Security Patterns Reference
+
+Comprehensive guide to protecting sensitive files and enforcing security boundaries in Claude Code.
+
+### Permission Deny Rules
+
+The primary mechanism for file protection uses deny rules in `settings.json`:
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.ssh/**)"
+    ]
+  }
+}
+```
+
+#### Rule Evaluation Order
+
+| Priority | Rule Type | Behavior |
+|----------|-----------|----------|
+| 1 (Highest) | deny | Always blocks, cannot be overridden |
+| 2 | ask | Prompts for user approval |
+| 3 (Lowest) | allow | Permits without prompting |
+
+**Critical**: Deny rules take absolute precedence—even if an allow rule matches, deny blocks the operation.
+
+### Pattern Syntax Reference
+
+| Pattern | Effect |
+|---------|--------|
+| `Read(./.env)` | Blocks reading `.env` in current directory |
+| `Read(./.env.*)` | Blocks `.env.local`, `.env.production`, etc. |
+| `Read(./secrets/**)` | Recursive block on `secrets/` directory |
+| `Read(~/path)` | Blocks home directory paths |
+| `Read(**/config.json)` | Blocks `config.json` in any nested directory |
+| `Read(.*)` | Blocks all hidden files |
+| `Read` | Blocks all file reads (extreme) |
+
+#### Bash Pattern Matching
+
+Space placement matters in Bash patterns:
+
+| Pattern | Matches | Does NOT Match |
+|---------|---------|----------------|
+| `Bash(ls *)` | `ls -la`, `ls foo` | `lsof` |
+| `Bash(ls*)` | `ls -la`, `ls foo`, `lsof` | - |
+| `Bash(npm run *)` | `npm run test`, `npm run build` | `npm install` |
+
+### Configuration Scopes
+
+Settings have hierarchical precedence:
+
+| Scope | Location | Shared? | Precedence |
+|-------|----------|---------|------------|
+| Managed | System paths | IT-deployed | Highest |
+| Local | `.claude/settings.local.json` | No (gitignored) | High |
+| Project | `.claude/settings.json` | Yes (committed) | Medium |
+| User | `~/.claude/settings.json` | No | Lowest |
+
+**Managed settings locations**:
+
+| Platform | Path |
+|----------|------|
+| macOS | `/Library/Application Support/ClaudeCode/managed-settings.json` |
+| Linux/WSL | `/etc/claude-code/managed-settings.json` |
+| Windows | `C:\Program Files\ClaudeCode\managed-settings.json` |
+
+### DSM Security Configuration
+
+The data-source-manager project uses this security configuration:
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(.env*)",
+      "Read(.mise.local.toml)",
+      "Edit(.env*)",
+      "Edit(.mise.local.toml)",
+      "Bash(pip install *)",
+      "Bash(git push --force *)",
+      "Bash(python3.14 *)",
+      "Bash(python3.12 *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(uv pip install *)"
+    ],
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(mise run *)",
+      "Bash(git *)",
+      "Read",
+      "Edit",
+      "Write"
+    ]
+  }
+}
+```
+
+### Security Best Practices
+
+#### 1. Secrets Protection
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./.secrets/**)",
+      "Read(./config/credentials.json)",
+      "Read(~/.aws/**)",
+      "Read(~/.ssh/**)",
+      "Read(**/*token*)",
+      "Read(**/*secret*)",
+      "Read(**/*password*)"
+    ]
+  }
+}
+```
+
+#### 2. Network Restriction
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "WebFetch(domain:internal.corp.com)"
+    ]
+  }
+}
+```
+
+#### 3. Destructive Operations
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -fd *)"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(git push *)"
+    ]
+  }
+}
+```
+
+#### 4. Build Artifact Protection
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(./build/**)",
+      "Read(./dist/**)",
+      "Read(./node_modules/**)",
+      "Read(./.venv/**)",
+      "Read(./__pycache__/**)"
+    ]
+  }
+}
+```
+
+### Tool-Specific Deny Rules
+
+| Tool | Syntax | Example |
+|------|--------|---------|
+| Read | `Read(path)` | `Read(./.env*)` |
+| Edit | `Edit(path)` | `Edit(./secrets/**)` |
+| Write | `Write(path)` | `Write(./.env)` |
+| WebFetch | `WebFetch(domain:host)` | `WebFetch(domain:internal.com)` |
+| Bash | `Bash(pattern)` | `Bash(curl *)` |
+| MCP | `MCP(server:name)` | `MCP(filesystem)` |
+| Task | `Task(agent:name)` | `Task(deploy)` |
+
+### Git Integration
+
+#### respectGitignore Setting
+
+```json
+{
+  "respectGitignore": true
+}
+```
+
+When enabled (default):
+- Files matching `.gitignore` excluded from `@` autocomplete
+- Does NOT block direct Read operations
+- Useful for reducing noise, not security enforcement
+
+#### Combining with Deny Rules
+
+For security, combine gitignore with explicit deny rules:
+
+```json
+{
+  "respectGitignore": true,
+  "permissions": {
+    "deny": [
+      "Read(.gitignore)",
+      "Read(./.env*)"
+    ]
+  }
+}
+```
+
+### No .claudeignore File
+
+**Important**: Claude Code does NOT support a `.claudeignore` file.
+
+**Alternatives**:
+1. Use `permissions.deny` in `settings.json` (primary)
+2. Use `.claude/settings.local.json` for personal exclusions
+3. Enable `respectGitignore` for autocomplete filtering
+4. Use PreToolUse hooks for custom logic
+
+### PreToolUse Hook for Custom Security
+
+For complex security requirements, use PreToolUse hooks:
+
+```bash
+#!/bin/bash
+# .claude/hooks/security-guard.sh
+
+TOOL_NAME="$1"
+INPUT_JSON="$2"
+
+# Custom pattern matching
+if [[ "$TOOL_NAME" == "Read" ]]; then
+  FILE_PATH=$(echo "$INPUT_JSON" | jq -r '.file_path')
+  
+  # Block files containing "secret" in name
+  if [[ "$FILE_PATH" == *secret* ]]; then
+    echo '{"action": "block", "message": "Blocked: File contains sensitive keyword"}'
+    exit 0
+  fi
+fi
+
+# Allow all other operations
+echo '{"action": "allow"}'
+```
+
+Configure in `.claude/hooks/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "command": ".claude/hooks/security-guard.sh"
+      }
+    ]
+  }
+}
+```
+
+### Enterprise Managed Settings
+
+For organization-wide security enforcement:
+
+```json
+// /Library/Application Support/ClaudeCode/managed-settings.json
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gcloud/**)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "WebFetch"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  }
+}
+```
+
+**Key enterprise options**:
+
+| Setting | Effect |
+|---------|--------|
+| `disableBypassPermissionsMode` | Prevents `--dangerously-skip-permissions` |
+| Managed deny rules | Cannot be overridden by user or project settings |
+
+### Security Audit Checklist
+
+| Check | Command/Action |
+|-------|----------------|
+| Review deny rules | `cat .claude/settings.json \| jq '.permissions.deny'` |
+| Check managed settings | `cat /Library/Application\ Support/ClaudeCode/managed-settings.json` |
+| Verify gitignore | `git ls-files --ignored --exclude-standard` |
+| Test Read denial | Ask Claude to read `.env` file |
+| Review hook logs | Check `.claude/hooks/` output |
+
+### Common Security Patterns
+
+#### Pattern: API Key Protection
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(.env*)",
+      "Read(**/*api*key*)",
+      "Read(**/*apikey*)",
+      "Read(./.secrets/**)",
+      "Bash(*API_KEY*)",
+      "Bash(*SECRET*)"
+    ]
+  }
+}
+```
+
+#### Pattern: Database Credential Protection
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(**/database.yml)",
+      "Read(**/db.json)",
+      "Read(**/*credentials*)",
+      "Bash(*DB_PASSWORD*)",
+      "Bash(*DATABASE_URL*)"
+    ]
+  }
+}
+```
+
+#### Pattern: Infrastructure Secrets
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.kube/config)",
+      "Read(~/.docker/config.json)",
+      "Read(terraform.tfvars)",
+      "Read(**/*.tfvars)",
+      "Read(~/.config/gcloud/**)"
+    ]
+  }
+}
+```
+
+### Troubleshooting Security
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Deny rule not working | Pattern mismatch | Use exact path or correct glob syntax |
+| Can still read file | Rule in wrong scope | Check precedence hierarchy |
+| Bash command bypassed | Space in pattern | Use `Bash(cmd *)` not `Bash(cmd*)` |
+| MCP accessing secrets | MCP not in deny | Add `MCP(server:name)` to deny |
+
+### Security Limitations
+
+**Deny rules are not security boundaries**:
+- Claude can potentially infer file contents from error messages
+- MCP servers may bypass Read restrictions
+- Bash commands can access files indirectly
+- System reminders may expose file paths
+
+**Defense in depth**:
+1. Use deny rules as first line
+2. Don't store secrets in project directory
+3. Use external secret managers (Doppler, 1Password)
+4. Enable managed settings for enterprise
+5. Monitor with PostToolUse hooks
+---
+
+<!-- SSoT-OK: Section added by autonomous Claude Code infrastructure improvement loop -->
+
+## Checkpointing & Rewind Reference
+
+Comprehensive guide to checkpoint management and session recovery in Claude Code.
+
+### How Checkpoints Work
+
+Claude Code automatically tracks file edits as you work, creating recovery points:
+
+| Feature            | Behavior                                       |
+| ------------------ | ---------------------------------------------- |
+| Automatic tracking | Every user prompt creates a new checkpoint     |
+| Persistence        | Checkpoints persist across sessions            |
+| Cleanup            | Auto-cleaned after 30 days (configurable)      |
+| Scope              | Only file edits via Claude's tools are tracked |
+
+### Accessing Rewind
+
+**Keyboard shortcut**: Press `Esc` twice (`Esc` + `Esc`)
+
+**Command**: `/rewind`
+
+**List checkpoints**: `/checkpoints`
+
+**Jump to specific**: `/rewind <checkpoint-id>`
+
+### Three Restore Options
+
+| Option                | Effect                            | Use Case                                              |
+| --------------------- | --------------------------------- | ----------------------------------------------------- |
+| **Conversation only** | Rewind to user message, keep code | Claude confused but code is correct                   |
+| **Code only**         | Revert files, keep conversation   | Execution failed but Claude's mental model is correct |
+| **Both**              | Restore conversation and code     | Complete reset to prior state                         |
+
+### Common Use Cases
+
+**Exploring alternatives**:
+
+```
+User: "Try implementing this with recursion"
+[Claude implements recursion]
+User: [Esc Esc] → rewind to before recursion
+User: "Now try with iteration"
+```
+
+**Recovering from mistakes**:
+
+```
+User: "Update the auth module"
+[Claude makes breaking changes]
+User: [Esc Esc] → Code only restore
+User: "Let's take a more incremental approach"
+```
+
+**Iterating on features**:
+
+```
+User: "Add form validation"
+[Claude adds validation v1]
+User: [Esc Esc] → Conversation only restore
+User: "I want stricter validation with regex"
+```
+
+### Limitations
+
+#### Bash Commands NOT Tracked
+
+Checkpointing does NOT track files modified by bash commands:
+
+```bash
+# These changes CANNOT be undone via rewind:
+rm file.txt
+mv old.txt new.txt
+cp source.txt dest.txt
+git checkout -- file.txt
+```
+
+**Workaround**: Use Claude's Edit tool instead of bash for file modifications:
+
+- Edit tool changes ARE tracked
+- Bash file operations are permanent
+
+#### External Changes NOT Tracked
+
+| Change Type                   | Tracked? |
+| ----------------------------- | -------- |
+| Claude's Edit tool            | Yes      |
+| Claude's Write tool           | Yes      |
+| Manual edits (outside Claude) | No       |
+| Other concurrent sessions     | No       |
+| Bash file operations          | No       |
+
+#### Network/External Operations
+
+Cannot be undone:
+
+- API calls
+- Database queries
+- File uploads
+- External service interactions
+
+### Checkpointing vs Git
+
+| Aspect        | Checkpoints   | Git              |
+| ------------- | ------------- | ---------------- |
+| Scope         | Session-level | Repository-level |
+| Granularity   | Per-prompt    | Per-commit       |
+| Persistence   | 30 days       | Permanent        |
+| Collaboration | Single user   | Multi-user       |
+| Use case      | Quick undo    | Version history  |
+
+**Best practice**: Use checkpoints for exploration, Git for commits.
+
+### CLI Integration
+
+**Resume with rewind**:
+
+```bash
+claude --resume <session-id> --rewind-files <checkpoint-uuid>
+```
+
+**List session checkpoints**:
+
+```bash
+claude --resume <session-id> --list-checkpoints
+```
+
+### SDK/API Integration
+
+**TypeScript SDK**:
+
+```typescript
+import { ClaudeCode } from "@anthropic-ai/claude-code-sdk";
+
+const client = new ClaudeCode({
+  fileCheckpointing: true, // Enable checkpointing
+});
+
+// Capture checkpoint UUID from response stream
+const checkpointId = response.checkpoint_uuid;
+
+// Rewind to checkpoint
+await client.rewindFiles(checkpointId);
+```
+
+**Python SDK**:
+
+```python
+from claude_code_sdk import ClaudeCode
+
+client = ClaudeCode(file_checkpointing=True)
+
+# Capture checkpoint UUID
+checkpoint_id = response.checkpoint_uuid
+
+# Rewind to checkpoint
+client.rewind_files(checkpoint_id)
+```
+
+### DSM Checkpoint Patterns
+
+#### Pattern: Safe Module Updates
+
+```
+User: "I want to update the FCP module"
+[Checkpoint created]
+
+User: "Start by extracting the cache logic"
+[Checkpoint created]
+
+User: "Now update the failover handling"
+[Checkpoint created]
+
+# If something breaks:
+User: [Esc Esc] → Code only restore to before failover changes
+```
+
+#### Pattern: Exploratory Implementation
+
+```
+User: "Let's try three different approaches for the rate limiter"
+
+# Approach 1
+User: "Implement with token bucket"
+[Checkpoint created]
+User: [Esc Esc] → Full restore
+
+# Approach 2
+User: "Implement with leaky bucket"
+[Checkpoint created]
+User: [Esc Esc] → Full restore
+
+# Approach 3
+User: "Implement with sliding window"
+[Checkpoint created]
+
+# Compare and decide
+User: "Go back to the token bucket implementation"
+User: /rewind <checkpoint-id-from-approach-1>
+```
+
+#### Pattern: Test-Driven Recovery
+
+```
+User: "Add tests for the new feature"
+[Checkpoint: tests added]
+
+User: "Now implement the feature"
+[Checkpoint: feature implemented but tests fail]
+
+User: [Esc Esc] → Code only restore
+User: "The tests are failing, let me explain the expected behavior better..."
+```
+
+### Checkpoint Configuration
+
+**Retention period** (in `settings.json`):
+
+```json
+{
+  "checkpoints": {
+    "retentionDays": 30,
+    "maxCheckpointsPerSession": 100
+  }
+}
+```
+
+**Disable checkpointing** (not recommended):
+
+```json
+{
+  "checkpoints": {
+    "enabled": false
+  }
+}
+```
+
+### Troubleshooting Checkpoints
+
+| Issue                 | Cause                     | Solution                               |
+| --------------------- | ------------------------- | -------------------------------------- |
+| Rewind not working    | Bash command made changes | Changes via bash are permanent         |
+| Checkpoint missing    | Exceeded retention period | Checkpoints auto-delete after 30 days  |
+| Can't find checkpoint | Wrong session             | Use `--resume` with correct session ID |
+| Partial restore       | Mixed Edit/Bash changes   | Only Edit tool changes are restored    |
+
+### Best Practices
+
+1. **Prefer Edit tool over Bash** for file modifications you might want to undo
+2. **Checkpoint before risky operations**: Ask Claude to make a git commit first
+3. **Use conversation-only restore** when Claude's plan is wrong but code is fine
+4. **Use code-only restore** when implementation failed but Claude understands the goal
+5. **Combine with git** for permanent version history
+6. **Don't rely on checkpoints** for destructive bash operations
+
+### Checkpoint Workflow Integration
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Claude Code Session                   │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  User Prompt ──► Checkpoint Created ──► Claude Response  │
+│       │                  │                    │          │
+│       │                  │                    ▼          │
+│       │                  │              Edit Tool        │
+│       │                  │                    │          │
+│       │                  │                    ▼          │
+│       │                  └──────────── File Changed      │
+│       │                                       │          │
+│       ▼                                       │          │
+│  [Esc Esc] ──► Rewind Menu                   │          │
+│       │                                       │          │
+│       ├── Conversation Only ─────────────────┘          │
+│       ├── Code Only ──► Restore Files                   │
+│       └── Both ──► Full Restore                         │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Session Recovery After Crash
+
+If Claude Code crashes mid-session:
+
+1. **Find session ID**:
+
+   ```bash
+   ls -lt ~/.claude/sessions/ | head -5
+   ```
+
+2. **Resume session**:
+
+   ```bash
+   claude --resume <session-id>
+   ```
+
+3. **List checkpoints**:
+
+   ```
+   /checkpoints
+   ```
+
+4. **Restore to last good state**:
+
+   ```
+   /rewind <checkpoint-id>
+   ```
+
+### Checkpoint Storage
+
+Checkpoints are stored in:
+
+- macOS/Linux: `~/.claude/checkpoints/`
+- Windows: `%USERPROFILE%\.claude\checkpoints\`
+
+**Structure**:
+
+```
+~/.claude/checkpoints/
+├── <session-id>/
+│   ├── <checkpoint-uuid>.json    # Metadata
+│   └── <checkpoint-uuid>/        # File snapshots
+│       ├── file1.py
+│       └── dir/file2.py
+```
+
+**Manual cleanup** (if needed):
+
+```bash
+# Remove checkpoints older than 7 days
+find ~/.claude/checkpoints -type d -mtime +7 -exec rm -rf {} +
+```
