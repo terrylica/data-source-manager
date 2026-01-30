@@ -38050,3 +38050,442 @@ uv run pytest tests/unit/ -v --run-in-background
 - `dd/yy/p` - Line operations
 - `ciw/diw` - Word text objects
 - `u/Ctrl+R` - Undo/redo
+## CLI Reference
+
+Complete reference for Claude Code command-line interface, including commands, flags, session management, and automation capabilities.
+
+### CLI Commands
+
+Core commands for launching and managing Claude Code sessions.
+
+| Command                         | Description                       | Example                                      |
+| ------------------------------- | --------------------------------- | -------------------------------------------- |
+| `claude`                        | Start interactive REPL            | `claude`                                     |
+| `claude "query"`                | Start REPL with initial prompt    | `claude "explain this project"`              |
+| `claude -p "query"`             | Query via SDK, then exit          | `claude -p "explain this function"`          |
+| `cat file \| claude -p "query"` | Process piped content             | `cat logs.txt \| claude -p "explain"`        |
+| `claude -c`                     | Continue most recent conversation | `claude -c`                                  |
+| `claude -c -p "query"`          | Continue via SDK                  | `claude -c -p "Check for type errors"`       |
+| `claude -r "<session>" "query"` | Resume session by ID or name      | `claude -r "auth-refactor" "Finish this PR"` |
+| `claude update`                 | Update to latest version          | `claude update`                              |
+| `claude mcp`                    | Configure MCP servers             | `claude mcp add`                             |
+
+### CLI Flags Reference
+
+#### Core Flags
+
+| Flag               | Description                             | Example                                     |
+| ------------------ | --------------------------------------- | ------------------------------------------- |
+| `--print`, `-p`    | Print response without interactive mode | `claude -p "query"`                         |
+| `--continue`, `-c` | Load most recent conversation           | `claude --continue`                         |
+| `--resume`, `-r`   | Resume specific session                 | `claude --resume auth-refactor`             |
+| `--model`          | Set model for session                   | `claude --model claude-sonnet-4-5-20250929` |
+| `--version`, `-v`  | Output version number                   | `claude -v`                                 |
+| `--verbose`        | Enable verbose logging                  | `claude --verbose`                          |
+| `--debug`          | Enable debug mode with filtering        | `claude --debug "api,mcp"`                  |
+
+#### Working Directory Flags
+
+| Flag        | Description                        | Example                           |
+| ----------- | ---------------------------------- | --------------------------------- |
+| `--add-dir` | Add additional working directories | `claude --add-dir ../apps ../lib` |
+
+#### Agent and Subagent Flags
+
+| Flag       | Description                       | Example                                |
+| ---------- | --------------------------------- | -------------------------------------- |
+| `--agent`  | Specify agent for current session | `claude --agent my-custom-agent`       |
+| `--agents` | Define custom subagents via JSON  | `claude --agents '{"reviewer":{...}}'` |
+
+**Agents JSON format**:
+
+```json
+{
+  "code-reviewer": {
+    "description": "Expert code reviewer. Use proactively after code changes.",
+    "prompt": "You are a senior code reviewer. Focus on code quality, security, and best practices.",
+    "tools": ["Read", "Grep", "Glob", "Bash"],
+    "model": "sonnet"
+  },
+  "debugger": {
+    "description": "Debugging specialist for errors and test failures.",
+    "prompt": "You are an expert debugger. Analyze errors, identify root causes, and provide fixes."
+  }
+}
+```
+
+| Field         | Required | Description                                       |
+| ------------- | -------- | ------------------------------------------------- |
+| `description` | Yes      | When the subagent should be invoked               |
+| `prompt`      | Yes      | System prompt guiding behavior                    |
+| `tools`       | No       | Array of tools (inherits all if omitted)          |
+| `model`       | No       | Model alias: `sonnet`, `opus`, `haiku`, `inherit` |
+
+#### System Prompt Flags
+
+| Flag                          | Behavior                       | Modes               | Use Case                        |
+| ----------------------------- | ------------------------------ | ------------------- | ------------------------------- |
+| `--system-prompt`             | Replaces entire default prompt | Interactive + Print | Complete control                |
+| `--system-prompt-file`        | Replaces with file contents    | Print only          | Version-controlled prompts      |
+| `--append-system-prompt`      | Appends to default prompt      | Interactive + Print | Add instructions, keep defaults |
+| `--append-system-prompt-file` | Appends file contents          | Print only          | Load additional instructions    |
+
+**Usage examples**:
+
+```bash
+# Replace entire system prompt
+claude --system-prompt "You are a Python expert who only writes type-annotated code"
+
+# Load from file (print mode)
+claude -p --system-prompt-file ./prompts/code-review.txt "Review this PR"
+
+# Append while keeping defaults (recommended for most cases)
+claude --append-system-prompt "Always use TypeScript and include JSDoc comments"
+
+# Append from file
+claude -p --append-system-prompt-file ./prompts/style-rules.txt "Review this PR"
+```
+
+`--system-prompt` and `--system-prompt-file` are mutually exclusive. Append flags can be used with either replacement flag.
+
+#### Permission and Security Flags
+
+| Flag                                   | Description                             | Example                                                              |
+| -------------------------------------- | --------------------------------------- | -------------------------------------------------------------------- |
+| `--permission-mode`                    | Begin in specified permission mode      | `claude --permission-mode plan`                                      |
+| `--dangerously-skip-permissions`       | Skip all permission prompts             | `claude --dangerously-skip-permissions`                              |
+| `--allow-dangerously-skip-permissions` | Enable permission bypassing as option   | `claude --permission-mode plan --allow-dangerously-skip-permissions` |
+| `--allowedTools`                       | Tools that execute without prompting    | `"Bash(git log *)" "Read"`                                           |
+| `--disallowedTools`                    | Tools removed from model context        | `"Bash(git push *)" "Edit"`                                          |
+| `--tools`                              | Restrict which built-in tools available | `claude --tools "Bash,Edit,Read"`                                    |
+| `--permission-prompt-tool`             | MCP tool for permission prompts         | `claude -p --permission-prompt-tool mcp_auth_tool "query"`           |
+
+#### Output and Format Flags
+
+| Flag                         | Description                      | Example                                                                    |
+| ---------------------------- | -------------------------------- | -------------------------------------------------------------------------- |
+| `--output-format`            | Specify output format            | `claude -p "query" --output-format json`                                   |
+| `--input-format`             | Specify input format             | `claude -p --input-format stream-json`                                     |
+| `--include-partial-messages` | Include partial streaming events | `claude -p --output-format stream-json --include-partial-messages "query"` |
+| `--json-schema`              | Get validated JSON output        | `claude -p --json-schema '{"type":"object",...}' "query"`                  |
+
+**Output format options**:
+
+- `text` - Plain text output (default)
+- `json` - JSON structured output
+- `stream-json` - Streaming JSON output
+
+#### Session Management Flags
+
+| Flag                       | Description                         | Example                                                      |
+| -------------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| `--session-id`             | Use specific session ID (UUID)      | `claude --session-id "550e8400-e29b-41d4-a716-446655440000"` |
+| `--fork-session`           | Create new session ID when resuming | `claude --resume abc123 --fork-session`                      |
+| `--no-session-persistence` | Don't save session to disk          | `claude -p --no-session-persistence "query"`                 |
+
+#### MCP Configuration Flags
+
+| Flag                  | Description                   | Example                                              |
+| --------------------- | ----------------------------- | ---------------------------------------------------- |
+| `--mcp-config`        | Load MCP servers from JSON    | `claude --mcp-config ./mcp.json`                     |
+| `--strict-mcp-config` | Only use specified MCP config | `claude --strict-mcp-config --mcp-config ./mcp.json` |
+
+#### Browser Integration Flags
+
+| Flag          | Description                       | Example              |
+| ------------- | --------------------------------- | -------------------- |
+| `--chrome`    | Enable Chrome browser integration | `claude --chrome`    |
+| `--no-chrome` | Disable Chrome integration        | `claude --no-chrome` |
+
+#### Plugin and Settings Flags
+
+| Flag                       | Description                   | Example                                 |
+| -------------------------- | ----------------------------- | --------------------------------------- |
+| `--plugin-dir`             | Load plugins from directories | `claude --plugin-dir ./my-plugins`      |
+| `--settings`               | Path to settings JSON file    | `claude --settings ./settings.json`     |
+| `--setting-sources`        | Setting sources to load       | `claude --setting-sources user,project` |
+| `--disable-slash-commands` | Disable all skills/commands   | `claude --disable-slash-commands`       |
+
+#### Automation and Limits Flags
+
+| Flag               | Description                            | Example                                     |
+| ------------------ | -------------------------------------- | ------------------------------------------- |
+| `--max-turns`      | Limit agentic turns (print mode)       | `claude -p --max-turns 3 "query"`           |
+| `--max-budget-usd` | Maximum API spend before stopping      | `claude -p --max-budget-usd 5.00 "query"`   |
+| `--fallback-model` | Fallback model when default overloaded | `claude -p --fallback-model sonnet "query"` |
+
+#### Remote and Web Session Flags
+
+| Flag         | Description                          | Example                               |
+| ------------ | ------------------------------------ | ------------------------------------- |
+| `--remote`   | Create new web session on claude.ai  | `claude --remote "Fix the login bug"` |
+| `--teleport` | Resume web session in local terminal | `claude --teleport`                   |
+
+#### Setup and Initialization Flags
+
+| Flag            | Description                              | Example                |
+| --------------- | ---------------------------------------- | ---------------------- |
+| `--init`        | Run Setup hooks and start interactive    | `claude --init`        |
+| `--init-only`   | Run Setup hooks and exit                 | `claude --init-only`   |
+| `--maintenance` | Run Setup hooks with maintenance trigger | `claude --maintenance` |
+| `--ide`         | Auto-connect to IDE on startup           | `claude --ide`         |
+
+#### API Configuration Flags
+
+| Flag      | Description                   | Example                               |
+| --------- | ----------------------------- | ------------------------------------- |
+| `--betas` | Beta headers for API requests | `claude --betas interleaved-thinking` |
+
+### Session Management
+
+Claude Code supports three primary execution modes.
+
+#### Interactive Mode (Default)
+
+```bash
+# Start interactive REPL
+claude
+
+# Start with initial prompt
+claude "explain the authentication flow"
+```
+
+Features:
+
+- Multi-turn conversations
+- Session persistence
+- Command history
+- Checkpointing support
+
+#### Print Mode (SDK Mode)
+
+```bash
+# Execute single prompt and exit
+claude -p "explain this function"
+
+# Process piped content
+cat error.log | claude -p "explain this error"
+
+# With JSON output for scripting
+claude -p --output-format json "list all TODO comments"
+```
+
+Use cases:
+
+- Scripting and automation
+- CI/CD pipelines
+- SRE bots
+- Automated code reviews
+- Agent integrations
+
+#### Session Continuation
+
+```bash
+# Continue most recent conversation
+claude -c
+
+# Continue in print mode
+claude -c -p "now fix the issue"
+
+# Resume specific session by name
+claude -r "auth-refactor"
+
+# Resume specific session by ID
+claude -r "abc123"
+
+# Fork session (new ID, same history)
+claude --resume abc123 --fork-session
+```
+
+Sessions are stored in `~/.claude/sessions/`:
+
+- Each session has a unique ID
+- Named sessions appear in `/resume` picker
+- Forked sessions maintain history but diverge
+
+### Checkpointing
+
+Claude Code automatically saves code state before each change.
+
+#### How Checkpoints Work
+
+1. **Automatic saving**: Code state saved before each edit
+2. **Access via /rewind**: Navigate to previous versions
+3. **Double-Escape access**: Tap Esc twice for quick access
+4. **Selective restore**: Choose to restore code, conversation, or both
+
+#### Checkpoint vs Git
+
+| Aspect        | Checkpoints      | Git                          |
+| ------------- | ---------------- | ---------------------------- |
+| Scope         | Session-local    | Permanent history            |
+| Trigger       | Each Claude edit | Manual commits               |
+| User edits    | Not tracked      | Tracked if committed         |
+| Bash commands | Not tracked      | Effects tracked if committed |
+
+Think of checkpoints as "local undo" and Git as "permanent history".
+
+#### Using Checkpoints
+
+```bash
+# Access rewind interface
+/rewind
+
+# Or double-tap Escape
+<Esc><Esc>
+```
+
+Restore options:
+
+1. **Code only**: Restore file state
+2. **Conversation only**: Restore chat history
+3. **Both**: Restore code and conversation
+
+#### Checkpoint Limitations
+
+- Only tracks Claude's edits
+- User edits not captured
+- Bash command side effects not captured
+- Should be used alongside Git
+
+### Automation Patterns
+
+#### CI/CD Integration
+
+```bash
+# Code review in CI
+claude -p --output-format json "Review this PR for security issues" \
+  --max-turns 5 \
+  --max-budget-usd 1.00
+
+# Automated testing feedback
+uv run pytest | claude -p "Explain the test failures and suggest fixes"
+
+# Documentation generation
+claude -p --system-prompt "You are a technical writer" \
+  "Generate API docs for src/api.py" \
+  --output-format json
+```
+
+#### Scripting with JSON Output
+
+```bash
+# Parse Claude's response programmatically
+response=$(claude -p --output-format json "List all functions in main.py")
+echo "$response" | jq '.result.message'
+
+# Check for specific patterns
+claude -p --json-schema '{"type":"object","properties":{"hasIssues":{"type":"boolean"}}}' \
+  "Does this code have security issues?"
+```
+
+#### Batch Processing
+
+```bash
+# Process multiple files
+for file in src/*.py; do
+  claude -p "Review $file for code quality" >> review_results.txt
+done
+
+# Parallel processing with xargs
+find src -name "*.py" | xargs -P 4 -I {} \
+  claude -p --no-session-persistence "Check {} for type errors"
+```
+
+### Environment Variables
+
+| Variable            | Purpose                           |
+| ------------------- | --------------------------------- |
+| `ANTHROPIC_API_KEY` | API key for direct API access     |
+| `CLAUDE_CONFIG_DIR` | Override default config directory |
+| `CLAUDE_MODEL`      | Default model to use              |
+| `NO_COLOR`          | Disable colored output            |
+
+### DSM-Specific CLI Patterns
+
+CLI patterns optimized for data-source-manager development.
+
+#### FCP Debugging Session
+
+```bash
+# Start dedicated FCP debugging session
+claude -r "fcp-debug" --agent fcp-debugger \
+  --append-system-prompt "Focus on FCP cache invalidation"
+
+# Continue previous FCP investigation
+claude -c -p "Check if the cache was properly invalidated"
+```
+
+#### Test Automation
+
+```bash
+# Run tests and get analysis
+uv run pytest tests/unit/ -v 2>&1 | claude -p \
+  "Analyze these test results, focusing on failures related to symbol formats"
+
+# Validate data pipeline output
+uv run python -c "from data_source_manager import DSM; print(DSM.fetch(...))" | \
+  claude -p --json-schema '{"type":"object","properties":{"valid":{"type":"boolean"}}}' \
+  "Is this OHLCV data valid?"
+```
+
+#### Code Review Pipeline
+
+```bash
+# Review DSM code with domain context
+claude -p \
+  --append-system-prompt "$(cat .claude/rules/fcp-protocol.md)" \
+  --output-format json \
+  "Review src/data_source_manager/core/ for FCP compliance"
+```
+
+#### Batch Symbol Validation
+
+```bash
+# Validate multiple symbols in parallel
+for symbol in BTCUSDT ETHUSDT BNBUSDT; do
+  claude -p --no-session-persistence \
+    "Validate $symbol format for Binance API" &
+done
+wait
+```
+
+#### CI Pipeline Integration
+
+```bash
+# Pre-merge validation
+claude -p \
+  --max-turns 10 \
+  --max-budget-usd 2.00 \
+  --output-format json \
+  "Review all staged changes for DSM pattern compliance"
+```
+
+### Slash Commands Quick Reference
+
+Built-in commands available in interactive mode:
+
+| Command        | Description                   |
+| -------------- | ----------------------------- |
+| `/help`        | Show all available commands   |
+| `/init`        | Create starter CLAUDE.md      |
+| `/clear`       | Wipe conversation history     |
+| `/compact`     | Summarize and compact context |
+| `/config`      | Open settings                 |
+| `/rewind`      | Rewind to checkpoint          |
+| `/cost`        | Show token usage and cost     |
+| `/model`       | Show or change model          |
+| `/permissions` | Show current permissions      |
+| `/resume`      | Resume previous session       |
+| `/tasks`       | List background tasks         |
+| `/hooks`       | Show active hooks             |
+| `/vim`         | Toggle vim mode               |
+
+### Third-Party Tools
+
+Community tools extending CLI capabilities:
+
+| Tool         | Purpose                                        |
+| ------------ | ---------------------------------------------- |
+| CCheckpoints | Session checkpoint tracking with web dashboard |
+| Claudekit    | Auto-save, hooks, specialized subagents        |
