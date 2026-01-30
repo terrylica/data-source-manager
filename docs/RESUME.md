@@ -4,6 +4,23 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Model Selection & Routing (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added model capabilities table (Opus, Sonnet, Haiku with speed/cost)
+- Added task-based model selection table
+- Added progressive escalation strategy diagram
+- Added mid-session switching commands
+- Added agent model configuration with DSM-specific recommendations
+
+**Sources**:
+
+- [Claude Fast Model Selection](https://claudefa.st/blog/guide/performance/model-selection)
+- [Official Model Config](https://code.claude.com/docs/en/model-config)
+
 ### Context Window Management (2026-01-30)
 
 **Status**: Complete

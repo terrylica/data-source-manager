@@ -1387,6 +1387,81 @@ Given DSM's domain complexity (FCP, symbols, timestamps), apply these patterns:
 | Timestamp rules | Critical   | Extended | UTC is non-negotiable      |
 | Error handling  | Patterns   | Full     | Domain exceptions are deep |
 
+## Model Selection & Routing
+
+Based on [Claude Fast Model Selection](https://claudefa.st/blog/guide/performance/model-selection) and [Official Model Config](https://code.claude.com/docs/en/model-config).
+
+### Model Capabilities
+
+| Model  | Best For                                    | Speed   | Cost |
+| ------ | ------------------------------------------- | ------- | ---- |
+| Opus   | Architecture, complex refactoring, security | Slowest | 5x   |
+| Sonnet | 90% of dev work, features, bugs, tests      | Fast    | 1x   |
+| Haiku  | Simple edits, syntax, status checks         | Fastest | 0.3x |
+
+### Task-Based Model Selection
+
+| Task Type               | Recommended Model | Rationale                      |
+| ----------------------- | ----------------- | ------------------------------ |
+| Architectural decisions | Opus              | Maximum reasoning depth        |
+| Multi-file refactoring  | Opus              | Complex dependency tracking    |
+| Feature implementation  | Sonnet            | Best speed/quality balance     |
+| Bug fixes               | Sonnet            | Good reasoning, fast iteration |
+| Code reviews            | Sonnet            | Efficient pattern recognition  |
+| Test writing            | Sonnet            | Familiar patterns, fast output |
+| Syntax questions        | Haiku             | Simple lookups                 |
+| Text transformations    | Haiku             | No reasoning needed            |
+
+### Progressive Escalation Strategy
+
+```
+Default → Sonnet (90% of tasks)
+    ↓
+Complexity detected → Opus (architectural, multi-step)
+    ↓
+Simple operations → Haiku (file ops, status)
+```
+
+**Cost savings**: 60-80% compared to Opus-only usage.
+
+### Mid-Session Switching Commands
+
+| Command         | Effect                          |
+| --------------- | ------------------------------- |
+| `/model opus`   | Switch to Opus for current task |
+| `/model sonnet` | Return to default Sonnet        |
+| `/model haiku`  | Use Haiku for simple ops        |
+
+### Agent Model Configuration
+
+Configure model per-agent in YAML frontmatter:
+
+```yaml
+---
+name: data-fetcher
+model: haiku # Fast, simple data operations
+tools: [Bash, Read]
+---
+```
+
+| Agent                 | Model  | Rationale                     |
+| --------------------- | ------ | ----------------------------- |
+| api-reviewer          | sonnet | Code analysis needs reasoning |
+| data-fetcher          | haiku  | Simple fetch operations       |
+| fcp-debugger          | sonnet | Diagnostic analysis           |
+| silent-failure-hunter | sonnet | Pattern detection             |
+| test-writer           | sonnet | Test generation needs context |
+
+### DSM Model Selection Guidelines
+
+| DSM Task                     | Model  | Reason                          |
+| ---------------------------- | ------ | ------------------------------- |
+| FCP protocol debugging       | opus   | Complex state machine analysis  |
+| Symbol format validation     | haiku  | Simple string operations        |
+| Timestamp handling review    | sonnet | Pattern matching, good coverage |
+| Cache invalidation logic     | opus   | Multi-layer dependency analysis |
+| Data fetching implementation | sonnet | Standard API patterns           |
+
 ## Verification Checklist
 
 ### Infrastructure
