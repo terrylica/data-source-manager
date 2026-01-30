@@ -40215,3 +40215,341 @@ IDE integration for data-source-manager development.
 | Plugin not working | Run from project root; restart IDE |
 | IDE not detected   | Check plugin enabled; restart      |
 | Command not found  | Configure Claude command path      |
+## Headless and Programmatic Usage
+
+Run Claude Code programmatically from the CLI, Python, or TypeScript for automation, CI/CD, and scripting.
+
+### Overview
+
+The Agent SDK provides the same tools, agent loop, and context management that power Claude Code. Available as:
+
+- **CLI**: For scripts and CI/CD (`claude -p`)
+- **Python package**: Full programmatic control
+- **TypeScript package**: Full programmatic control
+
+The CLI was previously called "headless mode." The `-p` flag and all options work the same way.
+
+### Basic CLI Usage
+
+Add `-p` (or `--print`) to run non-interactively:
+
+```bash
+claude -p "What does the auth module do?"
+```
+
+All CLI options work with `-p`:
+
+- `--continue` for continuing conversations
+- `--allowedTools` for auto-approving tools
+- `--output-format` for structured output
+
+### Output Formats
+
+Use `--output-format` to control response structure:
+
+| Format        | Description                   | Use Case                |
+| ------------- | ----------------------------- | ----------------------- |
+| `text`        | Plain text output (default)   | Human reading           |
+| `json`        | Structured JSON with metadata | Programmatic processing |
+| `stream-json` | Newline-delimited JSON        | Real-time streaming     |
+
+#### Text Output
+
+```bash
+claude -p "Summarize this project"
+```
+
+#### JSON Output
+
+Returns structured JSON with result, session ID, and metadata:
+
+```bash
+claude -p "Summarize this project" --output-format json
+```
+
+Response includes:
+
+- `result` - Text result
+- `session_id` - Session identifier
+- `usage` - Token usage
+
+#### Structured Output with JSON Schema
+
+Use `--json-schema` for output conforming to a specific schema:
+
+```bash
+claude -p "Extract the main function names from auth.py" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}'
+```
+
+Response includes `structured_output` field with the validated data.
+
+#### Parsing with jq
+
+```bash
+# Extract text result
+claude -p "Summarize this project" --output-format json | jq -r '.result'
+
+# Extract structured output
+claude -p "Extract function names from auth.py" \
+  --output-format json \
+  --json-schema '...' \
+  | jq '.structured_output'
+```
+
+### Streaming Responses
+
+Use `stream-json` with `--verbose` and `--include-partial-messages` for token-by-token streaming:
+
+```bash
+claude -p "Explain recursion" \
+  --output-format stream-json \
+  --verbose \
+  --include-partial-messages
+```
+
+Each line is a JSON object representing an event.
+
+**Filter for text deltas**:
+
+```bash
+claude -p "Write a poem" \
+  --output-format stream-json \
+  --verbose \
+  --include-partial-messages | \
+  jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
+```
+
+### Auto-Approve Tools
+
+Use `--allowedTools` to let Claude use tools without prompting:
+
+```bash
+claude -p "Run the test suite and fix any failures" \
+  --allowedTools "Bash,Read,Edit"
+```
+
+Uses permission rule syntax with prefix matching:
+
+- `Bash(git diff *)` - Commands starting with "git diff "
+- Space before `*` is important to avoid matching unintended commands
+
+### Common Patterns
+
+#### Create a Commit
+
+```bash
+claude -p "Look at my staged changes and create an appropriate commit" \
+  --allowedTools "Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git commit *)"
+```
+
+#### Security Review with Custom Prompt
+
+```bash
+gh pr diff "$1" | claude -p \
+  --append-system-prompt "You are a security engineer. Review for vulnerabilities." \
+  --output-format json
+```
+
+#### Continue Conversations
+
+```bash
+# First request
+claude -p "Review this codebase for performance issues"
+
+# Continue most recent conversation
+claude -p "Now focus on the database queries" --continue
+claude -p "Generate a summary of all issues found" --continue
+```
+
+#### Resume Specific Session
+
+```bash
+# Capture session ID
+session_id=$(claude -p "Start a review" --output-format json | jq -r '.session_id')
+
+# Resume later
+claude -p "Continue that review" --resume "$session_id"
+```
+
+### CI/CD Integration
+
+#### GitHub Actions Example
+
+```yaml
+name: Code Review
+on: pull_request
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review PR
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} | \
+            claude -p "Review this PR for issues" \
+            --output-format json \
+            --allowedTools "Read" \
+            > review.json
+```
+
+#### Pre-Commit Hook
+
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+staged_files=$(git diff --cached --name-only)
+claude -p "Check these files for issues: $staged_files" \
+  --allowedTools "Read" \
+  --output-format json | jq -e '.result | test("no issues")' || exit 1
+```
+
+#### Build Script Integration
+
+```bash
+#!/bin/bash
+# run-tests-with-fixes.sh
+claude -p "Run pytest and fix any failures" \
+  --allowedTools "Bash(pytest *),Read,Edit" \
+  --max-turns 10 \
+  --max-budget-usd 2.00
+```
+
+### SDK Usage
+
+#### Python SDK
+
+```python
+from claude_code_sdk import Agent, Config
+
+config = Config(
+    allowed_tools=["Read", "Edit", "Bash"],
+    max_turns=10
+)
+
+agent = Agent(config)
+result = agent.run("Fix the bug in auth.py")
+print(result.text)
+```
+
+#### TypeScript SDK
+
+```typescript
+import { Agent, Config } from "@anthropic-ai/claude-code-sdk";
+
+const config: Config = {
+  allowedTools: ["Read", "Edit", "Bash"],
+  maxTurns: 10,
+};
+
+const agent = new Agent(config);
+const result = await agent.run("Fix the bug in auth.py");
+console.log(result.text);
+```
+
+### Budget and Turn Limits
+
+Control costs and execution in automation:
+
+```bash
+# Limit API spend
+claude -p "Complex task" --max-budget-usd 5.00
+
+# Limit turns
+claude -p "Iterative task" --max-turns 10
+
+# Both limits
+claude -p "Bounded task" --max-budget-usd 2.00 --max-turns 5
+```
+
+### Authentication
+
+Supports multiple authentication methods:
+
+- Anthropic API key (`ANTHROPIC_API_KEY`)
+- Amazon Bedrock
+- Google Vertex AI
+- Microsoft Foundry
+
+Configure via `~/.claude/settings.json` or environment variables.
+
+### Skill and Command Availability
+
+User-invoked skills like `/commit` and built-in commands are only available in interactive mode. In `-p` mode, describe the task instead:
+
+| Interactive Mode | Headless Mode                                |
+| ---------------- | -------------------------------------------- |
+| `/commit`        | "Look at staged changes and create a commit" |
+| `/review-pr 123` | "Review PR #123 for issues"                  |
+| `/test`          | "Run the test suite"                         |
+
+### DSM-Specific Headless Patterns
+
+Automation patterns for data-source-manager development.
+
+#### FCP Validation Script
+
+```bash
+#!/bin/bash
+# validate-fcp.sh
+claude -p "Check FCP cache consistency for BTCUSDT in binance source" \
+  --allowedTools "Read,Bash(uv run *)" \
+  --output-format json \
+  | jq -r '.result'
+```
+
+#### Data Pipeline Testing
+
+```bash
+#!/bin/bash
+# test-pipeline.sh
+claude -p "Run DSM pipeline tests and report failures" \
+  --allowedTools "Bash(uv run pytest *),Read" \
+  --max-turns 5 \
+  --output-format json \
+  > test-results.json
+```
+
+#### Symbol Format Validation
+
+```bash
+#!/bin/bash
+# validate-symbols.sh
+symbols=("BTCUSDT" "ETHUSDT" "BNBUSDT")
+for symbol in "${symbols[@]}"; do
+  claude -p "Validate $symbol format for binance" \
+    --allowedTools "Read" \
+    --output-format json \
+    --no-session-persistence
+done
+```
+
+#### CI Pipeline Integration
+
+```bash
+#!/bin/bash
+# dsm-ci.sh
+# Run full DSM validation pipeline
+claude -p "
+1. Check all source files for DSM patterns
+2. Validate FCP protocol implementation
+3. Run unit tests
+4. Report any issues
+" \
+  --allowedTools "Read,Bash(uv run *)" \
+  --max-budget-usd 3.00 \
+  --output-format json \
+  | jq '.result'
+```
+
+### Troubleshooting
+
+| Issue                  | Solution                                         |
+| ---------------------- | ------------------------------------------------ |
+| No output              | Check `--output-format` matches expected format  |
+| Tool permission denied | Add to `--allowedTools`                          |
+| Session not found      | Use `--output-format json` to capture session ID |
+| Timeout                | Increase timeout or use `--max-turns`            |
+| Cost exceeded          | Adjust `--max-budget-usd`                        |
