@@ -3679,6 +3679,197 @@ def fetch_data(symbol: str, start: datetime, end: datetime) -> DataFrame:
 | DataFrame columns | Column names, types, meanings |
 | Rate limiting     | Backoff strategy explanation  |
 
+## Legacy Code Modernization
+
+Systematic migration from legacy systems to modern architectures.
+
+### Modernization Dimensions
+
+| Dimension      | Transformation                 |
+| -------------- | ------------------------------ |
+| Architecture   | Monolith → Microservices       |
+| Infrastructure | On-premise → Cloud-native      |
+| Language       | Legacy → Modern (COBOL → Java) |
+| Patterns       | Procedural → Object-oriented   |
+| Testing        | Manual → Automated             |
+
+### Migration Strategies
+
+| Strategy      | Description                      |
+| ------------- | -------------------------------- |
+| Strangler Fig | Gradually replace old components |
+| Facade Layer  | Create compatibility wrapper     |
+| Incremental   | Start small, expand coverage     |
+| Parallel Run  | Run old and new simultaneously   |
+| Big Bang      | Full replacement (high risk)     |
+
+### Phased Migration Approach
+
+1. **Analysis Phase**: Understand existing codebase
+2. **Structure Setup**: Create modern project structure
+3. **Data Models**: Translate legacy data structures
+4. **I/O Layer**: Build compatible interfaces
+5. **Business Logic**: Convert core functionality
+6. **Testing**: Dual test harness for validation
+
+### COBOL Migration Example
+
+Claude Code's approach:
+
+```
+> Analyze this COBOL program and create a migration plan to Java
+> [Claude creates 5-phase plan]
+> Start with the data model translation from copybooks to Java classes
+> [Claude converts COBOL copybooks to Java POJOs]
+```
+
+### Best Practices
+
+| Practice                  | Rationale                       |
+| ------------------------- | ------------------------------- |
+| Preserve business logic   | Core value of legacy system     |
+| Generate regression tests | Verify behavior unchanged       |
+| Start with simple CRUD    | Build confidence before complex |
+| Maintain backwards compat | Enable gradual rollout          |
+| Document as you go        | Capture domain knowledge        |
+
+### Velocity Gains
+
+Organizations report 2-10x velocity improvement with:
+
+- 40-50% faster than manual work
+- Maintained quality standards
+- Enterprise controls preserved
+- Weeks instead of years
+
+### DSM Modernization Considerations
+
+| Legacy Pattern    | Modern Equivalent     |
+| ----------------- | --------------------- |
+| Pandas DataFrames | Polars DataFrames     |
+| requests library  | httpx with async      |
+| Manual retries    | tenacity with backoff |
+| Print debugging   | Structured logging    |
+| Global state      | Dependency injection  |
+
+## Code Review Patterns
+
+AI-assisted pull request review and feedback.
+
+### Review Workflow
+
+```
+> Review my staged changes for issues
+> Summarize changes and suggest improvements
+> Check for security vulnerabilities
+> Verify coding standards compliance
+```
+
+### Review Types
+
+| Type                | Focus Area                       |
+| ------------------- | -------------------------------- |
+| Security Review     | Vulnerabilities, injection risks |
+| Style Review        | Coding standards, formatting     |
+| Logic Review        | Correctness, edge cases          |
+| Performance Review  | Optimization opportunities       |
+| Architecture Review | Design patterns, coupling        |
+
+### Confidence Scoring
+
+Claude Code uses confidence scoring to:
+
+- Filter out false positives
+- Ensure actionable feedback
+- Reduce review noise
+- Focus on critical issues
+
+### GitHub Actions Integration
+
+```yaml
+name: Claude Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+### Review Prompts
+
+**Concise review:**
+
+```
+Review this PR for:
+1. Critical bugs that would cause failures
+2. Security issues
+3. Pass/fail recommendation with emoji
+```
+
+**Detailed review:**
+
+```
+Analyze this pull request:
+1. Summarize the changes
+2. Identify potential issues
+3. Suggest improvements
+4. Check test coverage
+```
+
+### Using Memory for Consistency
+
+```
+> We discussed the FCP caching pattern earlier
+> Does this new code follow the same pattern?
+> [Claude remembers and validates consistency]
+```
+
+### Auto-Fix Workflow
+
+1. Review comments posted by human reviewer
+2. Claude analyzes suggested changes
+3. Claude implements fixes
+4. Claude pushes updates to PR branch
+
+### DSM Code Review Focus
+
+| Area               | Review Checklist                 |
+| ------------------ | -------------------------------- |
+| FCP implementation | Cache key consistency, TTL       |
+| Error handling     | Exception hierarchy, recovery    |
+| Rate limiting      | Backoff parameters, retry logic  |
+| Symbol validation  | Format correctness, market check |
+| DataFrame ops      | Column types, null handling      |
+
+### Custom Review Agent
+
+Create in `.claude/agents/`:
+
+```yaml
+---
+name: dsm-reviewer
+description: Reviews DSM code for consistency
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+
+You are a code reviewer for data-source-manager.
+Focus on:
+- FCP protocol compliance
+- Error handling patterns
+- Rate limiting correctness
+- Symbol format validation
+- DataFrame column consistency
+```
+
 ## Verification Checklist
 
 ### Infrastructure
