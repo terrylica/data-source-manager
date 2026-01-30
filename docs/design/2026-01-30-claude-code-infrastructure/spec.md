@@ -12782,3 +12782,270 @@ response = client.messages.create(
 4. **Preserve blocks**: Always pass thinking blocks back for tool use
 5. **Consider latency**: Extended thinking increases response time
 6. **Task selection**: Best for math, coding, analysis, complex reasoning
+
+---
+
+## GitHub Actions Integration Reference
+
+Integrate Claude Code into CI/CD pipelines with @claude mentions, automated code review, and PR creation.
+
+### Quick Setup
+
+```bash
+# In Claude Code terminal
+/install-github-app
+```
+
+This installs the GitHub app and configures required secrets.
+
+### Manual Setup
+
+1. Install Claude GitHub app: <https://github.com/apps/claude>
+2. Add `ANTHROPIC_API_KEY` to repository secrets
+3. Copy workflow file to `.github/workflows/`
+
+### Basic Workflow
+
+```yaml
+name: Claude Code
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+### @claude Mentions
+
+In PR or issue comments:
+
+```
+@claude implement this feature based on the issue description
+@claude how should I implement user authentication for this endpoint?
+@claude fix the TypeError in the user dashboard component
+@claude review this PR for security issues
+```
+
+### Action Parameters
+
+| Parameter         | Description                               | Required |
+| ----------------- | ----------------------------------------- | -------- |
+| prompt            | Instructions (text or skill like /review) | No       |
+| claude_args       | CLI arguments passed to Claude Code       | No       |
+| anthropic_api_key | Claude API key                            | Yes\*    |
+| github_token      | GitHub token for API access               | No       |
+| trigger_phrase    | Custom trigger (default: "@claude")       | No       |
+| use_bedrock       | Use AWS Bedrock                           | No       |
+| use_vertex        | Use Google Vertex AI                      | No       |
+
+\*Required for direct API, not for Bedrock/Vertex
+
+### CLI Arguments via claude_args
+
+```yaml
+- uses: anthropics/claude-code-action@v1
+  with:
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    prompt: "Review this PR"
+    claude_args: |
+      --max-turns 10
+      --model claude-sonnet-4-5-20250929
+      --append-system-prompt "Follow our coding standards"
+```
+
+Common arguments:
+
+- `--max-turns`: Maximum conversation turns
+- `--model`: Model to use
+- `--mcp-config`: MCP configuration path
+- `--allowed-tools`: Comma-separated allowed tools
+- `--debug`: Enable debug output
+
+### Code Review Workflow
+
+```yaml
+name: Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "/review"
+          claude_args: "--max-turns 5"
+```
+
+### Scheduled Automation
+
+```yaml
+name: Daily Report
+on:
+  schedule:
+    - cron: "0 9 * * *"
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Generate a summary of yesterday's commits and open issues"
+          claude_args: "--model claude-opus-4-5-20251101"
+```
+
+### AWS Bedrock Integration
+
+```yaml
+name: Claude PR Action (Bedrock)
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  claude-pr:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-west-2
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          use_bedrock: "true"
+          claude_args: "--model us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+```
+
+### Google Vertex AI Integration
+
+```yaml
+name: Claude PR Action (Vertex)
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  claude-pr:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          use_vertex: "true"
+          claude_args: "--model claude-sonnet-4@20250514"
+        env:
+          ANTHROPIC_VERTEX_PROJECT_ID: ${{ steps.auth.outputs.project_id }}
+          CLOUD_ML_REGION: us-east5
+```
+
+### Required Permissions
+
+```yaml
+permissions:
+  contents: write # Modify repository files
+  pull-requests: write # Create PRs and push changes
+  issues: write # Respond to issues
+  id-token: write # For OIDC (Bedrock/Vertex)
+```
+
+### Security Best Practices
+
+1. **Never commit API keys**: Use GitHub Secrets
+2. **Limit permissions**: Only grant necessary scopes
+3. **Review suggestions**: Always review before merging
+4. **Use OIDC**: For Bedrock/Vertex, avoid static credentials
+5. **Dedicate service accounts**: One per repository
+
+### Cost Optimization
+
+1. Use specific `@claude` commands to reduce API calls
+2. Configure `--max-turns` to prevent excessive iterations
+3. Set workflow-level timeouts to avoid runaway jobs
+4. Use GitHub concurrency controls for parallel runs
+
+### DSM GitHub Actions Integration
+
+```yaml
+name: DSM Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "src/**/*.py"
+      - "tests/**/*.py"
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this PR focusing on:
+            - FCP protocol compliance
+            - Silent failure patterns (bare except, etc.)
+            - Timestamp handling (UTC requirements)
+            - DataFrame operations (Polars patterns)
+          claude_args: "--max-turns 5"
+```
+
+### Troubleshooting
+
+| Issue                     | Solution                          |
+| ------------------------- | --------------------------------- |
+| Claude not responding     | Check GitHub App installation     |
+| CI not running on commits | Use GitHub App, not Actions user  |
+| Authentication errors     | Verify API key/OIDC configuration |
+| @claude not triggering    | Ensure comment contains `@claude` |
