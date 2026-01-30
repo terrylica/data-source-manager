@@ -36055,3 +36055,418 @@ When researching DSM codebase:
 - [XML Tags Guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/use-xml-tags)
 - [Extended Thinking](https://platform.claude.com/docs/en/build-with-claude/extended-thinking)
 - [Context Windows](https://platform.claude.com/docs/en/build-with-claude/context-windows)
+## Skills Architecture Reference
+
+Comprehensive reference for creating, managing, and sharing Claude Code skills following the Agent Skills open standard.
+
+### Overview
+
+Skills extend what Claude can do. Create a `SKILL.md` file with instructions, and Claude adds it to its toolkit. Claude uses skills when relevant, or you can invoke one directly with `/skill-name`.
+
+### SKILL.md Structure
+
+Every skill needs a `SKILL.md` file with two parts:
+
+1. **YAML frontmatter** (between `---` markers) - Tells Claude when to use the skill
+2. **Markdown content** - Instructions Claude follows when the skill is invoked
+
+```yaml
+---
+name: explain-code
+description: Explains code with visual diagrams and analogies. Use when explaining how code works, teaching about a codebase, or when the user asks "how does this work?"
+---
+
+When explaining code, always include:
+
+1. **Start with an analogy**: Compare the code to something from everyday life
+2. **Draw a diagram**: Use ASCII art to show the flow, structure, or relationships
+3. **Walk through the code**: Explain step-by-step what happens
+4. **Highlight a gotcha**: What's a common mistake or misconception?
+
+Keep explanations conversational. For complex concepts, use multiple analogies.
+```
+
+### Frontmatter Reference
+
+All fields are optional. Only `description` is recommended.
+
+| Field                      | Required    | Description                                                                                   |
+| -------------------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `name`                     | No          | Display name (uses directory name if omitted). Lowercase, numbers, hyphens only, max 64 chars |
+| `description`              | Recommended | What the skill does and when to use it. Max 1024 chars                                        |
+| `argument-hint`            | No          | Hint for autocomplete, e.g., `[issue-number]`                                                 |
+| `disable-model-invocation` | No          | `true` prevents Claude from auto-loading (default: false)                                     |
+| `user-invocable`           | No          | `false` hides from `/` menu (default: true)                                                   |
+| `allowed-tools`            | No          | Tools Claude can use without permission when skill is active                                  |
+| `model`                    | No          | Model override for this skill                                                                 |
+| `context`                  | No          | Set to `fork` to run in forked subagent                                                       |
+| `agent`                    | No          | Subagent type when `context: fork` is set                                                     |
+| `hooks`                    | No          | Hooks scoped to this skill's lifecycle                                                        |
+
+### Where Skills Live
+
+| Location   | Path                                     | Applies to             |
+| ---------- | ---------------------------------------- | ---------------------- |
+| Enterprise | Managed settings                         | All organization users |
+| Personal   | `~/.claude/skills/<skill-name>/SKILL.md` | All your projects      |
+| Project    | `.claude/skills/<skill-name>/SKILL.md`   | This project only      |
+| Plugin     | `<plugin>/skills/<skill-name>/SKILL.md`  | Where plugin enabled   |
+
+**Precedence**: enterprise > personal > project. Plugin skills use namespace `plugin-name:skill-name`.
+
+### Skill Directory Structure
+
+```
+my-skill/
+├── SKILL.md           # Main instructions (required)
+├── template.md        # Template for Claude to fill in
+├── examples/
+│   └── sample.md      # Example output showing expected format
+├── references/        # Documentation loaded into context
+│   └── api-docs.md
+├── scripts/           # Executable Python/Bash scripts
+│   └── validate.sh
+└── assets/            # Templates and binary files
+    └── config.json
+```
+
+### Progressive Disclosure Pattern
+
+Skills employ progressive disclosure architecture:
+
+1. **Metadata loading** (~100 tokens): Claude scans available skills to identify matches
+2. **Full instructions** (<5k tokens): Load when Claude determines skill applies
+3. **Bundled resources**: Files and scripts load only as needed
+
+**Keep SKILL.md under 500 lines**. Move detailed reference to separate files.
+
+### String Substitutions
+
+| Variable                | Description                               |
+| ----------------------- | ----------------------------------------- |
+| `$ARGUMENTS`            | All arguments passed when invoking        |
+| `$ARGUMENTS[N]` or `$N` | Access specific argument by 0-based index |
+| `${CLAUDE_SESSION_ID}`  | Current session ID                        |
+
+```yaml
+---
+name: fix-issue
+description: Fix a GitHub issue
+disable-model-invocation: true
+---
+Fix GitHub issue $ARGUMENTS following our coding standards.
+
+1. Read the issue description
+2. Understand the requirements
+3. Implement the fix
+4. Write tests
+5. Create a commit
+```
+
+### Invocation Control
+
+| Frontmatter                      | You can invoke | Claude can invoke | When loaded                                  |
+| -------------------------------- | -------------- | ----------------- | -------------------------------------------- |
+| (default)                        | Yes            | Yes               | Description in context, full loads on invoke |
+| `disable-model-invocation: true` | Yes            | No                | Not in context, loads when you invoke        |
+| `user-invocable: false`          | No             | Yes               | Description in context, loads when invoked   |
+
+### Reference Content vs Task Content
+
+**Reference content** - Knowledge Claude applies to current work:
+
+```yaml
+---
+name: api-conventions
+description: API design patterns for this codebase
+---
+When writing API endpoints:
+  - Use RESTful naming conventions
+  - Return consistent error formats
+  - Include request validation
+```
+
+**Task content** - Step-by-step instructions for specific action:
+
+```yaml
+---
+name: deploy
+description: Deploy the application to production
+context: fork
+disable-model-invocation: true
+---
+
+Deploy the application:
+1. Run the test suite
+2. Build the application
+3. Push to the deployment target
+```
+
+### Dynamic Context Injection
+
+The `!`command\`\` syntax runs shell commands before skill content is sent to Claude:
+
+```yaml
+---
+name: pr-summary
+description: Summarize changes in a pull request
+context: fork
+agent: Explore
+allowed-tools: Bash(gh *)
+---
+
+## Pull request context
+- PR diff: !`gh pr diff`
+- PR comments: !`gh pr view --comments`
+- Changed files: !`gh pr diff --name-only`
+
+## Your task
+Summarize this pull request...
+```
+
+### Running in Subagent
+
+Add `context: fork` for isolated execution:
+
+```yaml
+---
+name: deep-research
+description: Research a topic thoroughly
+context: fork
+agent: Explore
+---
+
+Research $ARGUMENTS thoroughly:
+
+1. Find relevant files using Glob and Grep
+2. Read and analyze the code
+3. Summarize findings with specific file references
+```
+
+**Agent options**: `Explore`, `Plan`, `general-purpose`, or custom from `.claude/agents/`
+
+### Tool Restrictions
+
+```yaml
+---
+name: safe-reader
+description: Read files without making changes
+allowed-tools: Read, Grep, Glob
+---
+```
+
+### Supporting Files Reference
+
+Reference supporting files from SKILL.md:
+
+```markdown
+## Additional resources
+
+- For complete API details, see [reference.md](reference.md)
+- For usage examples, see [examples.md](examples.md)
+```
+
+### Permission Control
+
+**Disable all skills**:
+
+```
+# Add to deny rules:
+Skill
+```
+
+**Allow/deny specific skills**:
+
+```
+# Allow only specific skills
+Skill(commit)
+Skill(review-pr *)
+
+# Deny specific skills
+Skill(deploy *)
+```
+
+**Hide individual skills**: Add `disable-model-invocation: true` to frontmatter.
+
+### DSM-Specific Skills
+
+#### DSM Usage Skill
+
+`.claude/skills/dsm-usage/SKILL.md`:
+
+```yaml
+---
+name: dsm-usage
+description: DataSourceManager API usage patterns. Use when fetching market data, configuring data sources, or working with OHLCV data.
+---
+
+## DataSourceManager API
+
+When using DataSourceManager:
+
+### Symbol Format
+- Always uppercase with slash separator: `BTC/USDT`, not `BTCUSDT`
+- Validate format before API calls
+
+### Timestamp Handling
+- All timestamps are UTC
+- Use `open_time` column for candle timestamps
+- Never use naive datetime - use pendulum
+
+### FCP Protocol
+- DataSourceManager handles failover automatically
+- Check FCP logs for debugging: `~/.cache/dsm/fcp.log`
+
+For complete API reference, see [references/api.md](references/api.md)
+For usage examples, see [examples/basic-fetch.md](examples/basic-fetch.md)
+```
+
+#### DSM Testing Skill
+
+`.claude/skills/dsm-testing/SKILL.md`:
+
+````yaml
+---
+name: dsm-testing
+description: DSM testing patterns and conventions. Use when writing tests, debugging test failures, or setting up test fixtures.
+---
+
+## DSM Testing Patterns
+
+### Test Structure
+- Use pytest with async support
+- Place tests in `tests/` mirroring `src/` structure
+- Use `conftest.py` for shared fixtures
+
+### Fixtures
+- `sample_ohlcv_df`: Valid OHLCV DataFrame
+- `mock_binance_client`: Mocked Binance API
+- `temp_cache_dir`: Isolated cache for tests
+
+### Running Tests
+```bash
+uv run pytest tests/ -v
+uv run pytest tests/test_specific.py::test_function -v
+````
+
+For test examples, see [examples/test-patterns.md](examples/test-patterns.md)
+
+````
+
+#### DSM Research Skill
+
+`.claude/skills/dsm-research/SKILL.md`:
+
+```yaml
+---
+name: dsm-research
+description: Research and explore DSM codebase. Use for understanding architecture, finding implementations, or debugging issues.
+context: fork
+agent: Explore
+user-invocable: true
+---
+
+## DSM Codebase Research
+
+Research the DSM codebase for: $ARGUMENTS
+
+### Key Locations
+- Core logic: `src/data_source_manager/`
+- Data sources: `src/data_source_manager/sources/`
+- FCP protocol: `src/data_source_manager/fcp/`
+- Tests: `tests/`
+- Examples: `examples/`
+
+### Research Process
+1. Start with relevant source directories
+2. Use Grep for pattern matching
+3. Read implementation files
+4. Check tests for expected behavior
+5. Review examples for usage patterns
+
+Provide findings with specific file:line references.
+````
+
+#### DSM FCP Monitor Skill
+
+`.claude/skills/dsm-fcp-monitor/SKILL.md`:
+
+```yaml
+---
+name: dsm-fcp-monitor
+description: Monitor and debug FCP (Failover Control Protocol) behavior. Use when investigating data source failures, cache issues, or failover decisions.
+context: fork
+agent: Explore
+allowed-tools: Read, Grep, Glob, Bash(cat *), Bash(tail *)
+---
+
+## FCP Monitoring
+
+Investigate FCP behavior for: $ARGUMENTS
+
+### FCP Log Location
+- Primary log: `~/.cache/dsm/fcp.log`
+- Cache metadata: `~/.cache/dsm/cache_meta.json`
+
+### Key Patterns to Search
+- `FAILOVER_TRIGGERED`: Source switch occurred
+- `CACHE_HIT`: Data served from cache
+- `CACHE_MISS`: Fresh data fetched
+- `SOURCE_ERROR`: Data source failure
+
+### Analysis Steps
+1. Check recent FCP decisions in log
+2. Verify cache validity and timestamps
+3. Review source availability status
+4. Identify patterns in failures
+
+Report findings with timestamps and decision reasoning.
+```
+
+### Visual Output Skills
+
+Skills can generate interactive HTML files:
+
+````yaml
+---
+name: codebase-visualizer
+description: Generate an interactive tree visualization of your codebase.
+allowed-tools: Bash(python *)
+---
+
+# Codebase Visualizer
+
+Run the visualization script:
+
+```bash
+python ~/.claude/skills/codebase-visualizer/scripts/visualize.py .
+````
+
+This creates `codebase-map.html` and opens it in your browser.
+
+```
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Skill not triggering | Check description includes expected keywords |
+| Triggers too often | Make description more specific or add `disable-model-invocation: true` |
+| Claude doesn't see skills | Check `SLASH_COMMAND_TOOL_CHAR_BUDGET` (default 15000) |
+| Skill not loading | Verify SKILL.md exists and frontmatter is valid |
+
+### Best Practices
+
+1. **Description is critical** - Claude uses it to decide when to load skill
+2. **Keep SKILL.md under 500 lines** - Use supporting files for details
+3. **Use progressive disclosure** - Reference files, don't inline everything
+4. **Test both invocation methods** - Direct `/skill-name` and natural language
+5. **Use `context: fork` for tasks** - Isolate side effects
+6. **Restrict tools appropriately** - Read-only for analysis skills
+
+### References
+
+- [Skills Documentation](https://code.claude.com/docs/en/skills)
+- [Agent Skills Standard](https://agentskills.io)
+- [Skill Authoring Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+```
