@@ -107,6 +107,18 @@ run = "uv sync --dev"
 description = "Verify package imports correctly"
 run = "uv run -p 3.13 python -c 'from data_source_manager import DataSourceManager; print(\"✓ Import OK\")'"
 
+[tasks."cache:clear"]
+description = "Clear cache directory (prompts for confirmation)"
+run = "uv run -p 3.13 python scripts/dev/clear_cache.py clear -d ~/.cache/data_source_manager"
+
+[tasks."cache:clear-force"]
+description = "Clear cache directory without confirmation"
+run = "uv run -p 3.13 python scripts/dev/clear_cache.py clear -d ~/.cache/data_source_manager -y"
+
+[tasks."cache:status"]
+description = "Show cache directory status"
+run = "du -sh ~/.cache/data_source_manager 2>/dev/null || echo 'Cache directory not found'"
+
 #
 # === HELP TASK ===
 #
@@ -138,6 +150,11 @@ echo "  mise run install        # Install in dev mode"
 echo "  mise run sync           # Sync dependencies"
 echo "  mise run clean          # Clean artifacts"
 echo "  mise run verify         # Verify imports"
+echo ""
+echo "Cache Management:"
+echo "  mise run cache:status   # Show cache size"
+echo "  mise run cache:clear    # Clear cache (prompts)"
+echo "  mise run cache:clear-force  # Clear without prompts"
 echo ""
 echo "Release (see .mise/tasks/release/):"
 echo "  mise run release:preflight  # Validate prerequisites"
