@@ -2,9 +2,12 @@
 name: dsm-testing
 description: Run tests for data-source-manager with proper markers and coverage. Use when writing tests, running tests, or checking test coverage for DSM.
 argument-hint: "[test-pattern]"
+user-invocable: true
 ---
 
 # Testing Data Source Manager
+
+Run tests for: $ARGUMENTS
 
 ## Test Organization
 

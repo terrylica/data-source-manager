@@ -7,7 +7,7 @@ user-invocable: true
 
 # FCP Monitor
 
-Monitor and diagnose Failover Control Protocol behavior for data-source-manager.
+Monitor and diagnose Failover Control Protocol behavior for: $ARGUMENTS
 
 ## Quick Diagnostics
 
