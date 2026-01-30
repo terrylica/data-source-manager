@@ -10648,3 +10648,389 @@ w data-source-manager fix/rate-limit-backoff claude
 4. **Use Plan Mode**: Safe exploration before changes
 5. **Monitor resources**: Watch memory with many sessions
 6. **Commit frequently**: Each worktree can commit independently
+
+## Playwright Testing Integration
+
+### Overview
+
+Playwright MCP enables Claude Code to directly control browser automation, combining AI reasoning with real-time testing capabilities.
+
+### Playwright Agent Types
+
+| Agent     | Purpose                            | Output             |
+| --------- | ---------------------------------- | ------------------ |
+| Planner   | Explore app, generate test plans   | Markdown test plan |
+| Generator | Convert plans to Playwright code   | Executable tests   |
+| Healer    | Fix broken tests, update selectors | Patched tests      |
+
+### Agent Workflow
+
+```
+1. Planner explores application
+   ↓ Markdown test plan
+2. Generator writes Playwright tests
+   ↓ Executable test code
+3. Healer repairs failures
+   ↓ Updated, passing tests
+```
+
+### Setup
+
+```bash
+# Initialize Playwright agents with Claude Code
+npx playwright init-agents --loop=claude
+```
+
+**Configuration** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@anthropic/mcp-server-playwright"]
+    }
+  }
+}
+```
+
+### Planner Agent
+
+Explores your application like a QA engineer:
+
+```markdown
+# Test Plan: Checkout Flow
+
+## Scenarios
+
+1. Guest checkout with valid payment
+2. Registered user with saved address
+3. Invalid credit card handling
+4. Coupon code application
+5. Shipping method selection
+
+## Edge Cases
+
+- Empty cart checkout attempt
+- Session timeout during payment
+- Network failure recovery
+```
+
+### Generator Agent
+
+Converts plans to best-practice Playwright code:
+
+```typescript
+import { test, expect } from "@playwright/test";
+
+test("guest checkout with valid payment", async ({ page }) => {
+  await page.goto("/products");
+  await page.getByRole("button", { name: "Add to Cart" }).click();
+  await page.getByRole("link", { name: "Checkout" }).click();
+
+  // Fill shipping info
+  await page.getByLabel("Email").fill("guest@example.com");
+  await page.getByLabel("Address").fill("123 Test St");
+
+  // Complete payment
+  await page.getByLabel("Card Number").fill("4242424242424242");
+  await expect(page.getByText("Order Confirmed")).toBeVisible();
+});
+```
+
+### Healer Agent
+
+Automatically repairs broken tests:
+
+```
+Test failure: Element not found 'button[name="Add to Cart"]'
+
+Healer analysis:
+- Button text changed to "Add to Basket"
+- Locator update: getByRole('button', { name: 'Add to Basket' })
+
+Test re-run: PASSED
+```
+
+### Framework Auto-Detection
+
+Claude adapts test generation to your stack:
+
+| Framework       | Test Library            | Patterns                   |
+| --------------- | ----------------------- | -------------------------- |
+| React + Jest    | React Testing Library   | fireEvent, waitFor, screen |
+| Vue + Vitest    | Vue Test Utils          | mount, wrapper.find        |
+| Angular + Karma | Angular Testing Library | TestBed, ComponentFixture  |
+| Playwright      | Cross-browser E2E       | Resilient selectors, waits |
+
+### MCP-Enabled Testing Workflow
+
+1. **Setup MCP Server** - Configure Playwright integration
+2. **Receive Requirements** - Define features to test
+3. **Plan Strategy** - Break into structured test plans
+4. **Generate Code** - AI creates test scripts
+5. **Execute via MCP** - Run tests with real-time feedback
+6. **Analyze Results** - Review pass/fail outcomes
+7. **Iterate** - Healer fixes failures automatically
+
+### DSM Testing Patterns
+
+```typescript
+// tests/e2e/fcp-flow.spec.ts
+import { test, expect } from "@playwright/test";
+
+test.describe("FCP Data Flow", () => {
+  test("fetches fresh data when cache expired", async ({ page }) => {
+    // Clear cache
+    await page.request.post("/api/cache/clear");
+
+    // Trigger fetch
+    const response = await page.request.get("/api/data/BTCUSDT");
+    const data = await response.json();
+
+    expect(data.source).toBe("FETCH_FRESH");
+    expect(data.bars).toHaveLength(greaterThan(0));
+  });
+
+  test("uses cache for repeated requests", async ({ page }) => {
+    // First request populates cache
+    await page.request.get("/api/data/BTCUSDT");
+
+    // Second request should use cache
+    const response = await page.request.get("/api/data/BTCUSDT");
+    const data = await response.json();
+
+    expect(data.source).toBe("USE_CACHE");
+  });
+});
+```
+
+### Best Practices
+
+1. **Use Planner for exploration**: Let AI discover edge cases
+2. **Review generated code**: AI is co-pilot, not autopilot
+3. **Enable Healer for maintenance**: Reduce test brittleness
+4. **Use Page Object Models**: Structure for maintainability
+5. **Run in CI with MCP**: Automated test execution
+
+## Error Recovery and Resilience Patterns
+
+### Overview
+
+Resilience patterns prevent cascading failures and ensure graceful degradation when services fail. These patterns are essential for AI-assisted development with external APIs.
+
+### Circuit Breaker Pattern
+
+Prevents overwhelming failing services by tracking failures and opening the circuit when thresholds are exceeded.
+
+**Three States**:
+
+```
+CLOSED (normal)     OPEN (failing)      HALF-OPEN (testing)
+     │                   │                    │
+     │ failure_count++   │ reject requests    │ allow 1 probe
+     │                   │ return fallback    │
+     ▼                   ▼                    ▼
+[threshold?]──YES──▶[timeout?]──YES──▶[probe success?]
+     │                   │                    │
+     NO                  NO                   YES: CLOSED
+     │                   │                    NO: OPEN
+     ▼                   ▼
+   continue           stay open
+```
+
+### Circuit Breaker Implementation
+
+```python
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Callable, TypeVar
+
+T = TypeVar('T')
+
+class CircuitState(Enum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+@dataclass
+class CircuitBreaker:
+    failure_threshold: int = 5
+    recovery_timeout: timedelta = timedelta(seconds=30)
+    half_open_max_calls: int = 3
+
+    state: CircuitState = CircuitState.CLOSED
+    failure_count: int = 0
+    last_failure_time: datetime | None = None
+    half_open_calls: int = 0
+
+    def call(self, func: Callable[[], T], fallback: Callable[[], T]) -> T:
+        if self.state == CircuitState.OPEN:
+            if self._should_attempt_reset():
+                self.state = CircuitState.HALF_OPEN
+                self.half_open_calls = 0
+            else:
+                return fallback()
+
+        try:
+            result = func()
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            return fallback()
+
+    def _on_success(self):
+        if self.state == CircuitState.HALF_OPEN:
+            self.half_open_calls += 1
+            if self.half_open_calls >= self.half_open_max_calls:
+                self.state = CircuitState.CLOSED
+                self.failure_count = 0
+
+    def _on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = datetime.now()
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitState.OPEN
+
+    def _should_attempt_reset(self) -> bool:
+        if self.last_failure_time is None:
+            return True
+        return datetime.now() - self.last_failure_time >= self.recovery_timeout
+```
+
+### Retry Pattern with Exponential Backoff
+
+```python
+import random
+import time
+from typing import Callable, TypeVar
+
+T = TypeVar('T')
+
+def retry_with_backoff(
+    func: Callable[[], T],
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    jitter: float = 0.25,
+) -> T:
+    """
+    Retry with exponential backoff and jitter.
+
+    Formula: min(base * 2^attempt, max_delay) * (1 ± jitter)
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as e:
+            if attempt == max_retries:
+                raise
+
+            # Calculate delay with exponential backoff
+            delay = min(base_delay * (2 ** attempt), max_delay)
+
+            # Add jitter to prevent thundering herd
+            jitter_range = delay * jitter
+            delay += random.uniform(-jitter_range, jitter_range)
+
+            time.sleep(delay)
+```
+
+### Combined Strategy
+
+```python
+class ResilientClient:
+    def __init__(self):
+        self.circuit_breaker = CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=timedelta(seconds=30)
+        )
+
+    def fetch_data(self, symbol: str) -> DataFrame:
+        def do_fetch():
+            return retry_with_backoff(
+                lambda: self._api_call(symbol),
+                max_retries=3,
+                base_delay=1.0
+            )
+
+        def fallback():
+            # Return cached data or empty result
+            return self._get_cached(symbol) or DataFrame()
+
+        return self.circuit_breaker.call(do_fetch, fallback)
+```
+
+### Key Configuration Parameters
+
+| Parameter         | Typical Value | Purpose                 |
+| ----------------- | ------------- | ----------------------- |
+| failure_threshold | 5             | Failures before opening |
+| recovery_timeout  | 30s           | Wait before half-open   |
+| max_retries       | 3-5           | Retry attempts          |
+| base_delay        | 1s            | Initial backoff         |
+| max_delay         | 60s           | Maximum backoff         |
+| jitter            | 0.25 (25%)    | Randomization range     |
+
+### Graceful Degradation Strategies
+
+| Strategy           | When to Use                 | Example                  |
+| ------------------ | --------------------------- | ------------------------ |
+| Cached fallback    | Recent data acceptable      | Return stale market data |
+| Default response   | Partial data acceptable     | Return empty DataFrame   |
+| Queue for retry    | Eventual consistency OK     | Queue failed writes      |
+| Alternative source | Redundant sources available | Try secondary exchange   |
+
+### DSM Resilience Patterns
+
+```python
+# In src/core/resilient_fetcher.py
+
+class ResilientDataFetcher:
+    """FCP-aware data fetcher with circuit breaker and retry."""
+
+    def __init__(self, primary: DataSource, fallback: DataSource):
+        self.primary = primary
+        self.fallback = fallback
+        self.circuit = CircuitBreaker(
+            failure_threshold=3,
+            recovery_timeout=timedelta(seconds=60)
+        )
+
+    def get_data(self, symbol: str, start: datetime, end: datetime) -> DataFrame:
+        def fetch_primary():
+            return retry_with_backoff(
+                lambda: self.primary.fetch(symbol, start, end),
+                max_retries=2,
+                base_delay=0.5
+            )
+
+        def fetch_fallback():
+            # FCP: FAILOVER decision
+            logger.warning(f"FAILOVER: {symbol} to secondary source")
+            return self.fallback.fetch(symbol, start, end)
+
+        return self.circuit.call(fetch_primary, fetch_fallback)
+```
+
+### Error Recovery Triggers
+
+| Trigger                   | Recovery Action             |
+| ------------------------- | --------------------------- |
+| Task execution failure    | Retry with backoff          |
+| Timeout                   | Open circuit, use fallback  |
+| External service failure  | Circuit breaker + fallback  |
+| Database transaction fail | Rollback + compensating txn |
+| Cascade failure risk      | Open circuit immediately    |
+
+### Best Practices
+
+1. **Always use idempotency**: Only retry safe operations
+2. **Add jitter**: Prevent thundering herd on recovery
+3. **Set timeouts**: All external calls need timeouts
+4. **Log state transitions**: Debug circuit breaker behavior
+5. **Monitor metrics**: Track failure rates and circuit state
+6. **Test failure modes**: Simulate failures in tests
+7. **Configure per-service**: Different services need different thresholds
