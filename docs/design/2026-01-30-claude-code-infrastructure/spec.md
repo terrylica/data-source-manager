@@ -7592,6 +7592,587 @@ In `settings.json`:
 }
 ```
 
+## GitHub Actions Integration
+
+### Overview
+
+Claude Code GitHub Actions brings AI-powered automation to your workflow with `@claude` mentions in any PR or issue. Claude can analyze code, create pull requests, implement features, and fix bugs while following your project's standards.
+
+### Quick Setup
+
+```bash
+# In Claude Code terminal
+/install-github-app
+```
+
+This guides through:
+
+1. Installing the Claude GitHub App
+2. Adding ANTHROPIC_API_KEY to repository secrets
+3. Creating the workflow file
+
+### Basic Workflow
+
+```yaml
+# .github/workflows/claude.yml
+name: Claude Code
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Responds to @claude mentions in comments
+```
+
+### PR Review Workflow
+
+```yaml
+name: Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "/review"
+          claude_args: "--max-turns 5"
+```
+
+### Scheduled Automation
+
+```yaml
+name: Daily Report
+on:
+  schedule:
+    - cron: "0 9 * * *"
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Generate a summary of yesterday's commits and open issues"
+          claude_args: "--model claude-opus-4-5-20251101"
+```
+
+### Trigger Phrases
+
+Common `@claude` commands:
+
+```
+@claude implement this feature based on the issue description
+@claude how should I implement user authentication for this endpoint?
+@claude fix the TypeError in the user dashboard component
+@claude review this PR for security issues
+```
+
+### Action Parameters
+
+| Parameter           | Description                         | Required |
+| ------------------- | ----------------------------------- | -------- |
+| `prompt`            | Instructions (text or skill)        | No       |
+| `claude_args`       | CLI arguments passed to Claude Code | No       |
+| `anthropic_api_key` | Claude API key                      | Yes\*    |
+| `github_token`      | GitHub token for API access         | No       |
+| `trigger_phrase`    | Custom trigger (default: "@claude") | No       |
+| `use_bedrock`       | Use AWS Bedrock                     | No       |
+| `use_vertex`        | Use Google Vertex AI                | No       |
+
+\*Required for direct Claude API, not for Bedrock/Vertex
+
+### CLI Arguments via claude_args
+
+```yaml
+claude_args: "--max-turns 5 --model claude-sonnet-4-5-20250929 --mcp-config /path/to/config.json"
+```
+
+Common arguments:
+
+- `--max-turns`: Maximum conversation turns (default: 10)
+- `--model`: Model to use
+- `--mcp-config`: Path to MCP configuration
+- `--allowed-tools`: Comma-separated list of allowed tools
+- `--debug`: Enable debug output
+
+### Cloud Provider Integration
+
+#### AWS Bedrock
+
+```yaml
+name: Claude PR Action
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude-pr:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-west-2
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          use_bedrock: "true"
+          claude_args: "--model us.anthropic.claude-sonnet-4-5-20250929-v1:0 --max-turns 10"
+```
+
+#### Google Vertex AI
+
+```yaml
+name: Claude PR Action
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude-pr:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          trigger_phrase: "@claude"
+          use_vertex: "true"
+          claude_args: "--model claude-sonnet-4@20250514 --max-turns 10"
+        env:
+          ANTHROPIC_VERTEX_PROJECT_ID: ${{ steps.auth.outputs.project_id }}
+          CLOUD_ML_REGION: us-east5
+```
+
+### Required Secrets
+
+#### Direct Claude API
+
+- `ANTHROPIC_API_KEY`: API key from console.anthropic.com
+
+#### AWS Bedrock
+
+- `AWS_ROLE_TO_ASSUME`: IAM role ARN for Bedrock access
+- `APP_ID`: GitHub App ID
+- `APP_PRIVATE_KEY`: GitHub App private key
+
+#### Google Vertex AI
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: Workload identity provider resource name
+- `GCP_SERVICE_ACCOUNT`: Service account email
+- `APP_ID`: GitHub App ID
+- `APP_PRIVATE_KEY`: GitHub App private key
+
+### CLAUDE.md in CI/CD
+
+Your `CLAUDE.md` file is automatically loaded in GitHub Actions:
+
+```markdown
+# CLAUDE.md
+
+## Code Review Criteria
+
+- Check for security vulnerabilities
+- Verify test coverage for new code
+- Ensure error handling follows patterns
+
+## PR Guidelines
+
+- Squash commits before merge
+- Require at least one approval
+- Run full test suite
+```
+
+### Cost Optimization
+
+**GitHub Actions costs:**
+
+- Runs on GitHub-hosted runners consuming Actions minutes
+- Set workflow-level timeouts to avoid runaway jobs
+- Use concurrency controls to limit parallel runs
+
+**API costs:**
+
+- Each interaction consumes tokens based on prompt/response length
+- Use specific @claude commands to reduce unnecessary calls
+- Configure appropriate `--max-turns` to prevent excessive iterations
+
+### Security Best Practices
+
+1. **Never hardcode API keys** - Always use GitHub Secrets
+2. **Limit action permissions** - Only grant what's necessary
+3. **Review suggestions before merging** - Human oversight
+4. **Use repository-specific configurations** - Least privilege
+5. **Monitor Claude's activities** - Audit logs
+
+### DSM GitHub Actions Workflow
+
+```yaml
+# .github/workflows/claude-dsm.yml
+name: Claude DSM Assistant
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --max-turns 10
+            --allowed-tools Read,Grep,Glob,Bash
+```
+
+## DevContainer Configuration
+
+### Overview
+
+DevContainers provide isolated, secure environments for running Claude Code. The container's enhanced security measures allow `--dangerously-skip-permissions` for unattended autonomous operation.
+
+### Key Features
+
+- **Production-ready Node.js**: Built on Node.js 20 with essential dependencies
+- **Security by design**: Custom firewall restricting network access
+- **Developer-friendly tools**: git, ZSH, fzf, and more
+- **VS Code integration**: Pre-configured extensions and settings
+- **Session persistence**: Preserves history between container restarts
+- **Cross-platform**: Compatible with macOS, Windows, and Linux
+
+### Quick Start
+
+1. Install VS Code and Remote - Containers extension
+2. Clone repository with devcontainer configuration
+3. Open in VS Code
+4. Click "Reopen in Container" when prompted
+
+### Configuration Files
+
+The devcontainer setup consists of three primary components:
+
+#### devcontainer.json
+
+```json
+{
+  "name": "Claude Code Dev",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/init-firewall.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance"],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind"
+  ],
+  "remoteUser": "node"
+}
+```
+
+#### Dockerfile
+
+```dockerfile
+FROM node:20-bookworm
+
+# Install essential tools
+RUN apt-get update && apt-get install -y \
+    git \
+    zsh \
+    fzf \
+    iptables \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code
+RUN npm install -g @anthropic-ai/claude-code
+
+# Set up non-root user
+USER node
+WORKDIR /home/node
+
+# Configure shell
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+```
+
+#### init-firewall.sh
+
+```bash
+#!/bin/bash
+set -e
+
+# Default policy: drop outbound
+iptables -P OUTPUT DROP
+
+# Allow loopback
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# Allow established connections
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Allow DNS
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+
+# Whitelist essential domains
+ALLOWED_HOSTS=(
+    "api.anthropic.com"
+    "api.github.com"
+    "github.com"
+    "registry.npmjs.org"
+    "pypi.org"
+    "files.pythonhosted.org"
+)
+
+for host in "${ALLOWED_HOSTS[@]}"; do
+    for ip in $(dig +short "$host" 2>/dev/null); do
+        iptables -A OUTPUT -d "$ip" -j ACCEPT
+    done
+done
+
+# Allow SSH
+iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
+
+echo "Firewall configured successfully"
+```
+
+### Security Model
+
+**Multi-layered protection:**
+
+1. **Precise access control**: Outbound connections restricted to whitelisted domains
+2. **Default-deny policy**: Blocks all unspecified external network access
+3. **Startup verification**: Validates firewall rules on initialization
+4. **Container isolation**: Separated from host system
+
+**What's allowed:**
+
+- npm registry, PyPI
+- GitHub, Claude API
+- Outbound DNS and SSH
+
+**What's blocked:**
+
+- All other external network access
+- Direct host filesystem access (except mounts)
+- Privilege escalation
+
+### Autonomous Mode
+
+With firewall protection, run autonomously:
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+**Warning**: Only use with trusted repositories. DevContainers don't prevent exfiltration of anything accessible in the container including Claude Code credentials.
+
+### Use Cases
+
+#### Secure Client Work
+
+Isolate different client projects:
+
+```json
+{
+  "name": "Client-A-Project",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "mounts": ["source=${localWorkspaceFolder},target=/workspace,type=bind"],
+  "containerEnv": {
+    "CLIENT": "client-a"
+  }
+}
+```
+
+#### Team Onboarding
+
+Consistent environment for all team members:
+
+```json
+{
+  "name": "DSM Development",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.13"
+    }
+  },
+  "postCreateCommand": "uv sync && uv run pre-commit install"
+}
+```
+
+#### CI/CD Mirror
+
+Match development and production environments:
+
+```yaml
+# .github/workflows/test.yml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/your-org/dsm-devcontainer:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: uv run pytest
+```
+
+### Resource Configuration
+
+```json
+{
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "runArgs": ["--memory=4g", "--cpus=2"]
+}
+```
+
+**Note**: 2GB RAM restriction makes Claude Code struggle. 4GB works well.
+
+### MCP Server in DevContainer
+
+```json
+{
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind"
+  ],
+  "postCreateCommand": "claude mcp add filesystem /workspace"
+}
+```
+
+### DSM DevContainer Configuration
+
+```json
+{
+  "name": "DSM Development",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.13"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/init-firewall.sh && uv sync",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": ".venv/bin/python"
+      }
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
+    "source=dsm-cache,target=/home/node/.cache,type=volume"
+  ],
+  "containerEnv": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "remoteUser": "node"
+}
+```
+
+### Best Practices
+
+1. **Use firewall rules**: Default-deny with explicit allowlist
+2. **Mount credentials carefully**: Only what's needed
+3. **Set resource limits**: Prevent runaway containers
+4. **Version your devcontainer**: Track in git
+5. **Test locally first**: Before using `--dangerously-skip-permissions`
+6. **Monitor activities**: Even in containers
+
+### Caveats
+
+- **IDE integration limited**: No access to IDE diagnostics, open files, selected ranges
+- **Terminal-only**: Claude operates through terminal interface
+- **GitHub access**: Mounted auth still allows repository operations
+- **Memory requirements**: 4GB minimum for smooth operation
+
 ## Verification Checklist
 
 ### Infrastructure
