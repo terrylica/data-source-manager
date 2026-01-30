@@ -129,8 +129,8 @@ user-invocable: true
 
 | Metric              | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
-| Design spec lines   | 5189                                                                             |
-| Sections            | 67                                                                               |
+| Design spec lines   | 5398                                                                             |
+| Sections            | 69                                                                               |
 | Agents              | 5 (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer) |
 | Commands            | 6 (debug-fcp, fetch-data, quick-test, review-dsm, validate-data, feature-dev)    |
 | Skills              | 4 (dsm-usage, dsm-testing, dsm-research, dsm-fcp-monitor)                        |
@@ -184,6 +184,8 @@ user-invocable: true
 - Cost optimization & token reduction (model selection, caching)
 - Feature flags & configuration toggles (env vars, modes)
 - Session logging & debug tools (JSONL, LangSmith, workflows)
+- Project templates & scaffolding (plugins, starter kits, CLAUDE.md seeds)
+- Voice input & audio mode (VoiceMode MCP, Whisper, accessibility)
 
 ## More Information
 

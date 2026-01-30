@@ -5163,6 +5163,215 @@ Check session health with:
 > /memory     # Loaded CLAUDE.md files
 ```
 
+## Project Templates & Scaffolding
+
+Rapidly bootstrap new projects with Claude Code templates.
+
+### Template Types
+
+| Template Type    | Purpose                       | Source                     |
+| ---------------- | ----------------------------- | -------------------------- |
+| Plugin templates | Claude Code marketplace items | cc-marketplace-boilerplate |
+| Starter kits     | Full application scaffolds    | claude-starter-kit         |
+| CLAUDE.md seeds  | Project-specific instructions | cc-skills patterns         |
+| Skill templates  | Progressive disclosure skills | SKILL.md format            |
+
+### Scaffolding Commands
+
+```bash
+# Create plugin from template
+claude -p "Create a new Claude Code plugin with:
+- Name: my-tool
+- Type: skill with slash command
+- Hook: PostToolUse for validation"
+
+# Bootstrap monorepo CLAUDE.md
+claude -p "Create CLAUDE.md hierarchy for this monorepo:
+- Root with hub navigation
+- Package-specific files in packages/*/
+- Shared rules in .claude/rules/"
+```
+
+### Template Structure
+
+```
+templates/
+├── plugin/
+│   ├── CLAUDE.md           # Plugin instructions
+│   ├── skills/             # Skill templates
+│   │   └── SKILL.md.tmpl
+│   ├── hooks/              # Hook templates
+│   │   └── hook.sh.tmpl
+│   └── manifest.json.tmpl
+├── project/
+│   ├── CLAUDE.md.tmpl      # Project CLAUDE.md
+│   ├── .claude/            # Infrastructure
+│   │   ├── settings.json.tmpl
+│   │   └── rules/
+│   └── docs/skills/        # Skills directory
+└── monorepo/
+    ├── root-CLAUDE.md.tmpl
+    └── package-CLAUDE.md.tmpl
+```
+
+### Dynamic Generation
+
+```python
+# Generate CLAUDE.md from project analysis
+from pathlib import Path
+
+def generate_claude_md(project_root: Path) -> str:
+    """Analyze project and generate appropriate CLAUDE.md."""
+    # Detect package manager
+    has_uv = (project_root / "pyproject.toml").exists()
+    has_npm = (project_root / "package.json").exists()
+
+    # Detect test framework
+    has_pytest = (project_root / "tests").exists()
+    has_jest = (project_root / "jest.config.js").exists()
+
+    # Generate commands section
+    commands = []
+    if has_uv:
+        commands.append("uv run pytest")
+    if has_npm:
+        commands.append("npm test")
+
+    return template.render(
+        package_manager="uv" if has_uv else "npm",
+        test_command=commands[0] if commands else "echo 'No tests'",
+        project_type=detect_project_type(project_root)
+    )
+```
+
+### DSM Template
+
+For data-source-manager style projects:
+
+```markdown
+# {Project Name}
+
+## Commands
+
+| Task       | Command             |
+| ---------- | ------------------- |
+| Test       | `uv run pytest`     |
+| Lint       | `uv run ruff check` |
+| Type check | `uv run pyright`    |
+
+## Architecture
+
+- Provider pattern for data sources
+- FCP for failover control
+- Polars for DataFrame operations
+
+## Rules
+
+When working with {domain}:
+
+- @.claude/rules/{domain}-patterns.md
+```
+
+## Voice Input & Audio Mode
+
+Enable voice interaction with Claude Code for hands-free development.
+
+### Voice Input Methods
+
+| Method              | Setup                          | Use Case          |
+| ------------------- | ------------------------------ | ----------------- |
+| VoiceMode MCP       | MCP server with speech-to-text | Full conversation |
+| System dictation    | macOS Dictation (Fn Fn)        | Quick text input  |
+| Whisper local       | whisper.cpp with microphone    | Privacy-focused   |
+| Cloud transcription | OpenAI Whisper API             | High accuracy     |
+
+### VoiceMode MCP Setup
+
+```json
+{
+  "mcpServers": {
+    "voicemode": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/voicemode-mcp"],
+      "env": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+### Local Whisper Integration
+
+```bash
+# Install whisper.cpp
+brew install whisper-cpp
+
+# Record and transcribe
+rec -c 1 -r 16000 -t wav - | whisper-cpp --model base.en
+
+# Pipe to Claude
+transcribe() {
+    rec -c 1 -r 16000 -t wav -d 30 /tmp/voice.wav
+    whisper-cpp --model base.en /tmp/voice.wav | claude
+}
+```
+
+### Voice Workflow Patterns
+
+```bash
+# Voice-activated code review
+alias voice-review='transcribe | xargs -I {} claude -p "Review this code: {}"'
+
+# Voice commit messages
+alias voice-commit='transcribe | xargs -I {} git commit -m "{}"'
+
+# Voice task creation
+alias voice-task='transcribe | xargs -I {} claude -p "Create task: {}"'
+```
+
+### Accessibility Benefits
+
+Voice input enables:
+
+- **Hands-free coding**: Continue working during RSI breaks
+- **Rapid dictation**: Faster than typing for documentation
+- **Accessibility**: Support for users with mobility limitations
+- **Mobile development**: Code review from phone with voice
+
+### DSM Voice Commands
+
+Custom voice shortcuts for data-source-manager:
+
+```bash
+# Voice-activated FCP debug
+alias voice-fcp='transcribe | xargs -I {} claude -p "Debug FCP for symbol: {}"'
+
+# Voice data fetch
+alias voice-fetch='transcribe | xargs -I {} claude -p "Fetch {} data for last 7 days"'
+
+# Voice test run
+alias voice-test='transcribe | xargs -I {} claude -p "Run tests matching: {}"'
+```
+
+### Privacy Considerations
+
+| Mode          | Data Flow                  | Privacy Level |
+| ------------- | -------------------------- | ------------- |
+| Local Whisper | Audio never leaves machine | Highest       |
+| VoiceMode MCP | Audio to OpenAI API        | Medium        |
+| System dictat | Audio to Apple servers     | Medium        |
+| Cloud only    | Audio to cloud provider    | Lowest        |
+
+For sensitive codebases, use local Whisper:
+
+```bash
+# Privacy-first voice setup
+export VOICE_MODE=local
+export WHISPER_MODEL=base.en
+export WHISPER_THREADS=4
+```
+
 ## Verification Checklist
 
 ### Infrastructure
