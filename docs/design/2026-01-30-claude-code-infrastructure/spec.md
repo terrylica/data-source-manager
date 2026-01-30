@@ -553,6 +553,87 @@ Subdirectory CLAUDE.md files load lazily when working with files in those direct
 | `examples/CLAUDE.md` | Example patterns, quick start   |
 | `tests/CLAUDE.md`    | Test fixtures, mocking patterns |
 
+## CLAUDE.md Imports
+
+Based on [Official Memory Docs](https://code.claude.com/docs/en/memory) and [MCPcat Guide](https://mcpcat.io/guides/reference-other-files/).
+
+### Import Syntax
+
+CLAUDE.md files can import additional files using `@path/to/file` syntax:
+
+```markdown
+See @README.md for project overview
+See @docs/api-patterns.md for API conventions
+See @package.json for available npm scripts
+```
+
+### Import Features
+
+| Feature             | Description                                    |
+| ------------------- | ---------------------------------------------- |
+| Relative paths      | `@docs/guide.md` from current location         |
+| Absolute paths      | `@/full/path/to/file.md`                       |
+| Home directory      | `@~/.claude/my-project-instructions.md`        |
+| Recursive imports   | Imported files can import others (max 5 hops)  |
+| Code block immunity | Imports not evaluated inside code spans/blocks |
+
+### Home Directory Imports
+
+For team members with individual preferences not in version control:
+
+```markdown
+# Individual Preferences
+
+- @~/.claude/my-project-instructions.md
+```
+
+This is an alternative to CLAUDE.local.md that works better across multiple git worktrees.
+
+### Best Practices for Imports
+
+| Practice            | Guidance                                      |
+| ------------------- | --------------------------------------------- |
+| Keep main file lean | Put details in separate files, reference them |
+| Use sparingly       | Avoid creating a maze of references           |
+| Max depth awareness | Recursive imports limited to 5 hops           |
+| Test with `/memory` | Run `/memory` to see what files are loaded    |
+
+## MCP Tool Search
+
+Based on [Anthropic Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use) and [MCP Context Optimization](https://scottspence.com/posts/optimising-mcp-server-context-usage-in-claude-code).
+
+### How Tool Search Works
+
+| Step                | Description                                       |
+| ------------------- | ------------------------------------------------- |
+| Detection           | Claude Code checks if MCP tools exceed 10K tokens |
+| Deferral            | Tools marked with `defer_loading: true`           |
+| Search injection    | Tool Search tool provided instead of all tools    |
+| On-demand discovery | Claude searches by keywords when needed           |
+| Selective loading   | 3-5 relevant tools (~3K tokens) loaded per query  |
+
+### Token Savings
+
+| Metric              | Without Tool Search | With Tool Search |
+| ------------------- | ------------------- | ---------------- |
+| Typical MCP tokens  | ~134K               | ~5K              |
+| Context reduction   | -                   | ~85%             |
+| Accuracy (Opus 4.5) | 79.5%               | 88.1%            |
+
+### Optimization Patterns
+
+| Pattern                      | Implementation                                       |
+| ---------------------------- | ---------------------------------------------------- |
+| Better tool descriptions     | Keyword-rich, specific descriptions for discovery    |
+| Server instructions          | Add `serverInstructions` for context about tools     |
+| High-frequency tools upfront | Configure frequently-used tools to load at start     |
+| Disable when needed          | Set `enable_tool_search: false` for specific servers |
+
+### Monitoring Context Usage
+
+- **`/context`**: See where tokens are going
+- **`/doctor`**: Detailed MCP server token breakdown
+
 ## Best Practices Applied
 
 ### Context Optimization

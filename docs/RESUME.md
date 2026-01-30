@@ -4,6 +4,25 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### CLAUDE.md Imports & MCP Tool Search (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added CLAUDE.md imports documentation (`@path/to/file` syntax)
+- Added import features table (relative, absolute, home directory, recursive)
+- Added home directory imports pattern for multi-worktree setups
+- Added MCP Tool Search documentation with token savings metrics
+- Added optimization patterns table for MCP context management
+
+**Sources**:
+
+- [Official Memory Docs](https://code.claude.com/docs/en/memory)
+- [MCPcat Guide](https://mcpcat.io/guides/reference-other-files/)
+- [Anthropic Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)
+- [Scott Spence MCP Optimization](https://scottspence.com/posts/optimising-mcp-server-context-usage-in-claude-code)
+
 ### Context Rules Enhancement (2026-01-30)
 
 **Status**: Complete
