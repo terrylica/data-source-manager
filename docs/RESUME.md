@@ -4,6 +4,23 @@ Last updated: 2026-01-30
 
 ## Recent Work
 
+### Productivity Workflows (2026-01-30)
+
+**Status**: Complete
+
+**What was done**:
+
+- Added high-impact practices table
+- Added Plan → Implement → Verify workflow diagram
+- Added efficiency commands table
+- Added measured impact metrics table
+- Added self-learning CLAUDE.md pattern quote
+
+**Sources**:
+
+- [Claude Code Creator Workflow](https://www.infoq.com/news/2026/01/claude-code-creator-workflow/)
+- [Productivity Tips](https://www.f22labs.com/blogs/10-claude-code-productivity-tips-for-every-developer/)
+
 ### Code Review Patterns (2026-01-30)
 
 **Status**: Complete

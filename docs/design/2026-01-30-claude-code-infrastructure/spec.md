@@ -1227,6 +1227,58 @@ Official code-review plugin outputs issues with 80+ confidence (adjustable 0-100
 | 50-79      | Medium - requires human judgment    |
 | < 50       | Low - may be false positive         |
 
+## Productivity Workflows
+
+Based on [Claude Code Creator Workflow](https://www.infoq.com/news/2026/01/claude-code-creator-workflow/) and [Productivity Tips](https://www.f22labs.com/blogs/10-claude-code-productivity-tips-for-every-developer/).
+
+### High-Impact Practices
+
+| Practice              | Impact                                     |
+| --------------------- | ------------------------------------------ |
+| Plan mode first       | Good plan → Claude 1-shots implementation  |
+| Parallel instances    | 5+ concurrent Claudes via iTerm2 tabs      |
+| Custom slash commands | Reusable workflows run dozens of times/day |
+| Session verification  | Claude reviews its own work before commit  |
+| Git worktrees         | Isolated branches for safe experimentation |
+
+### Workflow: Plan → Implement → Verify
+
+```
+1. /plan (refine until good)
+   ↓
+2. Auto-accept edits mode
+   ↓
+3. Claude 1-shots implementation
+   ↓
+4. Session verification
+   ↓
+5. Commit
+```
+
+### Efficiency Commands
+
+| Command    | Purpose                                    |
+| ---------- | ------------------------------------------ |
+| `/plan`    | Enter plan mode, iterate on approach       |
+| `/rewind`  | Roll back to earlier checkpoint            |
+| `/compact` | Reduce context while preserving essentials |
+| `/clear`   | Fresh start for new task                   |
+
+### Measured Impact
+
+| Metric             | Without Workflow | With Workflow |
+| ------------------ | ---------------- | ------------- |
+| Production bugs    | Baseline         | 70% fewer     |
+| Debugging time     | Baseline         | 50% faster    |
+| Test coverage      | 40%              | 90%           |
+| Quality (verified) | 1x               | 2-3x          |
+
+### Self-Learning CLAUDE.md Pattern
+
+> "Anytime we see Claude do something incorrectly we add it to the CLAUDE.md, so Claude knows not to do it next time."
+
+Evolving CLAUDE.md transforms the codebase into a self-learning system.
+
 ## Verification Checklist
 
 ### Infrastructure
