@@ -33629,3 +33629,324 @@ claude mcp add --transport http docs https://docs.example.com/mcp
 - Large files may consume significant context
 - Some servers may require authentication before resources available
 - Tab completion availability depends on terminal
+## Prompting Best Practices Reference
+
+### Overview
+
+Claude 4.x models are trained for precise instruction following. This guide covers prompting techniques optimized for Claude 4.5 models (Sonnet, Haiku, Opus).
+
+### General Principles
+
+#### Be Explicit
+
+Claude 4.x responds well to clear, explicit instructions. Be specific about desired output.
+
+**Less effective:**
+
+```
+Create an analytics dashboard
+```
+
+**More effective:**
+
+```
+Create an analytics dashboard. Include as many relevant features and interactions
+as possible. Go beyond the basics to create a fully-featured implementation.
+```
+
+#### Add Context (Explain WHY)
+
+Providing motivation helps Claude understand goals and deliver targeted responses.
+
+**Less effective:**
+
+```
+NEVER use ellipses
+```
+
+**More effective:**
+
+```
+Your response will be read aloud by a text-to-speech engine, so never use
+ellipses since the text-to-speech engine will not know how to pronounce them.
+```
+
+Claude generalizes from the explanation.
+
+#### Be Vigilant with Examples
+
+Claude pays close attention to details and examples. Ensure examples align with behaviors you want to encourage.
+
+### State Management
+
+#### Long-Horizon Reasoning
+
+Claude 4.5 excels at long-horizon tasks with exceptional state tracking. It maintains orientation by focusing on incremental progress.
+
+**Best practices:**
+
+1. **Use structured formats for state data:**
+
+```json
+{
+  "tests": [
+    { "id": 1, "name": "auth_flow", "status": "passing" },
+    { "id": 2, "name": "user_mgmt", "status": "failing" }
+  ],
+  "total": 200,
+  "passing": 150
+}
+```
+
+1. **Use unstructured text for progress notes:**
+
+```
+Session 3 progress:
+- Fixed authentication token validation
+- Next: investigate user_management test failures
+- Note: Do not remove tests
+```
+
+1. **Use git for state tracking:**
+   Git provides a log of what's been done and checkpoints that can be restored.
+
+2. **Emphasize incremental progress:**
+   Explicitly ask Claude to track progress and focus on incremental work.
+
+#### Multi-Context Window Workflows
+
+For tasks spanning multiple context windows:
+
+1. **Use different prompt for first window** - Set up framework (tests, scripts)
+2. **Write tests in structured format** - Keep in `tests.json`
+3. **Set up QoL tools** - Create `init.sh` for servers, test suites
+4. **Consider fresh start vs compaction** - Claude discovers state from filesystem
+5. **Provide verification tools** - Playwright MCP for UI testing
+
+**Sample prompt for context limits:**
+
+```
+Your context window will be automatically compacted as it approaches its limit.
+Do not stop tasks early due to token budget concerns. Save progress before
+context refresh. Be persistent and complete tasks fully.
+```
+
+### Tool Usage Patterns
+
+#### Action vs Suggestion
+
+Claude follows instructions precisely. "Can you suggest changes" may yield suggestions rather than implementations.
+
+**For action:**
+
+```
+Change this function to improve its performance.
+```
+
+**For proactive action by default:**
+
+```xml
+<default_to_action>
+By default, implement changes rather than only suggesting them. If intent is
+unclear, infer the most useful likely action and proceed, using tools to
+discover missing details instead of guessing.
+</default_to_action>
+```
+
+**For conservative behavior:**
+
+```xml
+<do_not_act_before_instructions>
+Do not jump into implementation unless clearly instructed. When intent is
+ambiguous, default to providing information and recommendations rather than
+taking action.
+</do_not_act_before_instructions>
+```
+
+#### Parallel Tool Calling
+
+Claude 4.x excels at parallel execution:
+
+- Multiple speculative searches
+- Read several files at once
+- Execute bash commands in parallel
+
+**Maximize parallel efficiency:**
+
+```xml
+<use_parallel_tool_calls>
+If you intend to call multiple tools and there are no dependencies between
+calls, make all independent calls in parallel. Never use placeholders or
+guess missing parameters.
+</use_parallel_tool_calls>
+```
+
+### XML Tags Usage
+
+XML tags help structure complex prompts:
+
+```xml
+<instructions>
+Your main task instructions here
+</instructions>
+
+<context>
+Background information
+</context>
+
+<example>
+Example input and output
+</example>
+
+<formatting>
+Output format requirements
+</formatting>
+```
+
+**Benefits:**
+
+- Clear separation of prompt components
+- Prevents mixing instructions with examples
+- Improved parsing accuracy
+
+### Output Format Control
+
+1. **Tell what to do, not what not to do:**
+   - Instead of: "Do not use markdown"
+   - Try: "Respond in smoothly flowing prose paragraphs"
+
+2. **Use XML format indicators:**
+
+   ```
+   Write prose in <smoothly_flowing_prose_paragraphs> tags
+   ```
+
+3. **Match prompt style to desired output:**
+   Remove markdown from prompt to reduce markdown in output.
+
+4. **Detailed formatting instructions:**
+
+```xml
+<avoid_excessive_markdown_and_bullet_points>
+Write in clear, flowing prose using complete paragraphs. Reserve markdown
+for inline code, code blocks, and simple headings. Avoid bold/italics.
+DO NOT use ordered/unordered lists unless presenting truly discrete items
+or user explicitly requests a list.
+</avoid_excessive_markdown_and_bullet_points>
+```
+
+### Extended Thinking Integration
+
+Guide Claude's thinking for complex tasks:
+
+```
+After receiving tool results, carefully reflect on their quality and determine
+optimal next steps before proceeding. Use thinking to plan and iterate based
+on new information.
+```
+
+**Note:** When extended thinking is disabled, Claude Opus 4.5 is sensitive to "think" and variants. Use "consider," "believe," "evaluate" instead.
+
+### Minimizing Hallucinations
+
+```xml
+<investigate_before_answering>
+Never speculate about code you have not opened. If user references a specific
+file, you MUST read it before answering. Investigate and read relevant files
+BEFORE answering questions. Give grounded, hallucination-free answers.
+</investigate_before_answering>
+```
+
+### Avoiding Over-Engineering
+
+```
+Avoid over-engineering. Only make changes directly requested or clearly
+necessary. Keep solutions simple and focused.
+
+Don't add features, refactor code, or make "improvements" beyond what was
+asked. Don't add error handling for scenarios that can't happen. Don't create
+helpers for one-time operations. Don't design for hypothetical requirements.
+```
+
+### Code Exploration
+
+```
+ALWAYS read and understand relevant files before proposing code edits. Do not
+speculate about code you have not inspected. If user references a specific
+file/path, you MUST open and inspect it before explaining or proposing fixes.
+Thoroughly review style, conventions, and abstractions before implementing.
+```
+
+### Research Tasks
+
+```
+Search in a structured way. As you gather data, develop competing hypotheses.
+Track confidence levels in progress notes. Regularly self-critique approach
+and plan. Update hypothesis tree or research notes to persist information.
+Break down complex research systematically.
+```
+
+### Subagent Orchestration
+
+Claude 4.5 recognizes when tasks benefit from delegating to subagents.
+
+**For conservative usage:**
+
+```
+Only delegate to subagents when the task clearly benefits from a separate
+agent with a new context window.
+```
+
+### DSM-Specific Prompting Patterns
+
+**FCP implementation guidance:**
+
+```xml
+<fcp_implementation>
+When implementing FCP (Failover Control Protocol) changes:
+1. Read existing FCP code before proposing changes
+2. Verify timeout values against constants file
+3. Test cache invalidation paths
+4. Check error handling follows DSM patterns
+Provide grounded analysis based on actual code, not speculation.
+</fcp_implementation>
+```
+
+**Data source integration:**
+
+```xml
+<data_source_patterns>
+When working with data sources:
+1. Symbol formats vary by exchange - read existing implementations first
+2. All timestamps must be UTC
+3. DataFrames use polars, not pandas
+4. Error handling must follow exception hierarchy
+Verify patterns against existing code before implementing.
+</data_source_patterns>
+```
+
+**Test writing:**
+
+```xml
+<test_requirements>
+When writing tests for DSM:
+1. Read existing test patterns in tests/ directory first
+2. Use pytest fixtures from conftest.py
+3. Test both success and failure paths
+4. Include FCP edge cases (timeouts, cache states)
+Match existing test conventions before creating new patterns.
+</test_requirements>
+```
+
+### Summary Table
+
+| Technique             | When to Use                  |
+| --------------------- | ---------------------------- |
+| Be explicit           | All prompts                  |
+| Add context (why)     | Complex instructions         |
+| XML tags              | Multi-component prompts      |
+| State tracking        | Long-horizon tasks           |
+| Parallel tools        | Independent operations       |
+| Format control        | Specific output requirements |
+| Investigation prompts | Code-related questions       |
+| Thinking guidance     | Complex multi-step reasoning |
