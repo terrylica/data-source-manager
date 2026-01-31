@@ -51,15 +51,15 @@ def detect_gaps(
     3. It calculates statistics about the gaps found
 
     Args:
-            df: DataFrame containing time series data
+        df: DataFrame containing time series data
         interval: Interval enum from market_constraints.py defining the expected time interval
         time_column: Name of the timestamp column in the DataFrame
         gap_threshold: Threshold as a fraction (0.3 = 30%) above the expected
-                       interval to consider as a gap
+            interval to consider as a gap
         day_boundary_threshold: Separate threshold for day boundary transitions
-                                (default 1.5 = 150% for greater tolerance)
+            (default 1.5 = 150% for greater tolerance)
         enforce_min_span: If True, require dataset to span at least 23 hours
-                          to prevent analyzing individual daily files
+            to prevent analyzing individual daily files
 
     Returns:
         Tuple containing:

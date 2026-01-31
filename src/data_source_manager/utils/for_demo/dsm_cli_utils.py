@@ -141,7 +141,19 @@ def print_config_table(
     """Print a formatted table of configuration settings.
 
     Args:
-        Various configuration parameters to display
+        provider: Data provider name (e.g., 'binance')
+        market: Market type string (e.g., 'spot', 'futures_usdt')
+        chart_type: Type of chart data to fetch
+        symbol: Trading symbol (e.g., 'BTCUSDT')
+        interval: Time interval for candles
+        start_time: Start of the data range
+        end_time: End of the data range
+        days: Number of days to fetch
+        enforce_source: Force a specific data source
+        retries: Number of retry attempts
+        no_cache: Whether to skip cache
+        clear_cache: Whether to clear cache before fetching
+        log_level: Logging verbosity level
     """
     # Convert market string to MarketType enum
     market_type = MarketType.from_string(market)
