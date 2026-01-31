@@ -1,4 +1,8 @@
-"""Unified cache manager for market data."""
+"""Unified cache manager for market data.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+"""
 
 import json
 import time
@@ -48,7 +52,7 @@ class UnifiedCacheManager:
         # Load existing metadata
         try:
             self._load_metadata()
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Failed to load cache metadata, starting fresh: {e}")
 
     def _get_metadata_path(self) -> Path:
@@ -67,7 +71,7 @@ class UnifiedCacheManager:
                 with open(metadata_path) as f:
                     self.metadata = json.load(f)
                 logger.debug(f"Loaded cache metadata: {len(self.metadata)} entries")
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, ValueError) as e:
                 logger.error(f"Failed to load metadata: {e}")
                 self.metadata = {}
         else:
@@ -94,7 +98,7 @@ class UnifiedCacheManager:
                 # Log warning if JSON size is very large
                 if json_size > 10 * 1024 * 1024:  # 10MB
                     logger.warning(f"Metadata JSON is extremely large: {json_size / (1024 * 1024):.2f} MB")
-            except Exception as json_err:
+            except (TypeError, ValueError) as json_err:
                 logger.error(f"JSON serialization failed: {json_err}")
                 return
 
@@ -124,7 +128,7 @@ class UnifiedCacheManager:
                 logger.debug(f"Renaming temporary file to {metadata_path}")
                 temp_path.replace(metadata_path)
 
-            except Exception as write_err:
+            except OSError as write_err:
                 logger.error(f"Metadata file write failed: {write_err}")
                 return
 
@@ -137,7 +141,7 @@ class UnifiedCacheManager:
                 file_size_after = metadata_path.stat().st_size
                 logger.debug(f"Final metadata file size: {file_size_after} bytes (change: {file_size_after - file_size_before} bytes)")
 
-        except Exception as e:
+        except OSError as e:
             logger.error(f"Error saving metadata: {e}")
             return
 
@@ -237,7 +241,7 @@ class UnifiedCacheManager:
             logger.debug(f"Cache path: {result_path}")
             return result_path
 
-        except Exception as e:
+        except (ValueError, IndexError, OSError) as e:
             logger.error(f"Error generating cache path for key {cache_key}: {e}")
             # Fallback to a simple path if we can't parse the key
             fallback_path = self.cache_dir / "fallback" / f"{cache_key}.arrow"
@@ -282,7 +286,7 @@ class UnifiedCacheManager:
             try:
                 files = list(cache_path.parent.glob("*.arrow"))
                 logger.debug(f"Directory contents: {[f.name for f in files]}")
-            except Exception as e:
+            except OSError as e:
                 logger.debug(f"Error listing directory: {e}")
 
         # Check if the file exists
@@ -326,7 +330,7 @@ class UnifiedCacheManager:
             logger.debug(f"Successfully loaded {len(df)} rows from {cache_path}")
             return df
 
-        except Exception as e:
+        except (pa.ArrowInvalid, pa.ArrowIOError, OSError) as e:
             logger.error(f"Error loading from cache for {cache_key}: {e}")
             # Mark as invalid for future reference
             self._mark_cache_invalid(cache_key, str(e))
@@ -422,7 +426,7 @@ class UnifiedCacheManager:
             logger.debug(f"Successfully cached {len(df)} rows to {cache_path} ({metadata_entry['file_size_bytes'] / 1024 / 1024:.2f} MB)")
             return True
 
-        except Exception as e:
+        except (pa.ArrowInvalid, pa.ArrowIOError, OSError, TypeError) as e:
             logger.error(f"Error saving to cache for {cache_key}: {e}")
             return False
 
