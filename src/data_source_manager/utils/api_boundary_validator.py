@@ -17,6 +17,7 @@ import random
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 import pandas as pd
 
 from data_source_manager.utils.config import (
@@ -461,7 +462,7 @@ class ApiBoundaryValidator:
 
                 if response.status_code >= HTTP_ERROR_CODE_THRESHOLD:
                     logger.error(f"API error {response.status_code}: {response.text}")
-                    raise Exception(f"API error {response.status_code}: {response.text}")
+                    raise RuntimeError(f"API error {response.status_code}: {response.text}")
 
                 # Parse the response data
                 data = response.json()
@@ -469,8 +470,8 @@ class ApiBoundaryValidator:
                 logger.debug(f"API returned {len(data)} records")
                 return data
 
-            except Exception as e:
-                # Handle retries
+            except (httpx.RequestError, httpx.HTTPStatusError, ValueError, RuntimeError) as e:
+                # Handle retries for network errors, HTTP errors, JSON decode errors
                 retries += 1
                 logger.warning(f"API call failed (retry {retries}/{MAX_RETRIES}): {e!s}")
 
@@ -481,10 +482,10 @@ class ApiBoundaryValidator:
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"All {MAX_RETRIES} API call retries failed: {e!s}")
-                    raise Exception(f"Failed to fetch data from API after {MAX_RETRIES} retries") from e
+                    raise RuntimeError(f"Failed to fetch data from API after {MAX_RETRIES} retries") from e
 
         # This should never be reached
-        raise Exception("API call retry loop exited unexpectedly")
+        raise RuntimeError("API call retry loop exited unexpectedly")
 
     def is_valid_time_range_sync(
         self,

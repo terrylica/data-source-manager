@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 Advanced Logging System for Data Source Manager
 
@@ -354,7 +356,7 @@ if __name__ == "__main__":
         try:
             # Fix B018: Use a variable assignment to prevent "useless expression" warning
             result = 1 / 0  # This will raise ZeroDivisionError
-        except Exception:
+        except ZeroDivisionError:
             logger.exception("Exception with Rich traceback")
 
         # Switch back to colorlog

@@ -265,7 +265,7 @@ class ArrowCacheReader:
                 df = df.set_index("open_time")
 
             return df
-        except Exception as e:
+        except (OSError, pa.ArrowInvalid, pa.ArrowIOError, ValueError) as e:
             logger.error(f"Error reading arrow file {file_path}: {e}")
             raise
 
