@@ -125,12 +125,10 @@ user-invocable: true
 
 **Completed**: 2026-01-30
 
-**Summary**: Comprehensive Claude Code infrastructure implemented with 281 commits.
+**Summary**: Claude Code infrastructure implemented for DSM.
 
 | Metric              | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
-| Design spec lines   | 51537                                                                            |
-| Sections            | 454                                                                              |
 | Agents              | 5 (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer) |
 | Commands            | 6 (debug-fcp, fetch-data, quick-test, review-dsm, validate-data, feature-dev)    |
 | Skills              | 4 (dsm-usage, dsm-testing, dsm-research, dsm-fcp-monitor)                        |
@@ -243,5 +241,6 @@ user-invocable: true
 
 - `.claude/README.md` - Infrastructure documentation
 - `docs/INDEX.md` - Documentation navigation hub
-- `docs/design/2026-01-30-claude-code-infrastructure/spec.md` - Full design spec (16113 lines)
 - [cc-skills](https://github.com/terrylica/cc-skills) - Pattern source
+
+**Note**: The original design spec was removed as it contained copied Anthropic documentation rather than DSM-specific content. The actual deliverables are the agents, commands, skills, rules, and hooks listed above.
