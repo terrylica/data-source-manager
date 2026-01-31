@@ -14,6 +14,9 @@ The main classes are:
 - DataSourceConfig: Configuration for the DataSourceManager
 - DataSourceManager: Core implementation of the FCP strategy
 
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+
 Example:
     >>> from core.sync.data_source_manager import DataSourceManager, DataSource
     >>> from data_source_manager import DataProvider, MarketType, Interval
@@ -31,6 +34,7 @@ Example:
     ... )
 """
 
+import json
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
@@ -69,6 +73,8 @@ from data_source_manager.utils.for_core.dsm_fcp_utils import (
     validate_interval,
     verify_final_data,
 )
+from data_source_manager.utils.for_core.rest_exceptions import RestAPIError
+from data_source_manager.utils.for_core.vision_exceptions import VisionAPIError
 from data_source_manager.utils.for_core.dsm_time_range_utils import (
     standardize_columns,
 )
@@ -546,7 +552,7 @@ class DataSourceManager:
             try:
                 self.fs_handler = FSSpecVisionHandler(base_cache_dir=self.cache_dir)
                 logger.info(f"Initialized FSSpecVisionHandler with cache_dir={self.cache_dir}")
-            except Exception as e:
+            except (OSError, ImportError, ValueError) as e:
                 logger.error(f"Failed to initialize FSSpecVisionHandler: {e}")
                 logger.warning("Continuing without cache")
                 self.use_cache = False
@@ -557,7 +563,7 @@ class DataSourceManager:
             try:
                 self.cache_manager = UnifiedCacheManager(cache_dir=self.cache_dir)
                 logger.debug("Legacy cache manager initialized (for backward compatibility)")
-            except Exception as e:
+            except (OSError, json.JSONDecodeError, ValueError) as e:
                 logger.warning(f"Failed to initialize legacy cache manager: {e}")
 
         # Initialize API clients
@@ -1085,22 +1091,29 @@ class DataSourceManager:
                         f"Data retrieval for {symbol} has {len(gaps)} gaps in the time series. "
                         f"The DataFrame contains NaN values for missing timestamps."
                     )
-            else:
-                # For auto_reindex=False, just report actual data coverage
-                if not result_df.empty and "open_time" in result_df.columns:
-                    actual_start = result_df["open_time"].min()
-                    actual_end = result_df["open_time"].max()
-                    logger.info(f"[FCP] auto_reindex=False: Data covers {actual_start} to {actual_end} ({len(result_df)} records)")
-                    
-                    # Check if we have NaN values (which shouldn't happen with auto_reindex=False)
-                    nan_count = result_df.isnull().sum().sum()
-                    if nan_count > 0:
-                        logger.error(f"[FCP] BUG: auto_reindex=False should not create {nan_count} NaN values!")
+            # For auto_reindex=False, just report actual data coverage
+            elif not result_df.empty and "open_time" in result_df.columns:
+                actual_start = result_df["open_time"].min()
+                actual_end = result_df["open_time"].max()
+                logger.info(f"[FCP] auto_reindex=False: Data covers {actual_start} to {actual_end} ({len(result_df)} records)")
+                
+                # Check if we have NaN values (which shouldn't happen with auto_reindex=False)
+                nan_count = result_df.isnull().sum().sum()
+                if nan_count > 0:
+                    logger.error(f"[FCP] BUG: auto_reindex=False should not create {nan_count} NaN values!")
 
             logger.info(f"[FCP] Successfully retrieved {len(result_df)} records for {symbol}")
             return result_df
 
-        except Exception as e:
+        except (
+            VisionAPIError,
+            RestAPIError,
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            pd.errors.ParserError,
+        ) as e:
             # Improved error handling using the dedicated error handler
             handle_error(e)
 
@@ -1153,7 +1166,7 @@ class DataSourceManager:
         if self.vision_client is not None:
             try:
                 self.vision_client.close()
-            except Exception as e:
+            except (OSError, AttributeError) as e:
                 logger.warning(f"Error closing Vision client: {e}")
             self.vision_client = None
 
@@ -1162,7 +1175,7 @@ class DataSourceManager:
             try:
                 if hasattr(self.rest_client, "close"):
                     self.rest_client.close()
-            except Exception as e:
+            except (OSError, AttributeError) as e:
                 logger.warning(f"Error closing REST client: {e}")
             self.rest_client = None
 
