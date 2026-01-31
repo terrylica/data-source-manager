@@ -8,6 +8,9 @@ across the codebase, particularly for:
 2. Standardizing DataFrame formats
 3. Converting between different DataFrame representations
 4. Ensuring proper index configuration
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import contextlib
@@ -91,7 +94,7 @@ def ensure_open_time_as_column(df: pd.DataFrame) -> pd.DataFrame:
             try:
                 logger.debug(f"Converting {CANONICAL_INDEX_NAME} to datetime")
                 df[CANONICAL_INDEX_NAME] = pd.to_datetime(df[CANONICAL_INDEX_NAME], utc=True)
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 logger.error(f"Error converting {CANONICAL_INDEX_NAME} to datetime: {e}")
 
         # Ensure timezone is UTC
@@ -168,7 +171,7 @@ def ensure_open_time_as_index(df: pd.DataFrame) -> pd.DataFrame:
 
             try:
                 return df.set_index(CANONICAL_INDEX_NAME)
-            except Exception as e:
+            except (ValueError, KeyError) as e:
                 logger.error(f"Error setting {CANONICAL_INDEX_NAME} as index: {e}")
                 # Continue to recovery options
 
@@ -193,7 +196,7 @@ def ensure_open_time_as_index(df: pd.DataFrame) -> pd.DataFrame:
                         try:
                             df = df.set_index(time_col)
                             df.index.name = CANONICAL_INDEX_NAME
-                        except Exception as e:
+                        except (ValueError, KeyError) as e:
                             logger.error(f"Error setting {time_col} as index: {e}")
                             # Create a copy of the column first before setting as index
                             df[CANONICAL_INDEX_NAME] = df[time_col]
@@ -217,7 +220,7 @@ def ensure_open_time_as_index(df: pd.DataFrame) -> pd.DataFrame:
                     try:
                         df.index = pd.to_datetime(df.index, utc=True)
                         df.index.name = CANONICAL_INDEX_NAME
-                    except Exception as e:
+                    except (ValueError, TypeError) as e:
                         logger.error(f"Error converting index to datetime: {e}")
                         # Create a new DatetimeIndex if conversion fails
                         old_index = df.index.copy()
@@ -249,7 +252,7 @@ def ensure_open_time_as_index(df: pd.DataFrame) -> pd.DataFrame:
                 logger.warning("Removing duplicate indices")
                 df = df[~df.index.duplicated(keep="first")]
 
-    except Exception as e:
+    except (ValueError, TypeError, KeyError) as e:
         logger.error(f"Error in ensure_open_time_as_index: {e}")
         import traceback
 
@@ -535,7 +538,7 @@ def convert_to_standardized_formats(df: pd.DataFrame, output_format: str = "defa
         if col in df.columns:
             try:
                 df[col] = df[col].astype(dtype)
-            except Exception as e:
+            except (ValueError, TypeError) as e:
                 logger.warning(f"Failed to convert {col} to {dtype}: {e}")
 
     # Perform the conversion based on the requested format
