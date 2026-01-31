@@ -8,6 +8,9 @@ and behaviors for consistent data handling.
 The main class provided is TimestampedDataFrame, which enforces proper
 timestamp handling and index naming for market data.
 
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+
 Example:
     >>> import pandas as pd
     >>> from data_source_manager.utils.dataframe_types import TimestampedDataFrame
@@ -103,7 +106,7 @@ class TimestampedDataFrame(pd.DataFrame):
         # Validate and normalize index
         try:
             self._validate_and_normalize_index()
-        except Exception as e:
+        except (ValueError, TypeError, KeyError) as e:
             logger.error(f"Error normalizing index: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             # Create an empty DataFrame with proper structure instead of raising
@@ -125,7 +128,7 @@ class TimestampedDataFrame(pd.DataFrame):
                     f"Added open_time column, dtype: {self['open_time'].dtype if 'open_time' in self.columns else 'N/A'} "
                     f"(represents BEGINNING of candle)"
                 )
-        except Exception as e:
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
             logger.error(f"Error ensuring open_time as column: {e}")
             logger.error(f"Columns available: {list(self.columns)}")
             logger.error(f"Index type: {type(self.index)}, name: {getattr(self.index, 'name', None)}")

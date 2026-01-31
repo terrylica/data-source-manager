@@ -4,6 +4,9 @@ Utility module for timestamp handling in Vision API data.
 
 This module provides functions for processing timestamp columns from Binance Vision API data,
 ensuring proper conversion and preservation of semantic meaning.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import re
@@ -124,7 +127,7 @@ def process_timestamp_columns(df: pd.DataFrame, interval_str: str) -> pd.DataFra
             for i in range(min(3, len(df))):
                 logger.debug(f"[TIMESTAMP TRACE] Processed row {i}: open_time={df['open_time'].iloc[i]}, close={df.iloc[i, 4]}")
 
-    except Exception as e:
+    except (ValueError, TypeError, KeyError) as e:
         logger.error(f"Error processing timestamp columns: {e}")
 
     return df
@@ -191,7 +194,7 @@ def parse_interval(interval_str: str) -> Interval:
         logger.debug(f"Using interval {interval_obj.name} ({interval_obj.value})")
 
         return interval_obj
-    except Exception as e:
+    except (ValueError, KeyError, StopIteration) as e:
         logger.error(f"Error parsing interval {interval_str}: {e}")
         # Default to 1s as a failsafe
         return Interval.SECOND_1

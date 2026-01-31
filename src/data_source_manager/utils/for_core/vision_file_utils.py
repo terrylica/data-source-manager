@@ -4,6 +4,9 @@ Utility module for file handling with Binance Vision API data.
 
 This module provides functions for downloading, processing, and handling files from
 the Binance Vision API, including boundary gap filling and related operations.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 from datetime import datetime, timedelta
@@ -108,7 +111,7 @@ def fill_boundary_gaps_with_rest(
 
         # If we didn't add any gap data, return the original
         return df
-    except Exception as e:
+    except (OSError, ConnectionError, TimeoutError, ValueError, KeyError) as e:
         logger.error(f"Error filling boundary gaps with REST API: {e}")
         return None
 
@@ -130,7 +133,7 @@ def find_day_boundary_gaps(gaps: list[Gap]) -> list[Gap]:
             if (gap.start_time.hour == 0 and gap.start_time.minute == 0 and gap.start_time.second == 0)
             or (gap.end_time.hour == 0 and gap.end_time.minute == 0 and gap.end_time.second == 0)
         ]
-    except Exception as e:
+    except (AttributeError, TypeError) as e:
         logger.error(f"Error checking for boundary gaps: {e}")
 
     return boundary_gaps
