@@ -5,6 +5,9 @@ This module provides the ApiBoundaryValidator class, which is responsible for va
 time boundaries and data ranges against the actual Binance REST API behavior rather than
 using manual time alignment logic. It directly calls the Binance API to determine the actual
 data boundaries for given time ranges, ensuring alignment with real API responses.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import asyncio
@@ -104,7 +107,7 @@ class ApiBoundaryValidator:
             is_valid = len(api_data) > 0
             logger.debug(f"Time range validation result: {'Valid' if is_valid else 'Invalid'}")
             return is_valid
-        except Exception as e:
+        except (OSError, ConnectionError, TimeoutError, ValueError) as e:
             logger.warning(f"Error validating time range: {e}")
             return False
 
@@ -179,7 +182,7 @@ class ApiBoundaryValidator:
             )
 
             return result
-        except Exception as e:
+        except (OSError, ConnectionError, TimeoutError, ValueError, KeyError) as e:
             logger.warning(f"Error getting API boundaries: {e}")
             return {
                 "api_start_time": None,
@@ -376,7 +379,7 @@ class ApiBoundaryValidator:
 
             return df
 
-        except Exception as e:
+        except (OSError, ConnectionError, TimeoutError, ValueError, KeyError) as e:
             logger.error(f"Error getting API response: {e}")
             # Return empty DataFrame
             empty_df = pd.DataFrame(
@@ -510,7 +513,7 @@ class ApiBoundaryValidator:
             is_valid = len(api_data) > 0
             logger.debug(f"Time range validation result (sync): {'Valid' if is_valid else 'Invalid'}")
             return is_valid
-        except Exception as e:
+        except (OSError, ConnectionError, TimeoutError, ValueError) as e:
             logger.warning(f"Error validating time range (sync): {e}")
             return False
 
@@ -585,7 +588,7 @@ class ApiBoundaryValidator:
             )
 
             return result
-        except Exception as e:
+        except (OSError, ConnectionError, TimeoutError, ValueError, KeyError) as e:
             logger.warning(f"Error getting API boundaries (sync): {e}")
             return {
                 "api_start_time": None,
@@ -665,7 +668,7 @@ class ApiBoundaryValidator:
                         f"retrying in {RETRY_DELAY}s (attempt {retries + 1}/{MAX_RETRIES})"
                     )
                     time.sleep(RETRY_DELAY)
-            except Exception as e:
+            except (OSError, ConnectionError, TimeoutError) as e:
                 # Connection error or timeout, retry
                 logger.warning(f"Connection error (sync): {e!s}, retrying in {RETRY_DELAY}s (attempt {retries + 1}/{MAX_RETRIES})")
                 time.sleep(RETRY_DELAY)
