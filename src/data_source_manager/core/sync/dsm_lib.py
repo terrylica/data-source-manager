@@ -17,6 +17,9 @@ Key components:
 - process_market_parameters: Validate and process market parameters
 - fetch_market_data: Primary interface for retrieving market data using FCP
 
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+
 Example:
     >>> from data_source_manager import fetch_market_data, MarketType, DataProvider, Interval, ChartType
     >>> from datetime import datetime
@@ -98,7 +101,7 @@ def setup_environment(clear_cache: bool = False) -> bool:
             clear_all_cache_directories()
 
         return True
-    except Exception as e:
+    except (OSError, PermissionError, ValueError) as e:
         logger.error(f"Environment setup failed: {e}")
         return False
 
