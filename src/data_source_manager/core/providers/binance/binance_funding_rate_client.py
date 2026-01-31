@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-"""Client for Binance funding rate data.
-
+# polars-exception: FundingRateClient returns pandas DataFrames for DSM pipeline compatibility
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
-"""
+"""Client for Binance funding rate data."""
 
 import time
 from datetime import datetime, timezone

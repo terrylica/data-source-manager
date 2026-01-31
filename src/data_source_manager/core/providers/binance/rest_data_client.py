@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-"""Client for fetching market data from REST APIs with synchronous implementation.
-
+# polars-exception: RestDataClient returns pandas DataFrames for DSM pipeline compatibility
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
-"""
+"""Client for fetching market data from REST APIs with synchronous implementation."""
 
 from datetime import datetime
 from typing import Any

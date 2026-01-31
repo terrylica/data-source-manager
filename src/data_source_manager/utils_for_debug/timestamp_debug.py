@@ -1,9 +1,10 @@
-"""
-TIMEZONE-AWARE FAIL-FAST TIMESTAMP DEBUGGING UTILITIES
+# polars-exception: Debug utilities work with pandas DataFrames for timestamp analysis
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+"""TIMEZONE-AWARE FAIL-FAST TIMESTAMP DEBUGGING UTILITIES.
 
 Philosophy: FAIL-FAST with MAXIMUM DEBUG INFORMATION
 - No failovers, no failsafes - precise exceptions with full context
-- Timezone-aware logging for datetime confusion elimination  
+- Timezone-aware logging for datetime confusion elimination
 - Rich exception details for rapid debugging
 - Aggressive validation with informative error messages
 
@@ -21,7 +22,7 @@ from data_source_manager.utils.loguru_setup import logger
 class TimezoneDebugError(Exception):
     """Specialized exception for timezone debugging with rich context."""
     
-    def __init__(self, message: str, context: dict = None):
+    def __init__(self, message: str, context: dict | None = None):
         self.context = context or {}
         detailed_msg = f"TIMEZONE DEBUG ERROR: {message}"
         if self.context:
@@ -34,24 +35,22 @@ def _format_timezone_info(dt: Union[datetime, pd.Timestamp]) -> str:
     if pd.isna(dt):
         return "NaT (Not-a-Time)"
     
-    if hasattr(dt, 'tz') and dt.tz is not None:
+    if hasattr(dt, "tz") and dt.tz is not None:
         tz_name = str(dt.tz)
-        utc_offset = dt.strftime('%z')
+        utc_offset = dt.strftime("%z")
         return f"{dt.isoformat()} [{tz_name} UTC{utc_offset}]"
-    elif hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+    if hasattr(dt, "tzinfo") and dt.tzinfo is not None:
         tz_name = str(dt.tzinfo)
-        utc_offset = dt.strftime('%z') 
+        utc_offset = dt.strftime("%z") 
         return f"{dt.isoformat()} [{tz_name} UTC{utc_offset}]"
-    else:
-        return f"{dt.isoformat()} [NAIVE-NO-TIMEZONE] ⚠️"
+    return f"{dt.isoformat()} [NAIVE-NO-TIMEZONE] ⚠️"
 
 
 def _get_timestamp_series(df: pd.DataFrame, time_column: str):
     """Helper to get timestamp series whether it's a column or index."""
     if time_column in df.columns:
         return df[time_column]
-    else:
-        return df.index
+    return df.index
 
 def trace_dataframe_timestamps(
     df: pd.DataFrame, 
@@ -59,8 +58,7 @@ def trace_dataframe_timestamps(
     start_time: Union[datetime, pd.Timestamp], 
     end_time: Union[datetime, pd.Timestamp]
 ) -> None:
-    """
-    FAIL-FAST timezone-aware timestamp tracing with rich debug information.
+    """FAIL-FAST timezone-aware timestamp tracing with rich debug information.
     
     NO GRACEFUL DEGRADATION - Fails immediately with full context on issues.
     """
@@ -107,9 +105,9 @@ def trace_dataframe_timestamps(
     logger.debug(f"  📈 MAX:   {_format_timezone_info(max_ts)}")
     
     # FAIL-FAST: Detect timezone mismatches
-    start_tz = getattr(start_time, 'tzinfo', None) or getattr(start_time, 'tz', None)
-    end_tz = getattr(end_time, 'tzinfo', None) or getattr(end_time, 'tz', None)
-    data_tz = getattr(sample_timestamp, 'tzinfo', None) or getattr(sample_timestamp, 'tz', None)
+    start_tz = getattr(start_time, "tzinfo", None) or getattr(start_time, "tz", None)
+    end_tz = getattr(end_time, "tzinfo", None) or getattr(end_time, "tz", None)
+    data_tz = getattr(sample_timestamp, "tzinfo", None) or getattr(sample_timestamp, "tz", None)
     
     if start_tz != end_tz:
         raise TimezoneDebugError(
@@ -154,9 +152,7 @@ def analyze_filter_conditions(
     end_time: Union[datetime, pd.Timestamp], 
     time_column: str
 ) -> None:
-    """
-    FAIL-FAST timezone-aware filter condition analysis with detailed results.
-    """
+    """FAIL-FAST timezone-aware filter condition analysis with detailed results."""
     if df.empty:
         raise TimezoneDebugError("Cannot analyze filter conditions on empty DataFrame")
     
@@ -212,9 +208,7 @@ def compare_filtered_results(
     end_time: Union[datetime, pd.Timestamp], 
     time_column: str
 ) -> None:
-    """
-    FAIL-FAST comparison with timezone-aware validation and rich error context.
-    """
+    """FAIL-FAST comparison with timezone-aware validation and rich error context."""
     logger.debug("📊 [TIMEZONE TRACE] FILTERING RESULTS COMPARISON:")
     logger.debug(f"  📥 INPUT:  {len(original_df)} rows")
     logger.debug(f"  📤 OUTPUT: {len(filtered_df)} rows")

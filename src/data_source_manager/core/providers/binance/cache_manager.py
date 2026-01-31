@@ -1,8 +1,7 @@
-"""Unified cache manager for market data.
-
+# polars-exception: CacheManager stores/retrieves pandas DataFrames as Arrow files
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
-"""
+"""Unified cache manager for market data."""
 
 import json
 import time

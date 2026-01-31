@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""
-Data fetching utilities for the Failover Control Protocol (FCP) demos.
+# polars-exception: Demo utilities work with pandas DataFrames from DSM
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+"""Data fetching utilities for the Failover Control Protocol (FCP) demos.
 
 This module provides functions to fetch data using the Failover Control Protocol
 mechanism, which automatically selects the appropriate data source based on availability.
-
-# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
-# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import time

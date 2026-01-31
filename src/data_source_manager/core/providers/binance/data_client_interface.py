@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# polars-exception: DataClientInterface defines pandas DataFrame return type for all providers
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """Interface for data clients."""
 
 from abc import ABC, abstractmethod

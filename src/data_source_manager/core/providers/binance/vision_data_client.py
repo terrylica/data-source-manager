@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# polars-exception: VisionDataClient returns pandas DataFrames for DSM pipeline compatibility
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 r"""VisionDataClient provides direct access to Binance Vision API for historical data.
 
 This module implements a client for retrieving historical market data from the

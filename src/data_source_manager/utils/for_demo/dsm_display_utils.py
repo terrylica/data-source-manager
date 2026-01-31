@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-Display utilities for the Failover Control Protocol (FCP) mechanism.
-
+# polars-exception: Display utilities format pandas DataFrames for terminal output
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
-"""
+"""Display utilities for the Failover Control Protocol (FCP) mechanism."""
 
 from pathlib import Path
 
