@@ -4,6 +4,9 @@ Gap Detector - Robust time series gap detection
 
 This module provides a clean, streamlined implementation for detecting gaps in time-series data
 based on expected intervals defined in market_constraints.py.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import sys
@@ -254,7 +257,7 @@ def analyze_file_for_gaps(
         # Detect gaps
         return detect_gaps(df, interval, time_column, gap_threshold, enforce_min_span=enforce_min_span)
 
-    except Exception as e:
+    except (OSError, pd.errors.ParserError, ValueError, KeyError) as e:
         logger.error(f"Error analyzing file {file_path}: {e!s}")
         return [], {"error": str(e)}
 
@@ -309,7 +312,7 @@ def combine_daily_files(
                 df[time_column] = pd.to_datetime(df[time_column], unit=time_unit, utc=True)
 
             dfs.append(df)
-        except Exception as e:
+        except (OSError, pd.errors.ParserError, ValueError, KeyError) as e:
             logger.error(f"Error reading file {path}: {e!s}")
 
     if not dfs:
