@@ -18,6 +18,10 @@ from rich import print as rprint
 from data_source_manager.utils.config import SHA256_HASH_LENGTH
 from data_source_manager.utils.loguru_setup import logger
 
+# Pre-compiled regex patterns for SHA256 checksum validation
+SHA256_PATTERN = re.compile(r"([a-fA-F0-9]{64})")
+SHA256_EXACT_PATTERN = re.compile(r"^[a-fA-F0-9]{64}$")
+
 
 def verify_file_checksum(file_path: Path, checksum_path: Path) -> tuple[bool, str | None]:
     """Verify file integrity using SHA-256 checksum from Binance Vision API.
@@ -133,7 +137,7 @@ def extract_checksum_from_file(checksum_path: Path) -> str | None:
                 return checksum
 
         # Method 2: Look for a 64-character hex string anywhere in the content
-        match = re.search(r"([a-fA-F0-9]{64})", text_content)
+        match = SHA256_PATTERN.search(text_content)
         if match:
             checksum = match.group(1)
             logger.debug(f"Extracted checksum using regex: {checksum}")
@@ -183,7 +187,7 @@ def is_valid_sha256(text: str) -> bool:
     Returns:
         True if the string is a valid SHA-256 hash, False otherwise
     """
-    return bool(re.match(r"^[a-fA-F0-9]{64}$", text))
+    return bool(SHA256_EXACT_PATTERN.match(text))
 
 
 def get_checksum_url(data_url: str) -> str:
