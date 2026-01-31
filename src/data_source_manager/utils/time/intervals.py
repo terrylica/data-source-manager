@@ -16,6 +16,9 @@ from datetime import datetime, timedelta, timezone
 from data_source_manager.utils.deprecation_rules import TimeUnit
 from data_source_manager.utils.market_constraints import Interval as MarketInterval
 
+# Pre-compiled regex pattern for parsing interval strings (performance optimization)
+INTERVAL_VALUE_PATTERN = re.compile(r"(\d+)([a-zA-Z]+)")
+
 __all__ = [
     "align_time_boundaries",
     "estimate_record_count",
@@ -62,7 +65,7 @@ def get_interval_micros(interval: MarketInterval) -> int:
         1 day = 86400000000 microseconds
     """
     # Parse interval value and unit
-    match = re.match(r"(\d+)([a-zA-Z]+)", interval.value)
+    match = INTERVAL_VALUE_PATTERN.match(interval.value)
     if not match:
         raise ValueError(f"Invalid interval format: {interval.value}")
 

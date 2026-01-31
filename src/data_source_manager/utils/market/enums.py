@@ -14,6 +14,9 @@ This module defines the core enums used throughout the Data Source Manager:
 import re
 from enum import Enum, auto
 
+# Pre-compiled regex pattern for parsing interval strings (performance optimization)
+INTERVAL_PATTERN = re.compile(r"(\d+)([smhdwM])")
+
 __all__ = [
     "ChartType",
     "DataProvider",
@@ -262,7 +265,7 @@ class Interval(Enum):
             ValueError: If the interval format is invalid
         """
         value = self.value
-        match = re.match(r"(\d+)([smhdwM])", value)
+        match = INTERVAL_PATTERN.match(value)
         if not match:
             raise ValueError(f"Invalid interval format: {value}")
 

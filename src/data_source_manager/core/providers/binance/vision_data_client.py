@@ -21,6 +21,7 @@ directly with this client.
 # Refactoring: Fix silent failure patterns (BLE001)
 """
 
+import re
 import tempfile
 import zipfile
 from concurrent.futures import BrokenExecutor, ThreadPoolExecutor, as_completed
@@ -74,6 +75,9 @@ from data_source_manager.utils.market_constraints import (
 )
 from data_source_manager.utils.time_utils import filter_dataframe_by_time
 from data_source_manager.utils.validation import DataFrameValidator
+
+# Pre-compiled regex pattern for SHA256 checksum extraction
+SHA256_HASH_PATTERN = re.compile(r"([a-fA-F0-9]{64})")
 
 # Define the type variable for VisionDataClient
 T = TypeVar("T")
@@ -481,9 +485,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                                     checksum_text = checksum_content.strip()
 
                                 # Look for a SHA-256 hash pattern (64 hex chars)
-                                import re
-
-                                hash_match = re.search(r"([a-fA-F0-9]{64})", checksum_text)
+                                hash_match = SHA256_HASH_PATTERN.search(checksum_text)
                                 if hash_match:
                                     expected_checksum = hash_match.group(1)
 

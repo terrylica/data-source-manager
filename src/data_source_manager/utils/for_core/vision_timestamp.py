@@ -16,6 +16,9 @@ from data_source_manager.utils.loguru_setup import logger
 from data_source_manager.utils.market_constraints import Interval
 from data_source_manager.utils.time_utils import detect_timestamp_unit
 
+# Pre-compiled regex pattern for parsing interval strings
+INTERVAL_PATTERN = re.compile(r"(\d+)([smhdwM])")
+
 
 def process_timestamp_columns(df: pd.DataFrame, interval_str: str) -> pd.DataFrame:
     """Process timestamp columns in the dataframe, handling various formats.
@@ -145,7 +148,7 @@ def get_interval_seconds(interval: str) -> int:
         Number of seconds in the interval
     """
     # Parse interval value and unit
-    match = re.match(r"(\d+)([smhdwM])", interval)
+    match = INTERVAL_PATTERN.match(interval)
     if not match:
         raise ValueError(f"Invalid interval format: {interval}")
 
