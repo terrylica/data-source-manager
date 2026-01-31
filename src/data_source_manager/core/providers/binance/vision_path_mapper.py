@@ -3,6 +3,9 @@
 
 This module provides utilities for mapping between remote Binance Vision API paths
 and local cache paths using fsspec, enabling unified filesystem operations.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import re
@@ -193,7 +196,7 @@ class FSSpecVisionHandler:
         fs, path = self.get_fs_and_path(url_or_path)
         try:
             return fs.exists(path)
-        except Exception as e:
+        except (OSError, PermissionError, FileNotFoundError) as e:
             logger.error(f"Error checking if {path} exists: {e}")
             return False
 
@@ -299,6 +302,6 @@ class FSSpecVisionHandler:
             logger.info(f"FSSpecVisionHandler would download and process data to {local_path}")
 
             return local_path
-        except Exception as e:
+        except (OSError, PermissionError, ValueError) as e:
             logger.error(f"Error downloading {remote_url}: {e}")
             return None
