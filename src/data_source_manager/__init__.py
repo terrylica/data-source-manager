@@ -17,10 +17,10 @@ Key Features:
 Quick Start:
     >>> from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
     >>> from datetime import datetime, timedelta
-    >>> 
+    >>>
     >>> # Create a manager for USDT-margined futures
     >>> manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
-    >>> 
+    >>>
     >>> # Fetch recent data with automatic failover (always use UTC)
     >>> from datetime import timezone
     >>> end_time = datetime.now(timezone.utc)
@@ -30,7 +30,7 @@ Quick Start:
 
 The FCP automatically handles:
 1. Local cache lookup (fastest)
-2. Vision API for historical data (efficient)  
+2. Vision API for historical data (efficient)
 3. REST API fallback (real-time)
 
 All with automatic retry, data validation, and gap detection.

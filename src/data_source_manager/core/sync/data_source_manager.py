@@ -392,12 +392,12 @@ class DataSourceManager:
         self.chart_type = chart_type
         self.use_cache = use_cache
         self.retry_count = retry_count
-        
+
         # Store logging configuration
         self.log_level = log_level.upper()
         self.suppress_http_debug = suppress_http_debug
         self.quiet_mode = quiet_mode
-        
+
         # Configure logging based on user preferences
         self._configure_logging()
 
@@ -434,21 +434,21 @@ class DataSourceManager:
 
     def _configure_logging(self) -> None:
         """Configure logging levels based on user preferences.
-        
+
         This method implements the logging behavior recommendations:
         1. Suppress HTTP debug logging by default
         2. Allow users to control DSM log levels
         3. Provide quiet mode for feature engineering workflows
         """
         import logging
-        
+
         # Configure DSM's own logging level
         # In quiet mode, only show errors and critical messages
         effective_level = "ERROR" if self.quiet_mode else self.log_level
 
         # Configure the main DSM logger
         logger.configure_level(effective_level)
-        
+
         # Configure HTTP library logging
         if self.suppress_http_debug:
             # Suppress noisy HTTP debugging by default
@@ -463,34 +463,34 @@ class DataSourceManager:
             logging.getLogger("httpx").setLevel(logging.DEBUG)
             logging.getLogger("urllib3").setLevel(logging.DEBUG)
             logging.getLogger("requests").setLevel(logging.DEBUG)
-            
+
         # Log the configuration for debugging
         if not self.quiet_mode:
             logger.debug(f"DSM logging configured: level={effective_level}, suppress_http_debug={self.suppress_http_debug}")
-        
+
     def reconfigure_logging(
-        self, 
-        log_level: str | None = None, 
-        suppress_http_debug: bool | None = None, 
+        self,
+        log_level: str | None = None,
+        suppress_http_debug: bool | None = None,
         quiet_mode: bool | None = None
     ) -> None:
         """Reconfigure logging settings after initialization.
-        
+
         This method allows users to change logging behavior dynamically,
         which is useful for debugging or changing verbosity during runtime.
-        
+
         Args:
             log_level: New logging level ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
             suppress_http_debug: Whether to suppress HTTP debug logging
             quiet_mode: Whether to enable quiet mode
-            
+
         Example:
             >>> # Start with default settings (quiet for feature engineering)
             >>> dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
-            >>> 
+            >>>
             >>> # Enable debug mode for troubleshooting
             >>> dsm.reconfigure_logging(log_level='DEBUG', suppress_http_debug=False)
-            >>> 
+            >>>
             >>> # Return to quiet mode
             >>> dsm.reconfigure_logging(quiet_mode=True)
         """
@@ -501,7 +501,7 @@ class DataSourceManager:
             self.suppress_http_debug = suppress_http_debug
         if quiet_mode is not None:
             self.quiet_mode = quiet_mode
-            
+
         # Re-apply logging configuration
         self._configure_logging()
 
@@ -955,7 +955,7 @@ class DataSourceManager:
                 actual_start = result_df["open_time"].min()
                 actual_end = result_df["open_time"].max()
                 logger.info(f"[FCP] auto_reindex=False: Data covers {actual_start} to {actual_end} ({len(result_df)} records)")
-                
+
                 # Check if we have NaN values (which shouldn't happen with auto_reindex=False)
                 nan_count = result_df.isna().sum().sum()
                 if nan_count > 0:

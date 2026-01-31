@@ -113,14 +113,14 @@ def get_from_cache(
     else:
         # Sort by open_time to ensure proper range detection
         result_df = result_df.sort_values("open_time")
-        
+
         # Use the proper gap detection function to identify missing segments
         # This will detect both missing days and intraday gaps
         from data_source_manager.utils.for_core.dsm_time_range_utils import identify_missing_segments
-        
+
         logger.debug(f"[CACHE] Using gap detection to find missing ranges between {start_time} and {end_time}")
         missing_ranges = identify_missing_segments(result_df, start_time, end_time, interval)
-        
+
         if missing_ranges:
             logger.debug(f"[CACHE] Gap detection found {len(missing_ranges)} missing segments:")
             for i, (miss_start, miss_end) in enumerate(missing_ranges):

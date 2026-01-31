@@ -265,7 +265,7 @@ def verify_final_data(
     now = datetime.now(timezone.utc)
     data_age_hours = (now - max_time).total_seconds() / 3600
     is_historical_data = data_age_hours > 24
-    
+
     logger.debug(f"[FCP] Final result spans from {min_time} to {max_time} with {len(result_df)} records")
     logger.debug(f"[FCP] Data age: {data_age_hours:.1f} hours, is_historical: {is_historical_data}")
 
@@ -273,7 +273,7 @@ def verify_final_data(
     # For historical data, if we have data, it should be considered successful.
     # The system correctly aligned timestamps and fetched available data.
     # Any "missing" data compared to theoretical boundaries is normal.
-    
+
     if is_historical_data:
         # Historical data - just log success
         time_span = max_time - min_time
@@ -283,30 +283,30 @@ def verify_final_data(
             f"covering {hours_covered:.1f} hours from {min_time} to {max_time}"
         )
         return
-    
+
     # ONLY for recent data (< 24 hours old), check for potential gaps
     # that might indicate real data availability issues
-    
+
     # Calculate theoretical range vs actual range
     total_range_seconds = (aligned_end - aligned_start).total_seconds()
-    
+
     # Check if we got reasonable coverage for recent data
     missing_start_seconds = (min_time - aligned_start).total_seconds() if min_time > aligned_start else 0
     missing_end_seconds = (aligned_end - max_time).total_seconds() if max_time < aligned_end else 0
     total_missing_seconds = missing_start_seconds + missing_end_seconds
     missing_percentage = (total_missing_seconds / total_range_seconds) * 100 if total_range_seconds > 0 else 0
-    
+
     # For recent data, only warn about significant gaps that might indicate real issues
     if missing_percentage > 10.0:  # Only warn if more than 10% missing for recent data
         logger.warning(
             f"[FCP] Recent data coverage concern: {100 - missing_percentage:.1f}% complete. "
             f"This might indicate data availability issues for recent time periods."
         )
-        
+
         # Log specific gaps only for recent data with significant issues
         if missing_start_seconds > 0 and missing_start_seconds > 300:  # > 5 minutes
             logger.warning(f"[FCP] Significant gap at start: {aligned_start} to {min_time}")
-        if missing_end_seconds > 0 and missing_end_seconds > 300:  # > 5 minutes  
+        if missing_end_seconds > 0 and missing_end_seconds > 300:  # > 5 minutes
             logger.warning(f"[FCP] Significant gap at end: {max_time} to {aligned_end}")
     else:
         # Recent data with good coverage
