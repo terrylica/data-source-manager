@@ -4,6 +4,7 @@
 # Refactoring: Fix silent failure patterns (BLE001)
 """Utility functions for Failover Control Protocol (FCP) implementation."""
 
+import traceback
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -335,8 +336,6 @@ def handle_error(e: Exception) -> None:
         logger.critical(f"Error type: {type(e).__name__}")
 
         # More controlled traceback handling
-        import traceback
-
         tb_string = traceback.format_exc()
         # Sanitize the traceback
         safe_tb = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string)
