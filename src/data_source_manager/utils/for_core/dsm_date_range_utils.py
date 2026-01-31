@@ -8,6 +8,9 @@ various scenarios including:
 2. Start time with days (forward calculation)
 3. Explicit start and end times
 4. Days-only calculation (backward from current time)
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 5. Default behavior (3 days backward from current time)
 """
 
@@ -62,7 +65,7 @@ def parse_datetime_string(dt_str: str | None) -> DateTime | None:
                 dt = pendulum.from_format(dt_str, "YYYY-MM-DD", tz="UTC")
                 logger.debug(f"Successfully parsed date-only string: {dt.format('YYYY-MM-DD HH:mm:ss.SSS')}")
                 return dt
-        except Exception as e2:
+        except (ValueError, TypeError) as e2:
             logger.debug(f"Failed specific format parsing: {e2}")
 
         error_msg = f"Unable to parse datetime: {dt_str!r}. Error: {e!s}"

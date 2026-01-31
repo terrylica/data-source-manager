@@ -4,6 +4,9 @@
 This module provides constraints and utility functions specific to the Binance
 Vision API, leveraging centralized definitions from the utils modules for common
 functionality to maintain DRY principles.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import logging
@@ -231,7 +234,7 @@ def get_vision_url(
         with open(debug_file, "a") as f:
             f.write(f"{url}\n")
         logger.debug(f"Saved URL to {debug_file}")
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         logger.debug(f"Failed to save URL to debug file: {e}")
 
     return url
