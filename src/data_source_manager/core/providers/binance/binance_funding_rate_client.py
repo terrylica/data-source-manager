@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-"""Client for Binance funding rate data."""
+"""Client for Binance funding rate data.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+"""
 
 import time
 from datetime import datetime, timezone
@@ -184,11 +188,11 @@ class BinanceFundingRateClient(DataClientInterface):
                                             f"Column {col} values would lose precision if converted from {df[col].dtype} to {dtype}"
                                         )
 
-                                except Exception as e:
+                                except (ValueError, TypeError) as e:
                                     dtype_errors.append(f"Column {col} cannot be converted from {df[col].dtype} to {dtype}: {e}")
 
                             dtype_errors.append(f"Column {col} has dtype {df[col].dtype}, expected {dtype}")
-                    except Exception as e:
+                    except (ValueError, TypeError, KeyError) as e:
                         dtype_errors.append(f"Error validating dtype for column {col}: {e}")
 
             if dtype_errors:
@@ -214,7 +218,7 @@ class BinanceFundingRateClient(DataClientInterface):
                     logger.warning(f"Unusually high funding rate detected: {max_rate}")
 
             return True, None
-        except Exception as e:
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
             logger.error(f"Error validating funding rate data: {e}")
             return False, f"Validation error: {e!s}"
 
@@ -263,7 +267,7 @@ class BinanceFundingRateClient(DataClientInterface):
                     logger.warning(f"Invalid interval: {interval}, using instance interval")
                     interval_obj = self._interval
 
-        except Exception:
+        except (StopIteration, ValueError, TypeError, AttributeError):
             logger.warning(f"Error converting interval '{interval}', using instance interval")
             interval_obj = self._interval
 
@@ -404,7 +408,7 @@ class BinanceFundingRateClient(DataClientInterface):
                 # Reset retry counter after successful request
                 retry_count = 0
 
-            except Exception as e:
+            except (OSError, ValueError, TypeError, KeyError, TimeoutError, ConnectionError) as e:
                 retry_count += 1
                 if retry_count > self._retry_count:
                     logger.error(f"Failed to fetch funding rate data after {self._retry_count} retries: {e}")
