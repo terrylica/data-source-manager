@@ -4,6 +4,9 @@ Utility module for Binance Vision API checksum verification.
 
 This module provides functions to verify the integrity of files downloaded
 from the Binance Vision API using SHA-256 checksums.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import hashlib
@@ -69,7 +72,7 @@ def verify_file_checksum(file_path: Path, checksum_path: Path) -> tuple[bool, st
         logger.critical(error_msg)
         return False, error_msg
 
-    except Exception as e:
+    except (OSError, PermissionError, ValueError) as e:
         error_msg = f"Error verifying checksum for {file_path.name}: {e}"
         logger.error(error_msg)
         return False, error_msg
@@ -102,7 +105,7 @@ def extract_checksum_from_file(checksum_path: Path) -> str | None:
         try:
             text_content = checksum_path.read_text(errors="replace").strip()
             logger.debug(f"Checksum content (text): '{text_content}'")
-        except Exception as text_error:
+        except (OSError, UnicodeDecodeError) as text_error:
             logger.debug(f"Reading as text failed: {text_error}, trying binary mode")
             try:
                 # If text reading fails, try binary
@@ -110,7 +113,7 @@ def extract_checksum_from_file(checksum_path: Path) -> str | None:
                     binary_content = f.read()
                     text_content = binary_content.decode("utf-8", errors="replace").strip()
                     logger.debug(f"Checksum content (binary): '{text_content}'")
-            except Exception as bin_error:
+            except (OSError, UnicodeDecodeError) as bin_error:
                 logger.error(f"Failed to read checksum file in binary mode: {bin_error}")
                 return None
 
@@ -149,7 +152,7 @@ def extract_checksum_from_file(checksum_path: Path) -> str | None:
         logger.debug(f"File content: '{text_content}'")
         return None
 
-    except Exception as e:
+    except (OSError, UnicodeDecodeError, ValueError) as e:
         logger.error(f"Error extracting checksum from {checksum_path}: {e}")
         import traceback
 
@@ -231,7 +234,7 @@ def calculate_checksums_multiple_methods(file_path: Path) -> dict[str, str]:
         # Calculate using direct hashlib method
         checksum = calculate_sha256_direct(file_path)
         return {"sha256": checksum}
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         logger.error(f"Error calculating checksum for {file_path}: {e}")
         return {"sha256": ""}
 
