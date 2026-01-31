@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-"""Utility functions for DataSourceManager API operations."""
+"""Utility functions for DataSourceManager API operations.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+"""
 
 import traceback
 from datetime import datetime
@@ -121,7 +125,7 @@ def fetch_from_vision(
             )
         return create_empty_dataframe()
 
-    except Exception as e:
+    except (OSError, ConnectionError, TimeoutError, ValueError, RuntimeError) as e:
         # Sanitize error message to prevent binary data from causing rich formatting issues
         try:
             error_message = str(e)
@@ -161,7 +165,7 @@ def fetch_from_vision(
             # Propagate the error to trigger failover
             raise RuntimeError(f"CRITICAL: Vision API failed to retrieve historical data: {safe_error_message}")
 
-        except Exception as nested_error:
+        except (OSError, UnicodeEncodeError, RuntimeError) as nested_error:
             # If even our error handling fails, log a simpler message
             logger.critical(f"Vision API error occurred (details unavailable): {type(e).__name__}")
             logger.critical(f"Error handling also failed: {type(nested_error).__name__}")
@@ -223,7 +227,7 @@ def fetch_from_rest(
         logger.info(f"Retrieved {len(df)} records from REST API")
 
         return df
-    except Exception as e:
+    except (OSError, ConnectionError, TimeoutError, ValueError, RuntimeError) as e:
         # Sanitize error message to prevent binary data from causing rich formatting issues
         try:
             error_message = str(e)
@@ -250,7 +254,7 @@ def fetch_from_rest(
             # to indicate complete failure of all sources
             raise RuntimeError(f"CRITICAL: REST API fallback failed: {safe_error_message}")
 
-        except Exception as nested_error:
+        except (OSError, UnicodeEncodeError, RuntimeError) as nested_error:
             # If even our error handling fails, log a simpler message
             logger.critical(f"REST API critical error: {type(e).__name__}")
             logger.critical(f"Error handling also failed: {type(nested_error).__name__}")
