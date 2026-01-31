@@ -360,13 +360,18 @@ class DSMConfig:
 
 class DSMConnectionPool:
     """Thread-safe connection pool for DSM following industry patterns.
-    
+
     This implements connection pooling similar to SQLAlchemy's QueuePool
     or requests Session management, preventing the resource exhaustion
     issues that can cause hanging.
     """
-    
+
     def __init__(self, config: DSMConfig):
+        """Initialize DSMConnectionPool with configuration.
+
+        Args:
+            config: DSM configuration object.
+        """
         self.config = config
         self._pool = {}
         self._pool_lock = threading.Lock()

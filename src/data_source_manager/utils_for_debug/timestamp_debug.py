@@ -21,8 +21,14 @@ from data_source_manager.utils.loguru_setup import logger
 
 class TimezoneDebugError(Exception):
     """Specialized exception for timezone debugging with rich context."""
-    
+
     def __init__(self, message: str, context: dict | None = None):
+        """Initialize TimezoneDebugError with message and context.
+
+        Args:
+            message: Error description.
+            context: Additional debugging context dictionary.
+        """
         self.context = context or {}
         detailed_msg = f"TIMEZONE DEBUG ERROR: {message}"
         if self.context:
