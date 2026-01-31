@@ -5,6 +5,9 @@ This module provides common utilities for REST API client operations including:
 1. HTTP client creation and configuration
 2. Retry logic for API requests
 3. Standardized error handling
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import json
@@ -277,6 +280,6 @@ def parse_interval_string(interval_str: str, default_interval: Interval = Interv
             except KeyError as e:
                 raise ValueError(f"Invalid interval: {interval_str}") from e
         return interval_enum
-    except Exception as e:
+    except (ValueError, StopIteration, AttributeError) as e:
         logger.warning(f"Error converting interval string '{interval_str}': {e}")
         return default_interval  # Fall back to default

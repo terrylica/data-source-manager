@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-"""Utility functions for Failover Control Protocol (FCP) implementation."""
+"""Utility functions for Failover Control Protocol (FCP) implementation.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+"""
 
 from datetime import datetime, timezone
 
@@ -345,7 +349,7 @@ def handle_error(e: Exception) -> None:
         logger.critical("...")
         for line in tb_lines[-3:]:
             logger.critical(line)
-    except Exception as nested_error:
+    except (ValueError, TypeError, AttributeError, UnicodeDecodeError) as nested_error:
         # If even our error handling fails, log a simpler message
         logger.critical(f"Critical error in get_data: {type(e).__name__}")
         logger.critical(f"Error handling also failed: {type(nested_error).__name__}")
