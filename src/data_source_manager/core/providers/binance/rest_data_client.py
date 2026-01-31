@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-"""Client for fetching market data from REST APIs with synchronous implementation."""
+"""Client for fetching market data from REST APIs with synchronous implementation.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+"""
 
 from datetime import datetime
 from typing import Any
@@ -218,8 +222,8 @@ class RestDataClient(DataClientInterface):
             # Handle any other REST API errors
             logger.error(f"REST API error when fetching chunk for {symbol}: {e}")
             return []
-        except Exception as e:
-            # Catch-all for any other errors
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
+            # Catch data processing errors not covered by specific REST exceptions
             logger.error(f"Unexpected error fetching chunk data for {symbol}: {e}")
             return []
 
