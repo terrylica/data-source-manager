@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 Display utilities for the Failover Control Protocol (FCP) mechanism.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 from pathlib import Path
@@ -193,10 +196,10 @@ def display_results(
                                         f"(difference: {(expected_timestamp - file_timestamp).total_seconds()} seconds)"
                                     )
                                     break
-                            except Exception as e:
+                            except (ValueError, TypeError) as e:
                                 logger.debug(f"Error parsing timestamp for file {log_file}: {e!s}")
                                 continue
-                    except Exception as e:
+                    except (ValueError, TypeError, AttributeError) as e:
                         logger.debug(f"Error in timestamp comparison: {e!s}")
 
             # If still not found after all attempts, show diagnostic info and file not found message
@@ -222,7 +225,7 @@ def display_results(
                         logger.debug(f"File exists according to stat but not Path.exists()!\n{stat_result.stdout}")
                     else:
                         logger.debug(f"File not found by stat command: {stat_result.stderr}")
-                except Exception as e:
+                except (OSError, ValueError, FileNotFoundError) as e:
                     logger.debug(f"Error during OS-level verification: {e!s}")
 
                 if log_dir.exists():
@@ -287,10 +290,10 @@ def display_results(
                                         f"(difference: {time_diff} seconds)"
                                     )
                                     break
-                            except Exception as e:
+                            except (ValueError, TypeError) as e:
                                 logger.debug(f"Error parsing timestamp for error file {error_file}: {e!s}")
                                 continue
-                    except Exception as e:
+                    except (ValueError, TypeError, AttributeError) as e:
                         logger.debug(f"Error in error timestamp comparison: {e!s}")
 
             # If still not found after all attempts, show diagnostic info and file not found message
@@ -316,7 +319,7 @@ def display_results(
                         logger.debug(f"Error file exists according to stat but not Path.exists()!\n{stat_result.stdout}")
                     else:
                         logger.debug(f"Error file not found by stat command: {stat_result.stderr}")
-                except Exception as e:
+                except (OSError, ValueError, FileNotFoundError) as e:
                     logger.debug(f"Error during OS-level verification: {e!s}")
 
                 if error_log_dir.exists():
@@ -330,6 +333,6 @@ def display_results(
         print(f"\n[dim]To view logs: cat {Path('logs') / f'{session_name}_logs' / f'{session_name}_*.log'}[/dim]")
 
         return csv_path
-    except Exception as e:
+    except (OSError, PermissionError, ValueError) as e:
         print(f"[bold red]Error saving data to CSV: {e}[/bold red]")
         return None
