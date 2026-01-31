@@ -3,6 +3,9 @@
 Custom logger classes.
 
 This module provides custom logger classes for the logger system.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import inspect
@@ -70,5 +73,5 @@ class CustomLogger(logging.Logger):
 
             return fn, lno, func, sinfo
 
-        except Exception:
+        except (IndexError, AttributeError, ValueError):
             return "(unknown file)", 0, "(unknown function)", None

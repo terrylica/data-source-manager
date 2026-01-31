@@ -3,6 +3,9 @@
 Command-line interface utilities for the DSM Demo applications.
 
 This module provides common CLI setup and display functions for DSM Demo scripts.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 from enum import Enum
@@ -252,7 +255,7 @@ def handle_error(error, start_time_perf=None):
                     border_style="red",
                 )
             )
-    except Exception:
+    except (OSError, ValueError, TypeError, RuntimeError):
         # Last resort if even error handling fails
         print("An error occurred, but the error handler encountered an exception.")
         import traceback

@@ -3,6 +3,9 @@
 Utility functions for parsing datetime strings for the DSM Demo.
 
 This module provides consistent datetime parsing functionality for all DSM Demos.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import pendulum
@@ -51,7 +54,7 @@ def parse_datetime(dt_str):
                 dt = pendulum.from_format(dt_str, "YYYY-MM-DD", tz="UTC")
                 logger.debug(f"Successfully parsed date-only string: {dt.format('YYYY-MM-DD HH:mm:ss.SSS')}")
                 return dt
-        except Exception as e2:
+        except (ValueError, TypeError) as e2:
             logger.debug(f"Failed specific format parsing: {e2}")
 
         error_msg = f"Unable to parse datetime: {dt_str!r}. Error: {e!s}"

@@ -4,6 +4,9 @@ Data fetching utilities for the Failover Control Protocol (FCP) demos.
 
 This module provides functions to fetch data using the Failover Control Protocol
 mechanism, which automatically selects the appropriate data source based on availability.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import time
@@ -169,7 +172,7 @@ def fetch_data_with_fcp(
         )
 
         return df
-    except Exception as e:
+    except (OSError, ConnectionError, TimeoutError, ValueError, RuntimeError) as e:
         print(f"[bold red]Error fetching data: {e}[/bold red]")
         import traceback
 

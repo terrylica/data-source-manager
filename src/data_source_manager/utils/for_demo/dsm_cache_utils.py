@@ -4,6 +4,9 @@ Utility functions for managing cache in DSM Demo applications.
 
 This module provides functions for cache directory management and verification
 for the Failover Control Protocol (FCP) demonstrations.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import os
@@ -52,7 +55,7 @@ def clear_cache_directory(cache_dir=None):
             shutil.rmtree(cache_path, ignore_errors=True)
             print("[bold green]Cache directory removed successfully[/bold green]")
             return True
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             logger.error(f"Error removing cache directory: {e}")
             print(f"[bold red]Error removing cache directory: {e}[/bold red]")
             return False
@@ -123,7 +126,7 @@ def clear_all_cache_directories():
         print(f"[bold yellow]Cache directory does not exist: {base_cache_dir}[/bold yellow]")
         return True  # Return True because there's nothing to clear
 
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         logger.error(f"Error clearing all cache directories: {e}")
         print(f"[bold red]Error clearing all cache directories: {e}[/bold red]")
         return False

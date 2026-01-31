@@ -4,6 +4,9 @@ Documentation utilities for DSM Demo CLI applications.
 
 This module contains functions to generate Markdown documentation from Typer help text
 using the official typer-cli tool for optimal GitHub-friendly output.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
 """
 
 import re
@@ -343,7 +346,7 @@ def verify_and_install_typer_cli() -> bool:
             )
             logger.info("typer-cli installed successfully")
             return True
-        except Exception as e:
+        except (OSError, subprocess.CalledProcessError) as e:
             logger.warning(f"Could not install typer-cli: {e}")
             return False
 

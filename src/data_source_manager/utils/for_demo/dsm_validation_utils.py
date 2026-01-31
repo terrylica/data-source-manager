@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Validation utilities for DSM demo."""
+"""Validation utilities for DSM demo.
+
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
+# Refactoring: Fix silent failure patterns (BLE001)
+"""
 
 import sys
 
@@ -67,6 +71,6 @@ def calculate_date_range(
 
         # Use the core data source manager utility
         return DataSourceManager.calculate_time_range(start_time=st, end_time=et, days=days, interval=interval)
-    except Exception as e:
+    except (ValueError, TypeError, AttributeError) as e:
         print(f"[bold red]Error calculating date range: {e}[/bold red]")
         sys.exit(1)
