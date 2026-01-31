@@ -40,12 +40,13 @@ docs/
 
 **Location**: `docs/design/YYYY-MM-DD-slug/spec.md`
 
-**Relationship**: 1:1 with ADRs. Each ADR has a corresponding design spec.
+**Relationship**: 1:1 with ADRs for significant features requiring detailed implementation specs.
 
-| Design Spec                                                              | ADR             |
-| ------------------------------------------------------------------------ | --------------- |
-| [FCP spec](design/2025-01-30-failover-control-protocol/spec.md)          | FCP ADR         |
-| [Claude Code spec](design/2026-01-30-claude-code-infrastructure/spec.md) | Claude Code ADR |
+| Design Spec                                                     | ADR     |
+| --------------------------------------------------------------- | ------- |
+| [FCP spec](design/2025-01-30-failover-control-protocol/spec.md) | FCP ADR |
+
+**Note**: Claude Code infrastructure ADR is self-contained (no separate spec needed).
 
 ## Skills Directory
 
