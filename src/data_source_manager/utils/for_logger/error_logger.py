@@ -66,8 +66,9 @@ _state = ErrorLoggerState()
 
 
 def configure_error_logger() -> logging.Logger:
-    """Configure the error logger for dedicated error, warning, and critical logging,
-    and above events, which can be used for monitoring and troubleshooting.
+    """Configure the dedicated error logger for monitoring and troubleshooting.
+
+    Handles error, warning, and critical level events separately from main logging.
 
     Returns:
         logging.Logger: The configured error logger

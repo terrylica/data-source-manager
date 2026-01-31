@@ -418,12 +418,11 @@ class LoggerProxy:
         return create_rich_progress(*args, **kwargs)
 
     def enable_smart_print(self, enabled=True):
-        """Enable or disable the smart print feature that makes all print statements
-        respect log level settings.
+        """Enable or disable smart print that respects log level settings.
 
-        When enabled, the built-in print function is monkey-patched to use logger.console.print,
-        making it respect the current log level (prints for DEBUG, INFO, WARNING; suppresses for ERROR, CRITICAL)
-        while providing the best rich object rendering available.
+        When enabled, the built-in print function is monkey-patched to use
+        logger.console.print, making it respect the current log level (prints for
+        DEBUG, INFO, WARNING; suppresses for ERROR, CRITICAL).
 
         Args:
             enabled (bool): Whether to enable (True) or disable (False) smart print

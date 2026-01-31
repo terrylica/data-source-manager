@@ -43,12 +43,11 @@ def should_show_rich_output() -> bool:
 
 
 def enable_smart_print(enabled: bool = True, console: object | None = None) -> bool:
-    """Enable or disable the smart print feature that makes all print statements
-    respect log level settings.
+    """Enable or disable smart print that respects log level settings.
 
     When enabled, the built-in print function is monkey-patched to use console.print,
-    making it respect the current log level (prints for DEBUG, INFO, WARNING; suppresses for ERROR, CRITICAL)
-    while providing the best rich object rendering available.
+    making it respect the current log level (prints for DEBUG, INFO, WARNING;
+    suppresses for ERROR, CRITICAL) while providing rich object rendering.
 
     Args:
         enabled (bool): Whether to enable (True) or disable (False) smart print

@@ -20,8 +20,10 @@ from data_source_manager.utils.loguru_setup import logger
 
 
 def verify_file_checksum(file_path: Path, checksum_path: Path) -> tuple[bool, str | None]:
-    """Verify the integrity of a file downloaded from Binance Vision API by comparing
-    its SHA-256 checksum with the expected value from the checksum file.
+    """Verify file integrity using SHA-256 checksum from Binance Vision API.
+
+    Compares the calculated checksum of the data file with the expected value
+    from the corresponding checksum file.
 
     Args:
         file_path: Path to the data file to verify
