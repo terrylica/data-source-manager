@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Custom exceptions for Binance Vision API related operations.
+"""Custom exceptions for Binance Vision API related operations.
 
 This module defines specialized exceptions to provide more precise error handling
 for the Binance Vision API component. By using custom exceptions, calling code can

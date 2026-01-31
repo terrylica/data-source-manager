@@ -42,8 +42,7 @@ def detect_gaps(
     day_boundary_threshold: float = 1.5,  # Use higher threshold for day boundaries
     enforce_min_span: bool = True,  # Enforce minimum timespan requirement
 ) -> tuple[list[Gap], dict[str, Any]]:
-    """
-    Detect gaps in time series data based on a fixed interval.
+    """Detect gaps in time series data based on a fixed interval.
 
     This function uses a streamlined approach to find gaps in time-series data:
     1. It calculates the expected interval based on the provided Interval enum
@@ -51,7 +50,7 @@ def detect_gaps(
        interval by more than the specified threshold
     3. It calculates statistics about the gaps found
 
-        Args:
+    Args:
             df: DataFrame containing time series data
         interval: Interval enum from market_constraints.py defining the expected time interval
         time_column: Name of the timestamp column in the DataFrame
@@ -62,12 +61,12 @@ def detect_gaps(
         enforce_min_span: If True, require dataset to span at least 23 hours
                           to prevent analyzing individual daily files
 
-        Returns:
+    Returns:
         Tuple containing:
         - List of Gap objects representing each detected gap
         - Dictionary with statistics about the gaps
 
-        Raises:
+    Raises:
         SystemExit: If the data doesn't meet the minimum span requirement or if interval is not an Interval enum
     """
     # Strictly validate that interval is an Interval enum from market_constraints.py
@@ -177,8 +176,7 @@ def detect_gaps(
 
 
 def format_gaps_for_display(gaps: list[Gap]) -> pd.DataFrame:
-    """
-    Format gaps into a DataFrame for display or analysis.
+    """Format gaps into a DataFrame for display or analysis.
 
     Args:
         gaps: List of Gap objects
@@ -213,8 +211,7 @@ def analyze_file_for_gaps(
     gap_threshold: float = 0.3,
     enforce_min_span: bool = True,
 ) -> tuple[list[Gap], dict[str, Any]]:
-    """
-    Analyze a CSV file for gaps in time series data.
+    """Analyze a CSV file for gaps in time series data.
 
     Args:
         file_path: Path to CSV file containing time series data
@@ -269,8 +266,7 @@ def combine_daily_files(
     time_column: str = "open_time",
     time_unit: str = "ms",
 ) -> pd.DataFrame:
-    """
-    Combine multiple daily files into a single DataFrame for gap analysis.
+    """Combine multiple daily files into a single DataFrame for gap analysis.
 
     Args:
         file_paths: List of paths to CSV files to combine

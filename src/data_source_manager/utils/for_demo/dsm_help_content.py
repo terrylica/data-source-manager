@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Centralized help content for DSM Demo applications.
+"""Centralized help content for DSM Demo applications.
 
 This module provides all help text content for DSM Demo scripts to maintain DRY principle.
 """

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Custom exceptions for REST API related operations.
+"""Custom exceptions for REST API related operations.
 
 This module defines specialized exceptions to provide more precise error handling
 for REST API requests. By using custom exceptions, calling code can catch specific

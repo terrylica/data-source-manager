@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Date range calculation utilities for DataSourceManager.
+"""Date range calculation utilities for DataSourceManager.
 
 This module provides robust date range calculation functions that support
 various scenarios including:

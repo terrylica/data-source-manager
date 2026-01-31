@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Utility functions for parsing datetime strings for the DSM Demo.
+"""Utility functions for parsing datetime strings for the DSM Demo.
 
 This module provides consistent datetime parsing functionality for all DSM Demos.
 

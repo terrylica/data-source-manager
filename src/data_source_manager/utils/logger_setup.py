@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
-"""
-Advanced Logging System for Data Source Manager
+"""Advanced Logging System for Data Source Manager.
 
 This module provides a sophisticated logging system that extends Python's standard
 logging facilities with additional features:
@@ -116,9 +115,7 @@ if RICH_AVAILABLE:
 
 
 def _setup_root_logger(level=None, use_rich=None):
-    """
-    Configure the root logger with specified level and colorized output.
-    """
+    """Configure the root logger with specified level and colorized output."""
     # Determine whether to use rich
     if use_rich is None:
         use_rich = _logger_state["use_rich"]
@@ -160,8 +157,7 @@ def _setup_root_logger(level=None, use_rich=None):
 
 
 def get_module_logger(name=None, level=None, setup_root=False, use_rich=None):
-    """
-    Get a module logger with the specified name and level.
+    """Get a module logger with the specified name and level.
 
     Args:
         name (str, optional): Logger name. If None, auto-detected from caller
@@ -183,8 +179,7 @@ def get_module_logger(name=None, level=None, setup_root=False, use_rich=None):
 
 
 def use_rich_logging(enable=True, level=None):
-    """
-    Enable or disable Rich logging.
+    """Enable or disable Rich logging.
 
     Parameters:
         enable (bool): True to enable Rich logging, False to use standard colorlog.
@@ -229,8 +224,7 @@ def enable_error_logging(error_log_file=None):
 
 
 def enable_smart_print(enabled=True):
-    """
-    Enable or disable the smart print feature that makes all print statements
+    """Enable or disable the smart print feature that makes all print statements
     respect log level settings.
 
     When enabled, the built-in print function is monkey-patched to use rich print,
@@ -296,8 +290,7 @@ def set_timeout_log_file(path: str):
 
 
 def configure_session_logging(session_name, log_level="DEBUG"):
-    """
-    Configure comprehensive session logging with timestamp-based files.
+    """Configure comprehensive session logging with timestamp-based files.
 
     This function:
     1. Creates necessary log directories

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Documentation utilities for DSM Demo CLI applications.
+"""Documentation utilities for DSM Demo CLI applications.
 
 This module contains functions to generate Markdown documentation from Typer help text
 using the official typer-cli tool for optimal GitHub-friendly output.

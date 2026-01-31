@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Application options for DSM Demo CLI applications.
+"""Application options for DSM Demo CLI applications.
 
 This module contains Typer app options and argument definitions for DSM Demo CLI tools.
 """

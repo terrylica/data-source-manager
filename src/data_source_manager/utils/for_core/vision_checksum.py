@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Utility module for Binance Vision API checksum verification.
+"""Utility module for Binance Vision API checksum verification.
 
 This module provides functions to verify the integrity of files downloaded
 from the Binance Vision API using SHA-256 checksums.
@@ -20,8 +19,7 @@ from data_source_manager.utils.loguru_setup import logger
 
 
 def verify_file_checksum(file_path: Path, checksum_path: Path) -> tuple[bool, str | None]:
-    """
-    Verify the integrity of a file downloaded from Binance Vision API by comparing
+    """Verify the integrity of a file downloaded from Binance Vision API by comparing
     its SHA-256 checksum with the expected value from the checksum file.
 
     Args:
@@ -79,8 +77,7 @@ def verify_file_checksum(file_path: Path, checksum_path: Path) -> tuple[bool, st
 
 
 def extract_checksum_from_file(checksum_path: Path) -> str | None:
-    """
-    Extract the SHA-256 checksum from a Binance Vision API checksum file.
+    """Extract the SHA-256 checksum from a Binance Vision API checksum file.
 
     Binance checksum files are typically in the format:
     "<sha256_hash>  <filename>"
@@ -161,8 +158,7 @@ def extract_checksum_from_file(checksum_path: Path) -> str | None:
 
 
 def calculate_sha256_direct(file_path: Path) -> str:
-    """
-    Calculate SHA-256 checksum directly using hashlib.
+    """Calculate SHA-256 checksum directly using hashlib.
 
     Args:
         file_path: Path to the file
@@ -178,8 +174,7 @@ def calculate_sha256_direct(file_path: Path) -> str:
 
 
 def is_valid_sha256(text: str) -> bool:
-    """
-    Check if the given text is a valid SHA-256 hash.
+    """Check if the given text is a valid SHA-256 hash.
 
     Args:
         text: String to check
@@ -191,8 +186,7 @@ def is_valid_sha256(text: str) -> bool:
 
 
 def get_checksum_url(data_url: str) -> str:
-    """
-    Generate the correct URL for a checksum file based on the data file URL.
+    """Generate the correct URL for a checksum file based on the data file URL.
 
     The Binance Vision API uses .zip.CHECKSUM extension for checksum files.
 
@@ -211,8 +205,7 @@ def get_checksum_url(data_url: str) -> str:
 
 
 def calculate_checksums_multiple_methods(file_path: Path) -> dict[str, str]:
-    """
-    Calculate file checksum using SHA-256 method.
+    """Calculate file checksum using SHA-256 method.
 
     This function was simplified to only use the direct SHA-256 calculation
     method for consistency and reliability.
@@ -240,8 +233,7 @@ def calculate_checksums_multiple_methods(file_path: Path) -> dict[str, str]:
 
 
 def verify_checksum_cli(file_path: str, checksum_path: str | None = None) -> None:
-    """
-    CLI-friendly function to verify a file's checksum against a checksum file.
+    """CLI-friendly function to verify a file's checksum against a checksum file.
 
     If checksum_path is not provided, it will attempt to find a file with the same name
     plus .CHECKSUM extension in the same directory.

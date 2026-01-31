@@ -28,8 +28,7 @@ def safely_reindex_dataframe(
     interval: Interval | str,
     fill_method: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Safely reindex a DataFrame to a complete time range with the given interval.
+    """Safely reindex a DataFrame to a complete time range with the given interval.
 
     This function creates a complete, regular DatetimeIndex from start_time to end_time
     with the specified interval, then reindexes the given DataFrame to match this
@@ -139,8 +138,7 @@ def safely_reindex_dataframe(
 
 
 def ensure_consistent_timezone(dt: datetime | pd.Timestamp | str | None) -> datetime | None:
-    """
-    Ensure a datetime object has a consistent timezone (UTC).
+    """Ensure a datetime object has a consistent timezone (UTC).
 
     This function standardizes timezone handling by:
     1. Converting string datetimes to datetime objects
@@ -189,8 +187,7 @@ def ensure_consistent_timezone(dt: datetime | pd.Timestamp | str | None) -> date
 
 
 def safe_timestamp_comparison(ts1: int | float | datetime | pd.Timestamp | str, ts2: int | float | datetime | pd.Timestamp | str) -> int:
-    """
-    Safely compare two timestamps of potentially different types.
+    """Safely compare two timestamps of potentially different types.
 
     This handles the common issue where timestamps may be represented as:
     - Integer milliseconds
@@ -229,8 +226,7 @@ def safe_timestamp_comparison(ts1: int | float | datetime | pd.Timestamp | str, 
 
 
 def _convert_to_datetime(ts: int | float | datetime | pd.Timestamp | str) -> datetime:
-    """
-    Convert various timestamp formats to a standard datetime object.
+    """Convert various timestamp formats to a standard datetime object.
 
     Args:
         ts: Timestamp in any supported format
@@ -270,8 +266,7 @@ def _convert_to_datetime(ts: int | float | datetime | pd.Timestamp | str) -> dat
 
 
 def get_data_source_info(df: pd.DataFrame) -> dict:
-    """
-    Get information about data sources used in the DataFrame.
+    """Get information about data sources used in the DataFrame.
 
     This is useful for understanding what data sources were used in a merged DataFrame.
 
@@ -300,8 +295,7 @@ def get_data_source_info(df: pd.DataFrame) -> dict:
 
 
 def check_window_data_completeness(df: pd.DataFrame, window_size: int, min_required_pct: float = 80.0) -> tuple[bool, float]:
-    """
-    Check if a DataFrame has enough data for window-based calculations.
+    """Check if a DataFrame has enough data for window-based calculations.
 
     This is useful for applications that need to perform window-based calculations
     (like moving averages) and need to ensure enough data is available.

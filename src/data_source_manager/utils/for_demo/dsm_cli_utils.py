@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Command-line interface utilities for the DSM Demo applications.
+"""Command-line interface utilities for the DSM Demo applications.
 
 This module provides common CLI setup and display functions for DSM Demo scripts.
 

@@ -47,8 +47,7 @@ def fetch_data_with_fcp(
     enforce_source: DataSource = DataSource.AUTO,
     max_retries: int = 3,
 ):
-    """
-    Fetch data using Failover Control Protocol (FCP) mechanism.
+    """Fetch data using Failover Control Protocol (FCP) mechanism.
 
     Args:
         provider: Data provider (currently only BINANCE is supported)
