@@ -264,8 +264,7 @@ def process_sample_commands(sample_commands_text):
         if group["commands"]:
             # Add code block without excessive blank lines
             formatted_lines.append("```bash")
-            for cmd in group["commands"]:
-                formatted_lines.append(cmd)
+            formatted_lines.extend(group["commands"])
             formatted_lines.append("```")
             formatted_lines.append("")
 

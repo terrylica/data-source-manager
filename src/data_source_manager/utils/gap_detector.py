@@ -187,18 +187,17 @@ def format_gaps_for_display(gaps: list[Gap]) -> pd.DataFrame:
     if not gaps:
         return pd.DataFrame()
 
-    data = []
-    for gap in gaps:
-        data.append(
-            {
-                "start_time": gap.start_time,
-                "end_time": gap.end_time,
-                "duration": gap.duration,
-                "duration_seconds": gap.duration.total_seconds(),
-                "missing_points": gap.missing_points,
-                "crosses_day_boundary": gap.crosses_day_boundary,
-            }
-        )
+    data = [
+        {
+            "start_time": gap.start_time,
+            "end_time": gap.end_time,
+            "duration": gap.duration,
+            "duration_seconds": gap.duration.total_seconds(),
+            "missing_points": gap.missing_points,
+            "crosses_day_boundary": gap.crosses_day_boundary,
+        }
+        for gap in gaps
+    ]
 
     return pd.DataFrame(data)
 
