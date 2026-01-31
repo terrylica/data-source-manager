@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# polars-exception: Core FCP implementation - DataSourceManager returns pandas DataFrames
+# for compatibility with all downstream consumers. Coordinated migration needed.
 """Data Source Manager (DSM) that mediates between different data sources.
 
 This module implements the core Failover Control Protocol (FCP) strategy for robust
@@ -440,12 +442,9 @@ class DataSourceManager:
         import logging
         
         # Configure DSM's own logging level
-        if self.quiet_mode:
-            # In quiet mode, only show errors and critical messages
-            effective_level = "ERROR"
-        else:
-            effective_level = self.log_level
-            
+        # In quiet mode, only show errors and critical messages
+        effective_level = "ERROR" if self.quiet_mode else self.log_level
+
         # Configure the main DSM logger
         logger.configure_level(effective_level)
         
