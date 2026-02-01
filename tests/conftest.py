@@ -45,6 +45,42 @@ def one_day_range(utc_now):
     return utc_now - timedelta(days=1), utc_now
 
 
+@pytest.fixture
+def one_month_range(utc_now):
+    """One month date range ending now.
+
+    Returns:
+        tuple: (start_time, end_time) both timezone-aware UTC.
+    """
+    return utc_now - timedelta(days=30), utc_now
+
+
+@pytest.fixture
+def historical_range(utc_now):
+    """Historical date range suitable for Vision API (ends 3 days ago).
+
+    Vision API has ~48h delay. This range is safe for Vision API tests.
+
+    Returns:
+        tuple: (start_time, end_time) both timezone-aware UTC.
+    """
+    end_time = utc_now - timedelta(days=3)
+    start_time = end_time - timedelta(days=7)
+    return start_time, end_time
+
+
+@pytest.fixture
+def recent_range(utc_now):
+    """Very recent date range suitable for REST API tests (last 2 hours).
+
+    This range is too recent for Vision API, forcing REST fallback.
+
+    Returns:
+        tuple: (start_time, end_time) both timezone-aware UTC.
+    """
+    return utc_now - timedelta(hours=2), utc_now
+
+
 # =============================================================================
 # Mock Fixtures
 # =============================================================================

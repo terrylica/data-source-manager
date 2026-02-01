@@ -121,15 +121,17 @@ class DataValidation:
     def enforce_utc_timestamp(dt: datetime) -> datetime:
         """Ensures datetime object is timezone aware and in UTC.
 
+        This delegates to the canonical implementation in time/conversion.py.
+
         Args:
             dt: Input datetime, can be naive or timezone-aware
 
         Returns:
             UTC timezone-aware datetime
         """
-        if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+        from data_source_manager.utils.time.conversion import enforce_utc_timezone
+
+        return enforce_utc_timezone(dt)
 
     @staticmethod
     def validate_time_range(
