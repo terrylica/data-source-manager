@@ -90,7 +90,7 @@ def test_fcp_mechanism():
         # Check if data was retrieved successfully
         if df is None or df.empty:
             print("[bold red]Error: No data retrieved[/bold red]")
-            assert False, "No data retrieved"
+            raise AssertionError("No data retrieved")
 
         # Calculate data integrity
         expected_seconds = int((end_time - start_time).total_seconds())
@@ -123,7 +123,7 @@ def test_fcp_mechanism():
             print(f"Expected records: {expected_count}")
             print(f"Actual records: {actual_count}")
             print(f"Missing records: {missing_count} ({missing_percentage:.2f}%)")
-        except Exception as e:
+        except (KeyError, AttributeError, TypeError) as e:
             # Fallback to our own calculations if integrity_result has issues
             print(f"Expected records: {expected_records}")
             print(f"Actual records: {actual_records}")
@@ -137,7 +137,7 @@ def test_fcp_mechanism():
             print(
                 "[bold red]Error: Source information not included in the result[/bold red]"
             )
-            assert False, "Source information not included in the result"
+            raise AssertionError("Source information not included in the result")
 
         # Check source breakdown
         source_counts = df["_data_source"].value_counts()
@@ -220,14 +220,14 @@ def test_fcp_mechanism():
         else:
             print("\n[bold red]✗ FAILURE: FCP mechanism failed[/bold red]")
             print("The system failed to merge data from multiple sources correctly.")
-            assert False, "FCP mechanism failed to merge data from multiple sources correctly"
+            raise AssertionError("FCP mechanism failed to merge data from multiple sources correctly")
 
-    except Exception as e:
+    except (RuntimeError, ValueError, KeyError, OSError) as e:
         print(f"[bold red]Error during test: {e}[/bold red]")
         import traceback
 
         traceback.print_exc()
-        assert False, f"Error during test: {e}"
+        raise AssertionError(f"Error during test: {e}") from e
 
 
 def main():

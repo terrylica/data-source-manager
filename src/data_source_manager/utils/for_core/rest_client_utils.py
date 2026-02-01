@@ -137,8 +137,8 @@ def fetch_chunk(
         except requests.Timeout as e:
             logger.error(f"Request timeout: {e}")
             raise RestTimeoutError(f"Request timed out: {e!s}") from e
-        except (requests.RequestException, Exception) as e:
-            # Catch any other requests exceptions
+        except requests.RequestException as e:
+            # Catch remaining requests library exceptions (after ConnectionError, Timeout)
             if not isinstance(e, RestAPIError):  # Avoid wrapping our own exceptions
                 logger.error(f"Request error: {e}")
                 raise RestAPIError(f"Request error: {e!s}") from e
