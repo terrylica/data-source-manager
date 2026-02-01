@@ -9,7 +9,6 @@ Vision API, leveraging centralized definitions from the utils modules for common
 functionality to maintain DRY principles.
 """
 
-import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import (
@@ -274,7 +273,9 @@ def validate_data_availability(start_time: datetime, end_time: datetime) -> None
     cutoff = now - CONSOLIDATION_DELAY
 
     if end_time > cutoff:
-        logging.warning(
+        from data_source_manager.utils.loguru_setup import logger
+
+        logger.warning(
             f"Requested data includes recent time ({end_time}) that may not be fully consolidated. "
             f"Data is typically available with a {CONSOLIDATION_DELAY} delay."
         )
@@ -319,7 +320,3 @@ def validate_column_names(columns: list[str]) -> list[str]:
     if CANONICAL_INDEX_NAME in columns:
         raise ValueError(f"{CANONICAL_INDEX_NAME} is reserved for index")
     return columns
-
-
-# Create logger
-logger = logging.getLogger(__name__)
