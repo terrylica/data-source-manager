@@ -128,7 +128,7 @@ Domain-specific rules Claude loads on demand (in `.claude/rules/`):
 
 - `binance-api.md` - API rate limits, error codes
 - `timestamp-handling.md` - UTC requirements
-- `dataframe-operations.md` - Polars/OHLCV patterns
+- `dataframe-operations.md` - DataFrame/OHLCV patterns
 - `caching-patterns.md` - Cache structure
 - `symbol-formats.md` - Market-specific formats
 - `error-handling.md` - Exception hierarchy, recovery patterns

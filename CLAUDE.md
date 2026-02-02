@@ -203,7 +203,7 @@ Domain-specific rules in `.claude/rules/` (Claude loads on demand):
 
 - @.claude/rules/binance-api.md - Rate limits, error codes, API endpoints
 - @.claude/rules/timestamp-handling.md - UTC requirements, open_time semantics
-- @.claude/rules/dataframe-operations.md - Polars preference, OHLCV validation
+- @.claude/rules/dataframe-operations.md - DataFrame handling, OHLCV validation
 - @.claude/rules/caching-patterns.md - Cache structure, invalidation rules
 - @.claude/rules/symbol-formats.md - Market-specific symbol format requirements
 - @.claude/rules/error-handling.md - Exception hierarchy, recovery patterns
