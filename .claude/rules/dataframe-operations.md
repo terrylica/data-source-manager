@@ -11,17 +11,19 @@ Guidelines for working with market data DataFrames in DSM.
 
 ## Library Preference
 
-**Polars preferred over Pandas** for new code.
+**DSM public API returns Pandas DataFrames** for backward compatibility.
 
 ```python
-# Preferred
-import polars as pl
-df = pl.DataFrame(data)
+# DSM returns pd.DataFrame
+from data_source_manager import DataSourceManager
+df = manager.get_data(...)  # Returns pd.DataFrame
 
-# Legacy (acceptable for compatibility)
-import pandas as pd
-df = pd.DataFrame(data)
+# Internal utilities may use Polars for performance
+# Cache uses Apache Arrow for storage
 ```
+
+**Note**: Polars is used internally for some operations, but the public `get_data()`
+API returns `pd.DataFrame` to maintain compatibility with existing consumer code.
 
 ## Index Conventions
 

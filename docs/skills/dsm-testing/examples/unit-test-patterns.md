@@ -78,7 +78,7 @@ class TestWithFixtures:
 ## Mocking HTTP Calls
 
 ```python
-import polars as pl
+import pandas as pd
 
 @patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
 @patch("data_source_manager.core.sync.data_source_manager.UnifiedCacheManager")
@@ -88,8 +88,9 @@ class TestMockedDataSource:
     def test_fetch_returns_dataframe(self, mock_cache, mock_vision):
         """Verify get_data returns a DataFrame."""
         # Arrange: Mock returns empty DataFrame
+        # Note: DSM returns pd.DataFrame for API compatibility
         mock_cache.return_value.get_cached_data.return_value = None
-        mock_vision.return_value.fetch_data.return_value = pl.DataFrame({
+        mock_vision.return_value.fetch_data.return_value = pd.DataFrame({
             "open_time": [],
             "open": [],
             "high": [],

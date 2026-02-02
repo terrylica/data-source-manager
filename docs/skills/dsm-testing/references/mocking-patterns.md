@@ -10,13 +10,14 @@ Mock Vision API (S3 access) for offline tests:
 
 ```python
 from unittest.mock import patch, MagicMock
-import polars as pl
+import pandas as pd
 
 @patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
 def test_without_vision(mock_handler):
     # Configure mock to return empty DataFrame
+    # Note: DSM returns pd.DataFrame for API compatibility
     handler_instance = MagicMock()
-    handler_instance.fetch_data.return_value = pl.DataFrame()
+    handler_instance.fetch_data.return_value = pd.DataFrame()
     mock_handler.return_value = handler_instance
 
     # Test logic...

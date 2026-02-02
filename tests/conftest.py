@@ -7,7 +7,7 @@ Fixtures defined here are automatically available to all tests in the tests/ dir
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-import polars as pl
+import pandas as pd
 import pytest
 
 
@@ -94,7 +94,7 @@ def mock_vision_handler():
     """
     with patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler") as mock:
         handler_instance = MagicMock()
-        handler_instance.fetch_data.return_value = pl.DataFrame()
+        handler_instance.fetch_data.return_value = pd.DataFrame()
         mock.return_value = handler_instance
         yield mock
 
