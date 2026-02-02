@@ -12,9 +12,7 @@ from pathlib import Path
 import pendulum
 
 
-def configure_session_logging(
-    session_name: str, log_level: str = "DEBUG", logger: object | None = None
-) -> tuple[str, str, str]:
+def configure_session_logging(session_name: str, log_level: str = "DEBUG", logger: object | None = None) -> tuple[str, str, str]:
     """Configure comprehensive session logging with timestamp-based files.
 
     This function:

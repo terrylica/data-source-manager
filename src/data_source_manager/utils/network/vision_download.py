@@ -108,10 +108,7 @@ class VisionDownloadManager:
         """
         try:
             # Construct URL for the date
-            url_template = (
-                "https://data.binance.vision/data/{market_type}/daily/klines/"
-                "{symbol}/{interval}/{symbol}-{interval}-{date}.zip"
-            )
+            url_template = "https://data.binance.vision/data/{market_type}/daily/klines/{symbol}/{interval}/{symbol}-{interval}-{date}.zip"
             url = url_template.format(
                 market_type=self.market_type,
                 symbol=self.symbol,

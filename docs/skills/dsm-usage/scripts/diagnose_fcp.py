@@ -62,9 +62,7 @@ def check_cache_status(symbol: str, market_type: MarketType, interval: Interval)
     print(f"   Newest: {arrow_files[-1].stem}")
 
 
-def diagnose_fetch(
-    symbol: str, market_type: MarketType, interval: Interval, days: int
-) -> None:
+def diagnose_fetch(symbol: str, market_type: MarketType, interval: Interval, days: int) -> None:
     """Perform diagnostic fetch and report FCP decisions."""
     print(f"\n🔍 Diagnosing FCP for {symbol} ({market_type.name}, {interval.value})")
     print(f"   Requesting: last {days} days")

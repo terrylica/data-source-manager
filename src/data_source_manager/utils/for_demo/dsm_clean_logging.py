@@ -40,9 +40,7 @@ from data_source_manager.utils.market_constraints import DataProvider, MarketTyp
 
 @contextlib.contextmanager
 def get_clean_market_data(
-    provider: DataProvider = DataProvider.BINANCE,
-    market_type: MarketType = MarketType.SPOT,
-    **kwargs
+    provider: DataProvider = DataProvider.BINANCE, market_type: MarketType = MarketType.SPOT, **kwargs
 ) -> Iterator[DataSourceManager]:
     """Clean DSM context manager with suppressed logging.
 
@@ -95,9 +93,7 @@ def get_clean_market_data(
 
 @contextlib.contextmanager
 def get_quiet_market_data(
-    provider: DataProvider = DataProvider.BINANCE,
-    market_type: MarketType = MarketType.SPOT,
-    **kwargs
+    provider: DataProvider = DataProvider.BINANCE, market_type: MarketType = MarketType.SPOT, **kwargs
 ) -> Iterator[DataSourceManager]:
     """Completely quiet DSM context manager for production use.
 
@@ -150,9 +146,7 @@ def get_quiet_market_data(
 
 @contextlib.contextmanager
 def get_debug_market_data(
-    provider: DataProvider = DataProvider.BINANCE,
-    market_type: MarketType = MarketType.SPOT,
-    **kwargs
+    provider: DataProvider = DataProvider.BINANCE, market_type: MarketType = MarketType.SPOT, **kwargs
 ) -> Iterator[DataSourceManager]:
     """Debug DSM context manager for troubleshooting.
 

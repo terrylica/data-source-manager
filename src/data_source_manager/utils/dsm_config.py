@@ -66,81 +66,40 @@ class DSMConfig:
     market_type: MarketType = attr.field(validator=attr.validators.instance_of(MarketType))
 
     # ✅ OPTIONAL: Chart and caching configuration
-    chart_type: ChartType = attr.field(
-        default=ChartType.KLINES,
-        validator=attr.validators.instance_of(ChartType)
-    )
+    chart_type: ChartType = attr.field(default=ChartType.KLINES, validator=attr.validators.instance_of(ChartType))
     cache_dir: Path | None = attr.field(
         default=None,
         validator=attr.validators.optional(attr.validators.instance_of(Path)),
         converter=lambda p: Path(p) if p is not None and not isinstance(p, Path) else p,  # type: ignore[arg-type]
     )
-    use_cache: bool = attr.field(
-        default=True,
-        validator=attr.validators.instance_of(bool)
-    )
+    use_cache: bool = attr.field(default=True, validator=attr.validators.instance_of(bool))
 
     # ✅ NETWORK: Connection and timeout configuration
-    connection_timeout: int = attr.field(
-        default=30,
-        validator=[attr.validators.instance_of(int), lambda _, __, v: v > 0]
-    )
-    max_retries: int = attr.field(
-        default=3,
-        validator=[attr.validators.instance_of(int), lambda _, __, v: v >= 0]
-    )
+    connection_timeout: int = attr.field(default=30, validator=[attr.validators.instance_of(int), lambda _, __, v: v > 0])
+    max_retries: int = attr.field(default=3, validator=[attr.validators.instance_of(int), lambda _, __, v: v >= 0])
 
     # ✅ PERFORMANCE: Connection pooling and threading
-    connection_pool_size: int = attr.field(
-        default=10,
-        validator=[attr.validators.instance_of(int), lambda _, __, v: v > 0]
-    )
-    thread_safe: bool = attr.field(
-        default=True,
-        validator=attr.validators.instance_of(bool)
-    )
+    connection_pool_size: int = attr.field(default=10, validator=[attr.validators.instance_of(int), lambda _, __, v: v > 0])
+    thread_safe: bool = attr.field(default=True, validator=attr.validators.instance_of(bool))
 
     # ✅ INITIALIZATION: Lazy loading control
-    lazy_init: bool = attr.field(
-        default=True,
-        validator=attr.validators.instance_of(bool)
-    )
+    lazy_init: bool = attr.field(default=True, validator=attr.validators.instance_of(bool))
 
     # ✅ LOGGING: Granular logging control
     log_level: str = attr.field(
         default="WARNING",
-        validator=[
-            attr.validators.instance_of(str),
-            attr.validators.in_(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
-        ],
-        converter=str.upper
+        validator=[attr.validators.instance_of(str), attr.validators.in_(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])],
+        converter=str.upper,
     )
-    suppress_http_debug: bool = attr.field(
-        default=True,
-        validator=attr.validators.instance_of(bool)
-    )
-    quiet_mode: bool = attr.field(
-        default=False,
-        validator=attr.validators.instance_of(bool)
-    )
+    suppress_http_debug: bool = attr.field(default=True, validator=attr.validators.instance_of(bool))
+    quiet_mode: bool = attr.field(default=False, validator=attr.validators.instance_of(bool))
 
     # ✅ RETRY: Configurable retry policy
-    retry_backoff_factor: float = attr.field(
-        default=1.0,
-        validator=[attr.validators.instance_of((int, float)), lambda _, __, v: v > 0]
-    )
-    retry_backoff_max: float = attr.field(
-        default=60.0,
-        validator=[attr.validators.instance_of((int, float)), lambda _, __, v: v > 0]
-    )
+    retry_backoff_factor: float = attr.field(default=1.0, validator=[attr.validators.instance_of((int, float)), lambda _, __, v: v > 0])
+    retry_backoff_max: float = attr.field(default=60.0, validator=[attr.validators.instance_of((int, float)), lambda _, __, v: v > 0])
 
     @classmethod
-    def create(
-        cls,
-        provider: DataProvider,
-        market_type: MarketType,
-        **kwargs: Any
-    ) -> "DSMConfig":
+    def create(cls, provider: DataProvider, market_type: MarketType, **kwargs: Any) -> "DSMConfig":
         """Create a DSMConfig with the given provider, market_type and optional overrides.
 
         This factory method follows the same pattern as:
@@ -239,12 +198,7 @@ class DSMConfig:
         return cls(**config_dict)
 
     @classmethod
-    def for_production(
-        cls,
-        provider: DataProvider,
-        market_type: MarketType,
-        **kwargs: Any
-    ) -> "DSMConfig":
+    def for_production(cls, provider: DataProvider, market_type: MarketType, **kwargs: Any) -> "DSMConfig":
         """Create production-optimized configuration.
 
         This provides sensible defaults for production environments:
@@ -285,12 +239,7 @@ class DSMConfig:
         return cls.create(provider, market_type, **production_defaults)
 
     @classmethod
-    def for_development(
-        cls,
-        provider: DataProvider,
-        market_type: MarketType,
-        **kwargs: Any
-    ) -> "DSMConfig":
+    def for_development(cls, provider: DataProvider, market_type: MarketType, **kwargs: Any) -> "DSMConfig":
         """Create development-optimized configuration.
 
         This provides sensible defaults for development environments:

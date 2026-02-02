@@ -469,10 +469,7 @@ class DataSourceManager:
             logger.debug(f"DSM logging configured: level={effective_level}, suppress_http_debug={self.suppress_http_debug}")
 
     def reconfigure_logging(
-        self,
-        log_level: str | None = None,
-        suppress_http_debug: bool | None = None,
-        quiet_mode: bool | None = None
+        self, log_level: str | None = None, suppress_http_debug: bool | None = None, quiet_mode: bool | None = None
     ) -> None:
         """Reconfigure logging settings after initialization.
 
@@ -896,6 +893,7 @@ class DataSourceManager:
             if not auto_reindex and not result_df.empty:
                 # Filter the result to the user's exact requested time range
                 from data_source_manager.utils.time_utils import filter_dataframe_by_time
+
                 original_length = len(result_df)
                 result_df = filter_dataframe_by_time(result_df, start_time, end_time, "open_time")
                 logger.info(f"[FCP] auto_reindex=False: Filtered to user's exact range: {original_length} -> {len(result_df)} records")

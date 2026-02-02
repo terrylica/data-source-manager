@@ -62,9 +62,7 @@ def parse_datetime(dt_str: str | None) -> pendulum.DateTime | None:
         raise ValueError(error_msg) from e
 
 
-def calculate_date_range(
-    start_time: str | None, end_time: str | None, days: int
-) -> tuple[pendulum.DateTime, pendulum.DateTime]:
+def calculate_date_range(start_time: str | None, end_time: str | None, days: int) -> tuple[pendulum.DateTime, pendulum.DateTime]:
     """Calculate a date range based on provided parameters.
 
     Args:

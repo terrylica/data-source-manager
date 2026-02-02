@@ -110,9 +110,7 @@ class RestMetricsTracker:
                     now = datetime.now(timezone.utc)
                     self._rate_limit_windows.append(now)
                     # Clean up old rate limit windows (older than 1 hour)
-                    self._rate_limit_windows = [
-                        t for t in self._rate_limit_windows if (now - t).total_seconds() < SECONDS_IN_HOUR
-                    ]
+                    self._rate_limit_windows = [t for t in self._rate_limit_windows if (now - t).total_seconds() < SECONDS_IN_HOUR]
 
     def get_metrics(self) -> dict[str, Any]:
         """Get current metrics.

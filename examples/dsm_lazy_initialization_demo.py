@@ -24,11 +24,13 @@ def benchmark_import_speed() -> tuple[float, float]:
     # Benchmark DSM import
     start_time = time.time()
     from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType  # noqa: F401
+
     dsm_import_time = time.time() - start_time
 
     # Compare with pandas (typical benchmark)
     start_time = time.time()
     import pandas  # noqa: F401
+
     pandas_import_time = time.time() - start_time
 
     print(f"📊 DSM import time:    {dsm_import_time:.3f}s")

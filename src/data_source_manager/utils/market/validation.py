@@ -157,8 +157,7 @@ def validate_symbol_for_market_type(
     market_name = market_type.name
 
     logger.debug(
-        f"Validating symbol '{symbol}' for {market_name} with {data_provider.name} provider "
-        f"(expected format: {capabilities.symbol_format})"
+        f"Validating symbol '{symbol}' for {market_name} with {data_provider.name} provider (expected format: {capabilities.symbol_format})"
     )
 
     # OKX symbol validation
@@ -205,11 +204,7 @@ def validate_symbol_for_market_type(
             )
 
     elif market_name == "OPTIONS":
-        if not (
-            "-" in symbol
-            and (symbol.endswith("-C") or symbol.endswith("-P"))
-            and len(symbol.split("-")) == OPTIONS_SYMBOL_PARTS
-        ):
+        if not ("-" in symbol and (symbol.endswith("-C") or symbol.endswith("-P")) and len(symbol.split("-")) == OPTIONS_SYMBOL_PARTS):
             raise ValueError(
                 f"Invalid symbol format for {market_name} market: '{symbol}'. "
                 f"OPTIONS symbols should follow the format: BTC-YYMMDD-STRIKE-C/P"

@@ -401,4 +401,3 @@ class DataValidation:
             return True, ""
         except ValueError as e:
             return False, str(e)
-

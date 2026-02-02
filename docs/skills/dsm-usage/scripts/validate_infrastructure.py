@@ -48,9 +48,7 @@ def validate_agents(claude_dir: Path) -> tuple[int, int, list[str]]:
 
     for agent_file in agents_dir.glob("*.md"):
         total += 1
-        ok, file_issues = check_file_has_frontmatter(
-            agent_file, ["name", "description", "tools"]
-        )
+        ok, file_issues = check_file_has_frontmatter(agent_file, ["name", "description", "tools"])
         if ok:
             passed += 1
         else:
@@ -75,16 +73,12 @@ def validate_commands(claude_dir: Path) -> tuple[int, int, list[str]]:
     for cmd_file in commands_dir.glob("*.md"):
         total += 1
         # Check required fields including argument-hint and allowed-tools
-        ok, file_issues = check_file_has_frontmatter(
-            cmd_file, ["name", "description", "argument-hint", "allowed-tools"]
-        )
+        ok, file_issues = check_file_has_frontmatter(cmd_file, ["name", "description", "argument-hint", "allowed-tools"])
 
         if cmd_file.name in side_effect_commands:
             content = cmd_file.read_text()
             if "disable-model-invocation: true" not in content:
-                file_issues.append(
-                    f"{cmd_file.name} has side effects but missing disable-model-invocation"
-                )
+                file_issues.append(f"{cmd_file.name} has side effects but missing disable-model-invocation")
                 ok = False
 
         if ok:
@@ -116,9 +110,7 @@ def validate_skills(docs_dir: Path) -> tuple[int, int, list[str]]:
             continue
 
         total += 1
-        ok, file_issues = check_file_has_frontmatter(
-            skill_file, ["name", "description", "user-invocable"]
-        )
+        ok, file_issues = check_file_has_frontmatter(skill_file, ["name", "description", "user-invocable"])
 
         # Check for $ARGUMENTS placeholder
         content = skill_file.read_text()

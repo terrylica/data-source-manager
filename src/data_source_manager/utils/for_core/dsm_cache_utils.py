@@ -124,7 +124,7 @@ def get_from_cache(
         if missing_ranges:
             logger.debug(f"[CACHE] Gap detection found {len(missing_ranges)} missing segments:")
             for i, (miss_start, miss_end) in enumerate(missing_ranges):
-                logger.debug(f"[CACHE]   Missing segment {i+1}: {miss_start} to {miss_end}")
+                logger.debug(f"[CACHE]   Missing segment {i + 1}: {miss_start} to {miss_end}")
         else:
             logger.debug("[CACHE] Gap detection found no missing segments - cache provides complete coverage")
 

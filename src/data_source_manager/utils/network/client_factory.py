@@ -140,9 +140,7 @@ def create_legacy_client(
     Returns:
         httpx.Client configured with the provided settings
     """
-    logger.warning(
-        "create_legacy_client is deprecated. Please update your code to use create_httpx_client or create_client directly."
-    )
+    logger.warning("create_legacy_client is deprecated. Please update your code to use create_httpx_client or create_client directly.")
 
     # Remove legacy-specific parameters
     if "impersonate" in kwargs:

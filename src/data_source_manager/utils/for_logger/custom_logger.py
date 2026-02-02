@@ -28,9 +28,7 @@ class CustomLogger(logging.Logger):
     to find the actual application code that initiated the logging call.
     """
 
-    def findCaller(
-        self, stack_info: bool = False, stacklevel: int = 1
-    ) -> tuple[str, int, str, str | None]:
+    def findCaller(self, stack_info: bool = False, stacklevel: int = 1) -> tuple[str, int, str, str | None]:
         """Find the stack frame of the caller.
 
         This customizes the stack level search to skip past the LoggerProxy class

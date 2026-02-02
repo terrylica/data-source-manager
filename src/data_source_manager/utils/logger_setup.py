@@ -34,8 +34,7 @@ from data_source_manager.utils.loguru_setup import (
 
 # Emit deprecation warning on import
 warnings.warn(
-    "data_source_manager.utils.logger_setup is deprecated. "
-    "Use data_source_manager.utils.loguru_setup instead.",
+    "data_source_manager.utils.logger_setup is deprecated. Use data_source_manager.utils.loguru_setup instead.",
     DeprecationWarning,
     stacklevel=2,
 )

@@ -87,15 +87,7 @@ class CacheKeyManager:
         interval = interval.lower()
 
         # Generate path with standardized structure
-        path = (
-            cache_dir
-            / options.exchange
-            / options.market_type
-            / options.data_nature
-            / options.packaging_frequency
-            / symbol
-            / interval
-        )
+        path = cache_dir / options.exchange / options.market_type / options.data_nature / options.packaging_frequency / symbol / interval
         path.mkdir(parents=True, exist_ok=True)
 
         # Generate filename with standardized format

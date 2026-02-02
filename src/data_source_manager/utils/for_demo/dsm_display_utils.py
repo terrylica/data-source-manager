@@ -85,9 +85,7 @@ def display_results(
             print("[yellow]Warning: Could not find open_time column or index for timeline display[/yellow]")
             return None
 
-        date_groups = df.pivot_table(
-            index="date", columns="_data_source", aggfunc="size", fill_value=0
-        )
+        date_groups = df.pivot_table(index="date", columns="_data_source", aggfunc="size", fill_value=0)
 
         # Display timeline visualization
         timeline_table = Table(title="Sources by Date")

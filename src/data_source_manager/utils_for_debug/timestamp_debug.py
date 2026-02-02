@@ -58,11 +58,9 @@ def _get_timestamp_series(df: pd.DataFrame, time_column: str):
         return df[time_column]
     return df.index
 
+
 def trace_dataframe_timestamps(
-    df: pd.DataFrame,
-    time_column: str,
-    start_time: Union[datetime, pd.Timestamp],
-    end_time: Union[datetime, pd.Timestamp]
+    df: pd.DataFrame, time_column: str, start_time: Union[datetime, pd.Timestamp], end_time: Union[datetime, pd.Timestamp]
 ) -> None:
     """FAIL-FAST timezone-aware timestamp tracing with rich debug information.
 
@@ -70,8 +68,7 @@ def trace_dataframe_timestamps(
     """
     if df.empty:
         raise TimezoneDebugError(
-            "DataFrame is empty - cannot trace timestamps",
-            {"time_column": time_column, "start_time": start_time, "end_time": end_time}
+            "DataFrame is empty - cannot trace timestamps", {"time_column": time_column, "start_time": start_time, "end_time": end_time}
         )
 
     # FAIL-FAST: Validate time column exists (column or index)
@@ -84,8 +81,8 @@ def trace_dataframe_timestamps(
                 "available_columns": available_columns,
                 "dataframe_shape": df.shape,
                 "dataframe_index_name": df.index.name,
-                "suggestion": f"Use index.name='{df.index.name}' if timestamps are in index"
-            }
+                "suggestion": f"Use index.name='{df.index.name}' if timestamps are in index",
+            },
         )
 
     # Get timezone information for all timestamps (unified access)
@@ -122,8 +119,8 @@ def trace_dataframe_timestamps(
                 "start_timezone": str(start_tz),
                 "end_timezone": str(end_tz),
                 "start_time": _format_timezone_info(start_time),
-                "end_time": _format_timezone_info(end_time)
-            }
+                "end_time": _format_timezone_info(end_time),
+            },
         )
 
     if start_tz is None and data_tz is not None:
@@ -150,10 +147,7 @@ def trace_dataframe_timestamps(
 
 
 def analyze_filter_conditions(
-    df: pd.DataFrame,
-    start_time: Union[datetime, pd.Timestamp],
-    end_time: Union[datetime, pd.Timestamp],
-    time_column: str
+    df: pd.DataFrame, start_time: Union[datetime, pd.Timestamp], end_time: Union[datetime, pd.Timestamp], time_column: str
 ) -> None:
     """FAIL-FAST timezone-aware filter condition analysis with detailed results."""
     if df.empty:
@@ -165,8 +159,8 @@ def analyze_filter_conditions(
             {
                 "available_columns": list(df.columns),
                 "dataframe_index_name": df.index.name,
-                "suggestion": f"Use index.name='{df.index.name}' if timestamps are in index"
-            }
+                "suggestion": f"Use index.name='{df.index.name}' if timestamps are in index",
+            },
         )
 
     # Analyze each condition separately with timezone awareness
@@ -192,8 +186,8 @@ def analyze_filter_conditions(
                 "filter_end": _format_timezone_info(end_time),
                 "data_range_min": _format_timezone_info(data_min),
                 "data_range_max": _format_timezone_info(data_max),
-                "total_rows": len(df)
-            }
+                "total_rows": len(df),
+            },
         )
 
     # Find boundary issues
@@ -209,7 +203,7 @@ def compare_filtered_results(
     filtered_df: pd.DataFrame,
     start_time: Union[datetime, pd.Timestamp],
     end_time: Union[datetime, pd.Timestamp],
-    time_column: str
+    time_column: str,
 ) -> None:
     """FAIL-FAST comparison with timezone-aware validation and rich error context."""
     logger.debug("📊 [TIMEZONE TRACE] FILTERING RESULTS COMPARISON:")
@@ -223,8 +217,8 @@ def compare_filtered_results(
             {
                 "original_rows": len(original_df),
                 "filtered_rows": len(filtered_df),
-                "filter_range": f"{_format_timezone_info(start_time)} to {_format_timezone_info(end_time)}"
-            }
+                "filter_range": f"{_format_timezone_info(start_time)} to {_format_timezone_info(end_time)}",
+            },
         )
 
     # Validate that filtered data is actually within bounds
@@ -240,8 +234,8 @@ def compare_filtered_results(
                 {
                     "start_time": _format_timezone_info(start_time),
                     "filtered_min": _format_timezone_info(filtered_min),
-                    "violation_magnitude": str(start_time - filtered_min)
-                }
+                    "violation_magnitude": str(start_time - filtered_min),
+                },
             )
 
         if filtered_max > end_time:
@@ -250,8 +244,8 @@ def compare_filtered_results(
                 {
                     "end_time": _format_timezone_info(end_time),
                     "filtered_max": _format_timezone_info(filtered_max),
-                    "violation_magnitude": str(filtered_max - end_time)
-                }
+                    "violation_magnitude": str(filtered_max - end_time),
+                },
             )
 
         logger.debug("✅ [TIMEZONE TRACE] BOUNDARY VALIDATION PASSED:")
@@ -275,8 +269,8 @@ def compare_filtered_results(
                 {
                     "start_time": _format_timezone_info(start_time),
                     "original_matches_at_start": original_at_start,
-                    "filtered_matches_at_start": filtered_at_start
-                }
+                    "filtered_matches_at_start": filtered_at_start,
+                },
             )
 
         logger.debug(f"🎯 [TIMEZONE TRACE] Start boundary preservation: {filtered_at_start}/{original_at_start} rows")

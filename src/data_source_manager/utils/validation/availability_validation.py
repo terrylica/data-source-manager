@@ -35,9 +35,7 @@ def enforce_utc_timestamp(dt: datetime) -> datetime:
     return enforce_utc_timezone(dt)
 
 
-def validate_data_availability(
-    start_time: datetime, end_time: datetime, buffer_hours: int = 24
-) -> tuple[datetime, datetime]:
+def validate_data_availability(start_time: datetime, end_time: datetime, buffer_hours: int = 24) -> tuple[datetime, datetime]:
     """Validate that data is likely to be available for the requested time range.
 
     Args:

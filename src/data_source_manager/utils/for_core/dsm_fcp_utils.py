@@ -311,8 +311,7 @@ def verify_final_data(
     else:
         # Recent data with good coverage
         logger.info(
-            f"[FCP] Recent data coverage: {100 - missing_percentage:.1f}% complete "
-            f"({len(result_df)} records from {min_time} to {max_time})"
+            f"[FCP] Recent data coverage: {100 - missing_percentage:.1f}% complete ({len(result_df)} records from {min_time} to {max_time})"
         )
 
 

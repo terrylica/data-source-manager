@@ -216,13 +216,7 @@ class CacheValidator:
                 False,
             )
 
-        if (
-            self.api_boundary_validator
-            and options.start_time
-            and options.end_time
-            and options.interval
-            and not df.empty
-        ):
+        if self.api_boundary_validator and options.start_time and options.end_time and options.interval and not df.empty:
             try:
                 is_api_aligned = await self.api_boundary_validator.does_data_range_match_api_response(
                     df,
@@ -277,9 +271,7 @@ class CacheValidator:
                 if columns:
                     all_cols = reader.schema.names
                     cols_to_read = (
-                        ["open_time", *list(columns)]
-                        if "open_time" in all_cols and "open_time" not in columns
-                        else list(columns)
+                        ["open_time", *list(columns)] if "open_time" in all_cols and "open_time" not in columns else list(columns)
                     )
                     table = reader.read_all().select(cols_to_read)
                 else:
