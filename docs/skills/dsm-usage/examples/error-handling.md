@@ -124,4 +124,4 @@ for attempt in range(MAX_RETRIES):
 ## Related
 
 - [FCP Protocol](../references/fcp-protocol.md) - Fallback behavior
-- [Troubleshooting](../../../../TROUBLESHOOTING.md) - Common issues
+- [Troubleshooting](../../../TROUBLESHOOTING.md) - Common issues

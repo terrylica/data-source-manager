@@ -884,8 +884,7 @@ Last updated: 2026-02-01
 - `.claude/settings.md` - Human-readable configuration reference
 - `.claude/hooks/dsm-bash-guard.sh` - PreToolUse command validation
 - `.claude/hooks/dsm-code-guard.sh` - PostToolUse code quality checks
-- `docs/design/2026-01-30-claude-code-infrastructure/spec.md` - Implementation spec
-- `docs/adr/2026-01-30-claude-code-infrastructure.md` - ADR
+- `docs/adr/2026-01-30-claude-code-infrastructure.md` - ADR (self-contained, no separate spec)
 
 **Validation**:
 
