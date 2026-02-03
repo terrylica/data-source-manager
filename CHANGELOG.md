@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/terrylica/data-source-manager/compare/v1.0.2...v1.1.0) (2026-02-03)
+
+
+### Features
+
+* **memory:** implement Polars-first memory optimization ([49abd14](https://github.com/terrylica/data-source-manager/commit/49abd140032d5325c3708031e005639087b12004))
+
 ## [1.0.2](https://github.com/terrylica/data-source-manager/compare/v1.0.1...v1.0.2) (2026-02-02)
 
 
