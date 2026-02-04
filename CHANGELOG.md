@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/terrylica/data-source-manager/compare/v1.3.0...v1.4.0) (2026-02-04)
+
+
+### Features
+
+* **memory:** add stress tests and memory optimizations ([1ce1a55](https://github.com/terrylica/data-source-manager/commit/1ce1a55568291144ece31fcf5e54aa0f04e36114)), closes [#1](https://github.com/terrylica/data-source-manager/issues/1)
+
 # [1.3.0](https://github.com/terrylica/data-source-manager/compare/v1.2.0...v1.3.0) (2026-02-04)
 
 
