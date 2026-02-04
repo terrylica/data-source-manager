@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/terrylica/data-source-manager/compare/v1.1.0...v1.2.0) (2026-02-04)
+
+
+### Features
+
+* **dsm:** add return_polars parameter and provider validation ([33ba8cc](https://github.com/terrylica/data-source-manager/commit/33ba8ccff7b2a0679d6846b116426e4bc9043187))
+
 # [1.1.0](https://github.com/terrylica/data-source-manager/compare/v1.0.2...v1.1.0) (2026-02-03)
 
 
