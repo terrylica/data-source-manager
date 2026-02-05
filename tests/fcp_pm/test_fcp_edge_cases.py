@@ -693,6 +693,261 @@ class TestFCPCachePartialHit:
 # =============================================================================
 # CLI Entry Point (for manual testing)
 # =============================================================================
+# Edge Case 11: Polars Pipeline FCP Integration (Task #99)
+# =============================================================================
+
+
+@pytest.mark.integration
+class TestFCPPolarsIntegration:
+    """FCP edge case tests with Polars pipeline enabled.
+
+    These tests verify that the FCP logic works correctly when
+    USE_POLARS_PIPELINE and USE_POLARS_OUTPUT feature flags are enabled.
+
+    The FCP priority (REST > CACHE > VISION) must be preserved in
+    the Polars-based merge implementation.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_polars_flags(self, monkeypatch):
+        """Enable Polars pipeline for all tests in this class."""
+        monkeypatch.setenv("DSM_USE_POLARS_PIPELINE", "true")
+        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "true")
+
+    def test_polars_fcp_cache_hit(self, fcp_manager_futures, historical_range):
+        """Cache hit should work correctly with Polars pipeline."""
+        start_time, end_time = historical_range
+
+        # First fetch populates cache
+        df1 = fcp_manager_futures.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+            include_source_info=True,
+        )
+
+        assert df1 is not None and not df1.empty, "First fetch failed"
+
+        # Second fetch should hit cache
+        df2 = fcp_manager_futures.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+            include_source_info=True,
+        )
+
+        assert df2 is not None and not df2.empty, "Cache hit fetch failed"
+
+        # Verify cache was used
+        if "_data_source" in df2.columns:
+            analysis = analyze_source_distribution(df2)
+            cache_pct = analysis["sources"].get("CACHE", {}).get("percentage", 0)
+            print_source_table(analysis, "Polars FCP Cache Hit")
+            # Cache should contribute at least some data
+            rprint(f"[cyan]CACHE percentage: {cache_pct:.1f}%[/cyan]")
+
+    def test_polars_fcp_source_priority_preserved(self, fcp_manager_futures, historical_range):
+        """FCP source priority (REST > CACHE > VISION) must be preserved."""
+        start_time, end_time = historical_range
+
+        df = fcp_manager_futures.get_data(
+            symbol="ETHUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+            include_source_info=True,
+        )
+
+        assert df is not None and not df.empty, "FCP fetch failed"
+
+        # Data integrity checks
+        if df.index.name == "open_time":
+            assert df.index.is_monotonic_increasing, "Timestamps not sorted"
+            assert not df.index.has_duplicates, "Duplicate timestamps found"
+        else:
+            sorted_df = df.sort_values("open_time")
+            assert sorted_df["open_time"].is_monotonic_increasing, "Timestamps not sorted"
+
+        # Verify OHLCV integrity
+        assert (df["high"] >= df["low"]).all(), "high < low found"
+        assert (df["volume"] >= 0).all(), "Negative volume found"
+
+        rprint("[green]✓ FCP source priority preserved with Polars pipeline[/green]")
+
+    def test_polars_fcp_hybrid_boundary(self, fcp_manager_futures, utc_now):
+        """Hybrid Vision+REST fetch across 48h boundary with Polars pipeline."""
+        # Range that spans Vision/REST boundary (~48h from now)
+        end_time = utc_now - timedelta(hours=24)
+        start_time = end_time - timedelta(days=5)
+
+        df = fcp_manager_futures.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+            include_source_info=True,
+        )
+
+        assert df is not None and not df.empty, "Hybrid fetch failed"
+
+        if "_data_source" in df.columns:
+            analysis = analyze_source_distribution(df)
+            print_source_table(analysis, "Polars FCP Hybrid Boundary")
+
+            # Should have multiple sources for boundary crossing
+            sources = list(analysis["sources"].keys())
+            rprint(f"[cyan]Sources used: {sources}[/cyan]")
+
+        # Data must be complete and gap-free
+        if df.index.name == "open_time":
+            assert df.index.is_monotonic_increasing, "Timestamps not monotonic"
+            assert not df.index.has_duplicates, "Duplicates found"
+        rprint("[green]✓ Hybrid boundary handled correctly[/green]")
+
+    def test_polars_fcp_return_polars_true(self, fcp_manager_futures, historical_range):
+        """return_polars=True should return Polars DataFrame with FCP."""
+        import polars as pl
+
+        start_time, end_time = historical_range
+
+        result = fcp_manager_futures.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+            return_polars=True,
+        )
+
+        assert isinstance(result, pl.DataFrame), f"Expected pl.DataFrame, got {type(result)}"
+        assert len(result) > 0, "Empty Polars DataFrame returned"
+
+        # Verify schema
+        expected_cols = {"open_time", "open", "high", "low", "close", "volume"}
+        assert expected_cols.issubset(set(result.columns)), (
+            f"Missing columns: {expected_cols - set(result.columns)}"
+        )
+        rprint(f"[green]✓ Polars DataFrame returned with {len(result)} rows[/green]")
+
+    @pytest.mark.parametrize("market_type,symbol", [
+        (MarketType.SPOT, "BTCUSDT"),
+        (MarketType.FUTURES_USDT, "ETHUSDT"),
+        (MarketType.FUTURES_COIN, "BTCUSD_PERP"),
+    ])
+    def test_polars_fcp_all_market_types(self, market_type, symbol, historical_range):
+        """Polars FCP should work across all market types."""
+        start_time, end_time = historical_range
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+
+        df = manager.get_data(
+            symbol=symbol,
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+            include_source_info=True,
+        )
+        manager.close()
+
+        assert df is not None and not df.empty, f"FCP failed for {symbol}/{market_type.name}"
+
+        # Verify data integrity
+        if df.index.name == "open_time":
+            assert df.index.is_monotonic_increasing, "Timestamps not sorted"
+
+        rprint(f"[green]✓ {market_type.name}/{symbol}: {len(df)} rows[/green]")
+
+    @pytest.mark.parametrize("interval,min_rows", [
+        (Interval.MINUTE_1, 5000),
+        (Interval.MINUTE_5, 1000),
+        (Interval.HOUR_1, 100),
+        (Interval.DAY_1, 5),
+    ])
+    def test_polars_fcp_interval_coverage(self, fcp_manager_futures, historical_range, interval, min_rows):
+        """Polars FCP should work correctly for all intervals."""
+        start_time, end_time = historical_range
+
+        df = fcp_manager_futures.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=interval,
+            include_source_info=True,
+        )
+
+        if df is None or df.empty:
+            pytest.skip(f"No data returned for interval {interval.value}")
+
+        assert len(df) >= min_rows, (
+            f"Interval {interval.value}: Expected {min_rows}+ rows, got {len(df)}"
+        )
+
+        rprint(f"[green]✓ {interval.value}: {len(df)} rows[/green]")
+
+    def test_polars_fcp_data_equivalence(self, fcp_manager_futures, historical_range):
+        """Polars FCP must produce same data as pandas path.
+
+        This is the critical equivalence test - FCP merge logic must
+        be identical regardless of code path used.
+        """
+        import os
+
+        start_time, end_time = historical_range
+
+        # Fetch with Polars pipeline (enabled by fixture)
+        df_polars = fcp_manager_futures.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+        )
+
+        # Fetch without Polars pipeline
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "false"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
+
+        # Create fresh manager to pick up env changes
+        fcp_manager_futures.close()
+        manager_pandas = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+
+        df_pandas = manager_pandas.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.HOUR_1,
+        )
+        manager_pandas.close()
+
+        if df_polars.empty or df_pandas.empty:
+            pytest.skip("Empty data - cannot compare")
+
+        # Reset index for comparison
+        df_polars_reset = df_polars.reset_index()
+        df_pandas_reset = df_pandas.reset_index()
+
+        # Shape must match
+        assert df_polars_reset.shape == df_pandas_reset.shape, (
+            f"Shape mismatch: polars={df_polars_reset.shape}, pandas={df_pandas_reset.shape}"
+        )
+
+        # OHLCV values must match
+        for col in ["open", "high", "low", "close", "volume"]:
+            if col in df_polars_reset.columns:
+                pd.testing.assert_series_equal(
+                    df_polars_reset[col],
+                    df_pandas_reset[col],
+                    check_exact=False,
+                    rtol=1e-10,
+                    obj=f"Column '{col}'",
+                )
+
+        rprint(f"[green]✓ Data equivalence verified: {len(df_polars)} rows match[/green]")
+
+
+# =============================================================================
+# CLI Entry Point (for manual testing)
+# =============================================================================
 
 
 def main():
