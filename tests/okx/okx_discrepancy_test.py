@@ -65,37 +65,45 @@ class TestBarParameterRequirement:
 
 @pytest.mark.integration
 @pytest.mark.okx
-class TestOneSecondIntervalAvailability:
-    """Tests for 1-second interval data availability."""
+class TestOneSecondIntervalRejection:
+    """Tests verifying that 1-second interval is NOT supported by OKX REST API v5.
 
-    def test_candles_1s_interval_available(self) -> None:
+    NOTE: OKX REST API v5 does NOT support 1-second intervals.
+    Supported intervals are: 1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, 1W, 1M
+    and their UTC variants (1Hutc, 4Hutc, etc.)
+
+    Error 51000 = "Parameter bar error" is returned for unsupported intervals.
+    """
+
+    def test_candles_rejects_1s_interval(self) -> None:
         """
-        Verify the candles endpoint supports 1-second interval for recent data.
+        Verify the candles endpoint rejects 1-second interval.
+
+        OKX REST API v5 does not support 1s interval. The minimum supported
+        interval is 1m (1 minute).
 
         Validates:
-        - API returns code "0" (success)
-        - Data is returned for 1s interval
+        - API returns error code "51000" (Parameter bar error)
         """
         params = {"instId": SPOT_INSTRUMENT, "bar": "1s", "limit": 5}
         response = retry_request(CANDLES_ENDPOINT, params)
 
         assert "data" in response, f"Request failed: {response.get('error')}"
         data = response["data"]
-        assert data.get("code") == "0", f"Expected code '0', got {data.get('code')}: {data.get('msg')}"
-        assert len(data.get("data", [])) > 0, "Expected 1s interval data"
+        # OKX returns code "51000" for "Parameter bar error"
+        assert data.get("code") == "51000", (
+            f"Expected error code '51000' for unsupported 1s interval, "
+            f"got code='{data.get('code')}', msg='{data.get('msg')}'"
+        )
 
-    @pytest.mark.parametrize("days_back", [1, 7, 14])
-    def test_history_candles_1s_interval_at_various_dates(self, days_back: int) -> None:
+    def test_history_candles_rejects_1s_interval(self) -> None:
         """
-        Verify 1-second interval data availability at different historical points.
-
-        The 1s interval typically has limited historical depth (around 20-30 days).
+        Verify the history-candles endpoint rejects 1-second interval.
 
         Validates:
-        - API returns code "0" (success)
-        - Data availability is checked at different time points
+        - API returns error code "51000" (Parameter bar error)
         """
-        test_time = datetime.now() - timedelta(days=days_back)
+        test_time = datetime.now() - timedelta(days=1)
         test_timestamp = int(test_time.timestamp() * 1000)
 
         params = {"instId": SPOT_INSTRUMENT, "bar": "1s", "limit": 5, "after": test_timestamp}
@@ -103,9 +111,11 @@ class TestOneSecondIntervalAvailability:
 
         assert "data" in response, f"Request failed: {response.get('error')}"
         data = response["data"]
-        assert data.get("code") == "0", f"Expected code '0', got {data.get('code')}: {data.get('msg')}"
-        # Note: 1s data may not be available for older dates
-        # We just verify the API responds correctly
+        # OKX returns code "51000" for "Parameter bar error"
+        assert data.get("code") == "51000", (
+            f"Expected error code '51000' for unsupported 1s interval, "
+            f"got code='{data.get('code')}', msg='{data.get('msg')}'"
+        )
 
 
 @pytest.mark.integration

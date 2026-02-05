@@ -6,13 +6,11 @@ These integration tests verify the OKX API behavior with different interval
 formats, including case sensitivity and 1-second interval support.
 """
 
-from datetime import datetime, timedelta
 
 import pytest
 
 from tests.okx.conftest import (
     CANDLES_ENDPOINT,
-    HISTORY_CANDLES_ENDPOINT,
     SPOT_INSTRUMENT,
     retry_request_with_status as retry_request,
 )
@@ -91,77 +89,32 @@ class TestIntervalCaseSensitivity:
 @pytest.mark.integration
 @pytest.mark.okx
 class TestOneSecondInterval:
-    """Tests for 1-second interval support."""
+    """Tests for 1-second interval behavior.
 
-    def test_candles_supports_1s_interval(self) -> None:
+    NOTE: OKX REST API v5 does NOT support 1-second intervals.
+    Supported intervals are: 1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, 1W, 1M
+    and their UTC variants (1Hutc, 4Hutc, etc.)
+
+    Error 51000 = "Parameter bar error" is returned for unsupported intervals.
+    """
+
+    def test_candles_rejects_1s_interval(self) -> None:
         """
-        Verify the candles endpoint supports 1-second interval.
+        Verify the candles endpoint rejects 1-second interval.
+
+        OKX REST API v5 does not support 1s interval. The minimum supported
+        interval is 1m (1 minute).
 
         Validates:
-        - API returns code "0" (success)
-        - Data is returned for 1s interval
+        - API returns error code "51000" (Parameter bar error)
         """
         params = {"instId": SPOT_INSTRUMENT, "bar": "1s", "limit": 10}
         response = retry_request(CANDLES_ENDPOINT, params)
 
         assert "data" in response, f"Request failed: {response.get('error')}"
         data = response["data"]
-        assert data.get("code") == "0", f"Expected success for 1s: {data.get('msg')}"
-        assert len(data.get("data", [])) > 0, "No data returned for 1s interval"
-
-    @pytest.mark.parametrize(
-        "days_back,period_name",
-        [
-            (1, "1 day ago"),
-            (7, "1 week ago"),
-        ],
-    )
-    def test_history_candles_1s_recent_availability(self, days_back: int, period_name: str) -> None:
-        """
-        Verify 1-second interval data availability for recent periods.
-
-        The 1s interval has limited historical depth (typically around 20-30 days).
-
-        Validates:
-        - API returns code "0" (success)
-        - Data is available for recent dates
-        """
-        timestamp = int((datetime.now() - timedelta(days=days_back)).timestamp() * 1000)
-        params = {
-            "instId": SPOT_INSTRUMENT,
-            "bar": "1s",
-            "limit": 10,
-            "after": timestamp,
-        }
-        response = retry_request(HISTORY_CANDLES_ENDPOINT, params)
-
-        assert "data" in response, f"Request failed: {response.get('error')}"
-        data = response["data"]
-        assert data.get("code") == "0", f"Expected success for 1s at {period_name}: {data.get('msg')}"
-        # Note: Data may or may not be available depending on the cutoff
-
-    def test_history_candles_1s_old_data_not_available(self) -> None:
-        """
-        Verify 1-second interval data is not available for dates beyond the retention period.
-
-        The 1s interval typically only retains data for ~20-30 days.
-
-        Validates:
-        - API returns code "0" (success)
-        - Data is empty for dates beyond retention
-        """
-        # 6 months ago should be beyond 1s retention
-        timestamp = int((datetime.now() - timedelta(days=180)).timestamp() * 1000)
-        params = {
-            "instId": SPOT_INSTRUMENT,
-            "bar": "1s",
-            "limit": 10,
-            "after": timestamp,
-        }
-        response = retry_request(HISTORY_CANDLES_ENDPOINT, params)
-
-        assert "data" in response, f"Request failed: {response.get('error')}"
-        data = response["data"]
-        assert data.get("code") == "0", f"Expected code '0': {data.get('msg')}"
-        # Expect no data for old 1s requests
-        assert len(data.get("data", [])) == 0, "Expected no 1s data from 6 months ago"
+        # OKX returns code "51000" for "Parameter bar error"
+        assert data.get("code") == "51000", (
+            f"Expected error code '51000' for unsupported 1s interval, "
+            f"got code='{data.get('code')}', msg='{data.get('msg')}'"
+        )

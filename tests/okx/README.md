@@ -34,16 +34,14 @@ This test suite includes the following files:
   - **Key Tests:**
     - **Limit Parameter Constraints:** Explores the actual maximum number of records returned by the API when requesting more than the typical limit.
     - **Invalid Instrument IDs:** Verifies API responses for malformed, non-existent, or empty instrument IDs.
-    - **Invalid Intervals:** Tests API responses for unsupported or improperly cased/formatted interval parameters (e.g., `1s`, `1h` instead of `1H`).
+    - **Invalid Intervals:** Tests API responses for unsupported or improperly cased/formatted interval parameters (e.g., `1h` instead of `1H`, `1s` which is not supported).
     - **Timestamp Edge Cases:** Tests API behavior with timestamps that are in the far future, far past (before available data), or invalid combinations of `before` and `after`.
     - **Missing Required Parameters:** Checks if the API correctly returns errors when essential parameters like `instId` are omitted.
 
-- **`test_okx_1s_availability.py`**:
-  - **Purpose:** Specifically investigates the availability of 1-second (`1s`) interval data from the OKX API, which is noted as having limited availability.
-  - **Key Tests:**
-    - Tests recent and historical availability of `1s` data for the `candles` and `history-candles` endpoints, confirming that `candles` does not support `1s`.
-    - Checks availability at specific historical timepoints and hourly intervals throughout the current day to understand patterns or limitations.
-    - Explores the actual historical depth of `1s` data available via the `history-candles` endpoint.
+- **`test_okx_1s_availability.py`**: **REMOVED**
+  - This file has been removed because OKX REST API v5 does NOT support 1-second (`1s`) intervals.
+  - Error code `51000` ("Parameter bar error") is returned for the `1s` interval.
+  - The minimum supported interval is `1m` (1 minute).
 
 - **`test_okx_candles_depth.py`**:
   - **Purpose:** Systematically determines the historical depth of candlestick data available for a range of intervals from both the `candles` and `history-candles` endpoints.
@@ -56,8 +54,9 @@ This test suite includes the following files:
   - **Purpose:** Focuses solely on validating the OKX API's handling of different time interval parameters, especially regarding case sensitivity and supported values.
   - **Key Tests:**
     - Tests case sensitivity for various intervals (e.g., `1h` vs `1H`), confirming OKX's requirement for uppercase for `H`, `D`, `W`, `M`.
-    - Explicitly tests the `1s` interval with both endpoints to confirm its rejection by `candles` and its limited availability via `history-candles`.
+    - Tests that the `1s` interval is rejected by the API with error code `51000` ("Parameter bar error").
     - Validates that only officially supported intervals are accepted by the API.
+  - **Supported Intervals:** `1m`, `3m`, `5m`, `15m`, `30m`, `1H`, `2H`, `4H`, `6H`, `12H`, `1D`, `1W`, `1M` (and UTC variants like `1Hutc`, `4Hutc`).
 
 ## Core Components and Utilities
 
