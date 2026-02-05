@@ -1,3 +1,12 @@
+# [1.5.0](https://github.com/terrylica/data-source-manager/compare/v1.4.0...v1.5.0) (2026-02-05)
+
+
+### Features
+
+* **providers:** wire factory pattern to DataSourceManager ([1c609ea](https://github.com/terrylica/data-source-manager/commit/1c609eabee75a4e329e3ba4db71482734072e8f6))
+* **release:** add local PyPI publishing with 1Password integration ([af489ec](https://github.com/terrylica/data-source-manager/commit/af489ec8fbfbc178b03b81d1097a44dd7a4206b2))
+* **release:** include PyPI publish in release:full workflow ([21a6746](https://github.com/terrylica/data-source-manager/commit/21a67469c81e469d060210c65fe08da52818d500))
+
 # [1.4.0](https://github.com/terrylica/data-source-manager/compare/v1.3.0...v1.4.0) (2026-02-04)
 
 
