@@ -36,7 +36,7 @@ Example:
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, overload
 
 import pandas as pd
 import polars as pl
@@ -61,6 +61,7 @@ from data_source_manager.utils.for_core.dsm_date_range_utils import (
     calculate_date_range,
     get_date_range_description,
 )
+from data_source_manager.utils.config import FeatureFlags
 from data_source_manager.utils.for_core.dsm_fcp_utils import (
     handle_error,
     process_cache_step,
@@ -69,6 +70,7 @@ from data_source_manager.utils.for_core.dsm_fcp_utils import (
     validate_interval,
     verify_final_data,
 )
+from data_source_manager.utils.internal.polars_pipeline import PolarsDataPipeline
 from data_source_manager.utils.for_core.dsm_time_range_utils import (
     standardize_columns,
 )
@@ -771,6 +773,34 @@ class DataSourceManager:
             # Ensure client is closed
             funding_client.close()
 
+    @overload
+    def get_data(
+        self,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        interval: Interval = ...,
+        chart_type: ChartType | None = ...,
+        include_source_info: bool = ...,
+        enforce_source: DataSource = ...,
+        auto_reindex: bool = ...,
+        return_polars: Literal[False] = ...,
+    ) -> pd.DataFrame: ...
+
+    @overload
+    def get_data(
+        self,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        interval: Interval = ...,
+        chart_type: ChartType | None = ...,
+        include_source_info: bool = ...,
+        enforce_source: DataSource = ...,
+        auto_reindex: bool = ...,
+        return_polars: Literal[True] = ...,
+    ) -> pl.DataFrame: ...
+
     def get_data(
         self,
         symbol: str,
@@ -964,6 +994,11 @@ class DataSourceManager:
             result_df = pd.DataFrame()
             missing_ranges = []
 
+            # Check if Polars pipeline is enabled via feature flag
+            use_polars_pipeline = FeatureFlags().USE_POLARS_PIPELINE
+            if use_polars_pipeline:
+                logger.debug("[FCP] Using Polars pipeline for internal processing (USE_POLARS_PIPELINE=True)")
+
             # ----------------------------------------------------------------
             # STEP 1: Local Cache Retrieval
             # ----------------------------------------------------------------
@@ -972,16 +1007,56 @@ class DataSourceManager:
                 DataSource.VISION,
             )
 
+            # Initialize Polars pipeline if enabled
+            polars_pipeline: PolarsDataPipeline | None = None
+            if use_polars_pipeline:
+                polars_pipeline = PolarsDataPipeline()
+
             if not skip_cache:
-                result_df, missing_ranges = process_cache_step(
-                    use_cache=self.use_cache,
-                    get_from_cache_func=self._get_from_cache,
-                    symbol=symbol,
-                    aligned_start=aligned_start,
-                    aligned_end=aligned_end,
-                    interval=interval,
-                    include_source_info=include_source_info,
-                )
+                if use_polars_pipeline and polars_pipeline is not None:
+                    # Use Polars LazyFrame-based cache retrieval
+                    from data_source_manager.utils.for_core.dsm_cache_utils import get_cache_lazyframes
+
+                    logger.info(f"[FCP] STEP 1: Checking local cache for {symbol} (Polars pipeline)")
+                    cache_lazyframes = get_cache_lazyframes(
+                        symbol=symbol,
+                        start_time=aligned_start,
+                        end_time=aligned_end,
+                        interval=interval,
+                        cache_dir=self.cache_dir,
+                        market_type=self.market_type,
+                        chart_type=chart_type,
+                    )
+
+                    if cache_lazyframes:
+                        for lf in cache_lazyframes:
+                            polars_pipeline.add_source(lf, "CACHE")
+                        logger.info(f"[FCP] Cache contributed {len(cache_lazyframes)} LazyFrame(s) to pipeline")
+
+                        # Still need to identify missing ranges for Vision/REST steps
+                        # Collect cache data to check coverage
+                        cache_df = polars_pipeline.collect_pandas(use_streaming=True)
+                        if not cache_df.empty:
+                            from data_source_manager.utils.for_core.dsm_time_range_utils import identify_missing_segments
+
+                            missing_ranges = identify_missing_segments(cache_df, aligned_start, aligned_end, interval)
+                            result_df = cache_df
+                        else:
+                            missing_ranges = [(aligned_start, aligned_end)]
+                    else:
+                        missing_ranges = [(aligned_start, aligned_end)]
+                        logger.debug(f"[FCP] No cache data available, entire range marked as missing: {aligned_start} to {aligned_end}")
+                else:
+                    # Original pandas-based cache step
+                    result_df, missing_ranges = process_cache_step(
+                        use_cache=self.use_cache,
+                        get_from_cache_func=self._get_from_cache,
+                        symbol=symbol,
+                        aligned_start=aligned_start,
+                        aligned_end=aligned_end,
+                        interval=interval,
+                        include_source_info=include_source_info,
+                    )
             else:
                 if enforce_source == DataSource.REST:
                     logger.info("[FCP] Cache check skipped due to enforce_source=REST")
@@ -1010,6 +1085,14 @@ class DataSourceManager:
                     include_source_info=include_source_info,
                     result_df=result_df,
                 )
+
+                # If using Polars pipeline, add Vision data to pipeline for final merge
+                if use_polars_pipeline and polars_pipeline is not None and not result_df.empty:
+                    # Filter to only Vision data and add to pipeline
+                    if "_data_source" in result_df.columns:
+                        vision_df = result_df[result_df["_data_source"] == "VISION"]
+                        if not vision_df.empty:
+                            polars_pipeline.add_pandas(vision_df, "VISION")
 
             # ----------------------------------------------------------------
             # STEP 3: REST API Fallback with Final Merge
@@ -1107,7 +1190,17 @@ class DataSourceManager:
 
             # Convert to Polars if requested
             if return_polars:
-                # Convert pandas DataFrame to Polars DataFrame
+                # Check if zero-copy Polars output is enabled
+                use_polars_output = FeatureFlags().USE_POLARS_OUTPUT
+
+                if use_polars_output and use_polars_pipeline and polars_pipeline is not None:
+                    # Zero-copy path: Use PolarsDataPipeline directly
+                    # This avoids the wasteful pandas → polars conversion
+                    logger.debug("[FCP] Using zero-copy Polars output (USE_POLARS_OUTPUT=True)")
+                    result_pl = polars_pipeline.collect_polars(use_streaming=True)
+                    logger.debug(f"[FCP] Zero-copy Polars DataFrame with {len(result_pl)} rows")
+                    return result_pl
+                # Fallback: Convert pandas DataFrame to Polars DataFrame
                 # Reset index to include open_time as a column before conversion
                 if result_df.index.name == "open_time":
                     result_df = result_df.reset_index()

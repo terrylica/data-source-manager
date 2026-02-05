@@ -217,15 +217,56 @@ DEFAULT_CACHE_DIR = Path.home() / ".binance_data_cache"
 DEFAULT_LOG_DIR = Path.home() / ".binance_data_logs"
 
 
+def _parse_bool_env(env_var: str, default: bool) -> bool:
+    """Parse boolean from environment variable with fallback to default.
+
+    Args:
+        env_var: Environment variable name to check
+        default: Default value if env var not set
+
+    Returns:
+        Boolean value from environment or default
+    """
+    env_value = os.getenv(env_var)
+    if env_value is None:
+        return default
+    return env_value.lower() in ("true", "1", "yes")
+
+
 # Feature flags
 @attrs.define
 class FeatureFlags:
-    """System-wide feature flags for enabling/disabling functionality."""
+    """System-wide feature flags for enabling/disabling functionality.
+
+    Phase 2-3 Polars Migration Flags (ADR: docs/adr/2025-01-30-failover-control-protocol.md):
+    - USE_POLARS_PIPELINE: Enable internal Polars LazyFrame processing (Phase 2)
+    - USE_POLARS_OUTPUT: Enable zero-copy Polars output when return_polars=True (Phase 3)
+
+    Environment variables:
+    - DSM_USE_POLARS_PIPELINE=true/false
+    - DSM_USE_POLARS_OUTPUT=true/false
+    """
 
     ENABLE_CACHE: bool = attrs.field(default=True)
     VALIDATE_CACHE_ON_READ: bool = attrs.field(default=True)
     USE_VISION_FOR_LARGE_REQUESTS: bool = attrs.field(default=True)
     VALIDATE_DATA_ON_WRITE: bool = attrs.field(default=True)
+
+    # Phase 2: Internal Polars LazyFrame processing
+    # When True, uses PolarsDataPipeline internally for FCP merge operations
+    # Returns pandas DataFrame at API boundary (backward compatible)
+    USE_POLARS_PIPELINE: bool = attrs.field(
+        default=False,
+        converter=lambda x: _parse_bool_env("DSM_USE_POLARS_PIPELINE", x),
+    )
+
+    # Phase 3: Zero-copy Polars output
+    # When True AND return_polars=True, skips pandas conversion entirely
+    # Provides maximum memory efficiency for Polars consumers
+    USE_POLARS_OUTPUT: bool = attrs.field(
+        default=False,
+        converter=lambda x: _parse_bool_env("DSM_USE_POLARS_OUTPUT", x),
+    )
 
     @classmethod
     def update(cls, **kwargs: Any) -> None:
@@ -236,6 +277,7 @@ class FeatureFlags:
 
         Example:
             FeatureFlags.update(ENABLE_CACHE=False)
+            FeatureFlags.update(USE_POLARS_PIPELINE=True)
         """
         for key, value in kwargs.items():
             if hasattr(cls, key):

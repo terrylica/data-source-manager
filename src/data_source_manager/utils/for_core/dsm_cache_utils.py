@@ -122,6 +122,86 @@ def get_cache_dir_for_symbol(
 # =============================================================================
 
 
+def get_cache_lazyframes(
+    symbol: str,
+    start_time: datetime,
+    end_time: datetime,
+    interval: Interval,
+    cache_dir: Path,
+    market_type: MarketType,
+    chart_type: ChartType = ChartType.KLINES,
+    provider: DataProvider = DataProvider.BINANCE,
+) -> list[pl.LazyFrame]:
+    """Get LazyFrames from cache for use with PolarsDataPipeline.
+
+    This function returns a list of filtered LazyFrames, one per cache file found.
+    The caller (PolarsDataPipeline) is responsible for concatenation and merge.
+
+    This enables predicate pushdown and lazy evaluation through the entire pipeline.
+
+    Args:
+        symbol: Trading symbol
+        start_time: Start time
+        end_time: End time
+        interval: Time interval
+        cache_dir: Cache directory
+        market_type: Market type (spot, um, cm)
+        chart_type: Chart type (klines, funding_rate)
+        provider: Data provider - currently supports Binance only
+
+    Returns:
+        List of LazyFrames with time-filtered data and _data_source="CACHE" column
+    """
+    # Initialize FSSpecVisionHandler for path mapping
+    fs_handler = FSSpecVisionHandler(base_cache_dir=cache_dir)
+
+    if provider != DataProvider.BINANCE:
+        logger.warning(f"Provider {provider.name} cache retrieval not yet implemented, falling back to Binance format")
+
+    # Calculate the days we need to query
+    current_date = pendulum.instance(start_time).start_of("day")
+    end_date = pendulum.instance(end_time).start_of("day")
+
+    lazy_frames: list[pl.LazyFrame] = []
+
+    # Iterate through days
+    while current_date <= end_date:
+        try:
+            # Get cache path for this day
+            cache_path = fs_handler.get_local_path_for_data(
+                symbol=symbol,
+                interval=interval,
+                date=current_date,
+                market_type=market_type,
+                chart_type=chart_type,
+            )
+
+            # Check if cache file exists
+            if fs_handler.exists(cache_path):
+                logger.debug(f"Found cache file: {cache_path}")
+
+                try:
+                    # Scan Arrow IPC lazily with time filter (predicate pushdown)
+                    lf = pl.scan_ipc(cache_path).filter(
+                        (pl.col("open_time") >= start_time) & (pl.col("open_time") <= end_time)
+                    ).with_columns(pl.lit("CACHE").alias("_data_source"))
+
+                    lazy_frames.append(lf)
+                    logger.debug(f"Added LazyFrame for {current_date.format('YYYY-MM-DD')}")
+                except (OSError, pl.exceptions.ComputeError, ValueError, KeyError) as e:
+                    logger.error(f"Error scanning cache file {cache_path}: {e}")
+            else:
+                logger.debug(f"No cache file found for {current_date.format('YYYY-MM-DD')}")
+        except (OSError, ValueError, TypeError) as e:
+            logger.error(f"Error processing cache for {current_date.format('YYYY-MM-DD')}: {e}")
+
+        # Move to next day
+        current_date = current_date.add(days=1)
+
+    logger.debug(f"Returning {len(lazy_frames)} cache LazyFrames")
+    return lazy_frames
+
+
 def get_from_cache(
     symbol: str,
     start_time: datetime,

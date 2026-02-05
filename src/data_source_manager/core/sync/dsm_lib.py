@@ -38,9 +38,12 @@ Example:
 
 from datetime import datetime
 from time import perf_counter
+from typing import Literal, overload
+
+import pandas as pd
+import polars as pl
 
 from data_source_manager.core.sync.data_source_manager import DataSource
-from data_source_manager.utils.dataframe_types import TimestampedDataFrame
 
 # Import utility modules
 from data_source_manager.utils.for_demo.dsm_cache_utils import (
@@ -164,6 +167,40 @@ def process_market_parameters(
     return provider_enum, market_type, chart_type_enum, symbol, interval_enum
 
 
+@overload
+def fetch_market_data(
+    provider: DataProvider,
+    market_type: MarketType,
+    chart_type: ChartType,
+    symbol: str,
+    interval: Interval,
+    start_time: datetime | str | None = ...,
+    end_time: datetime | str | None = ...,
+    days: int = ...,
+    use_cache: bool = ...,
+    enforce_source: str = ...,
+    max_retries: int = ...,
+    return_polars: Literal[False] = ...,
+) -> tuple[pd.DataFrame | None, float, int]: ...
+
+
+@overload
+def fetch_market_data(
+    provider: DataProvider,
+    market_type: MarketType,
+    chart_type: ChartType,
+    symbol: str,
+    interval: Interval,
+    start_time: datetime | str | None = ...,
+    end_time: datetime | str | None = ...,
+    days: int = ...,
+    use_cache: bool = ...,
+    enforce_source: str = ...,
+    max_retries: int = ...,
+    return_polars: Literal[True] = ...,
+) -> tuple[pl.DataFrame | None, float, int]: ...
+
+
 def fetch_market_data(
     provider: DataProvider,
     market_type: MarketType,
@@ -176,7 +213,8 @@ def fetch_market_data(
     use_cache: bool = True,
     enforce_source: str = "AUTO",
     max_retries: int = 3,
-) -> tuple[TimestampedDataFrame | None, float, int]:
+    return_polars: bool = False,
+) -> tuple[pd.DataFrame | pl.DataFrame | None, float, int]:
     """Fetch market data using the Failover Control Protocol.
 
     This function retrieves market data from multiple sources using a progressive
@@ -200,10 +238,13 @@ def fetch_market_data(
         use_cache: Whether to use the local cache
         enforce_source: Enforce specific data source ("AUTO", "CACHE", "VISION", "REST")
         max_retries: Maximum retry attempts for API calls
+        return_polars: Whether to return a Polars DataFrame instead of Pandas.
+                      When True, returns pl.DataFrame for better memory efficiency.
+                      When False (default), returns pd.DataFrame for backward compatibility.
 
     Returns:
         Tuple containing:
-        - DataFrame with market data (or None if error)
+        - DataFrame with market data (pd.DataFrame or pl.DataFrame based on return_polars)
         - Elapsed time in seconds
         - Number of records retrieved
 
@@ -251,6 +292,14 @@ def fetch_market_data(
         end_time_perf = perf_counter()
         elapsed_time = end_time_perf - start_time_perf
         records_count = 0 if df is None or df.empty else len(df)
+
+        # Convert to Polars if requested
+        if return_polars and df is not None and not df.empty:
+            # Reset index to include open_time as a column before conversion
+            if df.index.name == "open_time":
+                df = df.reset_index()
+            df = pl.from_pandas(df)
+            logger.debug(f"Converted to Polars DataFrame with {len(df)} rows")
 
         return df, elapsed_time, records_count
 
