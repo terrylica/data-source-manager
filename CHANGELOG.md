@@ -1,3 +1,27 @@
+# [3.0.0](https://github.com/terrylica/data-source-manager/compare/v2.0.2...v3.0.0) (2026-02-05)
+
+
+### Bug Fixes
+
+* **okx:** adjust candles endpoint test to reflect 12h window limit ([9fb731f](https://github.com/terrylica/data-source-manager/commit/9fb731f050935fff47b7b78bd7346cc6c33ec562))
+* **okx:** remove 1s interval tests (not supported by OKX REST API v5) ([0e2fc36](https://github.com/terrylica/data-source-manager/commit/0e2fc3697ed8ae8f5e7351ad83ae445d5f3b3680))
+* **polars:** handle schema mismatches for original_timestamp and adjust memory threshold ([c11adb8](https://github.com/terrylica/data-source-manager/commit/c11adb8b9df1339e5fe31b797c39ae5947c54b32))
+
+
+### Features
+
+* **polars:** enable Polars pipeline as default processing path ([1ac72eb](https://github.com/terrylica/data-source-manager/commit/1ac72ebc4b020f5a6819fe8628b6b93643d0b3b0))
+
+
+### BREAKING CHANGES
+
+* **polars:** Polars is now the default internal processing path.
+Users can opt-out by setting DSM_USE_POLARS_PIPELINE=false or
+DSM_USE_POLARS_OUTPUT=false environment variables.
+
+SRED-Type: experimental-development
+SRED-Claim: POLARS-MIGRATION
+
 ## [2.0.2](https://github.com/terrylica/data-source-manager/compare/v2.0.1...v2.0.2) (2026-02-05)
 
 
