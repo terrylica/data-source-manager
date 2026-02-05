@@ -1,3 +1,15 @@
+# [1.6.0](https://github.com/terrylica/data-source-manager/compare/v1.5.0...v1.6.0) (2026-02-05)
+
+
+### Bug Fixes
+
+* align Vision API interface and remove dead code ([b8c5eae](https://github.com/terrylica/data-source-manager/commit/b8c5eaeca0f07ebd3c2700a2b81ebcc22fa2bc66)), closes [#3-8](https://github.com/terrylica/data-source-manager/issues/3-8) [#7](https://github.com/terrylica/data-source-manager/issues/7) [#5](https://github.com/terrylica/data-source-manager/issues/5)
+
+
+### Features
+
+* **availability:** wire data availability validation with fail-loud behavior ([11563c5](https://github.com/terrylica/data-source-manager/commit/11563c53897e681325c4375fa506642bcf5383a9))
+
 # [1.5.0](https://github.com/terrylica/data-source-manager/compare/v1.4.0...v1.5.0) (2026-02-05)
 
 
