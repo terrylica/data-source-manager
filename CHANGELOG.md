@@ -1,3 +1,23 @@
+# [2.0.0](https://github.com/terrylica/data-source-manager/compare/v1.6.0...v2.0.0) (2026-02-05)
+
+
+### Code Refactoring
+
+* **utils:** eliminate ~1,880 LOC of dead code ([d22e75b](https://github.com/terrylica/data-source-manager/commit/d22e75b9499b315b89428aff6dbc75ffbe3fe46c)), closes [#12](https://github.com/terrylica/data-source-manager/issues/12)
+
+
+### BREAKING CHANGES
+
+* **utils:** Remove deprecated exports and dead code infrastructure
+
+- Fix unreachable else block in dataframe_utils.py (Vulture 100% confidence)
+- Delete utils/for_logger/ directory (9 files, 1,413 LOC) - zero consumers
+- Delete utils/dsm_config.py (351 LOC) - unused, DataSourceConfig is canonical
+- Delete utils/for_demo/dsm_datetime_parser.py (108 LOC) - duplicate of dsm_date_range_utils
+- Delete utils/logger_setup.py (51 LOC) - deprecated re-export with zero consumers
+- Remove TimeoutError alias from rest_exceptions.py
+- Remove create_legacy_client() from client_factory.py and all re-exports
+
 # [1.6.0](https://github.com/terrylica/data-source-manager/compare/v1.5.0...v1.6.0) (2026-02-05)
 
 
