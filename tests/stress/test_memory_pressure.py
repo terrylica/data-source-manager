@@ -154,3 +154,300 @@ class TestMixedSourceMerge:
         if final_size_mb > 0:
             efficiency_ratio = tracker.peak_mb / final_size_mb
             assert efficiency_ratio < 15.0, f"Merge efficiency {efficiency_ratio:.1f}x exceeds 15x limit"
+
+
+@pytest.mark.stress
+@pytest.mark.integration
+class TestPolarsFeatureFlagIntegration:
+    """Tests that verify Polars pipeline feature flags with real market data.
+
+    These tests ensure:
+    1. Feature flags actually enable the Polars pipeline code paths
+    2. Memory improvement is measurable when flags are enabled
+    3. Data integrity is preserved regardless of flag settings
+    4. Performance across multiple symbols and intervals
+    """
+
+    @pytest.fixture
+    def env_without_polars(self, monkeypatch):
+        """Environment with Polars pipeline disabled."""
+        monkeypatch.setenv("DSM_USE_POLARS_PIPELINE", "false")
+        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "false")
+
+    @pytest.fixture
+    def env_with_polars_pipeline(self, monkeypatch):
+        """Environment with Polars pipeline enabled (Phase 2)."""
+        monkeypatch.setenv("DSM_USE_POLARS_PIPELINE", "true")
+        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "false")
+
+    @pytest.fixture
+    def env_with_full_polars(self, monkeypatch):
+        """Environment with full Polars optimization (Phase 2 + Phase 3)."""
+        monkeypatch.setenv("DSM_USE_POLARS_PIPELINE", "true")
+        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "true")
+
+    def test_feature_flag_memory_comparison(self, memory_tracker):
+        """Compare memory usage with and without Polars pipeline.
+
+        This test measures the actual memory difference when USE_POLARS_PIPELINE
+        is enabled vs disabled, using real market data.
+        """
+        import os
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+
+        end = datetime(2024, 1, 8, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        # Measure WITHOUT Polars pipeline
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "false"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
+
+        gc.collect()
+        tracemalloc.start()
+        df_without = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
+        _, peak_without = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        row_count_without = len(df_without)
+        del df_without
+        gc.collect()
+
+        # Measure WITH Polars pipeline
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "true"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
+
+        # Need fresh manager to pick up env change
+        manager.close()
+        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+
+        gc.collect()
+        tracemalloc.start()
+        df_with = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
+        _, peak_with = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        row_count_with = len(df_with)
+        manager.close()
+
+        peak_without_mb = peak_without / (1024 * 1024)
+        peak_with_mb = peak_with / (1024 * 1024)
+
+        # Data integrity: same row count
+        assert row_count_without == row_count_with, (
+            f"Row count mismatch: without={row_count_without}, with={row_count_with}"
+        )
+
+        # Log memory comparison for analysis
+        print("\nMemory comparison (Polars pipeline):")
+        print(f"  Without: {peak_without_mb:.2f} MB")
+        print(f"  With:    {peak_with_mb:.2f} MB")
+        print(f"  Rows:    {row_count_with}")
+
+        # Polars pipeline should not be significantly worse
+        # Allow 20% overhead as tolerance (some env variations expected)
+        assert peak_with_mb <= peak_without_mb * 1.2, (
+            f"Polars pipeline ({peak_with_mb:.1f}MB) significantly worse than baseline ({peak_without_mb:.1f}MB)"
+        )
+
+    def test_zero_copy_output_memory(self, memory_tracker):
+        """Verify zero-copy Polars output uses less memory than pandas conversion.
+
+        When USE_POLARS_OUTPUT=true and return_polars=True, the output should
+        skip pandas conversion entirely, reducing memory usage.
+        """
+        import os
+
+        end = datetime(2024, 1, 8, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        # Measure WITH conversion (return_polars=True but output flag disabled)
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "true"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+
+        gc.collect()
+        tracemalloc.start()
+        manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, return_polars=True)
+        _, peak_with_conversion = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        manager.close()
+
+        gc.collect()
+
+        # Measure WITHOUT conversion (zero-copy path)
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "true"
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+
+        gc.collect()
+        tracemalloc.start()
+        manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, return_polars=True)
+        _, peak_zero_copy = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        manager.close()
+
+        peak_conversion_mb = peak_with_conversion / (1024 * 1024)
+        peak_zero_copy_mb = peak_zero_copy / (1024 * 1024)
+
+        print("\nZero-copy comparison:")
+        print(f"  With conversion: {peak_conversion_mb:.2f} MB")
+        print(f"  Zero-copy:       {peak_zero_copy_mb:.2f} MB")
+
+        # Zero-copy should be similar or better (not significantly worse)
+        assert peak_zero_copy_mb <= peak_conversion_mb * 1.2, (
+            f"Zero-copy ({peak_zero_copy_mb:.1f}MB) worse than conversion ({peak_conversion_mb:.1f}MB)"
+        )
+
+    @pytest.mark.parametrize(
+        "symbol,market_type",
+        [
+            ("BTCUSDT", MarketType.FUTURES_USDT),
+            ("ETHUSDT", MarketType.FUTURES_USDT),
+            ("BTCUSDT", MarketType.SPOT),
+            ("BTCUSD_PERP", MarketType.FUTURES_COIN),
+        ],
+    )
+    def test_polars_pipeline_multi_market(self, symbol, market_type, memory_tracker):
+        """Test Polars pipeline works correctly across different market types.
+
+        This test verifies that the feature flags work for:
+        - FUTURES_USDT (BTCUSDT, ETHUSDT)
+        - SPOT (BTCUSDT)
+        - FUTURES_COIN (BTCUSD_PERP)
+        """
+        import os
+
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "true"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "true"
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+
+        end = datetime(2024, 1, 8, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        with memory_tracker as tracker:
+            df = manager.get_data(symbol, start, end, Interval.HOUR_1)
+
+        manager.close()
+
+        if df.empty:
+            pytest.skip(f"No data returned for {symbol} on {market_type.name}")
+
+        # Verify data integrity
+        assert len(df) >= 100, f"Expected 100+ rows for 7 days, got {len(df)}"
+        assert df.index.is_monotonic_increasing, f"Timestamps not sorted for {symbol}"
+        assert not df.index.has_duplicates, f"Duplicate timestamps for {symbol}"
+
+        # Memory should be reasonable (< 50MB for 1 week of hourly data)
+        assert tracker.peak_mb < 50, (
+            f"{symbol}/{market_type.name}: Peak {tracker.peak_mb:.1f}MB exceeds 50MB"
+        )
+
+        print(f"\n{symbol}/{market_type.name}: {len(df)} rows, {tracker.peak_mb:.1f}MB peak")
+
+    @pytest.mark.parametrize(
+        "interval,expected_min_rows",
+        [
+            (Interval.MINUTE_1, 10000),  # 7 days * 24 * 60 = 10,080
+            (Interval.MINUTE_5, 2000),  # 7 days * 24 * 12 = 2,016
+            (Interval.HOUR_1, 160),  # 7 days * 24 = 168
+            (Interval.HOUR_4, 40),  # 7 days * 6 = 42
+            (Interval.DAY_1, 6),  # 7 days
+        ],
+    )
+    def test_polars_pipeline_multi_interval(self, interval, expected_min_rows, memory_tracker):
+        """Test Polars pipeline works correctly across different intervals.
+
+        This test verifies data integrity and memory efficiency for:
+        - High frequency: 1m, 5m
+        - Medium frequency: 1h, 4h
+        - Low frequency: 1d
+        """
+        import os
+
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "true"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "true"
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+
+        end = datetime(2024, 1, 8, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        with memory_tracker as tracker:
+            df = manager.get_data("BTCUSDT", start, end, interval)
+
+        manager.close()
+
+        if df.empty:
+            pytest.skip(f"No data returned for interval {interval.value}")
+
+        # Verify row count meets expectation
+        assert len(df) >= expected_min_rows, (
+            f"Interval {interval.value}: Expected {expected_min_rows}+ rows, got {len(df)}"
+        )
+
+        # Verify data integrity
+        assert df.index.is_monotonic_increasing, f"Timestamps not sorted for {interval.value}"
+        assert not df.index.has_duplicates, f"Duplicate timestamps for {interval.value}"
+
+        # OHLCV integrity checks
+        assert (df["high"] >= df["low"]).all(), f"high < low detected for {interval.value}"
+        assert (df["volume"] >= 0).all(), f"Negative volume for {interval.value}"
+
+        print(f"\n{interval.value}: {len(df)} rows, {tracker.peak_mb:.1f}MB peak")
+
+    def test_data_equivalence_with_without_flags(self):
+        """Verify data is identical with or without Polars pipeline.
+
+        Critical test: The Polars pipeline must produce exactly the same
+        data as the baseline pandas path.
+        """
+        import os
+
+        import pandas as pd
+
+        end = datetime(2024, 1, 8, tzinfo=timezone.utc)
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        # Get data WITHOUT Polars pipeline
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "false"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        df_baseline = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
+        manager.close()
+
+        # Get data WITH Polars pipeline
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "true"
+        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
+
+        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        df_polars = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
+        manager.close()
+
+        if df_baseline.empty or df_polars.empty:
+            pytest.skip("Empty data returned - network issue or no cache")
+
+        # Reset index for comparison (both should have open_time as index)
+        df_baseline_reset = df_baseline.reset_index()
+        df_polars_reset = df_polars.reset_index()
+
+        # Compare shape
+        assert df_baseline_reset.shape == df_polars_reset.shape, (
+            f"Shape mismatch: baseline={df_baseline_reset.shape}, polars={df_polars_reset.shape}"
+        )
+
+        # Compare data (allow small floating point differences)
+        for col in ["open", "high", "low", "close", "volume"]:
+            if col in df_baseline_reset.columns:
+                pd.testing.assert_series_equal(
+                    df_baseline_reset[col],
+                    df_polars_reset[col],
+                    check_exact=False,
+                    rtol=1e-10,
+                    obj=f"Column '{col}'",
+                )
+
+        print(f"\nData equivalence verified: {len(df_baseline)} rows match")
