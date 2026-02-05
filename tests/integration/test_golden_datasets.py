@@ -96,6 +96,7 @@ class TestGoldenDatasetRegression:
             df[ohlcv_cols].reset_index(drop=True),
             golden_btcusdt_futures_usdt[ohlcv_cols].reset_index(drop=True),
             check_exact=False,
+            check_dtype=False,  # Allow float64 vs int64 for volume (Polars uses Float64)
             rtol=1e-10,
             obj="FUTURES_USDT golden comparison",
         )
@@ -123,6 +124,7 @@ class TestGoldenDatasetRegression:
             df[ohlcv_cols].reset_index(drop=True),
             golden_btcusdt_spot[ohlcv_cols].reset_index(drop=True),
             check_exact=False,
+            check_dtype=False,  # Allow float64 vs int64 for volume (Polars uses Float64)
             rtol=1e-10,
             obj="SPOT golden comparison",
         )
@@ -150,6 +152,7 @@ class TestGoldenDatasetRegression:
             df[ohlcv_cols].reset_index(drop=True),
             golden_btcusd_perp_coin[ohlcv_cols].reset_index(drop=True),
             check_exact=False,
+            check_dtype=False,  # Allow float64 vs int64 for volume (Polars uses Float64)
             rtol=1e-10,
             obj="FUTURES_COIN golden comparison",
         )

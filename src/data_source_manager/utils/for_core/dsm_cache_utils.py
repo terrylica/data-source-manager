@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pendulum
 import polars as pl
+import pyarrow as pa
 
 from data_source_manager.core.providers.binance.vision_path_mapper import (
     FSSpecVisionHandler,
@@ -181,12 +182,30 @@ def get_cache_lazyframes(
                 logger.debug(f"Found cache file: {cache_path}")
 
                 try:
-                    # Scan Parquet lazily with time filter (predicate pushdown)
-                    # Note: Cache files use .arrow extension but are written as Parquet
-                    # format by save_to_cache() for better compression. scan_parquet()
-                    # supports predicate pushdown to row groups for efficient reads.
-                    lf = pl.scan_parquet(cache_path).filter(
-                        (pl.col("open_time") >= start_time) & (pl.col("open_time") <= end_time)
+                    # Detect file format by reading magic bytes
+                    # Arrow IPC files start with "ARROW1" (6 bytes), Parquet files start with "PAR1"
+                    # Use < end_time (exclusive) for consistency with OHLCV semantics:
+                    # open_time represents the START of a candle period, so a candle with
+                    # open_time == end_time would represent data AFTER the requested range.
+                    with open(cache_path, "rb") as f:
+                        magic = f.read(6)
+
+                    if magic == b"ARROW1":
+                        lf = pl.scan_ipc(cache_path)
+                    elif magic[:4] == b"PAR1":
+                        logger.debug(f"Cache file {cache_path} is Parquet format (legacy)")
+                        lf = pl.scan_parquet(cache_path)
+                    else:
+                        # Unknown format, try IPC first then Parquet
+                        try:
+                            lf = pl.scan_ipc(cache_path)
+                            # Force a schema check to validate format
+                            _ = lf.collect_schema()
+                        except pl.exceptions.ComputeError:
+                            lf = pl.scan_parquet(cache_path)
+
+                    lf = lf.filter(
+                        (pl.col("open_time") >= start_time) & (pl.col("open_time") < end_time)
                     ).with_columns(pl.lit("CACHE").alias("_data_source"))
 
                     lazy_frames.append(lf)
@@ -270,12 +289,26 @@ def get_from_cache(
 
                 # MEMORY OPTIMIZATION: Use Polars LazyFrame with predicate pushdown
                 # This filters at read time instead of loading entire file then filtering.
-                # Cache files are Arrow IPC format (.arrow), NOT Parquet.
-                # scan_ipc enables lazy evaluation with predicate pushdown.
+                # Detect format and use appropriate scanner.
                 # Source: https://docs.pola.rs/api/python/stable/reference/api/polars.scan_ipc.html
                 try:
-                    # Scan Arrow IPC lazily, apply filter, then collect only matching rows
-                    lf = pl.scan_ipc(cache_path)
+                    # Detect file format by reading magic bytes
+                    # Arrow IPC files start with "ARROW1" (6 bytes), Parquet files start with "PAR1"
+                    with open(cache_path, "rb") as f:
+                        magic = f.read(6)
+
+                    if magic == b"ARROW1":
+                        lf = pl.scan_ipc(cache_path)
+                    elif magic[:4] == b"PAR1":
+                        logger.debug(f"Cache file {cache_path} is Parquet format (legacy)")
+                        lf = pl.scan_parquet(cache_path)
+                    else:
+                        # Unknown format, try IPC first then Parquet
+                        try:
+                            lf = pl.scan_ipc(cache_path)
+                            _ = lf.collect_schema()  # Force schema check
+                        except pl.exceptions.ComputeError:
+                            lf = pl.scan_parquet(cache_path)
 
                     # Apply time range filter with predicate pushdown
                     # Note: Polars datetime comparison requires proper type handling
@@ -413,8 +446,12 @@ def save_to_cache(
                 # Remove the temporary date column before saving
                 save_df = day_df.drop(columns=["date"])
 
-                # Save to parquet format
-                save_df.to_parquet(cache_path)
+                # Save to Arrow IPC format (not Parquet) for consistency with
+                # cache_manager.py and vision_manager.py, and to enable memory
+                # mapping and predicate pushdown via scan_ipc()
+                table = pa.Table.from_pandas(save_df)
+                with pa.OSFile(str(cache_path), "wb") as sink, pa.ipc.new_file(sink, table.schema) as writer:
+                    writer.write_table(table)
                 logger.info(f"Saved {len(save_df)} records to cache: {cache_path}")
                 saved_files += 1
 

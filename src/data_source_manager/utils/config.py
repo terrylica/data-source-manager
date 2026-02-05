@@ -255,16 +255,18 @@ class FeatureFlags:
     # Phase 2: Internal Polars LazyFrame processing
     # When True, uses PolarsDataPipeline internally for FCP merge operations
     # Returns pandas DataFrame at API boundary (backward compatible)
+    # Default: True (v2.1.0+) - opt-out with DSM_USE_POLARS_PIPELINE=false
     USE_POLARS_PIPELINE: bool = attrs.field(
-        default=False,
+        default=True,
         converter=lambda x: _parse_bool_env("DSM_USE_POLARS_PIPELINE", x),
     )
 
     # Phase 3: Zero-copy Polars output
     # When True AND return_polars=True, skips pandas conversion entirely
     # Provides maximum memory efficiency for Polars consumers
+    # Default: True (v2.1.0+) - opt-out with DSM_USE_POLARS_OUTPUT=false
     USE_POLARS_OUTPUT: bool = attrs.field(
-        default=False,
+        default=True,
         converter=lambda x: _parse_bool_env("DSM_USE_POLARS_OUTPUT", x),
     )
 

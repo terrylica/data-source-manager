@@ -147,9 +147,10 @@ class PolarsDataPipeline:
                 )
 
         # Cast numeric columns to Float64 for consistency
+        # Include 'ignore' column which may have inconsistent types across cache files
         numeric_cols = ["open", "high", "low", "close", "volume",
                        "quote_volume", "quote_asset_volume",
-                       "taker_buy_volume", "taker_buy_quote_volume"]
+                       "taker_buy_volume", "taker_buy_quote_volume", "ignore"]
 
         for col in numeric_cols:
             if col in schema:
@@ -158,6 +159,10 @@ class PolarsDataPipeline:
         # Cast count to Int64
         if "count" in schema:
             casts.append(pl.col("count").cast(pl.Int64).alias("count"))
+
+        # Cast __index_level_0__ to Int64 for consistency (from pandas index)
+        if "__index_level_0__" in schema:
+            casts.append(pl.col("__index_level_0__").cast(pl.Int64).alias("__index_level_0__"))
 
         if casts:
             lf = lf.with_columns(casts)
@@ -198,7 +203,7 @@ class PolarsDataPipeline:
         return (
             combined.with_columns(
                 pl.col("_data_source")
-                .replace(SOURCE_PRIORITY, default=0)
+                .replace_strict(SOURCE_PRIORITY, default=0)
                 .alias("_priority")
             )
             .sort(["open_time", "_priority"])

@@ -212,10 +212,15 @@ class TestDsmCacheOptimization(unittest.TestCase):
         self.start_time = pendulum.datetime(2025, 4, 13, 15, 35, 0, tz="UTC")
         self.end_time = pendulum.datetime(2025, 4, 14, 15, 30, 0, tz="UTC")
 
-        # Save the original feature flag setting
+        # Save the original feature flag settings
         self.original_flag_value = FEATURE_FLAGS.get(
             "OPTIMIZE_CACHE_PARTIAL_DAYS", True
         )
+        # These tests mock _get_from_cache which is only used in pandas path
+        # Save and disable Polars pipeline via environment variable
+        import os
+        self._original_polars_env = os.environ.get("DSM_USE_POLARS_PIPELINE")
+        os.environ["DSM_USE_POLARS_PIPELINE"] = "false"
 
     def tearDown(self):
         """Clean up after tests."""
@@ -225,8 +230,13 @@ class TestDsmCacheOptimization(unittest.TestCase):
         if self.cache_dir.exists():
             shutil.rmtree(self.cache_dir)
 
-        # Restore the original feature flag value
+        # Restore the original feature flag values
         FEATURE_FLAGS["OPTIMIZE_CACHE_PARTIAL_DAYS"] = self.original_flag_value
+        import os
+        if self._original_polars_env is not None:
+            os.environ["DSM_USE_POLARS_PIPELINE"] = self._original_polars_env
+        else:
+            os.environ.pop("DSM_USE_POLARS_PIPELINE", None)
 
     def test_optimization_enabled(self):
         """Test with optimization enabled - should not make API calls."""
