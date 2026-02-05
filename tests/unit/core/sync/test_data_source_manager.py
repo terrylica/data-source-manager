@@ -18,7 +18,17 @@ import polars as pl
 import pytest
 
 from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from data_source_manager.utils.config import FeatureFlags
 from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
+
+
+# Skip marker for tests that mock the pandas FCP path
+# When USE_POLARS_PIPELINE=True, the code takes a different path using get_cache_lazyframes
+# instead of process_cache_step, so these mocks don't apply
+skip_if_polars_pipeline = pytest.mark.skipif(
+    FeatureFlags().USE_POLARS_PIPELINE,
+    reason="Test mocks pandas FCP path; skipped when USE_POLARS_PIPELINE=True",
+)
 
 
 # =============================================================================
@@ -126,9 +136,12 @@ class TestDataSourceManagerInitialization:
 
 # =============================================================================
 # FCP Logic Tests - Using FCP utility function patches
+# These tests mock process_cache_step/process_vision_step/process_rest_step
+# which are only used when USE_POLARS_PIPELINE=False (pandas path)
 # =============================================================================
 
 
+@skip_if_polars_pipeline
 class TestFCPCacheHit:
     """Tests for FCP cache hit path (Step 1)."""
 
@@ -172,6 +185,7 @@ class TestFCPCacheHit:
         manager.close()
 
 
+@skip_if_polars_pipeline
 class TestFCPVisionFallback:
     """Tests for FCP Vision API fallback path (Step 2)."""
 
@@ -216,6 +230,7 @@ class TestFCPVisionFallback:
         manager.close()
 
 
+@skip_if_polars_pipeline
 class TestFCPRestFallback:
     """Tests for FCP REST API fallback path (Step 3)."""
 
@@ -302,6 +317,7 @@ class TestFCPRestFallback:
         manager.close()
 
 
+@skip_if_polars_pipeline
 class TestFCPErrorPropagation:
     """Tests for error propagation in FCP."""
 
@@ -341,6 +357,7 @@ class TestFCPErrorPropagation:
         manager.close()
 
 
+@skip_if_polars_pipeline
 class TestAutoReindexBehavior:
     """Tests for auto_reindex parameter behavior."""
 
@@ -415,6 +432,7 @@ class TestAutoReindexBehavior:
         manager.close()
 
 
+@skip_if_polars_pipeline
 class TestEmptyResultHandling:
     """Tests for empty result scenarios."""
 
@@ -479,6 +497,7 @@ class TestInputValidation:
         manager.close()
 
 
+@skip_if_polars_pipeline
 class TestReturnPolarsParameter:
     """Tests for return_polars parameter behavior."""
 
@@ -703,6 +722,7 @@ class TestFundingRateRouting:
         assert "funding rate" in str(exc_info.value).lower()
         manager.close()
 
+    @skip_if_polars_pipeline
     @patch("data_source_manager.core.sync.data_source_manager.verify_final_data")
     @patch("data_source_manager.core.sync.data_source_manager.process_rest_step")
     @patch("data_source_manager.core.sync.data_source_manager.process_vision_step")

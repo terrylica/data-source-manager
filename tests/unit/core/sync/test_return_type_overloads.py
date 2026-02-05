@@ -21,6 +21,16 @@ import polars as pl
 import pytest
 
 from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from data_source_manager.utils.config import FeatureFlags
+
+
+# Skip marker for tests that mock the pandas FCP path
+# When USE_POLARS_PIPELINE=True, the code takes a different path using get_cache_lazyframes
+# instead of process_cache_step, so these mocks don't apply
+skip_if_polars_pipeline = pytest.mark.skipif(
+    FeatureFlags().USE_POLARS_PIPELINE,
+    reason="Test mocks pandas FCP path; skipped when USE_POLARS_PIPELINE=True",
+)
 
 
 # =============================================================================
@@ -58,6 +68,7 @@ def historical_time_range():
 # =============================================================================
 
 
+@skip_if_polars_pipeline
 class TestGetDataReturnTypes:
     """Tests for get_data() return type based on return_polars parameter."""
 
@@ -205,6 +216,7 @@ class TestGetDataReturnTypes:
 # =============================================================================
 
 
+@skip_if_polars_pipeline
 class TestTypeNarrowing:
     """Tests for type narrowing in conditionals."""
 
