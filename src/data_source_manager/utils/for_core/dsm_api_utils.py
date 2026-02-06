@@ -17,6 +17,39 @@ from data_source_manager.utils.market_constraints import ChartType, Interval, Ma
 from data_source_manager.utils.time_utils import align_time_boundaries, filter_dataframe_by_time
 
 
+def _log_critical_error_with_traceback(context: str, error: BaseException) -> str:
+    """Log a critical error with sanitized traceback summary.
+
+    Sanitizes error message and traceback to prevent binary data from
+    causing rich formatting issues. Logs first 3 + last 3 traceback lines.
+
+    Args:
+        context: Description of where the error occurred (e.g., "fetch_from_rest").
+        error: The exception that was caught.
+
+    Returns:
+        Sanitized error message string for use in re-raised exceptions.
+    """
+    error_message = str(error)
+    safe_error_message = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message)
+
+    logger.critical(f"Error in {context}: {safe_error_message}")
+    logger.critical(f"Error type: {type(error).__name__}")
+
+    tb_string = traceback.format_exc()
+    safe_tb = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string)
+    tb_lines = safe_tb.splitlines()
+
+    logger.critical("Traceback summary:")
+    for line in tb_lines[:3]:
+        logger.critical(line)
+    logger.critical("...")
+    for line in tb_lines[-3:]:
+        logger.critical(line)
+
+    return safe_error_message
+
+
 def fetch_from_vision(
     symbol: str,
     start_time: datetime,
@@ -137,24 +170,10 @@ def fetch_from_vision(
                 return create_empty_dataframe()
 
             # For historical data outside the delay window, log critical error
-            logger.critical(f"Vision API failed to retrieve historical data: {safe_error_message}")
-            logger.critical(f"Error type: {type(e).__name__}")
-
-            # More controlled traceback handling
-            tb_string = traceback.format_exc()
-            # Sanitize the traceback too
-            safe_tb = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string)
-            tb_lines = safe_tb.splitlines()
-
-            logger.critical("Traceback summary:")
-            for line in tb_lines[:3]:  # Just log first few lines
-                logger.critical(line)
-            logger.critical("...")
-            for line in tb_lines[-3:]:  # And last few lines
-                logger.critical(line)
+            safe_msg = _log_critical_error_with_traceback("fetch_from_vision", e)
 
             # Propagate the error to trigger failover
-            raise RuntimeError(f"CRITICAL: Vision API failed to retrieve historical data: {safe_error_message}")
+            raise RuntimeError(f"CRITICAL: Vision API failed to retrieve historical data: {safe_msg}")
 
         except (OSError, UnicodeEncodeError, RuntimeError) as nested_error:
             # If even our error handling fails, log a simpler message
@@ -219,31 +238,12 @@ def fetch_from_rest(
 
         return df
     except (OSError, ConnectionError, TimeoutError, ValueError, RuntimeError) as e:
-        # Sanitize error message to prevent binary data from causing rich formatting issues
         try:
-            error_message = str(e)
-            # Replace any non-printable characters to prevent rich markup errors
-            safe_error_message = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message)
-
-            logger.critical(f"Error in fetch_from_rest: {safe_error_message}")
-            logger.critical(f"Error type: {type(e).__name__}")
-
-            # More controlled traceback handling
-            tb_string = traceback.format_exc()
-            # Sanitize the traceback
-            safe_tb = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string)
-            tb_lines = safe_tb.splitlines()
-
-            logger.critical("Traceback summary:")
-            for line in tb_lines[:3]:  # Just log first few lines to avoid binary data
-                logger.critical(line)
-            logger.critical("...")
-            for line in tb_lines[-3:]:  # And last few lines
-                logger.critical(line)
+            safe_msg = _log_critical_error_with_traceback("fetch_from_rest", e)
 
             # This is the final fallback in the FCP chain, so raise an error
             # to indicate complete failure of all sources
-            raise RuntimeError(f"CRITICAL: REST API fallback failed: {safe_error_message}")
+            raise RuntimeError(f"CRITICAL: REST API fallback failed: {safe_msg}")
 
         except (OSError, UnicodeEncodeError, RuntimeError) as nested_error:
             # If even our error handling fails, log a simpler message

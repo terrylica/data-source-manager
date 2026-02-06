@@ -4,7 +4,6 @@
 # Refactoring: Fix silent failure patterns (BLE001)
 """Utility functions for Failover Control Protocol (FCP) implementation."""
 
-import traceback
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -334,26 +333,9 @@ def handle_error(e: Exception) -> None:
 
     safe_error_message = ""
     try:
-        # Sanitize error message to prevent binary data from causing rich formatting issues
-        error_message = str(e)
-        # Replace any non-printable characters
-        safe_error_message = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in error_message)
+        from data_source_manager.utils.for_core.dsm_api_utils import _log_critical_error_with_traceback
 
-        logger.critical(f"Error in get_data: {safe_error_message}")
-        logger.critical(f"Error type: {type(e).__name__}")
-
-        # More controlled traceback handling
-        tb_string = traceback.format_exc()
-        # Sanitize the traceback
-        safe_tb = "".join(c if c.isprintable() else f"\\x{ord(c):02x}" for c in tb_string)
-        tb_lines = safe_tb.splitlines()
-
-        logger.critical("Traceback summary:")
-        for line in tb_lines[:3]:
-            logger.critical(line)
-        logger.critical("...")
-        for line in tb_lines[-3:]:
-            logger.critical(line)
+        safe_error_message = _log_critical_error_with_traceback("get_data", e)
     except (ValueError, TypeError, AttributeError, UnicodeDecodeError) as nested_error:
         # If even our error handling fails, log a simpler message
         logger.critical(f"Critical error in get_data: {type(e).__name__}")
