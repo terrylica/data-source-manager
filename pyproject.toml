@@ -45,6 +45,7 @@ dev = [ # development dependencies using latest versions
     "pyupgrade>=3.20.0", # for upgrading Python code syntax
     "ruff>=0.11.0", # for linting and formatting
     "GitPython>=3.1.0", # for recmove CLI (git operations)
+    "import-linter>=2.0.0", # architectural contract enforcement
 ]
 # Command-line scripts defined here
 [project.scripts]
@@ -107,3 +108,49 @@ exclude_lines = [
     "if __name__ == .__main__.:",
 ]
 show_missing = true
+
+# =============================================================================
+# Import Architecture Contracts
+# Enforces layering: core → utils (not reverse), provider isolation
+# Pre-existing violations documented in ignore_imports (GitHub #16 context)
+# =============================================================================
+
+[tool.importlinter]
+root_packages = ["data_source_manager"]
+include_external_packages = false
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture: core → utils (not reverse)"
+type = "layers"
+layers = [
+    "data_source_manager.core",
+    "data_source_manager.utils",
+]
+ignore_imports = [
+    "data_source_manager.utils.for_core.vision_file_utils -> data_source_manager.core.providers.binance.rest_data_client",
+    "data_source_manager.utils.for_core.dsm_cache_utils -> data_source_manager.core.providers.binance.vision_path_mapper",
+]
+
+[[tool.importlinter.contracts]]
+name = "Provider isolation: Binance and OKX are independent"
+type = "independence"
+modules = [
+    "data_source_manager.core.providers.binance",
+    "data_source_manager.core.providers.okx",
+]
+# DataClientInterface is a shared ABC that should live in core/providers/
+# but currently resides in binance/. Moving it is a separate refactoring task.
+ignore_imports = [
+    "data_source_manager.core.providers.okx.okx_rest_client -> data_source_manager.core.providers.binance.data_client_interface",
+]
+
+[[tool.importlinter.contracts]]
+name = "No deleted layers: for_demo must stay deleted"
+type = "forbidden"
+source_modules = [
+    "data_source_manager",
+]
+forbidden_modules = [
+    "data_source_manager.utils.for_demo",
+    "data_source_manager.utils_for_debug",
+]

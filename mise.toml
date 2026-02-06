@@ -76,13 +76,18 @@ run = "uv run -p 3.13 ruff format --check src/ tests/"
 description = "Run type checking with pyright"
 run = "uv run -p 3.13 pyright src/"
 
+[tasks."lint:imports"]
+description = "Check import architecture contracts"
+run = "uv run -p 3.13 lint-imports"
+sources = ["src/**/*.py"]
+
 # -----------------------------------------------------------------------------
 # Composite Tasks (DAG)
 # -----------------------------------------------------------------------------
 
 [tasks."check:all"]
-description = "Run all checks: lint + format + typecheck"
-depends = ["lint", "format:check", "typecheck"]
+description = "Run all checks: lint + format + typecheck + import contracts"
+depends = ["lint", "format:check", "typecheck", "lint:imports"]
 
 [tasks.quick]
 description = "Quick validation: lint + unit tests + import check"
