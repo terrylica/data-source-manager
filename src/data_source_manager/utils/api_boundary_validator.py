@@ -44,6 +44,48 @@ RATE_LIMIT_STATUS = 429
 DEPRECATION_WARNING = "{} is deprecated and will be moved to utils.time_utils in a future version. Use utils.time_utils.{} instead."
 
 
+def _parse_api_response_boundaries(
+    api_data: list[list[Any]],
+    start_time: datetime,
+    end_time: datetime,
+) -> dict[str, Any]:
+    """Parse API response data into boundary information.
+
+    Shared logic for both async and sync API boundary methods.
+
+    Args:
+        api_data: Raw API response data (list of kline records).
+        start_time: The originally requested start time (UTC-aware).
+        end_time: The originally requested end time (UTC-aware).
+
+    Returns:
+        Dictionary with api_start_time, api_end_time, record_count, matches_request.
+    """
+    if not api_data:
+        return {
+            "api_start_time": None,
+            "api_end_time": None,
+            "record_count": 0,
+            "matches_request": False,
+        }
+
+    first_timestamp_ms = api_data[0][0]
+    last_timestamp_ms = api_data[-1][0]
+
+    api_start_time = datetime.fromtimestamp(first_timestamp_ms / 1000, tz=timezone.utc)
+    api_end_time = datetime.fromtimestamp(last_timestamp_ms / 1000, tz=timezone.utc)
+
+    start_matches = abs((api_start_time - start_time).total_seconds()) < MILLISECOND_TOLERANCE
+    end_within_range = api_end_time <= end_time
+
+    return {
+        "api_start_time": api_start_time,
+        "api_end_time": api_end_time,
+        "record_count": len(api_data),
+        "matches_request": start_matches and end_within_range,
+    }
+
+
 class ApiBoundaryValidator:
     """Validates time boundaries and data ranges against actual Binance API behavior.
 
@@ -151,38 +193,15 @@ class ApiBoundaryValidator:
             # Call API to get data for the requested range
             api_data = await self._call_api(start_time, end_time, interval, limit=1000, symbol=symbol)
 
+            result = _parse_api_response_boundaries(api_data, start_time, end_time)
+
             if not api_data:
                 logger.warning("API returned no data for the requested range")
-                return {
-                    "api_start_time": None,
-                    "api_end_time": None,
-                    "record_count": 0,
-                    "matches_request": False,
-                }
-
-            # Extract timestamps from first and last records
-            first_timestamp_ms = api_data[0][0]
-            last_timestamp_ms = api_data[-1][0]
-
-            # Convert to datetime objects
-            api_start_time = datetime.fromtimestamp(first_timestamp_ms / 1000, tz=timezone.utc)
-            api_end_time = datetime.fromtimestamp(last_timestamp_ms / 1000, tz=timezone.utc)
-
-            # Check if API boundaries match requested boundaries (within millisecond precision)
-            start_matches = abs((api_start_time - start_time).total_seconds()) < MILLISECOND_TOLERANCE
-            end_within_range = api_end_time <= end_time
-
-            result = {
-                "api_start_time": api_start_time,
-                "api_end_time": api_end_time,
-                "record_count": len(api_data),
-                "matches_request": start_matches and end_within_range,
-            }
-
-            logger.debug(
-                f"API boundaries found - Start: {api_start_time}, End: {api_end_time}, "
-                f"Records: {len(api_data)}, Matches Request: {start_matches and end_within_range}"
-            )
+            else:
+                logger.debug(
+                    f"API boundaries found - Start: {result['api_start_time']}, End: {result['api_end_time']}, "
+                    f"Records: {result['record_count']}, Matches Request: {result['matches_request']}"
+                )
 
             return result
         except (OSError, ConnectionError, TimeoutError, ValueError, KeyError) as e:
@@ -280,127 +299,6 @@ class ApiBoundaryValidator:
         )
 
         return result
-
-    async def get_api_response(
-        self,
-        start_time: datetime,
-        end_time: datetime,
-        interval: Interval,
-        limit: int = 1000,
-        symbol: str = "BTCUSDT",
-    ) -> pd.DataFrame:
-        """Call Binance API and return the response as a DataFrame.
-
-        This method serves as a reference for what the API would return for
-        the given parameters, for validation or comparison purposes.
-
-        Args:
-            start_time: Start time for the request
-            end_time: End time for the request
-            interval: Data interval
-            limit: Maximum number of records to retrieve
-            symbol: Trading pair symbol
-
-        Returns:
-            DataFrame containing the API response
-        """
-        logger.debug(f"Getting API response for {symbol} {interval}: {start_time} -> {end_time}")
-
-        # Ensure timezone awareness for input times
-        start_time = enforce_utc_timezone(start_time)
-        end_time = enforce_utc_timezone(end_time)
-
-        try:
-            # Call API
-            api_data = await self._call_api(start_time, end_time, interval, limit, symbol)
-
-            if not api_data:
-                logger.warning("API returned no data")
-                # Return empty DataFrame with the right structure
-                empty_df = pd.DataFrame(
-                    columns=[
-                        "open_time",
-                        "open",
-                        "high",
-                        "low",
-                        "close",
-                        "volume",
-                        "close_time",
-                        "quote_asset_volume",
-                        "count",
-                        "taker_buy_volume",
-                        "taker_buy_quote_volume",
-                    ]
-                )
-                empty_df["open_time"] = pd.to_datetime(empty_df["open_time"], unit="ms", utc=True)
-                # Return the set_index operation directly
-                return empty_df.set_index("open_time")
-
-            # Convert to DataFrame
-            df = pd.DataFrame(
-                api_data,
-                columns=[
-                    "open_time",
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                    "volume",
-                    "close_time",
-                    "quote_asset_volume",
-                    "count",
-                    "taker_buy_volume",
-                    "taker_buy_quote_volume",
-                    "ignore",
-                ],
-            )
-
-            # Convert timestamp to datetime
-            df["open_time"] = pd.to_datetime(df["open_time"], unit="ms", utc=True)
-            df = df.set_index("open_time")
-
-            # Convert numeric columns
-            numeric_cols = [
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "close_time",
-                "quote_asset_volume",
-                "count",
-                "taker_buy_volume",
-                "taker_buy_quote_volume",
-            ]
-            for col in numeric_cols:
-                df[col] = pd.to_numeric(df[col])
-
-            # Drop 'ignore' column
-            df = df.drop(columns=["ignore"])
-
-            logger.info(f"API returned {len(df)} records with index range {df.index.min()} -> {df.index.max()}")
-
-            return df
-
-        except (OSError, ConnectionError, TimeoutError, ValueError, KeyError) as e:
-            logger.error(f"Error getting API response: {e}")
-            # Return empty DataFrame
-            empty_df = pd.DataFrame(
-                columns=[
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                    "volume",
-                    "close_time",
-                    "quote_asset_volume",
-                    "count",
-                    "taker_buy_volume",
-                    "taker_buy_quote_volume",
-                ]
-            )
-            empty_df.index.name = "open_time"
-            return empty_df
 
     async def _call_api(
         self,
@@ -557,38 +455,15 @@ class ApiBoundaryValidator:
             # Call API to get data for the requested range
             api_data = self._call_api_sync(start_time, end_time, interval, limit=1000, symbol=symbol)
 
+            result = _parse_api_response_boundaries(api_data, start_time, end_time)
+
             if not api_data:
                 logger.warning("API returned no data for the requested range (sync)")
-                return {
-                    "api_start_time": None,
-                    "api_end_time": None,
-                    "record_count": 0,
-                    "matches_request": False,
-                }
-
-            # Extract timestamps from first and last records
-            first_timestamp_ms = api_data[0][0]
-            last_timestamp_ms = api_data[-1][0]
-
-            # Convert to datetime objects
-            api_start_time = datetime.fromtimestamp(first_timestamp_ms / 1000, tz=timezone.utc)
-            api_end_time = datetime.fromtimestamp(last_timestamp_ms / 1000, tz=timezone.utc)
-
-            # Check if API boundaries match requested boundaries (within millisecond precision)
-            start_matches = abs((api_start_time - start_time).total_seconds()) < MILLISECOND_TOLERANCE
-            end_within_range = api_end_time <= end_time
-
-            result = {
-                "api_start_time": api_start_time,
-                "api_end_time": api_end_time,
-                "record_count": len(api_data),
-                "matches_request": start_matches and end_within_range,
-            }
-
-            logger.debug(
-                f"API boundaries found (sync) - Start: {api_start_time}, End: {api_end_time}, "
-                f"Records: {len(api_data)}, Matches Request: {start_matches and end_within_range}"
-            )
+            else:
+                logger.debug(
+                    f"API boundaries found (sync) - Start: {result['api_start_time']}, End: {result['api_end_time']}, "
+                    f"Records: {result['record_count']}, Matches Request: {result['matches_request']}"
+                )
 
             return result
         except (OSError, ConnectionError, TimeoutError, ValueError, KeyError) as e:
