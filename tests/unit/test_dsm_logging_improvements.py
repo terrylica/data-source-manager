@@ -13,12 +13,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from data_source_manager.core.sync.data_source_manager import DataSourceManager, DataSourceConfig
-from data_source_manager.utils.for_demo.dsm_clean_logging import (
-    get_clean_market_data,
-    get_quiet_market_data,
-    get_debug_market_data,
-    suppress_http_logging,
-)
+from data_source_manager.utils.loguru_setup import suppress_http_logging
 from data_source_manager.utils.market_constraints import DataProvider, MarketType
 
 
@@ -202,84 +197,28 @@ class TestDataSourceManagerLogging:
 
 class TestCleanLoggingUtilities:
     """Test the clean logging utility functions."""
-    
+
     def test_suppress_http_logging(self):
         """Test global HTTP logging suppression."""
         with patch("logging.getLogger") as mock_get_logger:
             mock_httpcore_logger = MagicMock()
             mock_httpx_logger = MagicMock()
-            
+
             def get_logger_side_effect(name):
                 if name == "httpcore":
                     return mock_httpcore_logger
                 if name == "httpx":
                     return mock_httpx_logger
                 return MagicMock()
-            
+
             mock_get_logger.side_effect = get_logger_side_effect
-            
+
             # Call the suppression function
             suppress_http_logging()
-            
+
             # Verify loggers were configured
             mock_httpcore_logger.setLevel.assert_called_with(logging.WARNING)
             mock_httpx_logger.setLevel.assert_called_with(logging.WARNING)
-    
-    @patch("data_source_manager.core.sync.data_source_manager.DataSourceManager.create")
-    def test_clean_context_manager(self, mock_create):
-        """Test that clean context manager passes correct parameters."""
-        mock_dsm = MagicMock()
-        mock_create.return_value = mock_dsm
-        
-        with get_clean_market_data() as dsm:
-            assert dsm is mock_dsm
-        
-        # Verify create was called with clean parameters
-        mock_create.assert_called_once_with(
-            DataProvider.BINANCE,
-            MarketType.SPOT,
-            log_level="WARNING",
-            suppress_http_debug=True,
-            quiet_mode=False
-        )
-        mock_dsm.close.assert_called_once()
-    
-    @patch("data_source_manager.core.sync.data_source_manager.DataSourceManager.create")
-    def test_quiet_context_manager(self, mock_create):
-        """Test that quiet context manager passes correct parameters."""
-        mock_dsm = MagicMock()
-        mock_create.return_value = mock_dsm
-        
-        with get_quiet_market_data() as dsm:
-            assert dsm is mock_dsm
-        
-        # Verify create was called with quiet parameters
-        mock_create.assert_called_once_with(
-            DataProvider.BINANCE,
-            MarketType.SPOT,
-            quiet_mode=True,
-            suppress_http_debug=True
-        )
-        mock_dsm.close.assert_called_once()
-    
-    @patch("data_source_manager.core.sync.data_source_manager.DataSourceManager.create")
-    def test_debug_context_manager(self, mock_create):
-        """Test that debug context manager passes correct parameters."""
-        mock_dsm = MagicMock()
-        mock_create.return_value = mock_dsm
-        
-        with get_debug_market_data() as dsm:
-            assert dsm is mock_dsm
-        
-        # Verify create was called with debug parameters
-        mock_create.assert_called_once_with(
-            DataProvider.BINANCE,
-            MarketType.SPOT,
-            log_level="DEBUG",
-            suppress_http_debug=False,
-            quiet_mode=False
-        )
-        mock_dsm.close.assert_called_once()
 
 
 class TestBackwardCompatibility:
