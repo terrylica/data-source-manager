@@ -24,23 +24,29 @@ src/data_source_manager/
 └── utils/
     ├── market_constraints.py    # Enums and validation
     ├── loguru_setup.py          # Logging configuration
+    ├── config.py                # Feature flags (USE_POLARS_PIPELINE, etc.)
+    ├── internal/
+    │   └── polars_pipeline.py   # PolarsDataPipeline class
     └── for_core/                # Internal utilities
         ├── rest_exceptions.py   # REST API exceptions
-        └── vision_exceptions.py # Vision API exceptions
+        ├── vision_exceptions.py # Vision API exceptions
+        └── dsm_cache_utils.py   # Cache LazyFrame utilities
 ```
 
 ---
 
 ## Key Classes
 
-| Class               | Location                           | Purpose                   |
-| ------------------- | ---------------------------------- | ------------------------- |
-| `DataSourceManager` | `core/sync/data_source_manager.py` | Main entry point with FCP |
-| `DataSourceConfig`  | `core/sync/dsm_types.py`           | Configuration dataclass   |
-| `DataSource`        | `core/sync/dsm_types.py`           | Data source enum          |
-| `DataProvider`      | `utils/market_constraints.py`      | Provider enum (BINANCE)   |
-| `MarketType`        | `utils/market_constraints.py`      | Market type enum          |
-| `Interval`          | `utils/market_constraints.py`      | Timeframe interval enum   |
+| Class                | Location                            | Purpose                    |
+| -------------------- | ----------------------------------- | -------------------------- |
+| `DataSourceManager`  | `core/sync/data_source_manager.py`  | Main entry point with FCP  |
+| `DataSourceConfig`   | `core/sync/dsm_types.py`            | Configuration dataclass    |
+| `DataSource`         | `core/sync/dsm_types.py`            | Data source enum           |
+| `DataProvider`       | `utils/market_constraints.py`       | Provider enum (BINANCE)    |
+| `MarketType`         | `utils/market_constraints.py`       | Market type enum           |
+| `Interval`           | `utils/market_constraints.py`       | Timeframe interval enum    |
+| `PolarsDataPipeline` | `utils/internal/polars_pipeline.py` | Internal Polars processing |
+| `FeatureFlags`       | `utils/config.py`                   | Feature flag configuration |
 
 ---
 
@@ -110,8 +116,34 @@ response = httpx.get(url, timeout=30)
 
 ---
 
+---
+
+## Data Flow Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     INTERNAL (Polars)                        │
+│  Cache → pl.scan_ipc() → LazyFrame                          │
+│  Vision → pl.LazyFrame                                       │
+│  REST → pl.DataFrame → .lazy()                              │
+│                    ↓                                         │
+│  PolarsDataPipeline.merge_with_priority() → LazyFrame       │
+│                    ↓                                         │
+│  .collect(engine='streaming') → pl.DataFrame                │
+└─────────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   API BOUNDARY                               │
+│  return_polars=False → .to_pandas() → pd.DataFrame (default)│
+│  return_polars=True  → pl.DataFrame (zero-copy)             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Related
 
 - @.claude/rules/fcp-protocol.md - FCP decision logic
 - @.claude/rules/error-handling.md - Exception patterns
 - @docs/adr/2025-01-30-failover-control-protocol.md - FCP architecture
+- @docs/benchmarks/README.md - Performance benchmarks

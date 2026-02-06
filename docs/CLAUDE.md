@@ -10,6 +10,7 @@ Context for working with data-source-manager documentation.
 docs/
 ├── adr/                    ← Architecture Decision Records (MADR 4.0)
 ├── api/                    ← API reference documentation
+├── benchmarks/             ← Performance benchmarks (Polars vs Pandas, streaming)
 ├── cache_diagnostics/      ← Cache debugging and validation
 ├── core_architecture/      ← System architecture and design
 ├── data_client_interface/  ← Provider interface specifications
@@ -64,6 +65,17 @@ Progressive disclosure skills in `docs/skills/`:
 | [dsm-testing](skills/dsm-testing/SKILL.md)         | Testing patterns            |
 | [dsm-research](skills/dsm-research/SKILL.md)       | Codebase research           |
 | [dsm-fcp-monitor](skills/dsm-fcp-monitor/SKILL.md) | FCP monitoring              |
+
+## Benchmarks
+
+Performance benchmark documentation in `docs/benchmarks/`:
+
+| Document                                                    | Purpose                        |
+| ----------------------------------------------------------- | ------------------------------ |
+| [README.md](benchmarks/README.md)                           | Benchmark overview and results |
+| [PERFORMANCE_SUMMARY.md](benchmarks/PERFORMANCE_SUMMARY.md) | Executive summary              |
+| `scripts/`                                                  | Runnable benchmark scripts     |
+| `results/`                                                  | Raw benchmark output           |
 
 ## Key Documents
 

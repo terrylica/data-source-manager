@@ -2,6 +2,8 @@
 
 Professional market data integration with Failover Control Protocol (FCP).
 
+**Current Version**: See [GitHub Releases](https://github.com/terrylica/data-source-manager/releases)
+
 ## Navigation
 
 | Topic              | Document                                                 |
@@ -10,8 +12,10 @@ Professional market data integration with Failover Control Protocol (FCP).
 | Documentation      | [docs/](docs/) ([CLAUDE.md](docs/CLAUDE.md))             |
 | Examples           | [examples/](examples/) ([CLAUDE.md](examples/CLAUDE.md)) |
 | Tests              | [tests/](tests/) ([CLAUDE.md](tests/CLAUDE.md))          |
+| Scripts            | [scripts/](scripts/) ([CLAUDE.md](scripts/CLAUDE.md))    |
 | Claude Code Config | [.claude/settings.md](.claude/settings.md)               |
 | ADRs               | [docs/adr/](docs/adr/)                                   |
+| Benchmarks         | [docs/benchmarks/](docs/benchmarks/README.md)            |
 | Troubleshooting    | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)       |
 
 ## Essential Commands
@@ -90,6 +94,40 @@ Data retrieval follows this priority:
 3. **REST API** - Binance REST (real-time, rate-limited)
 
 Recent data (~48h) typically not in Vision API, falls through to REST.
+
+---
+
+## Performance
+
+<!-- SSoT-OK: Version reference for feature availability documentation -->
+
+| Comparison             | Winner    | Speedup   | Memory Savings |
+| ---------------------- | --------- | --------- | -------------- |
+| Polars vs Pandas FCP   | Polars    | **6.35x** | **92.1%**      |
+| Streaming vs In-Memory | Streaming | **1.42x** | **49.5%**      |
+
+See [docs/benchmarks/](docs/benchmarks/README.md) for full benchmark data.
+
+---
+
+## API Boundary Output
+
+**Default output: Pandas** (backward compatible)
+
+```python
+# Default: Returns pd.DataFrame
+df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
+
+# Opt-in Polars: Returns pl.DataFrame (zero-copy, faster)
+df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, return_polars=True)
+```
+
+| Parameter             | Default | Output Type    | Use Case               |
+| --------------------- | ------- | -------------- | ---------------------- |
+| `return_polars=False` | Yes     | `pd.DataFrame` | Backward compatibility |
+| `return_polars=True`  | No      | `pl.DataFrame` | Maximum performance    |
+
+**Internal processing**: Always Polars (LazyFrames + streaming engine)
 
 ---
 
@@ -281,17 +319,15 @@ Slash commands in `.claude/commands/`:
 
 ## Recent Lessons Learned
 
+**2026-02-05**: Performance benchmarks published - Polars 6.35x faster, streaming 1.42x faster. [Benchmarks](/docs/benchmarks/README.md)
+
+**2026-02-05**: API boundary defaults to Pandas (`return_polars=False`), internal processing uses Polars.
+
 **2026-02-01**: DRY audit identified consolidation opportunities - dual logger systems, cache function wrappers, scattered symbol validation. [RESUME.md](/docs/RESUME.md)
 
 **2026-02-01**: Example files must use `data_source_manager.` prefix imports, not relative imports from `__init__`.
 
-**2026-01-30**: Permission patterns in `.claude/settings.json` - allow/deny rules with gitignore syntax. [Official Docs](https://code.claude.com/docs/en/settings)
-
-**2026-01-30**: Path-specific rules load via `paths:` frontmatter when working with matching files. [Design Spec](/docs/design/2026-01-30-claude-code-infrastructure/spec.md)
-
-**2026-01-30**: 5 hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop). [README](/.claude/hooks/README.md)
-
-**2026-01-30**: Lazy-loaded CLAUDE.md in subdirs (src/, docs/, examples/, tests/).
+**2026-01-30**: Lazy-loaded CLAUDE.md in subdirs (src/, docs/, examples/, tests/, scripts/).
 
 **2025-01-30**: FCP priority is Cache → Vision → REST. [FCP ADR](/docs/adr/2025-01-30-failover-control-protocol.md)
 
