@@ -23,6 +23,40 @@ from data_source_manager.utils.loguru_setup import logger
 from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
+def _scan_cache_file(cache_path: str | Path) -> pl.LazyFrame:
+    """Detect cache file format via magic bytes and return a LazyFrame scanner.
+
+    Arrow IPC files start with "ARROW1" (6 bytes), Parquet files start with "PAR1".
+    Falls back to trying IPC then Parquet if magic bytes are unrecognized.
+
+    Args:
+        cache_path: Path to the cache file.
+
+    Returns:
+        Polars LazyFrame scanning the file.
+
+    Raises:
+        OSError: If the file cannot be read.
+        pl.exceptions.ComputeError: If the file format is invalid.
+    """
+    with open(cache_path, "rb") as f:
+        magic = f.read(6)
+
+    if magic == b"ARROW1":
+        return pl.scan_ipc(cache_path)
+    if magic[:4] == b"PAR1":
+        logger.debug(f"Cache file {cache_path} is Parquet format (legacy)")
+        return pl.scan_parquet(cache_path)
+
+    # Unknown format, try IPC first then Parquet
+    try:
+        lf = pl.scan_ipc(cache_path)
+        _ = lf.collect_schema()  # Force schema check
+        return lf
+    except pl.exceptions.ComputeError:
+        return pl.scan_parquet(cache_path)
+
+
 # =============================================================================
 # Provider-Agnostic Cache Path Generation
 # =============================================================================
@@ -182,27 +216,10 @@ def get_cache_lazyframes(
                 logger.debug(f"Found cache file: {cache_path}")
 
                 try:
-                    # Detect file format by reading magic bytes
-                    # Arrow IPC files start with "ARROW1" (6 bytes), Parquet files start with "PAR1"
                     # Use < end_time (exclusive) for consistency with OHLCV semantics:
                     # open_time represents the START of a candle period, so a candle with
                     # open_time == end_time would represent data AFTER the requested range.
-                    with open(cache_path, "rb") as f:
-                        magic = f.read(6)
-
-                    if magic == b"ARROW1":
-                        lf = pl.scan_ipc(cache_path)
-                    elif magic[:4] == b"PAR1":
-                        logger.debug(f"Cache file {cache_path} is Parquet format (legacy)")
-                        lf = pl.scan_parquet(cache_path)
-                    else:
-                        # Unknown format, try IPC first then Parquet
-                        try:
-                            lf = pl.scan_ipc(cache_path)
-                            # Force a schema check to validate format
-                            _ = lf.collect_schema()
-                        except pl.exceptions.ComputeError:
-                            lf = pl.scan_parquet(cache_path)
+                    lf = _scan_cache_file(cache_path)
 
                     lf = lf.filter(
                         (pl.col("open_time") >= start_time) & (pl.col("open_time") < end_time)
@@ -292,23 +309,7 @@ def get_from_cache(
                 # Detect format and use appropriate scanner.
                 # Source: https://docs.pola.rs/api/python/stable/reference/api/polars.scan_ipc.html
                 try:
-                    # Detect file format by reading magic bytes
-                    # Arrow IPC files start with "ARROW1" (6 bytes), Parquet files start with "PAR1"
-                    with open(cache_path, "rb") as f:
-                        magic = f.read(6)
-
-                    if magic == b"ARROW1":
-                        lf = pl.scan_ipc(cache_path)
-                    elif magic[:4] == b"PAR1":
-                        logger.debug(f"Cache file {cache_path} is Parquet format (legacy)")
-                        lf = pl.scan_parquet(cache_path)
-                    else:
-                        # Unknown format, try IPC first then Parquet
-                        try:
-                            lf = pl.scan_ipc(cache_path)
-                            _ = lf.collect_schema()  # Force schema check
-                        except pl.exceptions.ComputeError:
-                            lf = pl.scan_parquet(cache_path)
+                    lf = _scan_cache_file(cache_path)
 
                     # Apply time range filter with predicate pushdown
                     # Note: Polars datetime comparison requires proper type handling
