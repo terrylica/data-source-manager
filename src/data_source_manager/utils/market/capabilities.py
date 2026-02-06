@@ -47,6 +47,33 @@ class MarketCapabilities:
         return self.primary_endpoint
 
 
+# Shared interval lists to avoid duplication
+_BINANCE_FUTURES_INTERVALS = [i for i in Interval if i.value != "1s"]
+
+_OKX_SUPPORTED_INTERVALS = [
+    Interval.MINUTE_1,
+    Interval.MINUTE_3,
+    Interval.MINUTE_5,
+    Interval.MINUTE_15,
+    Interval.MINUTE_30,
+    Interval.HOUR_1,
+    Interval.HOUR_2,
+    Interval.HOUR_4,
+    Interval.HOUR_6,
+    Interval.HOUR_12,
+    Interval.DAY_1,
+    Interval.WEEK_1,
+    Interval.MONTH_1,
+]
+
+# Shared Binance futures endpoint configuration
+_BINANCE_FAPI_BACKUP_ENDPOINTS = [
+    "https://fapi-gcp.binance.com",
+    "https://fapi1.binance.com",
+    "https://fapi2.binance.com",
+    "https://fapi3.binance.com",
+]
+
 MARKET_CAPABILITIES: dict[MarketType, MarketCapabilities] = {
     MarketType.SPOT: MarketCapabilities(
         primary_endpoint="https://api.binance.com",
@@ -72,15 +99,10 @@ MARKET_CAPABILITIES: dict[MarketType, MarketCapabilities] = {
     ),
     MarketType.FUTURES_USDT: MarketCapabilities(
         primary_endpoint="https://fapi.binance.com",
-        backup_endpoints=[
-            "https://fapi-gcp.binance.com",
-            "https://fapi1.binance.com",
-            "https://fapi2.binance.com",
-            "https://fapi3.binance.com",
-        ],
+        backup_endpoints=_BINANCE_FAPI_BACKUP_ENDPOINTS,
         data_only_endpoint=None,
         api_version="v1",
-        supported_intervals=[i for i in Interval if i.value != "1s"],
+        supported_intervals=_BINANCE_FUTURES_INTERVALS,
         symbol_format="BTCUSDT",
         description=(
             "USDT-margined futures (UM) market with support for most intervals except 1-second data. "
@@ -100,7 +122,7 @@ MARKET_CAPABILITIES: dict[MarketType, MarketCapabilities] = {
         ],
         data_only_endpoint=None,
         api_version="v1",
-        supported_intervals=[i for i in Interval if i.value != "1s"],
+        supported_intervals=_BINANCE_FUTURES_INTERVALS,
         symbol_format="BTCUSD_PERP",
         description=(
             "Coin-margined futures (CM) market with support for most intervals except 1-second data. "
@@ -113,15 +135,10 @@ MARKET_CAPABILITIES: dict[MarketType, MarketCapabilities] = {
     ),
     MarketType.FUTURES: MarketCapabilities(
         primary_endpoint="https://fapi.binance.com",
-        backup_endpoints=[
-            "https://fapi-gcp.binance.com",
-            "https://fapi1.binance.com",
-            "https://fapi2.binance.com",
-            "https://fapi3.binance.com",
-        ],
+        backup_endpoints=_BINANCE_FAPI_BACKUP_ENDPOINTS,
         data_only_endpoint=None,
         api_version="v1",
-        supported_intervals=[i for i in Interval if i.value != "1s"],
+        supported_intervals=_BINANCE_FUTURES_INTERVALS,
         symbol_format="BTCUSDT",
         description=(
             "Generic futures market type (kept for backward compatibility). "
@@ -141,7 +158,7 @@ MARKET_CAPABILITIES: dict[MarketType, MarketCapabilities] = {
         ],
         data_only_endpoint=None,
         api_version="v1",
-        supported_intervals=[i for i in Interval if i.value != "1s"],
+        supported_intervals=_BINANCE_FUTURES_INTERVALS,
         symbol_format="BTC-230630-60000-C",
         description=(
             "Options market with structured contract naming. "
@@ -160,21 +177,7 @@ OKX_MARKET_CAPABILITIES: dict[MarketType, MarketCapabilities] = {
         backup_endpoints=[],
         data_only_endpoint=None,
         api_version="v5",
-        supported_intervals=[
-            Interval.MINUTE_1,
-            Interval.MINUTE_3,
-            Interval.MINUTE_5,
-            Interval.MINUTE_15,
-            Interval.MINUTE_30,
-            Interval.HOUR_1,
-            Interval.HOUR_2,
-            Interval.HOUR_4,
-            Interval.HOUR_6,
-            Interval.HOUR_12,
-            Interval.DAY_1,
-            Interval.WEEK_1,
-            Interval.MONTH_1,
-        ],
+        supported_intervals=_OKX_SUPPORTED_INTERVALS,
         symbol_format="BTC-USDT",
         description=(
             "OKX SPOT market with support for most intervals except 1-second data. "
@@ -190,21 +193,7 @@ OKX_MARKET_CAPABILITIES: dict[MarketType, MarketCapabilities] = {
         backup_endpoints=[],
         data_only_endpoint=None,
         api_version="v5",
-        supported_intervals=[
-            Interval.MINUTE_1,
-            Interval.MINUTE_3,
-            Interval.MINUTE_5,
-            Interval.MINUTE_15,
-            Interval.MINUTE_30,
-            Interval.HOUR_1,
-            Interval.HOUR_2,
-            Interval.HOUR_4,
-            Interval.HOUR_6,
-            Interval.HOUR_12,
-            Interval.DAY_1,
-            Interval.WEEK_1,
-            Interval.MONTH_1,
-        ],
+        supported_intervals=_OKX_SUPPORTED_INTERVALS,
         symbol_format="BTC-USD-SWAP",
         description=(
             "OKX USD-margined perpetual swaps (SWAP) market with support for most intervals except 1-second data. "
