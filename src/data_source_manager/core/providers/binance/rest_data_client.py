@@ -129,28 +129,24 @@ class RestDataClient(DataClientInterface):
     def _fetch_chunk(self, endpoint: str, params: dict[str, Any], retry_count: int = 0) -> list[list[Any]]:
         """Fetch a chunk of data with retry logic.
 
+        Delegates to the module-level fetch_chunk() which is decorated with
+        @create_retry_decorator() (unified retry with RateLimitError exclusion).
+
         Args:
             endpoint: API endpoint URL
             params: Request parameters
-            retry_count: Current retry attempt - parameter preserved for backward compatibility
-                       with legacy code, no longer used as retry logic is now handled by tenacity
-                       decorators in the utility functions
+            retry_count: Unused (retry_count is configured at module level)
 
         Returns:
             List of data points from the API
 
         Raises:
-            Exception: If all retry attempts fail
+            RateLimitError: If rate limited (not retried)
+            RestAPIError: If all retry attempts fail
         """
-        # Initialize client if not already done
         if self._client is None:
             self._client = create_optimized_client()
 
-        # Log retry attempt if non-zero (for debugging legacy code references)
-        if retry_count > 0:
-            logger.debug(f"Legacy retry_count parameter used: {retry_count} (ignored)")
-
-        # Use the utility function to fetch the chunk
         return fetch_chunk(self._client, endpoint, params, self.fetch_timeout)
 
     def _fetch_chunk_data(
@@ -270,8 +266,9 @@ class RestDataClient(DataClientInterface):
             "total_data_points": 0,
         }
 
-        # Fetch data in chunks
+        # Fetch data in chunks, preserving partial data on rate limit
         all_data = []
+        rate_limited = False
         for i, (chunk_start, chunk_end) in enumerate(chunks):
             logger.debug(
                 f"Fetching chunk {i + 1}/{len(chunks)} for {symbol}: "
@@ -279,13 +276,16 @@ class RestDataClient(DataClientInterface):
                 f"{milliseconds_to_datetime(chunk_end).isoformat()}"
             )
 
-            # Fetch the chunk - RateLimitError propagates to caller
             try:
                 chunk_data = self._fetch_chunk_data(symbol, interval_enum, chunk_start, chunk_end)
-            except RateLimitError:
-                # Rate limiting should stop the entire fetch operation
-                logger.error(f"Rate limited at chunk {i + 1}/{len(chunks)} for {symbol}")
-                raise
+            except RateLimitError as e:
+                logger.warning(
+                    f"Rate limited at chunk {i + 1}/{len(chunks)} for {symbol}, "
+                    f"returning {len(all_data)} partial records"
+                )
+                rate_limited = True
+                _rate_limit_error = e
+                break
 
             if chunk_data:
                 all_data.extend(chunk_data)
@@ -294,6 +294,13 @@ class RestDataClient(DataClientInterface):
                 logger.debug(f"Retrieved {len(chunk_data)} records for chunk {i + 1}")
             else:
                 logger.warning(f"No data returned for chunk {i + 1}")
+
+        # If rate limited with no data collected, propagate the error
+        if rate_limited and not all_data:
+            raise RateLimitError(
+                retry_after=getattr(_rate_limit_error, "retry_after", 60),
+                message=f"Rate limited fetching {symbol} with no partial data to return",
+            )
 
         # If no data was retrieved, return empty DataFrame
         if not all_data:
@@ -306,10 +313,15 @@ class RestDataClient(DataClientInterface):
         # Filter to requested time range
         filtered_df = filter_dataframe_by_time(df, aligned_start, aligned_end, "open_time")
 
+        # Signal partial data if rate limited
+        if rate_limited:
+            filtered_df.attrs["_rate_limited"] = True
+
         # Log success stats
         logger.info(
             f"Successfully retrieved {len(filtered_df)} records for {symbol} "
             f"(from {stats['successful_chunks']}/{stats['total_chunks']} chunks)"
+            + (" [PARTIAL - rate limited]" if rate_limited else "")
         )
 
         # Log REST metrics (for troubleshooting and monitoring)

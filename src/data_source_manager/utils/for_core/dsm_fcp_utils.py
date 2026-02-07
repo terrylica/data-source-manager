@@ -13,6 +13,7 @@ from data_source_manager.utils.for_core.dsm_time_range_utils import (
     merge_adjacent_ranges,
     merge_dataframes,
 )
+from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
 from data_source_manager.utils.for_core.vision_exceptions import UnsupportedIntervalError
 from data_source_manager.utils.loguru_setup import logger
 from data_source_manager.utils.market_constraints import (
@@ -150,10 +151,19 @@ def process_rest_step(
     # Merge adjacent ranges to minimize API calls
     merged_rest_ranges = merge_adjacent_ranges(missing_ranges, interval)
 
+    rate_limit_hit = False
     for range_idx, (miss_start, miss_end) in enumerate(merged_rest_ranges):
         logger.debug(f"[FCP] Fetching from REST API range {range_idx + 1}/{len(merged_rest_ranges)}: {miss_start} to {miss_end}")
 
-        rest_df = fetch_from_rest_func(symbol, miss_start, miss_end, interval)
+        try:
+            rest_df = fetch_from_rest_func(symbol, miss_start, miss_end, interval)
+        except RateLimitError as e:
+            logger.warning(
+                f"[FCP] Rate limited at REST range {range_idx + 1}/{len(merged_rest_ranges)}. "
+                f"Returning partial data. Retry after: {getattr(e, 'retry_after', 'unknown')}s"
+            )
+            rate_limit_hit = True
+            break
 
         if not rest_df.empty:
             # Add source info
@@ -172,6 +182,10 @@ def process_rest_step(
             if save_to_cache_func:
                 logger.debug("[FCP] Auto-saving REST data to cache")
                 save_to_cache_func(rest_df, symbol, interval, source="REST")
+
+    if rate_limit_hit and not result_df.empty:
+        result_df.attrs["_rate_limited"] = True
+        result_df.attrs["_fcp_partial"] = True
 
     return result_df
 

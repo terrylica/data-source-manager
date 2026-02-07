@@ -15,12 +15,6 @@ from datetime import datetime
 from typing import Any
 
 import requests
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_incrementing,
-)
 
 from data_source_manager.utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS, HTTP_OK
 from data_source_manager.utils.for_core.rest_exceptions import (
@@ -33,6 +27,7 @@ from data_source_manager.utils.for_core.rest_exceptions import (
     RestTimeoutError,
 )
 from data_source_manager.utils.for_core.rest_metrics import metrics_tracker, track_api_call
+from data_source_manager.utils.for_core.rest_retry import create_retry_decorator
 from data_source_manager.utils.loguru_setup import logger
 from data_source_manager.utils.market_constraints import Interval
 
@@ -57,14 +52,10 @@ def create_optimized_client() -> requests.Session:
     return session
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_incrementing(start=1, increment=1, max=3),
-    retry=retry_if_exception_type((RestAPIError, requests.RequestException, json.JSONDecodeError)),
-    before_sleep=lambda retry_state: logger.warning(
-        f"Error fetching data (attempt {retry_state.attempt_number}/3): {retry_state.outcome.exception()}"
-    ),
-)
+# Apply retry decorator at module level (default retry_count=3).
+# This preserves the original behavior where @patch("...fetch_chunk") replaces
+# the entire decorated function in tests (no retry logic applied to mocks).
+@create_retry_decorator()
 def fetch_chunk(
     client: requests.Session,
     endpoint: str,
@@ -105,7 +96,7 @@ def fetch_chunk(
 
             # Handle rate limiting
             if response.status_code in (418, 429):
-                retry_after = int(response.headers.get("retry-after", 1))
+                retry_after = int(response.headers.get("retry-after", 60))
                 logger.warning(f"Rate limited by API (HTTP {response.status_code}). Waiting {retry_after}s before continuing")
                 raise RateLimitError(retry_after=retry_after)
 

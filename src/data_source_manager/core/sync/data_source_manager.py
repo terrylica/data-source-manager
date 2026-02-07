@@ -73,7 +73,7 @@ from data_source_manager.utils.internal.polars_pipeline import PolarsDataPipelin
 from data_source_manager.utils.for_core.dsm_time_range_utils import (
     standardize_columns,
 )
-from data_source_manager.utils.for_core.rest_exceptions import RestAPIError
+from data_source_manager.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
 from data_source_manager.utils.for_core.vision_exceptions import VisionAPIError
 from data_source_manager.utils.loguru_setup import logger
 from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
@@ -1136,8 +1136,14 @@ class DataSourceManager:
             OSError,
             pd.errors.ParserError,
         ) as e:
-            # Improved error handling using the dedicated error handler
+            # Preserve partial data on rate limit instead of destroying it
+            if isinstance(e, RateLimitError) and not result_df.empty:
+                logger.warning(f"[FCP] Rate limited but returning {len(result_df)} partial records")
+                result_df.attrs["_rate_limited"] = True
+                return standardize_columns(result_df)
+
             handle_error(e)
+            return None  # unreachable, handle_error always raises
 
     def __enter__(self) -> "DataSourceManager":
         """Context manager entry point.

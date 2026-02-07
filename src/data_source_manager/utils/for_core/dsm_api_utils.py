@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from data_source_manager.utils.config import VISION_DATA_DELAY_HOURS, create_empty_dataframe
+from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
 from data_source_manager.utils.for_core.vision_constraints import is_date_too_fresh_for_vision
 from data_source_manager.utils.loguru_setup import logger
 from data_source_manager.utils.market_constraints import ChartType, Interval, MarketType
@@ -237,6 +238,8 @@ def fetch_from_rest(
         logger.info(f"Retrieved {len(df)} records from REST API")
 
         return df
+    except RateLimitError:
+        raise  # Let FCP handle rate limits with partial data preservation
     except (OSError, ConnectionError, TimeoutError, ValueError, RuntimeError) as e:
         try:
             safe_msg = _log_critical_error_with_traceback("fetch_from_rest", e)
