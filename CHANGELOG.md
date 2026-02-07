@@ -1,3 +1,16 @@
+# [3.1.0](https://github.com/terrylica/data-source-manager/compare/v3.0.0...v3.1.0) (2026-02-07)
+
+
+### Bug Fixes
+
+* **api:** rewrite fetch_market_data to use core layer directly ([1c97ef1](https://github.com/terrylica/data-source-manager/commit/1c97ef1f0816fbb2f9f1bf0b54704eb28045c7c0))
+* **date-range:** handle plain datetime objects in calculate_date_range ([0bab5e5](https://github.com/terrylica/data-source-manager/commit/0bab5e5a145b1f25046b915e64dcfb0728db23be))
+
+
+### Features
+
+* **architecture:** add import-linter contracts to enforce layer boundaries ([4a4da19](https://github.com/terrylica/data-source-manager/commit/4a4da19b366a2c942a3f40be989e7c44ac8093c8))
+
 # [3.0.0](https://github.com/terrylica/data-source-manager/compare/v2.0.2...v3.0.0) (2026-02-05)
 
 
