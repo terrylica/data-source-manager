@@ -11,7 +11,10 @@ Rules for working with Binance market data APIs.
 
 ## Rate Limits
 
-- REST API: 6000 weight per minute
+- REST API weight limits per minute (varies by market type):
+  - Spot: 6,000 weight/minute
+  - USDT-M Futures: 2,400 weight/minute
+  - Coin-M Futures: 2,400 weight/minute
 - Vision API: No rate limits (bulk S3 access)
 - Each klines request: ~1-5 weight depending on limit
 

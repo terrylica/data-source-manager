@@ -86,7 +86,10 @@ except ValueError as e:
 
 Binance rate limits:
 
-- REST API: 6000 weight per minute (weight varies by endpoint)
+- REST API weight limits per minute (varies by market type):
+  - Spot: 6,000 weight/minute
+  - USDT-M Futures: 2,400 weight/minute
+  - Coin-M Futures: 2,400 weight/minute
 - Vision API: No rate limit (S3 bucket)
 
 ```python

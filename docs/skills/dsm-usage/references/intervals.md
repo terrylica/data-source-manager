@@ -55,7 +55,7 @@ Interval.MONTH_1     # 1M
 **REST API** (real-time):
 
 - All intervals available
-- Rate limited (6000 weight/minute)
+- Rate limited (Spot: 6,000 / Futures: 2,400 weight/minute)
 - Maximum 1000 candles per request
 
 ## Converting Between Intervals

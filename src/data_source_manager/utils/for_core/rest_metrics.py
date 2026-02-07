@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from data_source_manager.utils.config import SECONDS_IN_HOUR
+from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
 from data_source_manager.utils.loguru_setup import logger
 
 
@@ -201,7 +202,10 @@ def track_api_call(endpoint: str, params: dict[str, Any]) -> callable:
                 return result
             except Exception as e:
                 error_type = type(e).__name__
-                if hasattr(e, "status_code"):
+                # RateLimitError has retry_after, not status_code — detect it explicitly
+                if isinstance(e, RateLimitError):
+                    status_code = 429
+                elif hasattr(e, "status_code"):
                     status_code = e.status_code
                 raise
             finally:

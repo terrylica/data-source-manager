@@ -64,7 +64,7 @@ assert end_time <= datetime.now(timezone.utc), "Cannot request future data"
 
 **Symptoms**: REST API returns 429 error.
 
-**Causes**: Exceeded 6000 weight/minute limit.
+**Causes**: Exceeded weight/minute limit (Spot: 6,000 / Futures: 2,400).
 
 **Solutions**:
 

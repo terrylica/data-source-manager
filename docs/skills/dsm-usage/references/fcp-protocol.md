@@ -32,7 +32,7 @@ FCP automatically retrieves market data from the best available source:
 ┌─────────────────────────────────────────────────────────┐
 │              3. REST API                                │
 │  - Real-time fallback                                   │
-│  - Rate limited (6000 weight/min)                       │
+│  - Rate limited (Spot: 6k / Futures: 2.4k weight/min)   │
 │  - 1000 candles per request max                         │
 │  - Used for recent data not in Vision                   │
 └─────────────────────────────────────────────────────────┘

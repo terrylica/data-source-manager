@@ -13,11 +13,11 @@ Key terminology used in Data Source Manager.
 
 ## Data Sources
 
-| Term           | Definition                                                                  |
-| -------------- | --------------------------------------------------------------------------- |
-| **Vision API** | Binance Vision - bulk historical data on AWS S3, ~48h delay, no rate limits |
-| **REST API**   | Real-time Binance REST API, rate limited (6000 weight/minute)               |
-| **Cache**      | Local Apache Arrow files for fast repeated access (~1ms)                    |
+| Term           | Definition                                                                         |
+| -------------- | ---------------------------------------------------------------------------------- |
+| **Vision API** | Binance Vision - bulk historical data on AWS S3, ~48h delay, no rate limits        |
+| **REST API**   | Real-time Binance REST API, rate limited (Spot: 6,000 / Futures: 2,400 weight/min) |
+| **Cache**      | Local Apache Arrow files for fast repeated access (~1ms)                           |
 
 ## Storage Concepts
 
@@ -55,12 +55,12 @@ Key terminology used in Data Source Manager.
 
 ## API Concepts
 
-| Term           | Definition                                            |
-| -------------- | ----------------------------------------------------- |
-| **Weight**     | API cost unit, REST API limited to 6000 weight/minute |
-| **Rate Limit** | Maximum allowed API requests per time period          |
-| **403**        | HTTP error indicating future timestamp requested      |
-| **429**        | HTTP error indicating rate limit exceeded             |
+| Term           | Definition                                                                |
+| -------------- | ------------------------------------------------------------------------- |
+| **Weight**     | API cost unit, REST API limited per minute (Spot: 6,000 / Futures: 2,400) |
+| **Rate Limit** | Maximum allowed API requests per time period                              |
+| **403**        | HTTP error indicating future timestamp requested                          |
+| **429**        | HTTP error indicating rate limit exceeded                                 |
 
 ## Data Quality
 
