@@ -1,3 +1,12 @@
+## [3.1.1](https://github.com/terrylica/data-source-manager/compare/v3.1.0...v3.1.1) (2026-02-07)
+
+
+### Bug Fixes
+
+* **metrics:** track RateLimitError in metrics and correct rate limit docs (Phase 4) ([c6ae3fb](https://github.com/terrylica/data-source-manager/commit/c6ae3fb4a23489998b9d2d6befc38fa957d8d06b)), closes [#18](https://github.com/terrylica/data-source-manager/issues/18)
+* **rate-limit:** stop data loss on 429 and fix retry behavior (Phase 1) ([9e1964d](https://github.com/terrylica/data-source-manager/commit/9e1964ddc4516711cec52ac0191f8f07c6850752)), closes [#18](https://github.com/terrylica/data-source-manager/issues/18)
+* **rate-limit:** unified retry module and fix api.py double-wait (Phase 2) ([5903af5](https://github.com/terrylica/data-source-manager/commit/5903af574776cd0498dd3e63a2f0d84130ee9b37)), closes [#18](https://github.com/terrylica/data-source-manager/issues/18)
+
 # [3.1.0](https://github.com/terrylica/data-source-manager/compare/v3.0.0...v3.1.0) (2026-02-07)
 
 
