@@ -50,8 +50,8 @@ class PolarsDataPipeline:
     dsm_time_range_utils.py but using Polars LazyFrame operations for
     better memory efficiency and predicate pushdown.
 
-    The pipeline is designed to be used internally by DataSourceManager
-    when the USE_POLARS_PIPELINE feature flag is enabled.
+    The pipeline is always active internally in DataSourceManager
+    (USE_POLARS_PIPELINE flag was removed in v3.1.0).
     """
 
     def __init__(self) -> None:

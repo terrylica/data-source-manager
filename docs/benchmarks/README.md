@@ -76,10 +76,8 @@ Compares Polars `.collect(engine='streaming')` vs `.collect()` (in-memory).
 
 ### Default (Recommended)
 
-```bash
-# Streaming is default - no configuration needed
-export DSM_USE_POLARS_PIPELINE=true  # Already default
-```
+The Polars pipeline is always active — no configuration needed.
+The `USE_POLARS_PIPELINE` flag was removed (see CHANGELOG for details).
 
 ### For Maximum Performance
 
@@ -94,12 +92,9 @@ df = manager.get_data(
 )
 ```
 
-### Legacy Pandas Path (Not Recommended)
+### Legacy Pandas Path
 
-```bash
-# Force legacy pandas path
-export DSM_USE_POLARS_PIPELINE=false
-```
+The legacy pandas FCP path has been removed. The Polars pipeline is unconditional.
 
 ## Running Benchmarks
 

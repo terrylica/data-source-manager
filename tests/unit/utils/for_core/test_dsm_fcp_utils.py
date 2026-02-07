@@ -3,11 +3,10 @@
 
 Tests the Failover Control Protocol utility functions in dsm_fcp_utils.py:
 1. validate_interval() - Interval validation
-2. process_cache_step() - FCP Step 1: Cache lookup
-3. process_vision_step() - FCP Step 2: Vision API
-4. process_rest_step() - FCP Step 3: REST API fallback
-5. verify_final_data() - Final data validation
-6. handle_error() - Error handling
+2. process_vision_step() - FCP Step 2: Vision API
+3. process_rest_step() - FCP Step 3: REST API fallback
+4. verify_final_data() - Final data validation
+5. handle_error() - Error handling
 
 ADR: docs/adr/2025-01-30-failover-control-protocol.md
 """
@@ -20,7 +19,6 @@ import pytest
 
 from data_source_manager.utils.for_core.dsm_fcp_utils import (
     handle_error,
-    process_cache_step,
     process_rest_step,
     process_vision_step,
     validate_interval,
@@ -123,107 +121,6 @@ class TestValidateInterval:
         error_msg = str(excinfo.value)
         # Should mention supported intervals
         assert "Supported intervals" in error_msg or "supported" in error_msg.lower()
-
-
-# =============================================================================
-# process_cache_step() Tests
-# =============================================================================
-
-
-class TestProcessCacheStep:
-    """Tests for process_cache_step function (FCP Step 1)."""
-
-    def test_cache_hit_returns_data_and_empty_missing_ranges(
-        self, sample_ohlcv_df, historical_time_range
-    ):
-        """Cache hit should return data with no missing ranges."""
-        start_time, end_time = historical_time_range
-
-        # Mock cache function that returns data
-        mock_cache_func = MagicMock(return_value=(sample_ohlcv_df, []))
-
-        result_df, missing_ranges = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache_func,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=True,
-        )
-
-        # Assertions
-        assert len(result_df) == len(sample_ohlcv_df)
-        assert len(missing_ranges) == 0
-        mock_cache_func.assert_called_once()
-
-    def test_cache_hit_adds_source_info(self, sample_ohlcv_df, historical_time_range):
-        """Cache hit with include_source_info should add _data_source column."""
-        start_time, end_time = historical_time_range
-
-        mock_cache_func = MagicMock(return_value=(sample_ohlcv_df.copy(), []))
-
-        result_df, _ = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache_func,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=True,
-        )
-
-        assert "_data_source" in result_df.columns
-        assert (result_df["_data_source"] == "CACHE").all()
-
-    def test_cache_miss_returns_empty_df_with_full_range_missing(
-        self, historical_time_range
-    ):
-        """Cache miss should return empty DataFrame with full range as missing."""
-        start_time, end_time = historical_time_range
-
-        # Mock cache function that returns empty
-        mock_cache_func = MagicMock(return_value=(pd.DataFrame(), []))
-
-        result_df, missing_ranges = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache_func,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=False,
-        )
-
-        assert result_df.empty
-        assert len(missing_ranges) == 1
-        assert missing_ranges[0] == (start_time, end_time)
-
-    def test_cache_partial_hit_returns_data_with_missing_ranges(
-        self, sample_ohlcv_df, historical_time_range
-    ):
-        """Partial cache hit should return data with remaining missing ranges."""
-        start_time, end_time = historical_time_range
-        mid_time = start_time + timedelta(hours=12)
-
-        # Mock returns partial data with gap
-        mock_cache_func = MagicMock(
-            return_value=(sample_ohlcv_df.iloc[:12], [(mid_time, end_time)])
-        )
-
-        result_df, missing_ranges = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache_func,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=False,
-        )
-
-        assert len(result_df) == 12
-        assert len(missing_ranges) == 1
-        assert missing_ranges[0] == (mid_time, end_time)
 
 
 # =============================================================================
@@ -513,120 +410,6 @@ class TestHandleError:
         # Should not contain raw binary, should be sanitized
         error_str = str(excinfo.value)
         assert "\x00" not in error_str or "\\x00" in error_str
-
-
-# =============================================================================
-# Integration-like Tests (FCP Flow)
-# =============================================================================
-
-
-class TestFCPFlowIntegration:
-    """Tests for complete FCP flow through utility functions."""
-
-    def test_cache_hit_short_circuits_flow(
-        self, sample_ohlcv_df, historical_time_range
-    ):
-        """Cache hit should provide complete data without needing Vision/REST."""
-        start_time, end_time = historical_time_range
-
-        # Cache returns complete data
-        mock_cache = MagicMock(return_value=(sample_ohlcv_df.copy(), []))
-
-        result_df, missing_ranges = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=True,
-        )
-
-        # No missing ranges means Vision/REST not needed
-        assert len(missing_ranges) == 0
-        assert len(result_df) == len(sample_ohlcv_df)
-
-    def test_cache_miss_vision_hit_flow(
-        self, sample_ohlcv_df, historical_time_range
-    ):
-        """Cache miss followed by Vision hit should complete without REST."""
-        start_time, end_time = historical_time_range
-
-        # Step 1: Cache miss
-        mock_cache = MagicMock(return_value=(pd.DataFrame(), []))
-        cache_df, missing_ranges = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=False,
-        )
-
-        assert cache_df.empty
-        assert missing_ranges == [(start_time, end_time)]
-
-        # Step 2: Vision hit
-        mock_vision = MagicMock(return_value=sample_ohlcv_df.copy())
-        result_df, _remaining = process_vision_step(
-            fetch_from_vision_func=mock_vision,
-            symbol="BTCUSDT",
-            missing_ranges=missing_ranges,
-            interval=Interval.HOUR_1,
-            include_source_info=True,
-            result_df=cache_df,
-        )
-
-        assert len(result_df) > 0
-        assert "_data_source" in result_df.columns
-
-    def test_full_fallback_chain_flow(
-        self, sample_ohlcv_df, historical_time_range
-    ):
-        """Full fallback: Cache miss -> Vision miss -> REST success."""
-        start_time, end_time = historical_time_range
-
-        # Step 1: Cache miss
-        mock_cache = MagicMock(return_value=(pd.DataFrame(), []))
-        cache_df, missing_ranges = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=False,
-        )
-
-        # Step 2: Vision miss
-        mock_vision = MagicMock(return_value=pd.DataFrame())
-        vision_df, remaining = process_vision_step(
-            fetch_from_vision_func=mock_vision,
-            symbol="BTCUSDT",
-            missing_ranges=missing_ranges,
-            interval=Interval.HOUR_1,
-            include_source_info=False,
-            result_df=cache_df,
-        )
-
-        assert vision_df.empty
-        assert len(remaining) > 0
-
-        # Step 3: REST success
-        mock_rest = MagicMock(return_value=sample_ohlcv_df.copy())
-        result_df = process_rest_step(
-            fetch_from_rest_func=mock_rest,
-            symbol="BTCUSDT",
-            missing_ranges=remaining,
-            interval=Interval.HOUR_1,
-            include_source_info=True,
-            result_df=vision_df,
-        )
-
-        assert len(result_df) > 0
-        assert "_data_source" in result_df.columns
-        assert (result_df["_data_source"] == "REST").all()
 
 
 # =============================================================================
@@ -928,24 +711,6 @@ class TestMergeDataFrames:
 
 class TestSourceAttribution:
     """Tests for _data_source column tracking."""
-
-    def test_cache_source_attribution(self, sample_ohlcv_df, historical_time_range):
-        """Cache step should attribute source as 'CACHE'."""
-        start_time, end_time = historical_time_range
-        mock_cache = MagicMock(return_value=(sample_ohlcv_df.copy(), []))
-
-        result_df, _ = process_cache_step(
-            use_cache=True,
-            get_from_cache_func=mock_cache,
-            symbol="BTCUSDT",
-            aligned_start=start_time,
-            aligned_end=end_time,
-            interval=Interval.HOUR_1,
-            include_source_info=True,
-        )
-
-        assert "_data_source" in result_df.columns
-        assert (result_df["_data_source"] == "CACHE").all()
 
     def test_vision_source_attribution(self, sample_ohlcv_df, historical_time_range):
         """Vision step should attribute source as 'VISION'."""

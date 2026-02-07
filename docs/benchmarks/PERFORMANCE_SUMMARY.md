@@ -94,12 +94,10 @@ Polars Memory Profile:
 
 ## Recommendations
 
-### Enable Polars Pipeline (Default)
+### Polars Pipeline (Always Active)
 
-```bash
-# Already enabled by default
-export DSM_USE_POLARS_PIPELINE=true
-```
+The Polars pipeline is always active — no configuration needed.
+The `USE_POLARS_PIPELINE` flag was removed (see CHANGELOG for details).
 
 ### For Maximum Performance
 
@@ -114,37 +112,13 @@ df = manager.get_data(
 )
 ```
 
-### When to Use Legacy Pandas Path
-
-Only if you have specific pandas-dependent downstream code that cannot accept Polars DataFrames.
-
-```bash
-# Force legacy pandas path (not recommended)
-export DSM_USE_POLARS_PIPELINE=false
-```
-
----
-
 ## Test Configuration
 
-- **Feature Flag**: `USE_POLARS_PIPELINE`
+- **Pipeline**: Polars (always active)
 - **Symbol**: BTCUSDT (Binance USDT-margined futures)
 - **Interval**: 1 hour
 - **Data Source**: Cache (for consistent comparison)
 - **Memory Tracking**: Python tracemalloc
-
----
-
-## Skipped Tests Explanation
-
-21 tests are intentionally skipped when `USE_POLARS_PIPELINE=True`:
-
-| Test File                     | Skipped | Reason                         |
-| ----------------------------- | ------- | ------------------------------ |
-| test_data_source_manager.py   | 13      | Mocks pandas FCP code paths    |
-| test_return_type_overloads.py | 8       | Tests pandas-specific behavior |
-
-These tests use `@pytest.mark.skipif(FeatureFlags().USE_POLARS_PIPELINE, ...)` to skip when the Polars pipeline is enabled, as the mocked pandas code paths are never executed.
 
 ---
 

@@ -675,17 +675,15 @@ class TestEmpiricalSummaryReport:
 class TestPolarsPipelineE2E:
     """End-to-end tests for Polars pipeline with real market data.
 
-    These tests verify that when USE_POLARS_PIPELINE and USE_POLARS_OUTPUT
-    feature flags are enabled, the data returned is correct and matches
-    the baseline (non-Polars) path.
+    The Polars pipeline is always active (USE_POLARS_PIPELINE removed in v3.1.0).
+    These tests verify data integrity and USE_POLARS_OUTPUT zero-copy behavior.
 
     GitHub Issue #14: Memory Efficiency Refactoring Complete - Phase 2-3
     """
 
     @pytest.fixture(autouse=True)
     def setup_polars_flags(self, monkeypatch):
-        """Enable Polars pipeline for all tests in this class."""
-        monkeypatch.setenv("DSM_USE_POLARS_PIPELINE", "true")
+        """Enable zero-copy Polars output for all tests in this class."""
         monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "true")
 
     @pytest.mark.parametrize(
@@ -760,60 +758,6 @@ class TestPolarsPipelineE2E:
                 f"Interval spacing invalid: {spacing_result['spacing_accuracy']:.1%} accuracy "
                 f"({spacing_result['correct_intervals']}/{spacing_result['total_intervals']})"
             )
-
-    def test_polars_vs_pandas_data_equivalence(self):
-        """Verify Polars pipeline produces identical data to pandas path.
-
-        Critical test: data must be byte-for-byte equivalent regardless
-        of which code path is used.
-        """
-        import os
-
-        # Fetch with Polars pipeline (already enabled by fixture)
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
-        df_polars = manager.get_data(
-            symbol="BTCUSDT",
-            start_time=EMPIRICAL_START,
-            end_time=EMPIRICAL_END,
-            interval=Interval.HOUR_1,
-        )
-        manager.close()
-
-        # Fetch without Polars pipeline
-        os.environ["DSM_USE_POLARS_PIPELINE"] = "false"
-        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
-
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
-        df_pandas = manager.get_data(
-            symbol="BTCUSDT",
-            start_time=EMPIRICAL_START,
-            end_time=EMPIRICAL_END,
-            interval=Interval.HOUR_1,
-        )
-        manager.close()
-
-        if df_polars.empty or df_pandas.empty:
-            pytest.skip("Empty data returned - network issue")
-
-        # Reset index for comparison
-        df_polars_reset = df_polars.reset_index()
-        df_pandas_reset = df_pandas.reset_index()
-
-        # Compare shape
-        assert df_polars_reset.shape == df_pandas_reset.shape, (
-            f"Shape mismatch: polars={df_polars_reset.shape}, pandas={df_pandas_reset.shape}"
-        )
-
-        # Compare OHLCV values (allow small floating point tolerance)
-        for col in ["open", "high", "low", "close", "volume"]:
-            if col in df_polars_reset.columns:
-                pd.testing.assert_series_equal(
-                    df_polars_reset[col],
-                    df_pandas_reset[col],
-                    check_exact=False,
-                    rtol=1e-10,
-                    obj=f"Column '{col}'",
-                )
 
     def test_polars_pipeline_return_polars_true(self):
         """Verify return_polars=True returns Polars DataFrame."""

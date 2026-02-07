@@ -24,7 +24,7 @@ src/data_source_manager/
 └── utils/
     ├── market_constraints.py    # Enums and validation
     ├── loguru_setup.py          # Logging configuration
-    ├── config.py                # Feature flags (USE_POLARS_PIPELINE, etc.)
+    ├── config.py                # Feature flags (USE_POLARS_OUTPUT)
     ├── internal/
     │   └── polars_pipeline.py   # PolarsDataPipeline class
     └── for_core/                # Internal utilities

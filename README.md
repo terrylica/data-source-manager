@@ -428,21 +428,13 @@ DSM_LOG_LEVEL=DEBUG python examples/dsm_logging_demo.py --test-dsm
 
 ## Feature Flags
 
-DSM supports optional feature flags for advanced memory optimization.
+DSM supports an optional feature flag for output format optimization.
 
-### Polars Pipeline (Internal Optimization)
-
-Enable internal Polars LazyFrame processing for 15-20% memory improvement:
-
-```bash
-export DSM_USE_POLARS_PIPELINE=true
-```
-
-This enables the PolarsDataPipeline for FCP merge operations, using lazy evaluation and streaming collection internally while maintaining pandas DataFrame output at the API boundary.
+**Note**: The Polars pipeline is always active internally (`USE_POLARS_PIPELINE` was removed — see [CHANGELOG](CHANGELOG.md) for details). The only remaining flag controls the API output format.
 
 ### Zero-Copy Polars Output
 
-When combined with `return_polars=True`, skip pandas conversion entirely for additional 10-15% memory savings:
+When combined with `return_polars=True`, skip pandas conversion entirely for 10-15% memory savings:
 
 ```bash
 export DSM_USE_POLARS_OUTPUT=true
@@ -453,7 +445,7 @@ from data_source_manager import DataSourceManager, DataProvider, MarketType, Int
 
 manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
-# Returns pl.DataFrame directly (zero-copy when both flags enabled)
+# Returns pl.DataFrame directly (zero-copy, skips pandas conversion)
 df = manager.get_data(
     symbol="BTCUSDT",
     start_time=start_time,
@@ -465,12 +457,11 @@ df = manager.get_data(
 
 ### Feature Flag Summary
 
-| Flag                  | Environment Variable      | Effect                     |
-| --------------------- | ------------------------- | -------------------------- |
-| `USE_POLARS_PIPELINE` | `DSM_USE_POLARS_PIPELINE` | Internal Polars processing |
-| `USE_POLARS_OUTPUT`   | `DSM_USE_POLARS_OUTPUT`   | Zero-copy Polars output    |
+| Flag                | Environment Variable    | Effect                  |
+| ------------------- | ----------------------- | ----------------------- |
+| `USE_POLARS_OUTPUT` | `DSM_USE_POLARS_OUTPUT` | Zero-copy Polars output |
 
-Both flags default to `False` for backward compatibility. Set to `true`, `1`, or `yes` to enable.
+Defaults to `False` for backward compatibility. Set to `true`, `1`, or `yes` to enable.
 
 ## Documentation
 

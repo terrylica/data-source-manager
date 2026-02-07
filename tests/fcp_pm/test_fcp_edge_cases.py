@@ -699,10 +699,11 @@ class TestFCPCachePartialHit:
 
 @pytest.mark.integration
 class TestFCPPolarsIntegration:
-    """FCP edge case tests with Polars pipeline enabled.
+    """FCP edge case tests with Polars zero-copy output enabled.
 
-    These tests verify that the FCP logic works correctly when
-    USE_POLARS_PIPELINE and USE_POLARS_OUTPUT feature flags are enabled.
+    The Polars pipeline is always active (USE_POLARS_PIPELINE removed in v3.1.0).
+    These tests verify that the FCP logic works correctly with
+    USE_POLARS_OUTPUT enabled for zero-copy Polars output.
 
     The FCP priority (REST > CACHE > VISION) must be preserved in
     the Polars-based merge implementation.
@@ -710,8 +711,7 @@ class TestFCPPolarsIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_polars_flags(self, monkeypatch):
-        """Enable Polars pipeline for all tests in this class."""
-        monkeypatch.setenv("DSM_USE_POLARS_PIPELINE", "true")
+        """Enable zero-copy Polars output for all tests in this class."""
         monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "true")
 
     def test_polars_fcp_cache_hit(self, fcp_manager_futures, historical_range):
@@ -884,65 +884,6 @@ class TestFCPPolarsIntegration:
         )
 
         rprint(f"[green]✓ {interval.value}: {len(df)} rows[/green]")
-
-    def test_polars_fcp_data_equivalence(self, fcp_manager_futures, historical_range):
-        """Polars FCP must produce same data as pandas path.
-
-        This is the critical equivalence test - FCP merge logic must
-        be identical regardless of code path used.
-        """
-        import os
-
-        start_time, end_time = historical_range
-
-        # Fetch with Polars pipeline (enabled by fixture)
-        df_polars = fcp_manager_futures.get_data(
-            symbol="BTCUSDT",
-            start_time=start_time,
-            end_time=end_time,
-            interval=Interval.HOUR_1,
-        )
-
-        # Fetch without Polars pipeline
-        os.environ["DSM_USE_POLARS_PIPELINE"] = "false"
-        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
-
-        # Create fresh manager to pick up env changes
-        fcp_manager_futures.close()
-        manager_pandas = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
-
-        df_pandas = manager_pandas.get_data(
-            symbol="BTCUSDT",
-            start_time=start_time,
-            end_time=end_time,
-            interval=Interval.HOUR_1,
-        )
-        manager_pandas.close()
-
-        if df_polars.empty or df_pandas.empty:
-            pytest.skip("Empty data - cannot compare")
-
-        # Reset index for comparison
-        df_polars_reset = df_polars.reset_index()
-        df_pandas_reset = df_pandas.reset_index()
-
-        # Shape must match
-        assert df_polars_reset.shape == df_pandas_reset.shape, (
-            f"Shape mismatch: polars={df_polars_reset.shape}, pandas={df_pandas_reset.shape}"
-        )
-
-        # OHLCV values must match
-        for col in ["open", "high", "low", "close", "volume"]:
-            if col in df_polars_reset.columns:
-                pd.testing.assert_series_equal(
-                    df_polars_reset[col],
-                    df_pandas_reset[col],
-                    check_exact=False,
-                    rtol=1e-10,
-                    obj=f"Column '{col}'",
-                )
-
-        rprint(f"[green]✓ Data equivalence verified: {len(df_polars)} rows match[/green]")
 
 
 # =============================================================================

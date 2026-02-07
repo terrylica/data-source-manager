@@ -238,12 +238,13 @@ def _parse_bool_env(env_var: str, default: bool) -> bool:
 class FeatureFlags:
     """System-wide feature flags for enabling/disabling functionality.
 
-    Phase 2-3 Polars Migration Flags (ADR: docs/adr/2025-01-30-failover-control-protocol.md):
-    - USE_POLARS_PIPELINE: Enable internal Polars LazyFrame processing (Phase 2)
-    - USE_POLARS_OUTPUT: Enable zero-copy Polars output when return_polars=True (Phase 3)
+    Polars Migration Flag (ADR: docs/adr/2025-01-30-failover-control-protocol.md):
+    - USE_POLARS_OUTPUT: Enable zero-copy Polars output when return_polars=True
+
+    Note: Internal Polars LazyFrame processing (PolarsDataPipeline) is always active.
+    The USE_POLARS_PIPELINE flag was removed in v3.1.0.
 
     Environment variables:
-    - DSM_USE_POLARS_PIPELINE=true/false
     - DSM_USE_POLARS_OUTPUT=true/false
     """
 
@@ -252,16 +253,7 @@ class FeatureFlags:
     USE_VISION_FOR_LARGE_REQUESTS: bool = attrs.field(default=True)
     VALIDATE_DATA_ON_WRITE: bool = attrs.field(default=True)
 
-    # Phase 2: Internal Polars LazyFrame processing
-    # When True, uses PolarsDataPipeline internally for FCP merge operations
-    # Returns pandas DataFrame at API boundary (backward compatible)
-    # Default: True (v2.1.0+) - opt-out with DSM_USE_POLARS_PIPELINE=false
-    USE_POLARS_PIPELINE: bool = attrs.field(
-        default=True,
-        converter=lambda x: _parse_bool_env("DSM_USE_POLARS_PIPELINE", x),
-    )
-
-    # Phase 3: Zero-copy Polars output
+    # Zero-copy Polars output
     # When True AND return_polars=True, skips pandas conversion entirely
     # Provides maximum memory efficiency for Polars consumers
     # Default: True (v2.1.0+) - opt-out with DSM_USE_POLARS_OUTPUT=false
@@ -279,7 +271,7 @@ class FeatureFlags:
 
         Example:
             FeatureFlags.update(ENABLE_CACHE=False)
-            FeatureFlags.update(USE_POLARS_PIPELINE=True)
+            FeatureFlags.update(USE_POLARS_OUTPUT=True)
         """
         for key, value in kwargs.items():
             if hasattr(cls, key):

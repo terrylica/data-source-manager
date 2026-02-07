@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from data_source_manager.utils.config import create_empty_dataframe
 from data_source_manager.utils.for_core.dsm_time_range_utils import (
     identify_missing_segments,
     merge_adjacent_ranges,
@@ -50,52 +49,6 @@ def validate_interval(market_type: MarketType, interval: Interval) -> None:
 
         logger.error(error_msg)
         raise UnsupportedIntervalError(error_msg)
-
-
-def process_cache_step(
-    use_cache: bool,
-    get_from_cache_func,
-    symbol: str,
-    aligned_start: datetime,
-    aligned_end: datetime,
-    interval: Interval,
-    include_source_info: bool,
-) -> tuple[pd.DataFrame, list[tuple[datetime, datetime]]]:
-    """Process the cache step (Step 1) of the FCP mechanism.
-
-    Args:
-        use_cache: Whether cache is enabled
-        get_from_cache_func: Function to retrieve data from cache
-        symbol: Symbol to retrieve data for
-        aligned_start: Aligned start time
-        aligned_end: Aligned end time
-        interval: Interval for data points
-        include_source_info: Whether to include source info in the DataFrame
-
-    Returns:
-        Tuple of (result_df, missing_ranges)
-    """
-    logger.info(f"[FCP] STEP 1: Checking local cache for {symbol}")
-
-    # Get data from cache
-    cache_df, missing_ranges = get_from_cache_func(symbol, aligned_start, aligned_end, interval)
-
-    if not cache_df.empty:
-        # Add source info if requested
-        if include_source_info and "_data_source" not in cache_df.columns:
-            cache_df["_data_source"] = "CACHE"
-
-        # Log the time range of the cache data
-        min_time = cache_df["open_time"].min()
-        max_time = cache_df["open_time"].max()
-        logger.debug(f"[FCP] Cache data provides records from {min_time} to {max_time}")
-
-        logger.info(f"[FCP] Cache contributed {len(cache_df)} records")
-        return cache_df, missing_ranges
-    # If cache is empty, treat entire range as missing
-    missing_ranges = [(aligned_start, aligned_end)]
-    logger.debug(f"[FCP] No cache data available, entire range marked as missing: {aligned_start} to {aligned_end}")
-    return create_empty_dataframe(), missing_ranges
 
 
 def process_vision_step(
