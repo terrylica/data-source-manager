@@ -1,5 +1,31 @@
 # [4.0.0](https://github.com/terrylica/crypto-kline-vision-data/compare/v3.1.1...v4.0.0) (2026-02-08)
 
+
+### Bug Fixes
+
+* resolve all lint, format, and typecheck warnings for zero-error CI ([f09b5f4](https://github.com/terrylica/crypto-kline-vision-data/commit/f09b5f48398f513cd365d8d1b68c61a5d61c9952))
+
+
+### Code Refactoring
+
+* **rename:** bump to v4.0.0 — complete package rename to crypto-kline-vision-data ([a2563bf](https://github.com/terrylica/crypto-kline-vision-data/commit/a2563bf735540ade8d75e61f8d804f6254f03062))
+
+
+### BREAKING CHANGES
+
+* **rename:** Package renamed from data-source-manager to crypto-kline-vision-data.
+- Import: from data_source_manager → from ckvd
+- Class: DataSourceManager → CryptoKlineVisionData
+- Config: DataSourceConfig → CKVDConfig
+- Env vars: DSM_* → CKVD_*
+- Cache: ~/.cache/data-source-manager → ~/.cache/crypto-kline-vision-data
+- No backward compatibility shim.
+
+SRED-Type: support-work
+SRED-Claim: CKVD-RENAME
+
+# [4.0.0](https://github.com/terrylica/crypto-kline-vision-data/compare/v3.1.1...v4.0.0) (2026-02-08)
+
 ### BREAKING CHANGES
 
 - **rename:** Package renamed from data-source-manager to crypto-kline-vision-data.
