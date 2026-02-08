@@ -1,6 +1,6 @@
 # Test Fixtures Reference
 
-Common pytest fixtures for DataSourceManager testing.
+Common pytest fixtures for CryptoKlineVisionData testing.
 
 ## Root Fixtures
 
@@ -47,19 +47,19 @@ Create these fixtures in your test files or `conftest.py`:
 
 ```python
 import pytest
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
 @pytest.fixture
 def spot_manager():
     """Spot market manager (auto-close)."""
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
     yield manager
     manager.close()
 
 @pytest.fixture
 def futures_manager():
     """USDT futures manager (auto-close)."""
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
     yield manager
     manager.close()
 ```
@@ -82,7 +82,7 @@ def one_week_range(utc_now):
 
 ## Fixture Scopes
 
-| Scope      | When Used               | DSM Pattern                    |
+| Scope      | When Used               | CKVD Pattern                    |
 | ---------- | ----------------------- | ------------------------------ |
 | `function` | Default, per-test       | Manager instances, time ranges |
 | `class`    | Shared across class     | Test data fixtures             |
@@ -99,7 +99,7 @@ def manager_with_cache():
     """Manager with cache directory."""
     import tempfile
     cache_dir = tempfile.mkdtemp()
-    manager = DataSourceManager.create(
+    manager = CryptoKlineVisionData.create(
         DataProvider.BINANCE,
         MarketType.SPOT,
         cache_dir=cache_dir

@@ -1,6 +1,6 @@
 # Claude Code Settings Documentation
 
-Human-readable documentation for DSM Claude Code configuration.
+Human-readable documentation for CKVD Claude Code configuration.
 
 ## Overview
 
@@ -31,7 +31,7 @@ This project uses Claude Code extensions for AI-assisted development:
 | /fetch-data    | Yes          | Fetch real market data       |
 | /quick-test    | Yes          | Run actual tests             |
 | /feature-dev   | No           | Guided feature development   |
-| /review-dsm    | No           | Review code against patterns |
+| /review-ckvd    | No           | Review code against patterns |
 | /validate-data | No           | Validate DataFrame structure |
 
 Commands with side effects have `disable-model-invocation: true`.
@@ -54,10 +54,10 @@ Claude loads these rules on demand based on context:
 
 | Skill           | Context | Agent   | allowed-tools          | Purpose                        |
 | --------------- | ------- | ------- | ---------------------- | ------------------------------ |
-| dsm-usage       | -       | -       | Read, Bash             | DataSourceManager API guide    |
-| dsm-testing     | -       | -       | Read, Bash, Grep, Glob | Testing patterns and pytest    |
-| dsm-research    | fork    | Explore | (agent's tools)        | Codebase research (subagent)   |
-| dsm-fcp-monitor | fork    | -       | Read, Bash, Grep, Glob | FCP monitoring and diagnostics |
+| ckvd-usage       | -       | -       | Read, Bash             | CryptoKlineVisionData API guide    |
+| ckvd-testing     | -       | -       | Read, Bash, Grep, Glob | Testing patterns and pytest    |
+| ckvd-research    | fork    | Explore | (agent's tools)        | Codebase research (subagent)   |
+| ckvd-fcp-monitor | fork    | -       | Read, Bash, Grep, Glob | FCP monitoring and diagnostics |
 
 ## Hooks Configuration
 
@@ -67,44 +67,44 @@ Project hooks are in `.claude/hooks/hooks.json`:
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "matcher": ".*", "hooks": [{ "command": "dsm-skill-suggest.sh" }] }
+      { "matcher": ".*", "hooks": [{ "command": "ckvd-skill-suggest.sh" }] }
     ],
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "command": "dsm-bash-guard.sh" }] }
+      { "matcher": "Bash", "hooks": [{ "command": "ckvd-bash-guard.sh" }] }
     ],
     "PostToolUse": [
-      { "matcher": "Write|Edit", "hooks": [{ "command": "dsm-code-guard.sh" }] }
+      { "matcher": "Write|Edit", "hooks": [{ "command": "ckvd-code-guard.sh" }] }
     ],
-    "Stop": [{ "hooks": [{ "command": "dsm-final-check.sh" }] }]
+    "Stop": [{ "hooks": [{ "command": "ckvd-final-check.sh" }] }]
   }
 }
 ```
 
 ### Skill Suggest (UserPromptSubmit)
 
-The `dsm-skill-suggest.sh` hook provides suggestions based on prompt keywords:
+The `ckvd-skill-suggest.sh` hook provides suggestions based on prompt keywords:
 
 | Keyword             | Suggested Skill  |
 | ------------------- | ---------------- |
-| fetch, data, klines | /dsm-usage       |
-| test, pytest, mock  | /dsm-testing     |
-| FCP, cache miss     | /dsm-fcp-monitor |
-| how does, explore   | /dsm-research    |
+| fetch, data, klines | /ckvd-usage       |
+| test, pytest, mock  | /ckvd-testing     |
+| FCP, cache miss     | /ckvd-fcp-monitor |
+| how does, explore   | /ckvd-research    |
 
 ### Bash Guard (PreToolUse)
 
-The `dsm-bash-guard.sh` blocks dangerous operations:
+The `ckvd-bash-guard.sh` blocks dangerous operations:
 
 | Blocked               | Reason                     |
 | --------------------- | -------------------------- |
 | Cache deletion        | Use `mise run cache:clear` |
-| Python version change | DSM requires 3.13 ONLY     |
+| Python version change | CKVD requires 3.13 ONLY     |
 | Force push to main    | Use feature branches       |
 | Direct pip install    | Use `uv add`               |
 
 ### Code Guard (PostToolUse)
 
-The `dsm-code-guard.sh` hook validates:
+The `ckvd-code-guard.sh` hook validates:
 
 | Check             | Pattern              | Severity |
 | ----------------- | -------------------- | -------- |
@@ -120,7 +120,7 @@ Run infrastructure validation:
 
 ```bash
 # Verify Claude Code setup
-uv run -p 3.13 python docs/skills/dsm-usage/scripts/validate_infrastructure.py
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/validate_infrastructure.py
 
 # Or via mise
 mise run claude:validate

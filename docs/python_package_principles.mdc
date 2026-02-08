@@ -4,18 +4,18 @@ globs:
 alwaysApply: false
 ---
 
-# Python Package Principles for Data Source Manager
+# Python Package Principles for Crypto Kline Vision Data
 
-This document outlines the Python package principles applied to the Data Source Manager package, ensuring it follows best practices for documentation, discoverability, and usability.
+This document outlines the Python package principles applied to the Crypto Kline Vision Data package, ensuring it follows best practices for documentation, discoverability, and usability.
 
 ## Self-Documentation Principles
 
-The Data Source Manager package follows these self-documentation principles:
+The Crypto Kline Vision Data package follows these self-documentation principles:
 
 ### 1. Descriptive Naming
 
-- Module names clearly indicate their purpose (e.g., `data_source_manager.py`, `market_constraints.py`)
-- Class and function names use descriptive verbs and nouns (`fetch_market_data`, `DataSourceConfig`)
+- Module names clearly indicate their purpose (e.g., `ckvd.py`, `market_constraints.py`)
+- Class and function names use descriptive verbs and nouns (`fetch_market_data`, `CKVDConfig`)
 - Enum values use clear, consistent naming conventions (`MarketType`, `Interval`, `DataSource`)
 
 ### 2. Comprehensive Docstrings
@@ -156,7 +156,7 @@ The package uses these tools and standards for documentation:
 
 - Standard Python package layout
 - Clear entry points via `__init__.py`
-- Logical import paths (e.g., `from data_source_manager import fetch_market_data`)
+- Logical import paths (e.g., `from ckvd import fetch_market_data`)
 
 ### 3. CLI Tools
 
@@ -173,9 +173,9 @@ Documentation quality is validated by ensuring:
 3. Examples can be run as documentation
 4. Package structure is navigable intuitively
 
-## Implementation in Data Source Manager
+## Implementation in Crypto Kline Vision Data
 
-The Data Source Manager package implements these principles through:
+The Crypto Kline Vision Data package implements these principles through:
 
 1. Comprehensive docstrings at all levels
 2. Exposed APIs through `__init__.py` for clean imports

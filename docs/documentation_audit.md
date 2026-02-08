@@ -1,14 +1,14 @@
 # Documentation Audit
 
-This file tracks the progress of implementing Python package principles in the Data Source Manager codebase.
+This file tracks the progress of implementing Python package principles in the Crypto Kline Vision Data codebase.
 
 ## Modules Completed
 
 ### Core API Modules
 
-- [x] `src/data_source_manager/core/sync/dsm_lib.py` - Enhanced with comprehensive module, function, and parameter documentation
-- [x] `src/data_source_manager/core/sync/data_source_manager.py` - Enhanced with comprehensive class, method, parameter documentation and examples
-- [x] `src/data_source_manager/core/providers/binance/vision_data_client.py` - Enhanced VisionDataClient with comprehensive docstrings and examples
+- [x] `src/ckvd/core/sync/ckvd_lib.py` - Enhanced with comprehensive module, function, and parameter documentation
+- [x] `src/ckvd/core/sync/crypto_kline_vision_data.py` - Enhanced with comprehensive class, method, parameter documentation and examples
+- [x] `src/ckvd/core/providers/binance/vision_data_client.py` - Enhanced VisionDataClient with comprehensive docstrings and examples
 
 ### Package Structure
 
@@ -16,9 +16,9 @@ This file tracks the progress of implementing Python package principles in the D
 
 ### Public Interface Modules
 
-- [x] `src/data_source_manager/utils/dataframe_types.py` - Enhanced TimestampedDataFrame with comprehensive docstrings and examples
-- [x] `src/data_source_manager/utils/market_constraints.py` - Enhanced with comprehensive module, class, function and parameter documentation
-- [x] `src/data_source_manager/utils/time_utils.py` - Enhanced with comprehensive module and function documentation, including examples
+- [x] `src/ckvd/utils/dataframe_types.py` - Enhanced TimestampedDataFrame with comprehensive docstrings and examples
+- [x] `src/ckvd/utils/market_constraints.py` - Enhanced with comprehensive module, class, function and parameter documentation
+- [x] `src/ckvd/utils/time_utils.py` - Enhanced with comprehensive module and function documentation, including examples
 
 ### CLI Tools
 
@@ -32,8 +32,8 @@ This file tracks the progress of implementing Python package principles in the D
 
 ### Utility Modules
 
-- [ ] `src/data_source_manager/utils/logger_setup.py` - Logging setup needs better documentation
-- [ ] `src/data_source_manager/utils/app_paths.py` - Application paths need better documentation
+- [ ] `src/ckvd/utils/logger_setup.py` - Logging setup needs better documentation
+- [ ] `src/ckvd/utils/app_paths.py` - Application paths need better documentation
 
 ## Implementation Notes
 

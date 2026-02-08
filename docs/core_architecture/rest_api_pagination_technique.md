@@ -320,7 +320,7 @@ async def fetch(self, symbol, interval, start_time, end_time):
 Key elements of the timeout handling implementation:
 
 1. **Centralized Timeout Configuration**
-   - Uses `MAX_TIMEOUT` constant from `src/data_source_manager/utils/config.py` for consistency
+   - Uses `MAX_TIMEOUT` constant from `src/ckvd/utils/config.py` for consistency
    - Sets an effective timeout based on operation complexity
 
 2. **Task-Based Execution**

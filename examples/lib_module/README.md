@@ -1,8 +1,8 @@
-# DSM Demo Module
+# CKVD Demo Module
 
 ## Overview
 
-This module demonstrates the programmatic use of `src/data_source_manager/core/sync/dsm_lib.py` functions to fetch historical market data from Binance.
+This module demonstrates the programmatic use of `src/ckvd/core/sync/ckvd_lib.py` functions to fetch historical market data from Binance.
 
 ## Features
 
@@ -21,7 +21,7 @@ This module demonstrates the programmatic use of `src/data_source_manager/core/s
 ## Example Code
 
 ```python
-from data_source_manager.data_source_manager.core.sync.dsm_lib import (
+from ckvd.ckvd.core.sync.ckvd_lib import (
     setup_environment,
     process_market_parameters,
     fetch_market_data,

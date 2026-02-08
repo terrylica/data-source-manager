@@ -12,7 +12,7 @@ We encountered two main issues while testing the caching functionality:
 
 ### Cache Verification Issues
 
-- Each instance of `DataSourceManager` maintained its own separate cache stats counter
+- Each instance of `CryptoKlineVisionData` maintained its own separate cache stats counter
 - When creating multiple instances in sequence, cache hit statistics were reset between instances
 - Missing `_endpoint_lock` in `RestDataClient` caused errors when trying to fetch data
 
@@ -79,7 +79,7 @@ async def cleanup_all_force_timeout_tasks():
 
 We created a simplified test that:
 
-- Uses the same cache directory across multiple `DataSourceManager` instances
+- Uses the same cache directory across multiple `CryptoKlineVisionData` instances
 - Performs multiple data retrieval operations with the same parameters
 - Monitors cache hit statistics between operations
 - Runs emergency cleanup after each client operation to prevent hanging

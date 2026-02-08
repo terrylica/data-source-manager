@@ -1,11 +1,11 @@
 # Market Types Reference
 
-Detailed documentation for Binance market types supported by DataSourceManager.
+Detailed documentation for Binance market types supported by CryptoKlineVisionData.
 
 ## MarketType Enum Values
 
 ```python
-from data_source_manager import MarketType
+from ckvd import MarketType
 
 # Available market types
 MarketType.SPOT           # Spot market trading
@@ -39,22 +39,22 @@ MarketType.FUTURES_COIN   # Coin-margined perpetual futures
 
 ```python
 # Spot market
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
 
 # USDT futures
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
 
 # Coin-margined futures (note different symbol format)
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 df = manager.get_data("BTCUSD_PERP", start, end, Interval.HOUR_1)
 ```
 
 ## Error Handling
 
 ```python
-from data_source_manager.utils.market_constraints import validate_symbol_for_market_type
+from ckvd.utils.market_constraints import validate_symbol_for_market_type
 
 # Validate before fetching
 is_valid, suggestion = validate_symbol_for_market_type("BTCUSDT", MarketType.FUTURES_COIN)

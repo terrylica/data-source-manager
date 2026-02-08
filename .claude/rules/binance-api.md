@@ -1,7 +1,7 @@
 ---
 adr: docs/adr/2025-01-30-failover-control-protocol.md
 paths:
-  - "src/data_source_manager/core/providers/binance/**/*.py"
+  - "src/ckvd/core/providers/binance/**/*.py"
   - "tests/integration/**/*.py"
 ---
 

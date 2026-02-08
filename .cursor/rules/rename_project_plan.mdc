@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Rename Project Plan (Detailed)
 
-This rule provides a detailed step-by-step plan to rename the project from `data-source-manager` to `data-source-manager`.
+This rule provides a detailed step-by-step plan to rename the project from `crypto-kline-vision-data` to `crypto-kline-vision-data`.
 
 ## Detailed Refactoring Plan
 
@@ -14,10 +14,10 @@ This plan includes checklist items and verification steps for each stage.
 
 ### 1. Update Project Name in `pyproject.toml`
 
-- **Action:** Change the `name` field in the `[project]` section to `"data-source-manager"`.
+- **Action:** Change the `name` field in the `[project]` section to `"crypto-kline-vision-data"`.
   - [pyproject.toml](mdc:pyproject.toml)
 - **Checklist:**
-  - [ ] Confirm `name = "data-source-manager"` is set in `[project]`.
+  - [ ] Confirm `name = "crypto-kline-vision-data"` is set in `[project]`.
 - **Verification:**
   - Run `poetry show` (if using poetry) or inspect the `.egg-info` directory name after a build to see the new package name.
 
@@ -26,31 +26,31 @@ This plan includes checklist items and verification steps for each stage.
 - **Action:** Modify the docstring to reflect the new project name.
   - [setup.py](mdc:setup.py)
 - **Checklist:**
-  - [ ] Confirm the docstring at the top of the file references `data-source-manager`.
+  - [ ] Confirm the docstring at the top of the file references `crypto-kline-vision-data`.
 - **Verification:**
   - Read the `setup.py` file content to visually verify the docstring update.
 
 ### 3. Update `APP_NAME` in `utils/app_paths.py`
 
-- **Action:** Change the value of the `APP_NAME` constant to `"data-source-manager"`.
+- **Action:** Change the value of the `APP_NAME` constant to `"crypto-kline-vision-data"`.
   - [utils/app_paths.py](mdc:utils/app_paths.py)
 - **Checklist:**
-  - [ ] Confirm `APP_NAME = "data-source-manager"` is set.
+  - [ ] Confirm `APP_NAME = "crypto-kline-vision-data"` is set.
 - **Verification:**
   - Run a simple script that imports `APP_NAME` from `utils.app_paths` and prints it to confirm the new value.
 
-### 4. Update Docstring in `utils/for_demo/dsm_cache_utils.py`
+### 4. Update Docstring in `utils/for_demo/ckvd_cache_utils.py`
 
 - **Action:** Update the docstring to refer to the new project name.
-  - [utils/for_demo/dsm_cache_utils.py](mdc:utils/for_demo/dsm_cache_utils.py)
+  - [utils/for_demo/ckvd_cache_utils.py](mdc:utils/for_demo/ckvd_cache_utils.py)
 - **Checklist:**
-  - [ ] Confirm the relevant docstring mentions `data-source-manager`.
+  - [ ] Confirm the relevant docstring mentions `crypto-kline-vision-data`.
 - **Verification:**
-  - Read the `utils/for_demo/dsm_cache_utils.py` file content to visually verify the docstring update.
+  - Read the `utils/for_demo/ckvd_cache_utils.py` file content to visually verify the docstring update.
 
 ### 5. Update Hardcoded Workspace Paths in Scripts and Config Files
 
-- **Action:** Replace occurrences of `/workspaces/data-source-manager` with `/workspaces/data-source-manager`.
+- **Action:** Replace occurrences of `/workspaces/crypto-kline-vision-data` with `/workspaces/crypto-kline-vision-data`.
   - [scripts/dev/dead_code_report.py](mdc:scripts/dev/dead_code_report.py)
   - [scripts/dev/linter_report.py](mdc:scripts/dev/linter_report.py)
   - [playground/rate_limit_test/extract_symbols.py](mdc:playground/rate_limit_test/extract_symbols.py)
@@ -60,7 +60,7 @@ This plan includes checklist items and verification steps for each stage.
 - **Checklist:**
   - [ ] All identified hardcoded paths in the listed files are updated.
 - **Verification:**
-  - Use `grep` or your IDE's search functionality to search for `/workspaces/data-source-manager` (and the new path) within these specific files to confirm changes.
+  - Use `grep` or your IDE's search functionality to search for `/workspaces/crypto-kline-vision-data` (and the new path) within these specific files to confirm changes.
 
 ### 6. Update `README.md`
 
@@ -94,7 +94,7 @@ This plan includes checklist items and verification steps for each stage.
 - **Action:** Rename the repository on GitHub.
   - Go to your repository on GitHub.
   - Navigate to Settings > General.
-  - Under "Repository name", change `data-source-manager` to `data-source-manager`.
+  - Under "Repository name", change `crypto-kline-vision-data` to `crypto-kline-vision-data`.
   - Click "Rename".
 - **Checklist:**
   - [ ] Repository successfully renamed on GitHub.
@@ -105,7 +105,7 @@ This plan includes checklist items and verification steps for each stage.
 
 - **Action:** Update the remote URL in your local repository to point to the new GitHub repository name.
   - Open your terminal in the project directory.
-  - Run the command: `git remote set-url origin git@github.com:Eon-Labs/data-source-manager.git`
+  - Run the command: `git remote set-url origin git@github.com:Eon-Labs/crypto-kline-vision-data.git`
 - **Checklist:**
   - [ ] Git remote URL updated locally.
 - **Verification:**

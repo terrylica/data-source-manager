@@ -1,6 +1,6 @@
-# Loguru Setup - Centralized Logging for Data Source Manager
+# Loguru Setup - Centralized Logging for Crypto Kline Vision Data
 
-The `src/data_source_manager/utils/loguru_setup.py` module provides a simple, powerful loguru-based logging system that addresses user complaints about log level control in the DSM package. It features environment variable configuration, automatic log rotation, and rich formatting support.
+The `src/ckvd/utils/loguru_setup.py` module provides a simple, powerful loguru-based logging system that addresses user complaints about log level control in the CKVD package. It features environment variable configuration, automatic log rotation, and rich formatting support.
 
 ## Key Features
 
@@ -14,7 +14,7 @@ The `src/data_source_manager/utils/loguru_setup.py` module provides a simple, po
 ## Basic Usage
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 logger.configure_level("INFO")
@@ -36,20 +36,20 @@ logger.error("Error: <red>FAILED</red>")
 The easiest way to control logging is via environment variables:
 
 ```bash
-# Suppress DSM logs for clean output (feature engineering workflows)
-export DSM_LOG_LEVEL=CRITICAL
+# Suppress CKVD logs for clean output (feature engineering workflows)
+export CKVD_LOG_LEVEL=CRITICAL
 
 # Normal development with info-level logging
-export DSM_LOG_LEVEL=INFO
+export CKVD_LOG_LEVEL=INFO
 
 # Detailed debugging
-export DSM_LOG_LEVEL=DEBUG
+export CKVD_LOG_LEVEL=DEBUG
 
 # Optional: Log to file with automatic rotation
-export DSM_LOG_FILE=./logs/dsm.log
+export CKVD_LOG_FILE=./logs/ckvd.log
 
 # Optional: Disable colored output
-export DSM_DISABLE_COLORS=true
+export CKVD_DISABLE_COLORS=true
 
 # Run your application
 python your_script.py
@@ -59,37 +59,37 @@ python your_script.py
 
 When no environment variable is set, the default log level is `ERROR`. This provides quieter operation by default, showing only errors and critical messages.
 
-## DSM Logging Suppression for Feature Engineering
+## CKVD Logging Suppression for Feature Engineering
 
-**Problem**: DSM produces extensive logging that clutters console output during feature engineering workflows.
+**Problem**: CKVD produces extensive logging that clutters console output during feature engineering workflows.
 
-**Solution**: Use `DSM_LOG_LEVEL=CRITICAL` to suppress all non-critical DSM logs:
+**Solution**: Use `CKVD_LOG_LEVEL=CRITICAL` to suppress all non-critical CKVD logs:
 
 ```python
 # Clean feature engineering code - no boilerplate needed!
 import os
-os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
+os.environ["CKVD_LOG_LEVEL"] = "CRITICAL"
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 
-# Create DSM instance - minimal logging
-dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+# Create CKVD instance - minimal logging
+ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
 # Fetch data - clean output, only your logs visible
-data = dsm.get_data(
+data = ckvd.get_data(
     symbol="SOLUSDT",
     start_time=start_time,
     end_time=end_time,
     interval=Interval.MINUTE_1,
 )
-# Clean output - no more cluttered DSM logs!
+# Clean output - no more cluttered CKVD logs!
 ```
 
 **Benefits**:
 
 - **No Boilerplate**: Eliminates 15+ lines of logging suppression code
 - **Clean Output**: Professional console output for feature engineering
-- **Easy Control**: Single environment variable controls all DSM logging
+- **Easy Control**: Single environment variable controls all CKVD logging
 - **Cleaner Default**: Default ERROR level provides quieter operation
 
 ## Programmatic Configuration
@@ -97,13 +97,13 @@ data = dsm.get_data(
 For more control, use the programmatic API:
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Set log level
 logger.configure_level("DEBUG")
 
 # Enable file logging with automatic rotation
-logger.configure_file("./logs/dsm.log")
+logger.configure_file("./logs/ckvd.log")
 
 # Disable colors (useful for CI/CD or file output)
 logger.disable_colors(True)
@@ -128,7 +128,7 @@ logger.configure_level("INFO").configure_file("./logs/app.log").info("Logging co
 For session-specific logging with timestamped files:
 
 ```python
-from data_source_manager.utils.loguru_setup import configure_session_logging
+from ckvd.utils.loguru_setup import configure_session_logging
 
 # Creates timestamped log files for a session
 main_log, error_log, timestamp = configure_session_logging(
@@ -225,7 +225,7 @@ Components:
 ```python
 #!/usr/bin/env python3
 import argparse
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 def main():
     parser = argparse.ArgumentParser(description="Demo")
@@ -271,12 +271,12 @@ python examples/loguru_demo.py --level DEBUG
 python examples/loguru_demo.py --level ERROR
 
 # Using environment variable
-DSM_LOG_LEVEL=DEBUG python examples/loguru_demo.py
+CKVD_LOG_LEVEL=DEBUG python examples/loguru_demo.py
 ```
 
 ## Best Practices
 
-1. **Use Environment Variables**: Set `DSM_LOG_LEVEL` for easy control without code changes
+1. **Use Environment Variables**: Set `CKVD_LOG_LEVEL` for easy control without code changes
 2. **Default to ERROR**: Keep production quiet by default
 3. **Use DEBUG for Development**: Enable verbose logging during development
 4. **Rich Formatting for Readability**: Use color tags for important status messages
@@ -286,7 +286,7 @@ DSM_LOG_LEVEL=DEBUG python examples/loguru_demo.py
 ## Architecture Notes
 
 - Built on [loguru](https://github.com/Delgan/loguru), a modern Python logging library
-- Global singleton pattern via `DSMLogger` class
+- Global singleton pattern via `CKVDLogger` class
 - Thread-safe by design (loguru handles thread safety)
 - Automatic exception formatting with backtraces
 - Lazy message formatting for performance
@@ -296,4 +296,4 @@ DSM_LOG_LEVEL=DEBUG python examples/loguru_demo.py
 - [Migration Guide](../howto/loguru_migration.md) - Detailed migration instructions
 - [README.md](/README.md#logging-control) - Overview in main README
 - [examples/loguru_demo.py](/examples/loguru_demo.py) - Demo script
-- [examples/dsm_logging_demo.py](/examples/dsm_logging_demo.py) - DSM-specific logging demo
+- [examples/dsm_logging_demo.py](/examples/dsm_logging_demo.py) - CKVD-specific logging demo

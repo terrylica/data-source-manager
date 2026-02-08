@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# DSM Skill Suggestion Hook (UserPromptSubmit)
-# Analyzes user prompts and suggests relevant DSM skills
+# CKVD Skill Suggestion Hook (UserPromptSubmit)
+# Analyzes user prompts and suggests relevant CKVD skills
 #
 # Exit codes:
 #   0 = success (suggestions provided via feedback)
@@ -18,24 +18,24 @@ PROMPT_LOWER=$(echo "$PROMPT" | tr '[:upper:]' '[:lower:]')
 
 SUGGESTIONS=()
 
-# dsm-usage triggers
+# ckvd-usage triggers
 if echo "$PROMPT_LOWER" | grep -qE 'fetch|data|klines|ohlcv|market data|datasourcemanager|binance|vision api|rest api|get_data'; then
-    SUGGESTIONS+=("💡 Consider: /dsm-usage [symbol] - Fetch market data with FCP")
+    SUGGESTIONS+=("💡 Consider: /ckvd-usage [symbol] - Fetch market data with FCP")
 fi
 
-# dsm-testing triggers
+# ckvd-testing triggers
 if echo "$PROMPT_LOWER" | grep -qE 'test|pytest|mock|fixture|coverage|unit test|integration test|marker'; then
-    SUGGESTIONS+=("💡 Consider: /dsm-testing [pattern] - Run tests or write new tests")
+    SUGGESTIONS+=("💡 Consider: /ckvd-testing [pattern] - Run tests or write new tests")
 fi
 
-# dsm-fcp-monitor triggers
+# ckvd-fcp-monitor triggers
 if echo "$PROMPT_LOWER" | grep -qE 'fcp|failover|cache (miss|hit|problem)|slow|performance|vision error|rest fallback|diagnos'; then
-    SUGGESTIONS+=("💡 Consider: /dsm-fcp-monitor [symbol] - Diagnose FCP behavior")
+    SUGGESTIONS+=("💡 Consider: /ckvd-fcp-monitor [symbol] - Diagnose FCP behavior")
 fi
 
-# dsm-research triggers
+# ckvd-research triggers
 if echo "$PROMPT_LOWER" | grep -qE 'how does|understand|find|explore|architecture|pattern|implementation|code flow'; then
-    SUGGESTIONS+=("💡 Consider: /dsm-research [topic] - Research codebase architecture")
+    SUGGESTIONS+=("💡 Consider: /ckvd-research [topic] - Research codebase architecture")
 fi
 
 # If no suggestions or prompt is empty, exit silently

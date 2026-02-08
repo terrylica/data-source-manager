@@ -20,20 +20,20 @@ $ARGUMENTS should be the symbol to debug, e.g., `BTCUSDT`
 
 ```python
 import os
-os.environ["DSM_LOG_LEVEL"] = "DEBUG"
+os.environ["CKVD_LOG_LEVEL"] = "DEBUG"
 ```
 
 1. **Check cache location**:
 
 ```bash
-ls -la ~/.cache/data_source_manager/binance/
+ls -la ~/.cache/ckvd/binance/
 ```
 
 1. **Test each source individually**:
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
-from data_source_manager.core.sync.data_source_manager import DataSource
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
+from ckvd.core.sync.crypto_kline_vision_data import DataSource
 from datetime import datetime, timedelta, timezone
 
 symbol = "$ARGUMENTS" or "BTCUSDT"
@@ -42,7 +42,7 @@ start_time = end_time - timedelta(days=3)
 
 # Test Cache only
 try:
-    manager = DataSourceManager.create(
+    manager = CryptoKlineVisionData.create(
         DataProvider.BINANCE, MarketType.FUTURES_USDT,
         enforce_source=DataSource.CACHE
     )
@@ -54,7 +54,7 @@ except Exception as e:
 
 # Test Vision only
 try:
-    manager = DataSourceManager.create(
+    manager = CryptoKlineVisionData.create(
         DataProvider.BINANCE, MarketType.FUTURES_USDT,
         enforce_source=DataSource.VISION
     )
@@ -66,7 +66,7 @@ except Exception as e:
 
 # Test REST only
 try:
-    manager = DataSourceManager.create(
+    manager = CryptoKlineVisionData.create(
         DataProvider.BINANCE, MarketType.FUTURES_USDT,
         enforce_source=DataSource.REST
     )

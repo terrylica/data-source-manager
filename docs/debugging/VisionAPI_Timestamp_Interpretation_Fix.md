@@ -8,7 +8,7 @@ This document summarizes the implementation of the fix for the Vision API timest
 
 ### 1. Fixed Timestamp Processing with Utility Function
 
-The core fix was implemented in the `process_timestamp_columns` utility function in `src/data_source_manager/utils/for_core/vision_timestamp.py`:
+The core fix was implemented in the `process_timestamp_columns` utility function in `src/ckvd/utils/for_core/vision_timestamp.py`:
 
 ```python
 def process_timestamp_columns(df: pd.DataFrame, interval_str: str) -> pd.DataFrame:
@@ -125,7 +125,7 @@ This fix may also help resolve other timestamp-related issues in the codebase:
 
 1. **Gap Detection at Day Boundaries**: By correctly interpreting timestamps, gap detection at day boundaries should become more reliable.
 
-2. **Data Source Manager Merging**: When the DataSourceManager merges data from different sources, timestamp alignment should now be more accurate.
+2. **Crypto Kline Vision Data Merging**: When the CryptoKlineVisionData merges data from different sources, timestamp alignment should now be more accurate.
 
 3. **Timezone Handling**: The consistent treatment of timestamps as UTC throughout the system should help avoid timezone-related issues.
 

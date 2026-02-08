@@ -1,8 +1,8 @@
-# DataSourceManager Documentation
+# CryptoKlineVisionData Documentation
 
 ## Overview
 
-The `DataSourceManager` serves as a mediator between different data sources across multiple providers. It provides intelligent source selection, caching, and fallback mechanisms to optimize data retrieval for various chart types.
+The `CryptoKlineVisionData` serves as a mediator between different data sources across multiple providers. It provides intelligent source selection, caching, and fallback mechanisms to optimize data retrieval for various chart types.
 
 ### Core Responsibilities
 
@@ -14,8 +14,8 @@ The `DataSourceManager` serves as a mediator between different data sources acro
 ### Module Location
 
 ```python
-from data_source_manager.core.sync.data_source_manager import DataSourceManager, DataSource
-from data_source_manager.utils.market_constraints import Interval, MarketType, ChartType, DataProvider
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData, DataSource
+from ckvd.utils.market_constraints import Interval, MarketType, ChartType, DataProvider
 ```
 
 ## System Architecture
@@ -49,7 +49,7 @@ from data_source_manager.utils.market_constraints import Interval, MarketType, C
 #### Configuration Constants
 
 ```python
-class DataSourceManager:
+class CryptoKlineVisionData:
     VISION_DATA_DELAY_HOURS = 48  # Data newer than this isn't available in Vision API
     REST_CHUNK_SIZE = 1000        # Maximum records per REST API request
     REST_MAX_CHUNKS = 5           # Maximum number of chunks to request via REST
@@ -223,16 +223,16 @@ def get_data(
 #### Getting Funding Rate Data
 
 ```python
-# Create a DataSourceManager for funding rate data
-with DataSourceManager(
+# Create a CryptoKlineVisionData for funding rate data
+with CryptoKlineVisionData(
     market_type=MarketType.FUTURES_USDT,
     provider=DataProvider.BINANCE,
     chart_type=ChartType.FUNDING_RATE,
     cache_dir=Path("./cache"),
     use_cache=True,
-) as dsm:
+) as ckvd:
     # Fetch funding rate data
-    funding_df = dsm.get_data(
+    funding_df = ckvd.get_data(
         symbol="BTCUSDT",
         start_time=start_time,
         end_time=end_time,
@@ -243,15 +243,15 @@ with DataSourceManager(
 #### Getting Multiple Data Types from a Single Manager
 
 ```python
-# Create a DataSourceManager that can handle all data types
-with DataSourceManager(
+# Create a CryptoKlineVisionData that can handle all data types
+with CryptoKlineVisionData(
     market_type=MarketType.FUTURES_USDT,
     provider=DataProvider.BINANCE,
     cache_dir=Path("./cache"),
     use_cache=True,
-) as dsm:
+) as ckvd:
     # Fetch price data
-    klines_df = dsm.get_data(
+    klines_df = ckvd.get_data(
         symbol="BTCUSDT",
         start_time=start_time,
         end_time=end_time,
@@ -260,7 +260,7 @@ with DataSourceManager(
     )
 
     # Fetch funding rate data from the same manager
-    funding_df = dsm.get_data(
+    funding_df = ckvd.get_data(
         symbol="BTCUSDT",
         start_time=start_time,
         end_time=end_time,
@@ -342,4 +342,4 @@ DataClientFactory.register_client(
 
 ## Conclusion
 
-The `DataSourceManager` has been redesigned to be a flexible, extensible framework that can handle multiple data providers and chart types. The factory pattern and abstract interface allow for easy addition of new data sources and chart types without modifying existing code, adhering to the Liskov Substitution Principle and Occam's Razor philosophy.
+The `CryptoKlineVisionData` has been redesigned to be a flexible, extensible framework that can handle multiple data providers and chart types. The factory pattern and abstract interface allow for easy addition of new data sources and chart types without modifying existing code, adhering to the Liskov Substitution Principle and Occam's Razor philosophy.

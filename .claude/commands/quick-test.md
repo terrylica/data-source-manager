@@ -26,7 +26,7 @@ uv run -p 3.13 pytest tests/unit/ -v --tb=short
 ### With Coverage
 
 ```bash
-uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-report=term-missing
+uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=term-missing
 ```
 
 ### Specific Test Pattern

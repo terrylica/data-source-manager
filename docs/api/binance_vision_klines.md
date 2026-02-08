@@ -4,7 +4,7 @@ This document provides information about the available kline (candlestick) data 
 
 ## Available Kline Intervals
 
-This section lists the historical kline data intervals available specifically on the Binance Vision API. For the complete list and definitions of intervals used within the project, please refer to [`src/data_source_manager/utils/market_constraints.py`](../../src/data_source_manager/utils/market_constraints.py).
+This section lists the historical kline data intervals available specifically on the Binance Vision API. For the complete list and definitions of intervals used within the project, please refer to [`src/ckvd/utils/market_constraints.py`](../../src/ckvd/utils/market_constraints.py).
 
 | Interval | Description      | URL Path Component | Status    |
 | -------- | ---------------- | ------------------ | --------- |
@@ -234,7 +234,7 @@ Note that older files from September 2020 don't include column headers:
 
 ## Cache Management
 
-The Data Source Manager includes utilities for cache management using the `CacheKeyManager` class. The following cache key format and path structure is used when caching data:
+The Crypto Kline Vision Data includes utilities for cache management using the `CacheKeyManager` class. The following cache key format and path structure is used when caching data:
 
 ### Cache Data Key Format
 
@@ -305,9 +305,9 @@ The `VisionCacheManager` handles saving and loading data with features like:
 - Memory-efficient loading using memory mapping
 - Column filtering for reduced memory usage
 
-## Integration with Data Source Manager
+## Integration with Crypto Kline Vision Data
 
-These kline intervals can be used with the Data Source Manager to fetch and cache historical candlestick data. When configuring data sources, use the interval values from the "URL Path Component" column in the table above.
+These kline intervals can be used with the Crypto Kline Vision Data to fetch and cache historical candlestick data. When configuring data sources, use the interval values from the "URL Path Component" column in the table above.
 
 ## Verification
 

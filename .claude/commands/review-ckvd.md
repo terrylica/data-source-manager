@@ -1,17 +1,17 @@
 ---
-name: review-dsm
-description: Review DSM code changes for common issues
+name: review-ckvd
+description: Review CKVD code changes for common issues
 argument-hint: "[file-path] [--staged] [--all]"
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
-# DSM Code Review
+# CKVD Code Review
 
-Review code changes against DSM-specific patterns and anti-patterns.
+Review code changes against CKVD-specific patterns and anti-patterns.
 
 ## Review Checklist
 
-Use this checklist when reviewing changes to data-source-manager:
+Use this checklist when reviewing changes to crypto-kline-vision-data:
 
 ### Critical Checks
 

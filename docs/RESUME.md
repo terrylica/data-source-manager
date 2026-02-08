@@ -18,7 +18,7 @@ Last updated: 2026-02-06
 | ------------------------ | -------------------------------------------------------------------------- | --- |
 | `rest_data_client.py`    | `OUTPUT_COLUMNS` alias, `_create_optimized_client()`                       | 12  |
 | `vision_path_mapper.py`  | `create_path_from_params()`                                                | 37  |
-| `data_source_manager.py` | `get_output_format()`, `configure_defaults()` stubs                        | 69  |
+| `crypto_kline_vision_data.py` | `get_output_format()`, `configure_defaults()` stubs                        | 69  |
 | `gap_detector.py`        | `format_gaps_for_display()`, `detect_gaps_in_range()`, `get_gap_summary()` | 147 |
 | `polars_pipeline.py`     | `sink_to_ipc()` (speculative)                                              | 14  |
 | `loguru_setup.py`        | `configure_ndjson()`, `ndjson_serializer()` (premature)                    | 68  |
@@ -28,8 +28,8 @@ Last updated: 2026-02-06
 | Clone                               | Fix                                               | File                        |
 | ----------------------------------- | ------------------------------------------------- | --------------------------- |
 | API response parsing (122 tokens)   | Extract `_parse_api_response_boundaries()`        | `api_boundary_validator.py` |
-| Magic byte detection (92 tokens)    | Extract `_scan_cache_file()`                      | `dsm_cache_utils.py`        |
-| Vision error logging (90+86 tokens) | Extract `_log_critical_error_with_traceback()`    | `dsm_api_utils.py`          |
+| Magic byte detection (92 tokens)    | Extract `_scan_cache_file()`                      | `ckvd_cache_utils.py`        |
+| Vision error logging (90+86 tokens) | Extract `_log_critical_error_with_traceback()`    | `ckvd_api_utils.py`          |
 | OKX intervals (79 tokens)           | Extract `_OKX_SUPPORTED_INTERVALS` constant       | `capabilities.py`           |
 | Synthetic timestamps (59 tokens)    | Extract `_create_synthetic_timestamps()`          | `dataframe_utils.py`        |
 | HTTP debug suppression (52 tokens)  | Consolidate to `suppress_http_logging()` SSoT     | `dsm_clean_logging.py`      |
@@ -51,7 +51,7 @@ Last updated: 2026-02-06
 
 **Status**: Complete
 
-**GitHub Issue**: [#12 - Dead Code Elimination](https://github.com/terrylica/data-source-manager/issues/12)
+**GitHub Issue**: [#12 - Dead Code Elimination](https://github.com/terrylica/crypto-kline-vision-data/issues/12)
 
 **Investigation**: 12-agent audit using PMD CPD, Semgrep, Vulture, and Ruff
 
@@ -70,11 +70,11 @@ Last updated: 2026-02-06
 
 3. **Unused Config Class Deleted** (`utils/dsm_config.py` - 351 LOC):
    - Never imported, never tested, never exported
-   - `DataSourceConfig` in `dsm_types.py` is canonical
+   - `CKVDConfig` in `ckvd_types.py` is canonical
 
 4. **DateTime Parsing Consolidated**:
    - Deleted `utils/for_demo/dsm_datetime_parser.py` (108 LOC duplicate)
-   - Updated import in `dsm_validation_utils.py` to use canonical `dsm_date_range_utils.py`
+   - Updated import in `dsm_validation_utils.py` to use canonical `ckvd_date_range_utils.py`
 
 5. **Deprecated Modules Deleted**:
    - `utils/logger_setup.py` (51 LOC) - zero code consumers, deprecated re-export
@@ -100,7 +100,7 @@ Last updated: 2026-02-06
   - `examples/loguru_demo.py` (80% duplicate of dsm_logging_demo.py)
   - `examples/dsm_logging_improvement_demo.py` (dead/empty file)
 - Fixed `examples/dsm_lazy_initialization_demo.py`:
-  - Rewrote to use actual DSM APIs (was referencing non-existent DSMManager/DSMConfig)
+  - Rewrote to use actual CKVD APIs (was referencing non-existent DSMManager/DSMConfig)
   - Fixed division by zero in benchmark function
   - Fixed incorrect imports from `__init__`
 - Removed duplicate `utc_now` fixture from `test_fcp_edge_cases.py` (already in conftest.py)
@@ -139,7 +139,7 @@ Last updated: 2026-02-06
 - Added workflow permissions table
 - Added authentication options table
 - Added best practices table
-- Added DSM-specific considerations (local-first policy)
+- Added CKVD-specific considerations (local-first policy)
 
 **Sources**:
 
@@ -158,7 +158,7 @@ Last updated: 2026-02-06
 - Added bash tool control patterns JSON example
 - Added safe autonomous mode Docker example
 - Added PreToolUse hooks as controls example
-- Added DSM permission configuration table
+- Added CKVD permission configuration table
 
 **Sources**:
 
@@ -177,7 +177,7 @@ Last updated: 2026-02-06
 - Added session management commands table
 - Added terminal setup for Shift+Enter table
 - Added shell aliases for productivity
-- Added DSM productivity tips table
+- Added CKVD productivity tips table
 
 **Sources**:
 
@@ -212,7 +212,7 @@ Last updated: 2026-02-06
 - Added multi-level CLAUDE.md deployment table
 - Added cloud provider configuration examples
 - Added LLM gateway pattern
-- Added DSM team deployment considerations table
+- Added CKVD team deployment considerations table
 
 **Sources**:
 
@@ -231,7 +231,7 @@ Last updated: 2026-02-06
 - Added plugin architecture pattern diagram
 - Added plugin directory structure
 - Added marketplace sources table
-- Added DSM plugin considerations table
+- Added CKVD plugin considerations table
 - Added custom marketplace configuration
 
 **Sources**:
@@ -251,7 +251,7 @@ Last updated: 2026-02-06
 - Added cost optimization strategies table
 - Added OpenTelemetry integration example
 - Added monitoring metrics table
-- Added DSM cost considerations table
+- Added CKVD cost considerations table
 
 **Sources**:
 
@@ -271,7 +271,7 @@ Last updated: 2026-02-06
 - Added conversation continuity example
 - Added IDE best practices table
 - Added workflow patterns (pair programming, autonomous)
-- Added DSM IDE workflow table
+- Added CKVD IDE workflow table
 
 **Sources**:
 
@@ -291,7 +291,7 @@ Last updated: 2026-02-06
 - Added subagent delegation pattern with YAML example
 - Added context hygiene table
 - Added flow-based architecture diagram
-- Added DSM agentic patterns table
+- Added CKVD agentic patterns table
 
 **Sources**:
 
@@ -311,7 +311,7 @@ Last updated: 2026-02-06
 - Added dotfiles directory structure example
 - Added encrypted sync with Chezmoi + Age
 - Added CLAUDE.md maintenance best practices table
-- Added DSM configuration sharing table
+- Added CKVD configuration sharing table
 
 **Sources**:
 
@@ -330,7 +330,7 @@ Last updated: 2026-02-06
 - Added "when to use parallel sessions" decision table
 - Added resource considerations table (tokens, ports, memory, cognitive)
 - Added context isolation benefits list
-- Added DSM parallel development patterns table
+- Added CKVD parallel development patterns table
 
 **Sources**:
 
@@ -352,7 +352,7 @@ Last updated: 2026-02-06
 - Added context window optimization strategies
 - Added MCP security best practices table
 - Added debugging commands reference
-- Added DSM MCP considerations table
+- Added CKVD MCP considerations table
 
 **Sources**:
 
@@ -369,7 +369,7 @@ Last updated: 2026-02-06
 - Added loop detection & recovery patterns
 - Added diagnostic commands reference
 - Added "Instrumentation Over Argument" debugging strategy
-- Added DSM-specific error recovery table
+- Added CKVD-specific error recovery table
 - Added prevention patterns list
 
 **Sources**:
@@ -387,7 +387,7 @@ Last updated: 2026-02-06
 - Added task-based model selection table
 - Added progressive escalation strategy diagram
 - Added mid-session switching commands
-- Added agent model configuration with DSM-specific recommendations
+- Added agent model configuration with CKVD-specific recommendations
 
 **Sources**:
 
@@ -404,7 +404,7 @@ Last updated: 2026-02-06
 - Added task complexity by context cost comparison
 - Added context preservation strategies (checkpoint notes, memory budget)
 - Added compaction best practices
-- Added DSM-specific context management table
+- Added CKVD-specific context management table
 
 **Sources**:
 
@@ -420,7 +420,7 @@ Last updated: 2026-02-06
 - Added document size guidelines table
 - Added documentation slash commands table
 - Added best practices list
-- Added DSM documentation structure table
+- Added CKVD documentation structure table
 
 **Sources**:
 
@@ -473,7 +473,7 @@ Last updated: 2026-02-06
 - Added design principles list
 - Added link to full design spec
 
-**Pattern**: DSM Claude Code Infrastructure Pattern - reusable by other projects.
+**Pattern**: CKVD Claude Code Infrastructure Pattern - reusable by other projects.
 
 ### Security & Testing Patterns (2026-01-30)
 
@@ -482,7 +482,7 @@ Last updated: 2026-02-06
 **What was done**:
 
 - Added Security Best Practices section (secrets protection, deny rules, key principle)
-- Added DSM settings.json security rules example
+- Added CKVD settings.json security rules example
 - Added security checklist items
 - Added Testing Patterns section (TDD workflow, test configuration, hooks)
 - Added AI test generation best practices table
@@ -551,7 +551,7 @@ Last updated: 2026-02-06
 - Added size guidelines for monorepo CLAUDE.md distribution
 - Added multi-agent orchestration patterns (Fan-Out, Pipeline, Map-Reduce)
 - Added built-in subagents table (Explore, Plan, general-purpose)
-- Added DSM-specific agent orchestration scenarios
+- Added CKVD-specific agent orchestration scenarios
 
 **Sources**:
 
@@ -763,7 +763,7 @@ Last updated: 2026-02-06
 
 **What was done**:
 
-- Added workflow checklist pattern to dsm-testing skill
+- Added workflow checklist pattern to ckvd-testing skill
 - Added official skill quality checklist to design spec
 - All skills verified under 500 lines (largest: 154 lines)
 
@@ -781,7 +781,7 @@ Last updated: 2026-02-06
 
 **What was done**:
 
-- Added SessionStart hook (dsm-session-start.sh) to load FCP context at session start
+- Added SessionStart hook (ckvd-session-start.sh) to load FCP context at session start
 - Now 5 hooks total: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop
 - Updated hooks.json, README.md, and design spec
 
@@ -789,7 +789,7 @@ Last updated: 2026-02-06
 
 - FCP priority (Cache → Vision → REST)
 - Key code patterns (UTC, timeouts, symbol formats)
-- Quick command references (/dsm-usage, /dsm-fcp-monitor, /quick-test)
+- Quick command references (/ckvd-usage, /ckvd-fcp-monitor, /quick-test)
 
 **Source**: [Official hooks reference](https://code.claude.com/docs/en/hooks) SessionStart pattern
 
@@ -799,7 +799,7 @@ Last updated: 2026-02-06
 
 **What was done**:
 
-- Added `adr:` field to dsm-fcp-monitor skill for ADR traceability
+- Added `adr:` field to ckvd-fcp-monitor skill for ADR traceability
 - Created `references/evolution-log.md` for tracking skill improvements
 - Updated design spec with Skill ADR Traceability and Self-Evolution Pattern sections
 
@@ -807,8 +807,8 @@ Last updated: 2026-02-06
 
 **Files Modified**:
 
-- `docs/skills/dsm-fcp-monitor/SKILL.md` - Added adr field
-- `docs/skills/dsm-fcp-monitor/references/evolution-log.md` - Created
+- `docs/skills/ckvd-fcp-monitor/SKILL.md` - Added adr field
+- `docs/skills/ckvd-fcp-monitor/references/evolution-log.md` - Created
 - `docs/design/.../spec.md` - Skill ADR and Self-Evolution sections
 
 ### Context Optimization Best Practices (2026-01-30)
@@ -879,7 +879,7 @@ Last updated: 2026-02-06
 | /fetch-data    | `[symbol] [days] [interval: 1m              | 5m                       | ...]` | Bash, Read |
 | /quick-test    | `[test-pattern] [--coverage] [--fast-fail]` | Bash                     |
 | /validate-data | `[--interval ...] [--check-gaps]`           | Bash, Read               |
-| /review-dsm    | `[file-path] [--staged] [--all]`            | Bash, Read, Grep, Glob   |
+| /review-ckvd    | `[file-path] [--staged] [--all]`            | Bash, Read, Grep, Glob   |
 | /feature-dev   | `[feature-description]`                     | R, Grep, Glob, Bash, W,E |
 
 **Sources**: [cc-skills command patterns](https://github.com/terrylica/cc-skills)
@@ -890,7 +890,7 @@ Last updated: 2026-02-06
 
 **What was done**:
 
-- Added Stop hook (dsm-final-check.sh) for session-end validation
+- Added Stop hook (ckvd-final-check.sh) for session-end validation
 - Added `color` field to all 5 agents for visual distinction in Claude Code UI
 - Total hooks: 4 (UserPromptSubmit + PreToolUse + PostToolUse + Stop)
 
@@ -902,8 +902,8 @@ Last updated: 2026-02-06
 
 **What was done**:
 
-- Added UserPromptSubmit hook (dsm-skill-suggest.sh) for proactive skill suggestions
-- Added `context: fork` to dsm-fcp-monitor skill for diagnostic isolation
+- Added UserPromptSubmit hook (ckvd-skill-suggest.sh) for proactive skill suggestions
+- Added `context: fork` to ckvd-fcp-monitor skill for diagnostic isolation
 - Updated design spec with hook events summary table and skill context isolation table
 
 **Sources**: [claude-code-showcase](https://github.com/ChrisWiles/claude-code-showcase), [HumanLayer CLAUDE.md guide](https://www.humanlayer.dev/blog/writing-a-good-claude-md)
@@ -915,7 +915,7 @@ Last updated: 2026-02-06
 **What was done**:
 
 - Added 2 new PostToolUse checks (DataFrame validation, Polars preference)
-- Total DSM-specific hooks: 11 checks covering silent failures and data integrity
+- Total CKVD-specific hooks: 11 checks covering silent failures and data integrity
 - Updated .claude/README.md with hooks summary table
 - Support `# polars-exception` comment to suppress Polars reminder
 
@@ -956,16 +956,16 @@ Last updated: 2026-02-06
 
 - Created comprehensive Claude Code infrastructure for AI-assisted development
 - 5 custom agents (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer)
-- 6 slash commands (debug-fcp, fetch-data, quick-test, review-dsm, validate-data, feature-dev)
+- 6 slash commands (debug-fcp, fetch-data, quick-test, review-ckvd, validate-data, feature-dev)
 - 7 context rules (binance-api, caching-patterns, dataframe-operations, error-handling, fcp-protocol, symbol-formats, timestamp-handling)
-- 4 progressive disclosure skills (dsm-usage, dsm-testing, dsm-research, dsm-fcp-monitor)
+- 4 progressive disclosure skills (ckvd-usage, ckvd-testing, ckvd-research, ckvd-fcp-monitor)
 - 2 hooks (PreToolUse bash-guard, PostToolUse code-guard)
 
 **Key files**:
 
 - `.claude/settings.md` - Human-readable configuration reference
-- `.claude/hooks/dsm-bash-guard.sh` - PreToolUse command validation
-- `.claude/hooks/dsm-code-guard.sh` - PostToolUse code quality checks
+- `.claude/hooks/ckvd-bash-guard.sh` - PreToolUse command validation
+- `.claude/hooks/ckvd-code-guard.sh` - PostToolUse code quality checks
 - `docs/adr/2026-01-30-claude-code-infrastructure.md` - ADR (self-contained, no separate spec)
 
 **Validation**:
@@ -995,8 +995,8 @@ Last updated: 2026-02-06
 
 | Hook              | Event       | Purpose                                   |
 | ----------------- | ----------- | ----------------------------------------- |
-| dsm-bash-guard.sh | PreToolUse  | Block dangerous commands before execution |
-| dsm-code-guard.sh | PostToolUse | Detect silent failure patterns in code    |
+| ckvd-bash-guard.sh | PreToolUse  | Block dangerous commands before execution |
+| ckvd-code-guard.sh | PostToolUse | Detect silent failure patterns in code    |
 
 **Blocked operations** (PreToolUse):
 
@@ -1024,7 +1024,7 @@ mise run fcp:diagnose
 ## Architecture Overview
 
 ```
-data-source-manager/
+crypto-kline-vision-data/
 ├── CLAUDE.md              # Root instructions (hub)
 ├── .claude/               # Claude Code extensions
 │   ├── agents/            # 5 subagents

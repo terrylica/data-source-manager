@@ -14,7 +14,7 @@ This test suite includes the following files:
     - Analyzes the structure and data types of the returned candlestick data.
 
 - **`okx_symbol_test.py`**:
-  - **Purpose:** Focuses on testing the internal utilities related to OKX symbol handling and endpoint resolution, particularly functions within `src/data_source_manager/utils/market_constraints.py`.
+  - **Purpose:** Focuses on testing the internal utilities related to OKX symbol handling and endpoint resolution, particularly functions within `src/ckvd/utils/market_constraints.py`.
   - **Key Tests:**
     - Validates the correct formatting of symbols for different market types (SPOT, FUTURES_USDT), ensuring adherence to the `BASE-QUOTE` or `BASE-USD-SWAP` format (e.g., converts `BTCUSDT` to `BTC-USDT`).
     - Tests the validation logic for OKX symbols to ensure only correctly formatted symbols are accepted for specific market types.
@@ -63,8 +63,8 @@ This test suite includes the following files:
 The test suite relies on several core components and utilities within the codebase:
 
 - **API Endpoints:** Tests interact with `https://www.okx.com/api/v5/market/candles` and `https://www.okx.com/api/v5/market/history-candles`.
-- **`src/data_source_manager/utils/market_constraints.py`:** Provides enums and functions for market types, data providers, chart types, intervals, symbol formatting, and validation, ensuring tests use consistent and correct parameters.
-- **`src/data_source_manager/utils/logger_setup.py`:** Used for logging output within the tests, often utilizing `rich` for formatted console output.
+- **`src/ckvd/utils/market_constraints.py`:** Provides enums and functions for market types, data providers, chart types, intervals, symbol formatting, and validation, ensuring tests use consistent and correct parameters.
+- **`src/ckvd/utils/logger_setup.py`:** Used for logging output within the tests, often utilizing `rich` for formatted console output.
 - **`httpx` Library:** Used for making asynchronous HTTP requests to the OKX API.
 - **Retry Logic:** A `retry_request` helper function (implemented using `tenacity` in the actual API client, but simulated with a loop in the tests) is used to handle transient network issues with retries.
 

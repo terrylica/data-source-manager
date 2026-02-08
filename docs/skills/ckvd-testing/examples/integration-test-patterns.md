@@ -8,7 +8,7 @@ Examples of integration tests that call external APIs.
 import pytest
 from datetime import datetime, timedelta, timezone
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 
 
 @pytest.mark.integration
@@ -17,7 +17,7 @@ class TestVisionAPIIntegration:
 
     def test_fetch_historical_data(self):
         """Verify Vision API returns historical data."""
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.FUTURES_USDT
         )
@@ -67,7 +67,7 @@ class TestMarketTypeIntegration:
     ])
     def test_all_market_types(self, market_type, symbol):
         """Each market type should return valid data."""
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             market_type
         )
@@ -96,7 +96,7 @@ class TestFCPFallback:
 
     def test_recent_data_uses_rest(self):
         """Recent data (<48h) should fall back to REST API."""
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.FUTURES_USDT
         )
@@ -130,7 +130,7 @@ class TestRateLimitHandling:
 
     def test_many_requests_with_retry(self):
         """Multiple requests should handle rate limits."""
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.SPOT
         )

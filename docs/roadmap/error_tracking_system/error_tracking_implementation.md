@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines a comprehensive plan for implementing a centralized error tracking and classification system within the Data Source Manager architecture. The system aims to standardize error handling, improve monitoring, and provide insights into data invalidness patterns.
+This document outlines a comprehensive plan for implementing a centralized error tracking and classification system within the Crypto Kline Vision Data architecture. The system aims to standardize error handling, improve monitoring, and provide insights into data invalidness patterns.
 
 ## Problem Statement
 
@@ -15,9 +15,9 @@ The current implementation lacks systematic categorization of different types of
 
 ## Implementation Plan
 
-### 1. Error Type Definitions (`src/data_source_manager/utils/config.py`)
+### 1. Error Type Definitions (`src/ckvd/utils/config.py`)
 
-Extend the existing configuration with standardized error types and severity levels. After examining the current `src/data_source_manager/utils/config.py`, we'll integrate with the existing config pattern:
+Extend the existing configuration with standardized error types and severity levels. After examining the current `src/ckvd/utils/config.py`, we'll integrate with the existing config pattern:
 
 ```python
 # Error type definitions to be added to utils/config.py
@@ -58,7 +58,7 @@ ERROR_THRESHOLDS = {
 }
 ```
 
-### 2. Error Handling Module (`src/data_source_manager/utils/error_tracker.py`)
+### 2. Error Handling Module (`src/ckvd/utils/error_tracker.py`)
 
 Create a new module with classes for error context, classification, and tracking. After analyzing the existing pattern in `utils` directory and specifically `validation_utils.py` and `network_utils.py`, we'll design this to be compatible with the existing codebase:
 
@@ -68,7 +68,7 @@ import logging
 import traceback
 import pandas as pd
 from typing import Dict, Any, Optional, List, Tuple
-from data_source_manager.utils.config import ERROR_TYPES, ERROR_THRESHOLDS
+from ckvd.utils.config import ERROR_TYPES, ERROR_THRESHOLDS
 
 class DataResult:
     """Container for data operation results with error context"""
@@ -321,7 +321,7 @@ class ErrorTracker:
 error_tracker = ErrorTracker()
 ```
 
-### 3. Logger Enhancement (`src/data_source_manager/utils/logger_setup.py`)
+### 3. Logger Enhancement (`src/ckvd/utils/logger_setup.py`)
 
 After thorough examination of the existing `logger_setup.py` which already implements a sophisticated LoggerProxy pattern, we'll enhance it with error context support while preserving its current strengths:
 
@@ -535,7 +535,7 @@ This implementation enhances the existing `LoggerProxy` pattern with error conte
 The enhanced logger remains compatible with pytest's caplog fixture, allowing easy verification of logs with error context:
 
 ```python
-from data_source_manager.utils.logger_setup import logger
+from ckvd.utils.logger_setup import logger
 
 def test_error_context_logging(caplog):
     # Set capture level
@@ -556,17 +556,17 @@ def test_error_context_logging(caplog):
             assert record.error_context['retry_count'] == 3
 ```
 
-This approach preserves the simplicity of using just `from data_source_manager.utils.logger_setup import logger` in test files while enabling comprehensive error context verification.
+This approach preserves the simplicity of using just `from ckvd.utils.logger_setup import logger` in test files while enabling comprehensive error context verification.
 
-### 4. Data Source Manager Integration (`src/data_source_manager/core/data_source_manager.py`)
+### 4. Crypto Kline Vision Data Integration (`src/ckvd/core/crypto_kline_vision_data.py`)
 
-After examining the existing `data_source_manager.py` (568 lines), we'll integrate our error tracking system with it:
+After examining the existing `crypto_kline_vision_data.py` (568 lines), we'll integrate our error tracking system with it:
 
 ```python
-from data_source_manager.utils.error_tracker import DataResult, classify_exception, classify_empty_data, error_tracker
-from data_source_manager.utils.logger_setup import logger
+from ckvd.utils.error_tracker import DataResult, classify_exception, classify_empty_data, error_tracker
+from ckvd.utils.logger_setup import logger
 
-# Modified _fetch_from_source method in DataSourceManager
+# Modified _fetch_from_source method in CryptoKlineVisionData
 def _fetch_from_source(self, symbol, interval, start_time, end_time, **kwargs):
     """Fetch data from source with error tracking"""
     try:
@@ -661,13 +661,13 @@ def _fetch_from_source(self, symbol, interval, start_time, end_time, **kwargs):
         )
 ```
 
-### 5. REST Client Integration (`src/data_source_manager/core/rest_data_client.py`)
+### 5. REST Client Integration (`src/ckvd/core/rest_data_client.py`)
 
 Based on examining `rest_data_client.py` (838 lines), which focuses on handling REST API requests for data fetching:
 
 ```python
-from data_source_manager.utils.error_tracker import DataResult, classify_exception, classify_empty_data, error_tracker
-from data_source_manager.utils.logger_setup import logger
+from ckvd.utils.error_tracker import DataResult, classify_exception, classify_empty_data, error_tracker
+from ckvd.utils.logger_setup import logger
 
 # Modify the fetch method in RestDataClient
 def fetch(self, symbol, interval, start_time, end_time, **kwargs):
@@ -742,13 +742,13 @@ def fetch(self, symbol, interval, start_time, end_time, **kwargs):
         )
 ```
 
-### 6. Network Utilities Enhancement (`src/data_source_manager/utils/network_utils.py`)
+### 6. Network Utilities Enhancement (`src/ckvd/utils/network_utils.py`)
 
 Based on examining the comprehensive `network_utils.py` (1310 lines) which handles various network operations:
 
 ```python
-from data_source_manager.utils.error_tracker import classify_exception, error_tracker
-from data_source_manager.utils.logger_setup import logger
+from ckvd.utils.error_tracker import classify_exception, error_tracker
+from ckvd.utils.logger_setup import logger
 
 # Enhanced check_connectivity function
 def check_connectivity(url, timeout=5):
@@ -829,7 +829,7 @@ def check_connectivity(url, timeout=5):
 ### Testing Enhanced Logger with caplog
 
 ```python
-from data_source_manager.utils.logger_setup import logger
+from ckvd.utils.logger_setup import logger
 
 def test_enhanced_logger_with_error_context(caplog):
     """Test that error context is properly captured by caplog."""
@@ -855,7 +855,7 @@ def test_enhanced_logger_with_error_context(caplog):
 
 ```python
 import pandas as pd
-from data_source_manager.utils.error_tracker import DataResult, error_tracker
+from ckvd.utils.error_tracker import DataResult, error_tracker
 
 def test_data_result_tracking(caplog):
     """Test integration between DataResult and error tracking."""
@@ -921,15 +921,15 @@ These metrics will enable:
 
 ### Phase 1: Core Infrastructure (Week 1)
 
-- Add error type definitions to `src/data_source_manager/utils/config.py`
-- Create `src/data_source_manager/utils/error_tracker.py` with DataResult class and classification functions
-- Update logger setup in `src/data_source_manager/utils/logger_setup.py`
+- Add error type definitions to `src/ckvd/utils/config.py`
+- Create `src/ckvd/utils/error_tracker.py` with DataResult class and classification functions
+- Update logger setup in `src/ckvd/utils/logger_setup.py`
 
 ### Phase 2: Integration (Weeks 2-3)
 
-- Integrate with `src/data_source_manager/core/data_source_manager.py`
-- Integrate with `src/data_source_manager/core/rest_data_client.py`
-- Update network utilities in `src/data_source_manager/utils/network_utils.py`
+- Integrate with `src/ckvd/core/crypto_kline_vision_data.py`
+- Integrate with `src/ckvd/core/rest_data_client.py`
+- Update network utilities in `src/ckvd/utils/network_utils.py`
 - Create unit tests for core components
 
 ### Phase 3: Monitoring and Reporting (Week 4)

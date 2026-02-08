@@ -1,8 +1,8 @@
 ---
 adr: docs/adr/2025-01-30-failover-control-protocol.md
 paths:
-  - "src/data_source_manager/core/providers/binance/**/*.py"
-  - "src/data_source_manager/utils/market_constraints.py"
+  - "src/ckvd/core/providers/binance/**/*.py"
+  - "src/ckvd/utils/market_constraints.py"
   - "examples/**/*.py"
   - "tests/integration/**/*.py"
 ---
@@ -23,7 +23,7 @@ Symbol format varies by market type. Using the wrong format causes empty DataFra
 
 ```python
 # WRONG: Using USDT format for coin-margined
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 df = manager.get_data(symbol="BTCUSDT", ...)  # Returns empty DataFrame!
 
 # CORRECT: Use USD_PERP format for coin-margined
@@ -35,7 +35,7 @@ df = manager.get_data(symbol="BTCUSD_PERP", ...)
 Always validate symbols before fetching:
 
 ```python
-from data_source_manager.utils.market_constraints import (
+from ckvd.utils.market_constraints import (
     validate_symbol_for_market_type,
     get_market_symbol_format,
     MarketType,

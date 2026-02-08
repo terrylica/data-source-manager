@@ -1,6 +1,6 @@
 # Tests Directory
 
-Context-specific instructions for working with DSM tests.
+Context-specific instructions for working with CKVD tests.
 
 **Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [src/](../src/CLAUDE.md) | [docs/](../docs/CLAUDE.md) | [examples/](../examples/CLAUDE.md)
 
@@ -19,7 +19,7 @@ uv run -p 3.13 pytest tests/integration/ -v
 uv run -p 3.13 pytest tests/okx/ -m okx -v
 
 # Unit tests with coverage
-uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-report=term-missing
+uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=term-missing
 
 # FCP edge case tests
 uv run -p 3.13 pytest tests/fcp_pm/test_fcp_edge_cases.py -v
@@ -43,7 +43,7 @@ uv run -p 3.13 pytest tests/fcp_pm/test_fcp_edge_cases.py -v
 unit/
 ├── core/
 │   ├── providers/binance/   # REST/Vision client tests
-│   └── sync/                # DataSourceManager tests
+│   └── sync/                # CryptoKlineVisionData tests
 ├── utils/                   # Utility function tests
 ├── test_timestamp_semantics.py
 └── test_dsm_logging_improvements.py
@@ -63,13 +63,13 @@ unit/
 
 ## Mocking Patterns
 
-### Mock DataSourceManager
+### Mock CryptoKlineVisionData
 
 ```python
 from unittest.mock import patch, MagicMock
 
-@patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
-@patch("data_source_manager.core.sync.data_source_manager.UnifiedCacheManager")
+@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
+@patch("ckvd.core.sync.crypto_kline_vision_data.UnifiedCacheManager")
 def test_with_mocks(mock_cache, mock_vision):
     mock_cache.return_value = MagicMock()
     mock_vision.return_value = MagicMock()
@@ -124,10 +124,10 @@ def test_rest_response(mock_get):
 
 | Fixture                | Purpose                                  |
 | ---------------------- | ---------------------------------------- |
-| `fcp_manager_spot`     | DSM for SPOT market with cache enabled   |
-| `fcp_manager_futures`  | DSM for USDT futures with cache enabled  |
-| `fcp_manager_coin`     | DSM for coin-margined with cache enabled |
-| `fcp_manager_no_cache` | DSM with cache disabled for isolation    |
+| `fcp_manager_spot`     | CKVD for SPOT market with cache enabled   |
+| `fcp_manager_futures`  | CKVD for USDT futures with cache enabled  |
+| `fcp_manager_coin`     | CKVD for coin-margined with cache enabled |
+| `fcp_manager_no_cache` | CKVD with cache disabled for isolation    |
 
 ---
 
@@ -171,7 +171,7 @@ Comprehensive edge case tests for Failover Control Protocol. Run with `mise run 
 **Design Decisions:**
 
 - TestFCPEmptyResult accepts multiple outcomes (intentional for edge case)
-- TestFCPFutureTimestamp accepts data OR RuntimeError (documented DSM behavior)
+- TestFCPFutureTimestamp accepts data OR RuntimeError (documented CKVD behavior)
 - DAY_1 interval enforces REST to avoid Vision API CSV issues
 
 ### Source Verification Pattern
@@ -219,7 +219,7 @@ Memory efficiency and fault tolerance tests. Run with `mise run test:stress` or 
 
 ## Related
 
-- @docs/skills/dsm-testing/SKILL.md - Full testing guide
+- @docs/skills/ckvd-testing/SKILL.md - Full testing guide
 - @conftest.py - Shared fixtures
 - @tests/fcp_pm/test_fcp_edge_cases.py - FCP edge case tests
 - @tests/stress/ - Memory and fault tolerance stress tests

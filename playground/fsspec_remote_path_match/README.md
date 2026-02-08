@@ -89,7 +89,7 @@ A higher-level handler that uses fsspec for file operations:
 
 ```python
 from vision_path_mapper import VisionPathMapper
-from data_source_manager.data_source_manager.utils.market_constraints import MarketType
+from ckvd.ckvd.utils.market_constraints import MarketType
 import pendulum
 
 # Create a mapper instance
@@ -151,7 +151,7 @@ print(f"Remote URL: {remote_url}")
 
 ```python
 from vision_path_mapper import FSSpecVisionHandler
-from data_source_manager.data_source_manager.utils.market_constraints import MarketType
+from ckvd.ckvd.utils.market_constraints import MarketType
 
 # Create a handler instance
 handler = FSSpecVisionHandler(base_cache_dir="cache")
@@ -189,7 +189,7 @@ python test_all_market_types.py
 
 This will output tables showing the consistent path mapping across all market types.
 
-## Integration with DataSourceManager
+## Integration with CryptoKlineVisionData
 
 The `dsm_integration_example.py` script demonstrates how to integrate the path mapper with a data source manager:
 

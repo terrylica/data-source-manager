@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DSM Code Guard - PostToolUse hook for data-source-manager
+# CKVD Code Guard - PostToolUse hook for crypto-kline-vision-data
 # Detects silent failure patterns specific to market data code
 
 set -euo pipefail
@@ -39,43 +39,43 @@ if echo "$CONTENT" | grep -qE 'subprocess\.(run|call|check_output)\(' && ! echo 
     WARNINGS+=("⚠️ subprocess call without check=True - errors may be silently ignored")
 fi
 
-# Check 5: Naive datetime (DSM-specific)
+# Check 5: Naive datetime (CKVD-specific)
 if echo "$CONTENT" | grep -qE 'datetime\.now\(\)' && ! echo "$CONTENT" | grep -q 'timezone'; then
     WARNINGS+=("⚠️ datetime.now() without timezone - use datetime.now(timezone.utc)")
 fi
 
-# Check 6: HTTP without timeout (DSM-specific)
+# Check 6: HTTP without timeout (CKVD-specific)
 if echo "$CONTENT" | grep -qE '(requests|httpx)\.(get|post|put|delete|patch)\(' && ! echo "$CONTENT" | grep -qE 'timeout\s*='; then
     WARNINGS+=("⚠️ HTTP request without explicit timeout parameter")
 fi
 
-# Check 7: DataSourceManager without close() (DSM-specific)
+# Check 7: CryptoKlineVisionData without close() (CKVD-specific)
 # Detect manager creation without matching close() call
-if echo "$CONTENT" | grep -qE 'DataSourceManager\.create\(' && ! echo "$CONTENT" | grep -q '\.close()'; then
+if echo "$CONTENT" | grep -qE 'CryptoKlineVisionData\.create\(' && ! echo "$CONTENT" | grep -q '\.close()'; then
     # Only warn if not using context manager pattern
-    if ! echo "$CONTENT" | grep -qE 'with\s+.*DataSourceManager'; then
-        WARNINGS+=("⚠️ DataSourceManager.create() without manager.close() - consider using context manager or explicit close")
+    if ! echo "$CONTENT" | grep -qE 'with\s+.*CryptoKlineVisionData'; then
+        WARNINGS+=("⚠️ CryptoKlineVisionData.create() without manager.close() - consider using context manager or explicit close")
     fi
 fi
 
-# Check 8: Mixing sync and async patterns (DSM-specific)
-if echo "$CONTENT" | grep -qE 'async\s+def' && echo "$CONTENT" | grep -qE 'DataSourceManager\.create\('; then
-    WARNINGS+=("⚠️ Async function using sync DataSourceManager - consider async patterns for better performance")
+# Check 8: Mixing sync and async patterns (CKVD-specific)
+if echo "$CONTENT" | grep -qE 'async\s+def' && echo "$CONTENT" | grep -qE 'CryptoKlineVisionData\.create\('; then
+    WARNINGS+=("⚠️ Async function using sync CryptoKlineVisionData - consider async patterns for better performance")
 fi
 
-# Check 9: Hardcoded symbol format issues (DSM-specific)
+# Check 9: Hardcoded symbol format issues (CKVD-specific)
 # Check for BTCUSD_PERP with SPOT/FUTURES_USDT market type
 if echo "$CONTENT" | grep -qE 'MarketType\.(SPOT|FUTURES_USDT)' && echo "$CONTENT" | grep -qE '"[A-Z]+USD_PERP"'; then
     WARNINGS+=("⚠️ COIN-margined symbol format (_PERP) used with SPOT/FUTURES_USDT market type")
 fi
 
-# Check 10: DataFrame validation (DSM-specific)
+# Check 10: DataFrame validation (CKVD-specific)
 # Warn if returning DataFrame without validation
 if echo "$CONTENT" | grep -qE '(return|yield)\s+df' && ! echo "$CONTENT" | grep -qE 'len\(df\)|df\.empty|assert|validate'; then
     WARNINGS+=("⚠️ Returning DataFrame without validation - consider checking len(df) > 0 or df.empty")
 fi
 
-# Check 11: Polars preference reminder (DSM-specific)
+# Check 11: Polars preference reminder (CKVD-specific)
 # Note: This is informational only, not blocking
 if echo "$CONTENT" | grep -qE 'import pandas as pd|from pandas import' && echo "$CONTENT" | grep -qE 'pd\.DataFrame\('; then
     if ! echo "$CONTENT" | grep -qE '# polars-exception|# legacy|# compatibility'; then

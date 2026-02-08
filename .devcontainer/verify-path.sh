@@ -17,7 +17,7 @@ ls -la /home/vscode/.local/bin/
 
 # Check specific binaries
 echo -e "\nChecking for specific binaries:"
-for binary in dsm-demo-cli dsm-demo-module pytest pylint twine
+for binary in ckvd-demo-cli ckvd-demo-module pytest pylint twine
 do
     if command -v $binary &> /dev/null; then
         echo "✅ $binary found at $(which $binary)"

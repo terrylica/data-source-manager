@@ -1,6 +1,6 @@
 # Coverage Configuration Reference
 
-pytest-cov configuration for DataSourceManager.
+pytest-cov configuration for CryptoKlineVisionData.
 
 ## Current Configuration
 
@@ -9,7 +9,7 @@ From `pyproject.toml`:
 ```toml
 [tool.coverage.run]
 branch = true
-source = ["src/data_source_manager"]
+source = ["src/ckvd"]
 omit = [
     "*/tests/*",
     "*/test_*.py",
@@ -33,10 +33,10 @@ show_missing = true
 
 ```bash
 # Unit tests only (fast)
-uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-report=term-missing
+uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=term-missing
 
 # All tests
-uv run -p 3.13 pytest tests/ --cov=src/data_source_manager --cov-report=term-missing
+uv run -p 3.13 pytest tests/ --cov=src/ckvd --cov-report=term-missing
 ```
 
 ### Coverage Reports
@@ -59,7 +59,7 @@ uv run -p 3.13 pytest tests/ --cov=src/data_source_manager --cov-report=term-mis
 
 ```bash
 # Fail if coverage drops below threshold
-uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-fail-under=80
+uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-fail-under=80
 ```
 
 ## Module Coverage Breakdown
@@ -68,7 +68,7 @@ Key modules to maintain coverage for:
 
 | Module                        | Target | Notes                        |
 | ----------------------------- | ------ | ---------------------------- |
-| `core/sync/`                  | 70%+   | Main DSM logic               |
+| `core/sync/`                  | 70%+   | Main CKVD logic               |
 | `utils/market_constraints.py` | 90%+   | Pure functions, easy to test |
 | `providers/`                  | 60%+   | Provider-specific logic      |
 

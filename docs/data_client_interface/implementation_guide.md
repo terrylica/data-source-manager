@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides comprehensive instructions for implementing the `DataClientInterface` consistently across different data clients. Adhering to these guidelines ensures that all data clients work seamlessly with the `DataSourceManager` and maintain consistent behavior.
+This guide provides comprehensive instructions for implementing the `DataClientInterface` consistently across different data clients. Adhering to these guidelines ensures that all data clients work seamlessly with the `CryptoKlineVisionData` and maintain consistent behavior.
 
 ## Interface Requirements
 
@@ -163,7 +163,7 @@ When implementing a new data client:
 2. Test empty data handling
 3. Test error handling by simulating network failures
 4. Test resource cleanup
-5. Test with the DataSourceManager to ensure integration works correctly
+5. Test with the CryptoKlineVisionData to ensure integration works correctly
 
 ## Current Implementations
 

@@ -1,4 +1,4 @@
-# Timestamp Evolution and Handling in Data Source Manager
+# Timestamp Evolution and Handling in Crypto Kline Vision Data
 
 ## Binance Vision Timestamp Evolution
 
@@ -30,7 +30,7 @@ These patterns are crucial for validating the correctness of timestamp parsing a
 
 ## Code Mechanisms for Handling Timestamp Evolution
 
-The Data Source Manager core implements specific mechanisms to handle the timestamp evolution and precision patterns:
+The Crypto Kline Vision Data core implements specific mechanisms to handle the timestamp evolution and precision patterns:
 
 ### 1. Dynamic Timestamp Unit Detection (`vision_constraints.py`)
 
@@ -70,4 +70,4 @@ def process_kline_data(raw_data: List[List]) -> pd.DataFrame:
 - **Data Consistency**: By consistently processing timestamps in microseconds and adjusting `close_time`, the system maintains internal data consistency and aligns with the observed precision patterns.
 - **Robustness**: The design anticipates and addresses potential changes in external data sources, making the data services more robust and less prone to breaking due to external format evolutions.
 
-By implementing these mechanisms, Data Source Manager is well-equipped to handle the current and future timestamp formats from Binance Vision, ensuring data accuracy and reliability for downstream applications like financial time series forecasting.
+By implementing these mechanisms, Crypto Kline Vision Data is well-equipped to handle the current and future timestamp formats from Binance Vision, ensuring data accuracy and reliability for downstream applications like financial time series forecasting.

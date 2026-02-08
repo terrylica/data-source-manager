@@ -1,10 +1,10 @@
-# DateTime Handling in Data Source Manager
+# DateTime Handling in Crypto Kline Vision Data
 
-This document explains the datetime handling and DataFrame consistency enhancements in the Data Source Manager (DSM).
+This document explains the datetime handling and DataFrame consistency enhancements in the Crypto Kline Vision Data (CKVD).
 
 ## Core Principles
 
-The Data Source Manager now follows these core principles for datetime handling:
+The Crypto Kline Vision Data now follows these core principles for datetime handling:
 
 1. **Consistent DateTime Representation**:
    - All timestamps are timezone-aware in UTC
@@ -20,17 +20,17 @@ The Data Source Manager now follows these core principles for datetime handling:
    - Missing data segments are identified and reported
    - Complete time series reindexing ensures regular intervals
 
-## Using the Data Source Manager
+## Using the Crypto Kline Vision Data
 
 ### Core API Pattern
 
 ```python
 from datetime import datetime, timezone
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.market_constraints import DataProvider, MarketType, Interval
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.market_constraints import DataProvider, MarketType, Interval
 
 # Create a manager
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
 # Fetch data with timezone-aware datetimes
 start_time = datetime(2023, 1, 1, tzinfo=timezone.utc)
@@ -66,7 +66,7 @@ The returned DataFrame has a consistent structure:
 You can verify data completeness using the provided utility:
 
 ```python
-from data_source_manager.utils.dataframe_utils import verify_data_completeness
+from ckvd.utils.dataframe_utils import verify_data_completeness
 
 is_complete, gaps = verify_data_completeness(
     df,
@@ -86,7 +86,7 @@ if not is_complete:
 For calculations that require a minimum amount of data:
 
 ```python
-from data_source_manager.utils.for_core.dsm_utilities import check_window_data_completeness
+from ckvd.utils.for_core.ckvd_utilities import check_window_data_completeness
 
 # Check if we have enough data for a 24-period calculation (80% minimum)
 has_enough_data, completeness_pct = check_window_data_completeness(
@@ -106,14 +106,14 @@ else:
 
 ### Datetime Handling
 
-The `src/data_source_manager/utils/for_core/dsm_utilities.py` module provides several utility functions:
+The `src/ckvd/utils/for_core/ckvd_utilities.py` module provides several utility functions:
 
 #### `ensure_consistent_timezone`
 
 Ensures datetime objects have a consistent timezone (UTC):
 
 ```python
-from data_source_manager.utils.for_core.dsm_utilities import ensure_consistent_timezone
+from ckvd.utils.for_core.ckvd_utilities import ensure_consistent_timezone
 
 # Convert naive datetime to timezone-aware
 aware_dt = ensure_consistent_timezone(naive_dt)
@@ -127,7 +127,7 @@ aware_dt = ensure_consistent_timezone("2023-01-01T00:00:00")
 Safely compares timestamps of different formats:
 
 ```python
-from data_source_manager.utils.for_core.dsm_utilities import safe_timestamp_comparison
+from ckvd.utils.for_core.ckvd_utilities import safe_timestamp_comparison
 
 # Compare millisecond timestamp to datetime
 result = safe_timestamp_comparison(
@@ -141,7 +141,7 @@ result = safe_timestamp_comparison(
 Creates a complete time series with regular intervals:
 
 ```python
-from data_source_manager.utils.for_core.dsm_utilities import safely_reindex_dataframe
+from ckvd.utils.for_core.ckvd_utilities import safely_reindex_dataframe
 
 # Reindex with 1-minute intervals, filling forward
 complete_df = safely_reindex_dataframe(
@@ -189,9 +189,9 @@ complete_df = safely_reindex_dataframe(
 4. **Standardize Your Own DataFrames**:
 
    ```python
-   from data_source_manager.utils.dataframe_utils import standardize_dataframe
+   from ckvd.utils.dataframe_utils import standardize_dataframe
 
-   # Standardize your custom DataFrame to match DSM format
+   # Standardize your custom DataFrame to match CKVD format
    df = standardize_dataframe(df)
    ```
 

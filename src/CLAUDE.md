@@ -1,6 +1,6 @@
 # Source Code Directory
 
-Context-specific instructions for working with DSM source code.
+Context-specific instructions for working with CKVD source code.
 
 **Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [tests/](../tests/CLAUDE.md) | [docs/](../docs/CLAUDE.md) | [examples/](../examples/CLAUDE.md)
 
@@ -9,13 +9,13 @@ Context-specific instructions for working with DSM source code.
 ## Package Structure
 
 ```
-src/data_source_manager/
+src/ckvd/
 ├── __init__.py              # Public API exports
 ├── core/
 │   ├── sync/
-│   │   ├── data_source_manager.py  # Main DSM class with FCP
-│   │   ├── dsm_types.py            # DataSource, DataSourceConfig
-│   │   └── dsm_lib.py              # High-level functions
+│   │   ├── crypto_kline_vision_data.py  # Main CKVD class with FCP
+│   │   ├── ckvd_types.py            # DataSource, CKVDConfig
+│   │   └── ckvd_lib.py              # High-level functions
 │   └── providers/
 │       └── binance/
 │           ├── vision_data_client.py   # Vision API (S3)
@@ -30,7 +30,7 @@ src/data_source_manager/
     └── for_core/                # Internal utilities
         ├── rest_exceptions.py   # REST API exceptions
         ├── vision_exceptions.py # Vision API exceptions
-        └── dsm_cache_utils.py   # Cache LazyFrame utilities
+        └── ckvd_cache_utils.py   # Cache LazyFrame utilities
 ```
 
 ---
@@ -39,9 +39,9 @@ src/data_source_manager/
 
 | Class                | Location                            | Purpose                    |
 | -------------------- | ----------------------------------- | -------------------------- |
-| `DataSourceManager`  | `core/sync/data_source_manager.py`  | Main entry point with FCP  |
-| `DataSourceConfig`   | `core/sync/dsm_types.py`            | Configuration dataclass    |
-| `DataSource`         | `core/sync/dsm_types.py`            | Data source enum           |
+| `CryptoKlineVisionData`  | `core/sync/crypto_kline_vision_data.py`  | Main entry point with FCP  |
+| `CKVDConfig`   | `core/sync/ckvd_types.py`            | Configuration dataclass    |
+| `DataSource`         | `core/sync/ckvd_types.py`            | Data source enum           |
 | `DataProvider`       | `utils/market_constraints.py`       | Provider enum (BINANCE)    |
 | `MarketType`         | `utils/market_constraints.py`       | Market type enum           |
 | `Interval`           | `utils/market_constraints.py`       | Timeframe interval enum    |
@@ -50,7 +50,7 @@ src/data_source_manager/
 
 ---
 
-## FCP Implementation (core/sync/data_source_manager.py)
+## FCP Implementation (core/sync/crypto_kline_vision_data.py)
 
 The Failover Control Protocol orchestrates data retrieval:
 
@@ -75,8 +75,8 @@ Key methods:
 
 ```python
 # CORRECT: Specific exceptions
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
-from data_source_manager.utils.for_core.vision_exceptions import VisionAPIError
+from ckvd.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
+from ckvd.utils.for_core.vision_exceptions import VisionAPIError
 
 try:
     df = manager.get_data(...)

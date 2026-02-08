@@ -1,20 +1,20 @@
-# DSM Debugging Reference
+# CKVD Debugging Reference
 
-Comprehensive debugging techniques for DataSourceManager issues.
+Comprehensive debugging techniques for CryptoKlineVisionData issues.
 
 ## Enable Debug Logging
 
 ### Method 1: Environment Variable
 
 ```bash
-DSM_LOG_LEVEL=DEBUG uv run -p 3.13 python your_script.py
+CKVD_LOG_LEVEL=DEBUG uv run -p 3.13 python your_script.py
 ```
 
 ### Method 2: Programmatic
 
 ```python
 import logging
-logging.getLogger("data_source_manager").setLevel(logging.DEBUG)
+logging.getLogger("ckvd").setLevel(logging.DEBUG)
 
 # Or with structlog
 import structlog
@@ -26,9 +26,9 @@ structlog.configure(
 ### Method 3: Manager Configuration
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT,
     log_level="DEBUG"
@@ -45,7 +45,7 @@ manager = DataSourceManager.create(
 
 ```python
 # Check if symbol exists
-from data_source_manager.utils.market_constraints import validate_symbol_for_market_type
+from ckvd.utils.market_constraints import validate_symbol_for_market_type
 
 try:
     validate_symbol_for_market_type("BTCUSDT", MarketType.FUTURES_USDT)
@@ -70,10 +70,10 @@ print(f"Now: {datetime.now(timezone.utc)}")
 
 ```bash
 # Check cache directory
-ls -la ~/.cache/data_source_manager/binance/futures_usdt/klines/daily/BTCUSDT/1h/
+ls -la ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/1h/
 
 # Run FCP diagnostic
-uv run -p 3.13 python docs/skills/dsm-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h
 ```
 
 **Common causes**:
@@ -162,7 +162,7 @@ print(f"Fetch took {elapsed:.2f}s")
 
 ```python
 import logging
-logging.getLogger("data_source_manager").setLevel(logging.DEBUG)
+logging.getLogger("ckvd").setLevel(logging.DEBUG)
 
 # Watch for log entries like:
 # DEBUG - Cache hit for BTCUSDT 1h 2024-01-15
@@ -172,7 +172,7 @@ logging.getLogger("data_source_manager").setLevel(logging.DEBUG)
 
 ## Diagnostic Scripts
 
-Available in `docs/skills/dsm-usage/scripts/`:
+Available in `docs/skills/ckvd-usage/scripts/`:
 
 | Script               | Purpose                     |
 | -------------------- | --------------------------- |

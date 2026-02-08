@@ -10,7 +10,7 @@ research-method: Analysis of cc-skills best practices and Claude Code official d
 
 ## Context and Problem Statement
 
-Data Source Manager is a complex package with domain-specific patterns (FCP, timestamp handling, symbol formats) that require context for effective AI-assisted development. How do we structure documentation and tooling to maximize Claude Code effectiveness?
+Crypto Kline Vision Data is a complex package with domain-specific patterns (FCP, timestamp handling, symbol formats) that require context for effective AI-assisted development. How do we structure documentation and tooling to maximize Claude Code effectiveness?
 
 ## Decision Drivers
 
@@ -45,10 +45,10 @@ Chosen option: **Progressive Disclosure** with Claude Code infrastructure becaus
 │   ├── fetch-data.md
 │   ├── feature-dev.md
 │   ├── quick-test.md
-│   ├── review-dsm.md
+│   ├── review-ckvd.md
 │   └── validate-data.md
 ├── hooks/            # Project-specific hooks
-│   └── dsm-code-guard.sh
+│   └── ckvd-code-guard.sh
 └── rules/            # Context rules (loaded on demand)
     ├── binance-api.md
     ├── caching-patterns.md
@@ -59,17 +59,17 @@ Chosen option: **Progressive Disclosure** with Claude Code infrastructure becaus
     └── timestamp-handling.md
 
 docs/skills/
-├── dsm-usage/        # DataSourceManager usage skill
+├── ckvd-usage/        # CryptoKlineVisionData usage skill
 │   ├── SKILL.md
 │   ├── examples/
 │   ├── references/
 │   └── scripts/
-├── dsm-testing/      # Testing skill
+├── ckvd-testing/      # Testing skill
 │   ├── SKILL.md
 │   ├── examples/
 │   ├── references/
 │   └── scripts/
-└── dsm-research/     # Codebase research skill
+└── ckvd-research/     # Codebase research skill
     └── SKILL.md
 ```
 
@@ -96,7 +96,7 @@ docs/skills/
 
 ```yaml
 ---
-name: dsm-research
+name: ckvd-research
 context: fork
 agent: Explore
 user-invocable: true
@@ -125,24 +125,24 @@ user-invocable: true
 
 **Completed**: 2026-01-30
 
-**Summary**: Claude Code infrastructure implemented for DSM.
+**Summary**: Claude Code infrastructure implemented for CKVD.
 
 | Metric              | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
 | Agents              | 5 (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer) |
-| Commands            | 6 (debug-fcp, fetch-data, quick-test, review-dsm, validate-data, feature-dev)    |
-| Skills              | 4 (dsm-usage, dsm-testing, dsm-research, dsm-fcp-monitor)                        |
+| Commands            | 6 (debug-fcp, fetch-data, quick-test, review-ckvd, validate-data, feature-dev)    |
+| Skills              | 4 (ckvd-usage, ckvd-testing, ckvd-research, ckvd-fcp-monitor)                        |
 | Rules               | 7 (binance-api, caching, dataframe, error, fcp, symbols, timestamp)              |
 | Hooks               | 5 (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop)                |
 | CLAUDE.md hierarchy | 5 files (root, src/, tests/, docs/, examples/)                                   |
 
-**DSM-specific patterns implemented**:
+**CKVD-specific patterns implemented**:
 
 - Progressive disclosure with on-demand FCP and API rule loading
 - Hub-spoke navigation across CLAUDE.md hierarchy (root, src/, tests/, docs/, examples/)
 - Domain-specific context rules for Binance API, timestamps, symbols, caching
-- Custom agents for DSM tasks (silent-failure-hunter, fcp-debugger, api-reviewer)
-- Skill-based guidance for DSM usage, testing, and FCP monitoring
+- Custom agents for CKVD tasks (silent-failure-hunter, fcp-debugger, api-reviewer)
+- Skill-based guidance for CKVD usage, testing, and FCP monitoring
 
 ## More Information
 
@@ -150,4 +150,4 @@ user-invocable: true
 - `docs/INDEX.md` - Documentation navigation hub
 - [cc-skills](https://github.com/terrylica/cc-skills) - Pattern source
 
-**Note**: The original design spec was removed as it contained copied Anthropic documentation rather than DSM-specific content. The actual deliverables are the agents, commands, skills, rules, and hooks listed above.
+**Note**: The original design spec was removed as it contained copied Anthropic documentation rather than CKVD-specific content. The actual deliverables are the agents, commands, skills, rules, and hooks listed above.

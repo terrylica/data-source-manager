@@ -1,6 +1,6 @@
 # Logger Demo
 
-This directory contains a demonstration of the smart print functionality and module-specific logging provided by the `src/data_source_manager/utils/logger_setup.py` module.
+This directory contains a demonstration of the smart print functionality and module-specific logging provided by the `src/ckvd/utils/logger_setup.py` module.
 
 ## Smart Print Demo
 
@@ -22,7 +22,7 @@ python examples/logger_demo/simple_print_demo.py --level ERROR
 
 ### Key Features
 
-- Single import approach: `from data_source_manager.data_source_manager.utils.logger_setup import logger`
+- Single import approach: `from ckvd.ckvd.utils.logger_setup import logger`
 - Enhanced print statements with rich formatting
 - Automatic suppression of visual output at higher log levels
 - Consistent interface for both logging and console output
@@ -36,7 +36,7 @@ The logger system allows a parent script to control the logging behavior of all 
 
 ```python
 # In your main.py (run this first)
-from data_source_manager.data_source_manager.utils.logger_setup import logger
+from ckvd.ckvd.utils.logger_setup import logger
 
 # Set global log level and enable smart print before importing modules
 logger.setLevel("ERROR")

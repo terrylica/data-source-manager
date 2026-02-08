@@ -1,5 +1,5 @@
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
-# Hub configuration for data-source-manager
+# Hub configuration for crypto-kline-vision-data
 # See: https://mise.jdx.dev/
 
 [tools]
@@ -7,7 +7,7 @@ python = "3.13"
 
 [env]
 # Project-specific environment variables
-DSM_LOG_LEVEL = "WARNING"
+CKVD_LOG_LEVEL = "WARNING"
 PYTHONPATH = "{{cwd}}/src"
 
 # =============================================================================
@@ -49,7 +49,7 @@ run = "uv run -p 3.13 pytest tests/okx/ -m okx -v"
 
 [tasks."test:cov"]
 description = "Run tests with coverage report"
-run = "uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-report=term-missing"
+run = "uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=term-missing"
 
 # -----------------------------------------------------------------------------
 # Linting & Formatting
@@ -94,7 +94,7 @@ description = "Quick validation: lint + unit tests + import check"
 run = """
 uv run -p 3.13 ruff check --fix src/ tests/
 uv run -p 3.13 pytest tests/unit/ -q
-uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('Import check: OK')"
+uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('Import check: OK')"
 """
 
 [tasks.verify]
@@ -109,8 +109,8 @@ depends = ["lint:fix", "test", "import:check"]
 description = "Verify package imports correctly"
 run = """
 uv run -p 3.13 python -c "
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
-from data_source_manager import fetch_market_data, ChartType, DataSource
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
+from ckvd import fetch_market_data, ChartType, DataSource
 print('All imports OK')
 "
 """
@@ -175,19 +175,19 @@ run = "./scripts/publish-to-pypi.sh"
 # -----------------------------------------------------------------------------
 
 [tasks."cache:clear"]
-description = "Clear local DSM cache"
+description = "Clear local CKVD cache"
 run = """
-echo "Clearing DSM cache..."
-rm -rf ~/.cache/data_source_manager
-echo "Cache cleared: ~/.cache/data_source_manager"
+echo "Clearing CKVD cache..."
+rm -rf ~/.cache/ckvd
+echo "Cache cleared: ~/.cache/ckvd"
 """
 
 [tasks."cache:stats"]
 description = "Show cache statistics"
 run = """
-echo "DSM Cache Statistics:"
-du -sh ~/.cache/data_source_manager 2>/dev/null || echo "No cache found"
-find ~/.cache/data_source_manager -name "*.arrow" 2>/dev/null | wc -l | xargs echo "Arrow files:"
+echo "CKVD Cache Statistics:"
+du -sh ~/.cache/ckvd 2>/dev/null || echo "No cache found"
+find ~/.cache/ckvd -name "*.arrow" 2>/dev/null | wc -l | xargs echo "Arrow files:"
 """
 
 # -----------------------------------------------------------------------------
@@ -225,5 +225,5 @@ description = "Run logging demo"
 run = "uv run -p 3.13 python examples/dsm_logging_demo.py"
 
 [tasks."demo:cli"]
-description = "Run DSM CLI demo"
+description = "Run CKVD CLI demo"
 run = "uv run -p 3.13 python examples/sync/dsm_demo_cli.py"

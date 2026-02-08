@@ -1,11 +1,11 @@
 # Intervals Reference
 
-Detailed documentation for kline/candlestick intervals supported by DataSourceManager.
+Detailed documentation for kline/candlestick intervals supported by CryptoKlineVisionData.
 
 ## Interval Enum Values
 
 ```python
-from data_source_manager import Interval
+from ckvd import Interval
 
 # Sub-minute (Spot only)
 Interval.SECOND_1    # 1s - Spot market only, not available in futures
@@ -61,7 +61,7 @@ Interval.MONTH_1     # 1M
 ## Converting Between Intervals
 
 ```python
-from data_source_manager.utils.market_constraints import Interval
+from ckvd.utils.market_constraints import Interval
 
 # Get interval in seconds
 interval_sec = Interval.HOUR_1.to_seconds()  # 3600

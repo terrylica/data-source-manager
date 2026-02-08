@@ -1,6 +1,6 @@
 # Pytest Markers Reference
 
-Comprehensive guide to pytest markers used in data-source-manager.
+Comprehensive guide to pytest markers used in crypto-kline-vision-data.
 
 ## Built-in Markers
 
@@ -12,7 +12,7 @@ Tests that require external network access or API calls.
 @pytest.mark.integration
 def test_live_api_fetch():
     """Test that requires network access to Binance."""
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
     df = manager.get_data(symbol="BTCUSDT", ...)
     assert len(df) > 0
     manager.close()
@@ -28,7 +28,7 @@ OKX-specific integration tests.
 @pytest.mark.okx
 def test_okx_spot_data():
     """OKX spot market data fetch."""
-    manager = DataSourceManager.create(DataProvider.OKX, MarketType.SPOT)
+    manager = CryptoKlineVisionData.create(DataProvider.OKX, MarketType.SPOT)
     ...
 ```
 
@@ -49,7 +49,7 @@ def test_cache_population():
 
 **Run serially**: `pytest -m serial --dist=no`
 
-## Custom DSM Markers
+## Custom CKVD Markers
 
 ### @pytest.mark.fcp
 

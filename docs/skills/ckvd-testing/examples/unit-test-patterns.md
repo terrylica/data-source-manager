@@ -1,6 +1,6 @@
 # Unit Test Patterns
 
-Examples of well-structured unit tests for DSM.
+Examples of well-structured unit tests for CKVD.
 
 ## Basic Test Structure
 
@@ -9,15 +9,15 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 
 
-class TestDataSourceManager:
-    """Unit tests for DataSourceManager."""
+class TestCryptoKlineVisionData:
+    """Unit tests for CryptoKlineVisionData."""
 
     def test_create_manager_spot(self):
         """Verify manager creation for spot market."""
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.SPOT
         )
@@ -28,7 +28,7 @@ class TestDataSourceManager:
 
     def test_create_manager_futures_usdt(self):
         """Verify manager creation for USDT futures."""
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.FUTURES_USDT
         )
@@ -46,7 +46,7 @@ import pytest
 @pytest.fixture
 def manager():
     """Create a manager for testing, auto-cleanup."""
-    mgr = DataSourceManager.create(
+    mgr = CryptoKlineVisionData.create(
         DataProvider.BINANCE,
         MarketType.FUTURES_USDT
     )
@@ -80,15 +80,15 @@ class TestWithFixtures:
 ```python
 import pandas as pd
 
-@patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
-@patch("data_source_manager.core.sync.data_source_manager.UnifiedCacheManager")
+@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
+@patch("ckvd.core.sync.crypto_kline_vision_data.UnifiedCacheManager")
 class TestMockedDataSource:
     """Tests with mocked external dependencies."""
 
     def test_fetch_returns_dataframe(self, mock_cache, mock_vision):
         """Verify get_data returns a DataFrame."""
         # Arrange: Mock returns empty DataFrame
-        # Note: DSM returns pd.DataFrame for API compatibility
+        # Note: CKVD returns pd.DataFrame for API compatibility
         mock_cache.return_value.get_cached_data.return_value = None
         mock_vision.return_value.fetch_data.return_value = pd.DataFrame({
             "open_time": [],
@@ -99,7 +99,7 @@ class TestMockedDataSource:
             "volume": [],
         })
 
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.FUTURES_USDT
         )
@@ -123,7 +123,7 @@ class TestMockedDataSource:
 
 ```python
 import pytest
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
 
 
 class TestErrorHandling:
@@ -139,7 +139,7 @@ class TestErrorHandling:
                 end_time=datetime.now(timezone.utc)
             )
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.RestDataClient")
+    @patch("ckvd.core.providers.binance.rest_data_client.RestDataClient")
     def test_rate_limit_propagates(self, mock_client, manager):
         """Rate limit errors should propagate."""
         mock_client.return_value.fetch_klines.side_effect = RateLimitError("429")

@@ -262,7 +262,7 @@ cache/
 
 ## Market Type Support
 
-The Arrow cache system follows the market constraints defined in `src/data_source_manager/utils/market_constraints.py`. The directory structure encodes key information:
+The Arrow cache system follows the market constraints defined in `src/ckvd/utils/market_constraints.py`. The directory structure encodes key information:
 
 ```bash
 cache/{provider}/{chart_type}/{market_type}/{symbol}/{interval}/{date}.arrow
@@ -337,17 +337,17 @@ This database provides a comprehensive index of all cached data, including file 
 
 ## Using ArrowCacheReader with Market Constraints
 
-The ArrowCacheReader is designed to work seamlessly with the enums defined in `src/data_source_manager/utils/market_constraints.py`. This ensures type safety and consistent use of market parameters throughout the system.
+The ArrowCacheReader is designed to work seamlessly with the enums defined in `src/ckvd/utils/market_constraints.py`. This ensures type safety and consistent use of market parameters throughout the system.
 
 Here's an example of how to use the ArrowCacheReader with proper enum values:
 
 ```python
-from data_source_manager.data_source_manager.utils.logger_setup import logger
+from ckvd.ckvd.utils.logger_setup import logger
 from rich import print
 from datetime import datetime
 
-from data_source_manager.data_source_manager.utils.market_constraints import DataProvider, MarketType, ChartType, Interval
-from data_source_manager.data_source_manager.utils.arrow_cache_reader import ArrowCacheReader
+from ckvd.ckvd.utils.market_constraints import DataProvider, MarketType, ChartType, Interval
+from ckvd.ckvd.utils.arrow_cache_reader import ArrowCacheReader
 
 # Initialize the reader
 reader = ArrowCacheReader()

@@ -1,4 +1,4 @@
-# dsm-demo-cli: Failover Control Protocol (FCP)
+# ckvd-demo-cli: Failover Control Protocol (FCP)
 
 This CLI tool retrieves data from multiple sources:
 
@@ -11,7 +11,7 @@ It displays real-time source information about where each data point comes from.
 ## Usage
 
 ```bash
-dsm-demo-cli [OPTIONS]
+ckvd-demo-cli [OPTIONS]
 ```
 
 ## Options
@@ -41,7 +41,7 @@ dsm-demo-cli [OPTIONS]
 #### End time with days and ERROR log level (complex case)
 
 ```bash
-dsm-demo-cli -s BTCUSDT -et 2025-04-14T15:59:59 -i 3m -d 5 -l E
+ckvd-demo-cli -s BTCUSDT -et 2025-04-14T15:59:59 -i 3m -d 5 -l E
 ```
 
 ### Time Range CLI Examples
@@ -49,67 +49,67 @@ dsm-demo-cli -s BTCUSDT -et 2025-04-14T15:59:59 -i 3m -d 5 -l E
 #### End time with days (fetch backward from end time)
 
 ```bash
-dsm-demo-cli -s BTCUSDT -et 2025-04-15 -d 7
+ckvd-demo-cli -s BTCUSDT -et 2025-04-15 -d 7
 ```
 
 #### Start time with days (fetch forward from start time)
 
 ```bash
-dsm-demo-cli -s BTCUSDT -st 2025-04-05 -d 10
+ckvd-demo-cli -s BTCUSDT -st 2025-04-05 -d 10
 ```
 
 #### Exact time range (start time to end time)
 
 ```bash
-dsm-demo-cli -s BTCUSDT -st 2025-04-05 -et 2025-04-15
+ckvd-demo-cli -s BTCUSDT -st 2025-04-05 -et 2025-04-15
 ```
 
 #### Days only (fetch backward from current time)
 
 ```bash
-dsm-demo-cli -s BTCUSDT -d 7
+ckvd-demo-cli -s BTCUSDT -d 7
 ```
 
 #### Default (3 days backward from current time)
 
 ```bash
-dsm-demo-cli -s BTCUSDT
+ckvd-demo-cli -s BTCUSDT
 ```
 
 ### Market Types
 
 ```bash
-dsm-demo-cli -s BTCUSDT -m um
-dsm-demo-cli -s BTCUSD_PERP -m cm
+ckvd-demo-cli -s BTCUSDT -m um
+ckvd-demo-cli -s BTCUSD_PERP -m cm
 ```
 
 #### Note: Coin-margined futures (-m cm) require symbols with USD_PERP format (e.g., BTCUSD_PERP, not BTCUSDT)
 
 ```bash
-dsm-demo-cli -s BTCUSD_PERP -m cm -d 1 -et 2025-03-01
+ckvd-demo-cli -s BTCUSD_PERP -m cm -d 1 -et 2025-03-01
 ```
 
 ### Data Provider Options
 
 ```bash
-dsm-demo-cli -s BTCUSDT -p binance
-dsm-demo-cli -s BTCUSDT -p tradestation
+ckvd-demo-cli -s BTCUSDT -p binance
+ckvd-demo-cli -s BTCUSDT -p tradestation
 ```
 
 ### Different Intervals
 
 ```bash
-dsm-demo-cli -s BTCUSDT -i 5m
-dsm-demo-cli -s BTCUSDT -i 1h
-dsm-demo-cli -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
+ckvd-demo-cli -s BTCUSDT -i 5m
+ckvd-demo-cli -s BTCUSDT -i 1h
+ckvd-demo-cli -s SOLUSDT -m spot -i 1s  -cc -l D -st 2025-04-14T15:31:01 -et 2025-04-14T15:32:01
 ```
 
 ### Data Source Options
 
 ```bash
-dsm-demo-cli -s BTCUSDT -es REST
-dsm-demo-cli -s BTCUSDT -nc
-dsm-demo-cli -s BTCUSDT -cc
+ckvd-demo-cli -s BTCUSDT -es REST
+ckvd-demo-cli -s BTCUSDT -nc
+ckvd-demo-cli -s BTCUSDT -cc
 ```
 
 ### Documentation Generation
@@ -117,25 +117,25 @@ dsm-demo-cli -s BTCUSDT -cc
 #### Generate documentation
 
 ```bash
-dsm-demo-cli -gd
+ckvd-demo-cli -gd
 ```
 
 #### Generate documentation with linting configuration files
 
 ```bash
-dsm-demo-cli -gd -glc
+ckvd-demo-cli -gd -glc
 ```
 
 ### Combined Examples
 
 ```bash
-dsm-demo-cli -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
-dsm-demo-cli -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
-dsm-demo-cli -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03
+ckvd-demo-cli -s ETHUSDT -m um -i 15m -st 2025-04-01 -et 2025-04-10 -r 5 -l D
+ckvd-demo-cli -s ETHUSD_PERP -m cm -i 5m -d 10 -l D -cc
+ckvd-demo-cli -s BTCUSDT -p binance -es VISION -m spot -i 1m -st 2025-04-01 -et 2025-04-03
 ```
 
 #### Bitcoin historical data for coin-margined futures (using required USD_PERP format)
 
 ```bash
-dsm-demo-cli -s BTCUSD_PERP -m cm -i 15m -d 7 -et 2025-03-01 -l D -cc
+ckvd-demo-cli -s BTCUSD_PERP -m cm -i 15m -d 7 -et 2025-03-01 -l D -cc
 ```

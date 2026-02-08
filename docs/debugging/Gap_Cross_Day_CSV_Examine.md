@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document analyzes the gap issue reported at the day boundary between `2025-04-10 23:59:00` and `2025-04-11 00:01:00` in the DataSourceManager. The goal is to determine if the gap exists in the raw data files from Binance Vision API or if it's introduced during processing.
+This document analyzes the gap issue reported at the day boundary between `2025-04-10 23:59:00` and `2025-04-11 00:01:00` in the CryptoKlineVisionData. The goal is to determine if the gap exists in the raw data files from Binance Vision API or if it's introduced during processing.
 
 ## Investigation Method
 
@@ -102,7 +102,7 @@ The issue appears to be in the `VisionDataClient` class when merging data from m
 
 1. **File Merging Logic**: When the `VisionDataClient` merges data from multiple files, it calculates time differences after the merge. This causes it to detect a "gap" at day boundaries even when the data is complete, because it's not recognizing that the 00:00:00 record from the next day should connect seamlessly with the 23:59:00 record.
 
-2. **Day Boundary Check Logic**: The `_fix_day_boundary_gaps` function in `DataSourceManager` looks specifically for:
+2. **Day Boundary Check Logic**: The `_fix_day_boundary_gaps` function in `CryptoKlineVisionData` looks specifically for:
 
    ```python
    if (
@@ -115,7 +115,7 @@ The issue appears to be in the `VisionDataClient` class when merging data from m
 
    This is looking for 23:59 → 00:01 gaps, assuming 00:00 is missing. But in the raw data, 00:00 exists.
 
-3. **Data Source Prioritization**: The DataSourceManager prioritizes different data sources (cache → Vision → REST). Since the Vision API reports a gap that doesn't actually exist, it may cause unnecessary fallback to REST API data when the Vision data is actually complete.
+3. **Data Source Prioritization**: The CryptoKlineVisionData prioritizes different data sources (cache → Vision → REST). Since the Vision API reports a gap that doesn't actually exist, it may cause unnecessary fallback to REST API data when the Vision data is actually complete.
 
 ## Recommendations
 
@@ -155,7 +155,7 @@ The issue appears to be in the `VisionDataClient` class when merging data from m
 
 4. **Consider File Pre-Check**: Before reporting a gap, check if the next day's file explicitly contains the 00:00:00 record.
 
-By addressing these issues, the DataSourceManager should be able to handle day boundary transitions correctly and avoid unnecessary fallbacks to the REST API.
+By addressing these issues, the CryptoKlineVisionData should be able to handle day boundary transitions correctly and avoid unnecessary fallbacks to the REST API.
 
 ## Additional Day Boundary Analysis: March 2025 Samples
 
@@ -264,4 +264,4 @@ The data consistently shows continuous sequences across different time intervals
 - 23:00:00 (from March 20 file)
 - 00:00:00 (from March 21 file)
 
-This confirms that the day boundary gap issue identified in the DataSourceManager is not present in the raw data files from Binance Vision API, but is introduced during processing as described in the original analysis.
+This confirms that the day boundary gap issue identified in the CryptoKlineVisionData is not present in the raw data files from Binance Vision API, but is introduced during processing as described in the original analysis.

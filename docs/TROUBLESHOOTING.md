@@ -1,18 +1,18 @@
 # Troubleshooting Guide
 
-Common issues and solutions for Data Source Manager.
+Common issues and solutions for Crypto Kline Vision Data.
 
 ## Quick Diagnostics
 
 ```bash
 # Check imports
-uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"
+uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 
 # Check cache status
-du -sh ~/.cache/data_source_manager
+du -sh ~/.cache/ckvd
 
 # Enable debug logging
-DSM_LOG_LEVEL=DEBUG uv run -p 3.13 python your_script.py
+CKVD_LOG_LEVEL=DEBUG uv run -p 3.13 python your_script.py
 ```
 
 ## Common Issues
@@ -31,8 +31,8 @@ DSM_LOG_LEVEL=DEBUG uv run -p 3.13 python your_script.py
 
 ```python
 # Check symbol format - raises ValueError with suggestion if invalid
-from data_source_manager import MarketType
-from data_source_manager.utils.market_constraints import validate_symbol_for_market_type
+from ckvd import MarketType
+from ckvd.utils.market_constraints import validate_symbol_for_market_type
 
 try:
     validate_symbol_for_market_type("BTCUSDT", MarketType.FUTURES_COIN)
@@ -92,7 +92,7 @@ now = datetime.now(timezone.utc)
 
 ### Import Errors
 
-**Symptoms**: `ModuleNotFoundError: No module named 'data_source_manager'`
+**Symptoms**: `ModuleNotFoundError: No module named 'ckvd'`
 
 **Solutions**:
 
@@ -115,7 +115,7 @@ uv sync --dev
 mise run cache:clear
 
 # Or manually
-rm -rf ~/.cache/data_source_manager
+rm -rf ~/.cache/ckvd
 ```
 
 ## Debug Mode
@@ -124,9 +124,9 @@ Enable verbose logging to see FCP decisions:
 
 ```python
 import os
-os.environ["DSM_LOG_LEVEL"] = "DEBUG"
+os.environ["CKVD_LOG_LEVEL"] = "DEBUG"
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
 # Now get_data() logs:
 # DEBUG - Cache hit for 2024-01-01
@@ -141,10 +141,10 @@ Force specific data source for debugging by passing `enforce_source` to `get_dat
 
 ```python
 from datetime import datetime, timedelta, timezone
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
-from data_source_manager.core.sync.dsm_types import DataSource
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
+from ckvd.core.sync.ckvd_types import DataSource
 
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
 end = datetime.now(timezone.utc)
 start = end - timedelta(days=7)
@@ -181,7 +181,7 @@ manager.close()
 
 ## Getting Help
 
-1. Check [FCP Protocol Reference](skills/dsm-usage/references/fcp-protocol.md)
-2. Review [Market Types](skills/dsm-usage/references/market-types.md)
+1. Check [FCP Protocol Reference](skills/ckvd-usage/references/fcp-protocol.md)
+2. Review [Market Types](skills/ckvd-usage/references/market-types.md)
 3. Enable debug logging and check output
 4. Run `/debug-fcp SYMBOL` command in Claude Code

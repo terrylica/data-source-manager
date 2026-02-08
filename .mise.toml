@@ -1,4 +1,4 @@
-# mise configuration for data-source-manager
+# mise configuration for crypto-kline-vision-data
 # See: https://mise.jdx.dev/
 #
 # IMPORTANT: Python 3.13 ONLY - never change this version
@@ -38,7 +38,7 @@ run = "uv run -p 3.13 pytest tests/okx/ -m okx -v"
 
 [tasks."test:coverage"]
 description = "Run tests with coverage report"
-run = "uv run -p 3.13 pytest --cov=src/data_source_manager --cov-report=html --cov-report=term-missing tests/unit/"
+run = "uv run -p 3.13 pytest --cov=src/ckvd --cov-report=html --cov-report=term-missing tests/unit/"
 outputs = ["htmlcov/"]
 
 #
@@ -105,23 +105,23 @@ run = "uv sync --dev"
 
 [tasks.verify]
 description = "Verify package imports correctly"
-run = "uv run -p 3.13 python -c 'from data_source_manager import DataSourceManager; print(\"✓ Import OK\")'"
+run = "uv run -p 3.13 python -c 'from ckvd import CryptoKlineVisionData; print(\"✓ Import OK\")'"
 
 [tasks."cache:clear"]
 description = "Clear cache directory (prompts for confirmation)"
-run = "uv run -p 3.13 python scripts/dev/clear_cache.py clear -d ~/.cache/data_source_manager"
+run = "uv run -p 3.13 python scripts/dev/clear_cache.py clear -d ~/.cache/ckvd"
 
 [tasks."cache:clear-force"]
 description = "Clear cache directory without confirmation"
-run = "uv run -p 3.13 python scripts/dev/clear_cache.py clear -d ~/.cache/data_source_manager -y"
+run = "uv run -p 3.13 python scripts/dev/clear_cache.py clear -d ~/.cache/ckvd -y"
 
 [tasks."cache:status"]
 description = "Show cache directory status"
-run = "du -sh ~/.cache/data_source_manager 2>/dev/null || echo 'Cache directory not found'"
+run = "du -sh ~/.cache/ckvd 2>/dev/null || echo 'Cache directory not found'"
 
 [tasks."cache:health"]
 description = "Check cache health and statistics"
-run = "uv run -p 3.13 python docs/skills/dsm-fcp-monitor/scripts/cache_health.py --verbose"
+run = "uv run -p 3.13 python docs/skills/ckvd-fcp-monitor/scripts/cache_health.py --verbose"
 
 #
 # === FCP DIAGNOSTICS TASKS ===
@@ -129,7 +129,7 @@ run = "uv run -p 3.13 python docs/skills/dsm-fcp-monitor/scripts/cache_health.py
 
 [tasks."fcp:diagnose"]
 description = "Diagnose FCP behavior for BTCUSDT (default)"
-run = "uv run -p 3.13 python docs/skills/dsm-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h --days 3"
+run = "uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h --days 3"
 
 [tasks."fcp:validate"]
 description = "Validate symbol format for market type"
@@ -146,7 +146,7 @@ echo "Valid market types: SPOT, FUTURES_USDT, FUTURES_COIN"
 
 [tasks."claude:validate"]
 description = "Validate Claude Code infrastructure setup"
-run = "uv run -p 3.13 python docs/skills/dsm-usage/scripts/validate_infrastructure.py"
+run = "uv run -p 3.13 python docs/skills/ckvd-usage/scripts/validate_infrastructure.py"
 sources = [".claude/**/*.md", "docs/skills/*/SKILL.md", "CLAUDE.md"]
 
 #
@@ -166,7 +166,7 @@ echo "2. Unit tests..."
 uv run -p 3.13 pytest tests/unit/ -q --tb=no
 echo ""
 echo "3. Import check..."
-uv run -p 3.13 python -c 'from data_source_manager import DataSourceManager; print("   ✓ Import OK")'
+uv run -p 3.13 python -c 'from ckvd import CryptoKlineVisionData; print("   ✓ Import OK")'
 echo ""
 echo "=== All checks passed ==="
 """
@@ -178,7 +178,7 @@ echo "=== All checks passed ==="
 [tasks.help]
 description = "Show available tasks"
 run = """
-echo "=== Data Source Manager Tasks ==="
+echo "=== Crypto Kline Vision Data Tasks ==="
 echo ""
 echo "Testing:"
 echo "  mise run test           # Unit tests"

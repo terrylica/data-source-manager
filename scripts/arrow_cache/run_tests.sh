@@ -509,9 +509,9 @@ EOF
     print_info "All schema standardization tests completed!"
 }
 
-# Function to run DataSourceManager FCP tests
+# Function to run CryptoKlineVisionData FCP tests
 run_dsm_orchestration_tests() {
-    # These tests focus on the DataSourceManager Failover Control Protocol (FCP)
+    # These tests focus on the CryptoKlineVisionData Failover Control Protocol (FCP)
     # as described in focus_demo.mdc
     
     # Default test parameters
@@ -538,7 +538,7 @@ run_dsm_orchestration_tests() {
     done
     
     print_header "DATA SOURCE MANAGER ORCHESTRATION TESTS"
-    print_info "Testing the DataSourceManager's Failover Control Protocol (FCP)"
+    print_info "Testing the CryptoKlineVisionData's Failover Control Protocol (FCP)"
     print_info "This tests the orchestration between cache, VISION API, and REST API"
     print_info "Using historical data from Dec 24, 2024 12:09:03 to Feb 25, 2025 23:56:56"
     print_info "Note: Today is April 11, 2025, so these are past dates"
@@ -632,7 +632,7 @@ while [[ $# -gt 0 ]]; do
             RUN_DSM_TESTS=false
             shift
             ;;
-        --dsm-only|--fcp-only)
+        --ckvd-only|--fcp-only)
             RUN_CACHE_TESTS=false
             RUN_SCHEMA_TESTS=false
             RUN_DSM_TESTS=true
@@ -667,9 +667,9 @@ if $SHOW_HELP; then
     echo "Options:"
     echo "  --help, -h           Display this help message"
     echo "  --schema-only        Run only schema standardization tests"
-    echo "  --dsm-only, --fcp-only  Run only DataSourceManager FCP tests"
+    echo "  --ckvd-only, --fcp-only  Run only CryptoKlineVisionData FCP tests"
     echo "  --cache-only         Run only cache tests (default)"
-    echo "  --all                Run all tests (cache, schema, dsm)"
+    echo "  --all                Run all tests (cache, schema, ckvd)"
     echo ""
     echo "Schema standardization test options:"
     echo "  --rest-only          Run only the REST API schema test"
@@ -681,7 +681,7 @@ if $SHOW_HELP; then
     echo "  --no-um              Skip the UM market schema test"
     echo "  --no-sample          Skip the sample debugging schema test"
     echo ""
-    echo "DataSourceManager test options:"
+    echo "CryptoKlineVisionData test options:"
     echo "  --debug              Run in debug mode (fetch data in smaller chunks)"
     echo "  --spot-only          Run only SPOT market tests"
     echo "  --um-only            Run only UM market tests"
@@ -692,7 +692,7 @@ fi
 # Run the selected tests
 print_header "RUNNING TEST SUITE"
 
-# Run DataSourceManager FCP tests if requested
+# Run CryptoKlineVisionData FCP tests if requested
 if $RUN_DSM_TESTS; then
     run_dsm_orchestration_tests "${DSM_TEST_ARGS[@]}"
 fi
@@ -729,7 +729,7 @@ if $RUN_CACHE_TESTS; then
     print_info "9. Run Checksum Handling Test"
     print_info "10. Run All Cache Tests"
     print_info "11. Clean Cache Index Files"
-    print_info "12. Run DataSourceManager FCP Historical Tests"
+    print_info "12. Run CryptoKlineVisionData FCP Historical Tests"
     print_info "0. Exit"
 
     # Get user input
@@ -835,7 +835,7 @@ if $RUN_CACHE_TESTS; then
                 clean_cache_index_files
                 ;;
             12)
-                # Run DataSourceManager FCP Historical Tests
+                # Run CryptoKlineVisionData FCP Historical Tests
                 run_dsm_orchestration_tests
                 ;;
             *)
@@ -855,7 +855,7 @@ if $RUN_CACHE_TESTS; then
     print_info "7. Checksum handling"
     print_info "8. Proper use of market parameters: ${DATA_PROVIDER}/${CHART_TYPE}/${MARKET_TYPE}"
     if [[ " ${TEST_CHOICES[@]} " =~ " 12 " ]]; then
-        print_info "9. DataSourceManager FCP orchestration with historical data"
+        print_info "9. CryptoKlineVisionData FCP orchestration with historical data"
     fi
 
     # Display the error log summary

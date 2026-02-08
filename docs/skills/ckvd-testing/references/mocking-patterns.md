@@ -1,6 +1,6 @@
 # Mocking Patterns Reference
 
-DSM-specific mocking patterns for unit tests.
+CKVD-specific mocking patterns for unit tests.
 
 ## Core Component Mocks
 
@@ -12,10 +12,10 @@ Mock Vision API (S3 access) for offline tests:
 from unittest.mock import patch, MagicMock
 import pandas as pd
 
-@patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
+@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
 def test_without_vision(mock_handler):
     # Configure mock to return empty DataFrame
-    # Note: DSM returns pd.DataFrame for API compatibility
+    # Note: CKVD returns pd.DataFrame for API compatibility
     handler_instance = MagicMock()
     handler_instance.fetch_data.return_value = pd.DataFrame()
     mock_handler.return_value = handler_instance
@@ -28,7 +28,7 @@ def test_without_vision(mock_handler):
 Mock cache operations:
 
 ```python
-@patch("data_source_manager.core.sync.data_source_manager.UnifiedCacheManager")
+@patch("ckvd.core.sync.crypto_kline_vision_data.UnifiedCacheManager")
 def test_without_cache(mock_cache):
     cache_instance = MagicMock()
     cache_instance.read.return_value = None  # Cache miss
@@ -42,8 +42,8 @@ def test_without_cache(mock_cache):
 For complete isolation:
 
 ```python
-@patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
-@patch("data_source_manager.core.sync.data_source_manager.UnifiedCacheManager")
+@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
+@patch("ckvd.core.sync.crypto_kline_vision_data.UnifiedCacheManager")
 def test_isolated(mock_cache, mock_handler):
     # Note: decorator order reverses parameter order
     mock_cache.return_value = MagicMock()
@@ -92,7 +92,7 @@ def test_httpx_request(mock_get):
 from unittest.mock import patch
 from datetime import datetime, timezone
 
-@patch("data_source_manager.utils.time.datetime")
+@patch("ckvd.utils.time.datetime")
 def test_time_sensitive(mock_datetime):
     frozen_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
     mock_datetime.now.return_value = frozen_time
@@ -112,8 +112,8 @@ def test_time_sensitive(mock_datetime):
 
 ```python
 # ❌ Don't mock internal implementation details
-@patch("data_source_manager.core.sync.data_source_manager._internal_method")
+@patch("ckvd.core.sync.crypto_kline_vision_data._internal_method")
 
 # ✅ Mock at service boundaries
-@patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
+@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
 ```

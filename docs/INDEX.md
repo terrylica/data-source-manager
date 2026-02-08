@@ -1,6 +1,6 @@
 # Documentation Index
 
-Navigation hub for Data Source Manager documentation.
+Navigation hub for Crypto Kline Vision Data documentation.
 
 **Quick links**: [CLAUDE.md](/CLAUDE.md) | [README.md](/README.md) | [GLOSSARY.md](GLOSSARY.md) | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | [Examples](/examples/)
 
@@ -12,7 +12,7 @@ Navigation hub for Data Source Manager documentation.
 | ------------------------------------------------ | ---------------------------------------- |
 | [api/](api/)                                     | API reference and endpoint documentation |
 | [core_architecture/](core_architecture/)         | System architecture and design           |
-| [data_source_manager/](data_source_manager/)     | DSM class documentation                  |
+| [ckvd/](ckvd/)     | CKVD class documentation                  |
 | [data_client_interface/](data_client_interface/) | Provider interface specifications        |
 
 ---
@@ -94,10 +94,10 @@ Progressive disclosure for detailed guidance. Each has a SKILL.md with YAML fron
 
 | Skill                                      | Purpose                              |
 | ------------------------------------------ | ------------------------------------ |
-| [dsm-usage](skills/dsm-usage/)             | DataSourceManager usage guide        |
-| [dsm-testing](skills/dsm-testing/)         | Testing patterns and pytest          |
-| [dsm-research](skills/dsm-research/)       | Codebase research (runs in subagent) |
-| [dsm-fcp-monitor](skills/dsm-fcp-monitor/) | FCP monitoring and diagnostics       |
+| [ckvd-usage](skills/ckvd-usage/)             | CryptoKlineVisionData usage guide        |
+| [ckvd-testing](skills/ckvd-testing/)         | Testing patterns and pytest          |
+| [ckvd-research](skills/ckvd-research/)       | Codebase research (runs in subagent) |
+| [ckvd-fcp-monitor](skills/ckvd-fcp-monitor/) | FCP monitoring and diagnostics       |
 
 ### Agents
 
@@ -107,7 +107,7 @@ Specialized subagents that Claude can delegate to:
 | --------------------- | -------------------------------------- |
 | api-reviewer          | Reviews code for API consistency       |
 | data-fetcher          | Fetches data with proper FCP handling  |
-| test-writer           | Writes tests following DSM patterns    |
+| test-writer           | Writes tests following CKVD patterns    |
 | silent-failure-hunter | Finds silent failures and bare excepts |
 | fcp-debugger          | Diagnoses FCP issues                   |
 
@@ -119,7 +119,7 @@ Slash commands for common workflows:
 | -------------- | --------------------------------- |
 | /debug-fcp     | Debug FCP behavior for a symbol   |
 | /quick-test    | Run quick verification tests      |
-| /review-dsm    | Review code against DSM patterns  |
+| /review-ckvd    | Review code against CKVD patterns  |
 | /fetch-data    | Fetch market data with validation |
 | /validate-data | Validate DataFrame structure      |
 | /feature-dev   | Guided feature development        |

@@ -5,11 +5,11 @@ tools: Read, Grep, Glob, Bash
 model: sonnet
 color: yellow
 skills:
-  - dsm-fcp-monitor
-  - dsm-usage
+  - ckvd-fcp-monitor
+  - ckvd-usage
 ---
 
-You are an FCP (Failover Control Protocol) debugging specialist for the Data Source Manager.
+You are an FCP (Failover Control Protocol) debugging specialist for the Crypto Kline Vision Data.
 
 ## FCP Priority Order
 
@@ -33,7 +33,7 @@ You are an FCP (Failover Control Protocol) debugging specialist for the Data Sou
 
 ```python
 # Check symbol format
-from data_source_manager.utils.market_constraints import validate_symbol_for_market_type
+from ckvd.utils.market_constraints import validate_symbol_for_market_type
 
 # BTCUSDT for spot/futures_usdt
 # BTCUSD_PERP for futures_coin
@@ -53,19 +53,19 @@ is_valid, suggestion = validate_symbol_for_market_type("BTCUSDT", MarketType.FUT
 
 ```bash
 # Check cache exists
-ls -la ~/.cache/data_source_manager/
+ls -la ~/.cache/ckvd/
 
 # Check structure
-tree ~/.cache/data_source_manager/binance/ -L 3
+tree ~/.cache/ckvd/binance/ -L 3
 
 # Verify permissions
-ls -la ~/.cache/data_source_manager/binance/futures_usdt/klines/daily/BTCUSDT/
+ls -la ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/
 ```
 
 **Expected path structure:**
 
 ```
-~/.cache/data_source_manager/
+~/.cache/ckvd/
 └── binance/
     ├── spot/klines/daily/{SYMBOL}/{INTERVAL}/{DATE}.arrow
     ├── futures_usdt/klines/daily/{SYMBOL}/{INTERVAL}/{DATE}.arrow
@@ -124,9 +124,9 @@ Enable verbose logging to see FCP decisions:
 
 ```python
 import os
-os.environ["DSM_LOG_LEVEL"] = "DEBUG"
+os.environ["CKVD_LOG_LEVEL"] = "DEBUG"
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
 # Now get_data() logs:
 # DEBUG - Cache hit for 2024-01-01
@@ -140,24 +140,24 @@ from data_source_manager import DataSourceManager, DataProvider, MarketType
 For debugging, bypass FCP and force a specific source:
 
 ```python
-from data_source_manager.core.sync.data_source_manager import DataSource
+from ckvd.core.sync.crypto_kline_vision_data import DataSource
 
 # Force Vision only (skip cache)
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT,
     enforce_source=DataSource.VISION
 )
 
 # Force REST only
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.SPOT,
     enforce_source=DataSource.REST
 )
 
 # Force cache only (offline mode)
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.SPOT,
     enforce_source=DataSource.CACHE
@@ -168,22 +168,22 @@ manager = DataSourceManager.create(
 
 | File                                                                   | Purpose           |
 | ---------------------------------------------------------------------- | ----------------- |
-| `src/data_source_manager/core/sync/data_source_manager.py`             | FCP orchestration |
-| `src/data_source_manager/core/providers/binance/cache_manager.py`      | Cache read/write  |
-| `src/data_source_manager/core/providers/binance/vision_data_client.py` | Vision API        |
-| `src/data_source_manager/core/providers/binance/rest_data_client.py`   | REST API          |
+| `src/ckvd/core/sync/crypto_kline_vision_data.py`             | FCP orchestration |
+| `src/ckvd/core/providers/binance/cache_manager.py`      | Cache read/write  |
+| `src/ckvd/core/providers/binance/vision_data_client.py` | Vision API        |
+| `src/ckvd/core/providers/binance/rest_data_client.py`   | REST API          |
 
 ## Quick Diagnostic Commands
 
 ```bash
 # Verify imports work
-uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"
+uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 
 # Check cache size
-du -sh ~/.cache/data_source_manager
+du -sh ~/.cache/ckvd
 
 # Clear cache (nuclear option)
-rm -rf ~/.cache/data_source_manager
+rm -rf ~/.cache/ckvd
 
 # Run FCP debug command
 # /debug-fcp BTCUSDT

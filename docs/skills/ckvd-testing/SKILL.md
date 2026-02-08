@@ -1,12 +1,12 @@
 ---
-name: dsm-testing
-description: Run tests for data-source-manager with proper markers and coverage. TRIGGERS - write tests, run tests, pytest, test coverage, unit tests, integration tests, mocking patterns.
+name: ckvd-testing
+description: Run tests for crypto-kline-vision-data with proper markers and coverage. TRIGGERS - write tests, run tests, pytest, test coverage, unit tests, integration tests, mocking patterns.
 argument-hint: "[test-pattern]"
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
 ---
 
-# Testing Data Source Manager
+# Testing Crypto Kline Vision Data
 
 Run tests for: $ARGUMENTS
 
@@ -25,9 +25,9 @@ Test Progress:
 
 **Step 1**: `uv run -p 3.13 ruff check --fix .`
 **Step 2**: `uv run -p 3.13 pytest tests/unit/ -v`
-**Step 3**: `uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"`
+**Step 3**: `uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"`
 **Step 4**: `uv run -p 3.13 pytest tests/integration/ -v` (if needed)
-**Step 5**: `uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager`
+**Step 5**: `uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd`
 
 ## Test Organization
 
@@ -48,7 +48,7 @@ tests/
 uv run -p 3.13 pytest tests/unit/ -v
 
 # With coverage
-uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-report=term-missing
+uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=term-missing
 ```
 
 ### Integration Tests
@@ -79,7 +79,7 @@ uv run -p 3.13 pytest tests/ -v
 
 ```python
 import pytest
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
 class TestMyFeature:
     """Tests for MyFeature."""
@@ -87,7 +87,7 @@ class TestMyFeature:
     def test_basic_functionality(self):
         """Verify basic operation."""
         # Arrange
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Act
         result = manager.some_method()
@@ -108,8 +108,8 @@ class TestMyFeature:
 ```python
 from unittest.mock import patch, MagicMock
 
-@patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
-@patch("data_source_manager.core.sync.data_source_manager.UnifiedCacheManager")
+@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
+@patch("ckvd.core.sync.crypto_kline_vision_data.UnifiedCacheManager")
 def test_with_mocks(self, mock_cache, mock_handler):
     mock_handler.return_value = MagicMock()
     mock_cache.return_value = MagicMock()
@@ -129,10 +129,10 @@ Quick test runner:
 
 ```bash
 # Run all quick checks (lint + unit tests + import)
-./docs/skills/dsm-testing/scripts/run_quick_tests.sh
+./docs/skills/ckvd-testing/scripts/run_quick_tests.sh
 
 # Run with test pattern filter
-./docs/skills/dsm-testing/scripts/run_quick_tests.sh test_timestamp
+./docs/skills/ckvd-testing/scripts/run_quick_tests.sh test_timestamp
 ```
 
 ## Detailed References
@@ -141,5 +141,5 @@ For deeper information, see:
 
 - @references/fixtures.md - Pytest fixtures and auto-cleanup patterns
 - @references/coverage.md - Coverage configuration and thresholds
-- @references/mocking-patterns.md - DSM-specific mocking patterns
+- @references/mocking-patterns.md - CKVD-specific mocking patterns
 - @references/markers.md - Pytest markers and test categorization

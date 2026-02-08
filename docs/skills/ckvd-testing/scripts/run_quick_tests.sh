@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Quick test runner for DSM
+# Quick test runner for CKVD
 # Usage: ./run_quick_tests.sh [test_pattern]
 
 set -euo pipefail
 
 PATTERN="${1:-}"
 
-echo "=== DSM Quick Test Runner ==="
+echo "=== CKVD Quick Test Runner ==="
 echo ""
 
 # Run lint check first
@@ -34,7 +34,7 @@ echo ""
 
 # Verify imports
 echo "3. Verifying imports..."
-if uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('   ✓ Import OK')" 2>/dev/null; then
+if uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('   ✓ Import OK')" 2>/dev/null; then
     :
 else
     echo "   ✗ Import failed"

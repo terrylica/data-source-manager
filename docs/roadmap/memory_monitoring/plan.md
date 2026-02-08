@@ -42,7 +42,7 @@ Total timeline: 2 months (Q2 2025)
 
 ### 1. Core Module Implementation
 
-#### 1.1 `src/data_source_manager/utils/memory_monitor.py`
+#### 1.1 `src/ckvd/utils/memory_monitor.py`
 
 ```python
 """
@@ -69,7 +69,7 @@ class MemoryMonitor:
     # but with enhanced production capabilities...
 ```
 
-#### 1.2 `src/data_source_manager/utils/gc_diagnostics.py`
+#### 1.2 `src/ckvd/utils/gc_diagnostics.py`
 
 ```python
 """

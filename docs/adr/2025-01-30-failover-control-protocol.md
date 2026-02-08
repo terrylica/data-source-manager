@@ -39,7 +39,7 @@ Chosen option: **Failover Control Protocol (FCP)** because it provides the best 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    DataSourceManager.get_data()              │
+│                    CryptoKlineVisionData.get_data()              │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -92,10 +92,10 @@ Chosen option: **Failover Control Protocol (FCP)** because it provides the best 
 1. **Cache Manager** (`cache_manager.py`): Arrow files with mmap for fast reads
 2. **Vision Client** (`vision_data_client.py`): FSSpec-based S3 access
 3. **REST Client** (`rest_data_client.py`): httpx with retry logic
-4. **DSM Orchestrator** (`data_source_manager.py`): FCP logic and validation
+4. **CKVD Orchestrator** (`crypto_kline_vision_data.py`): FCP logic and validation
 
 ## More Information
 
-- `src/data_source_manager/core/sync/data_source_manager.py` - Main DSM class
-- `src/data_source_manager/core/sync/dsm_lib.py` - High-level `fetch_market_data()`
+- `src/ckvd/core/sync/crypto_kline_vision_data.py` - Main CKVD class
+- `src/ckvd/core/sync/ckvd_lib.py` - High-level `fetch_market_data()`
 - `docs/core_architecture/` - Detailed architecture documentation

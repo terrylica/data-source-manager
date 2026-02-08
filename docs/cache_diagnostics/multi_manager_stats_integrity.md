@@ -1,4 +1,4 @@
-# DataSourceManager Cache Statistics Integrity Analysis
+# CryptoKlineVisionData Cache Statistics Integrity Analysis
 
 ## Motivation
 
@@ -23,7 +23,7 @@ Created specialized test harnesses with precise tracking:
 
 ```python
 # Key test pattern
-async with DataSourceManager(...) as manager:
+async with CryptoKlineVisionData(...) as manager:
     print("Initial stats:", manager.get_cache_stats())
 
     df1 = await manager.get_data(...)
@@ -73,7 +73,7 @@ graph TD
     end
 
     subgraph "Core Components"
-        DSM["DataSourceManager"]
+        CKVD["CryptoKlineVisionData"]
         UCM["UnifiedCacheManager"]
     end
 
@@ -93,16 +93,16 @@ graph TD
         CS["_cache_stats counter"]
     end
 
-    EF -->|"Creates multiple\ninstances"| DSM
-    DSM -->|"Delegates cache\noperations"| UCM
+    EF -->|"Creates multiple\ninstances"| CKVD
+    CKVD -->|"Delegates cache\noperations"| UCM
     UCM -->|"Reads/writes"| AF
     UCM -->|"Tracks metadata"| CI
-    DSM -->|"Maintains"| CS
+    CKVD -->|"Maintains"| CS
     CS -->|"Exposes"| GCS
-    DSM -->|"Cache operations"| UCM
+    CKVD -->|"Cache operations"| UCM
 
-    CT1 -->|"Validates\ncache hit"| DSM
-    CT2 -->|"Verifies specific\ncache files"| DSM
+    CT1 -->|"Validates\ncache hit"| CKVD
+    CT2 -->|"Verifies specific\ncache files"| CKVD
 
     MS -->|"Aggregates across\ninstances"| GCS
 ```

@@ -1,21 +1,21 @@
 ---
 adr: docs/adr/2025-01-30-failover-control-protocol.md
 paths:
-  - "src/data_source_manager/core/sync/**/*.py"
-  - "src/data_source_manager/core/cache/**/*.py"
+  - "src/ckvd/core/sync/**/*.py"
+  - "src/ckvd/core/cache/**/*.py"
   - "tests/**/test_cache*.py"
 ---
 
 # Caching Patterns Rules
 
-Guidelines for DSM cache operations.
+Guidelines for CKVD cache operations.
 
 ## Cache Location
 
-Default: `~/.cache/data_source_manager/`
+Default: `~/.cache/ckvd/`
 
 ```
-~/.cache/data_source_manager/
+~/.cache/ckvd/
 └── binance/
     ├── spot/
     │   └── klines/daily/{SYMBOL}/{INTERVAL}/
@@ -51,7 +51,7 @@ Cache files are immutable once written. To refresh:
 
 ```bash
 # Clear specific symbol
-rm -rf ~/.cache/data_source_manager/binance/futures_usdt/klines/daily/BTCUSDT/
+rm -rf ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/
 
 # Clear all cache
 mise run cache:clear

@@ -1,13 +1,13 @@
 ---
 paths:
-  - "src/data_source_manager/**/*.py"
+  - "src/ckvd/**/*.py"
   - "examples/**/*.py"
   - "tests/**/*.py"
 ---
 
 # Timestamp Handling Rules
 
-Critical rules for timestamp handling in Data Source Manager.
+Critical rules for timestamp handling in Crypto Kline Vision Data.
 
 ## Always UTC
 
@@ -47,7 +47,7 @@ dt = datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
 # datetime to Unix milliseconds
 ms = int(dt.timestamp() * 1000)
 
-# Note: DSM uses Polars internally for some cache operations,
+# Note: CKVD uses Polars internally for some cache operations,
 # but the public API always returns pandas DataFrames
 ```
 

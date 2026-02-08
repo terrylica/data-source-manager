@@ -1,4 +1,4 @@
-# Data Source Manager
+# Crypto Kline Vision Data
 
 A high-performance, robust package for efficient market data retrieval from multiple data providers, including [Binance Vision](https://data.binance.vision/) and Binance REST ([Spot](https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints), [USDS-Margined Futures](https://developers.binance.com/docs/derivatives/usds-margined-futures/general-info), [Coin-Margined Futures](https://developers.binance.com/docs/derivatives/coin-margined-futures/general-info)) using Apache Arrow MMAP for optimal performance.
 
@@ -15,18 +15,18 @@ A high-performance, robust package for efficient market data retrieval from mult
 
 ## Package Structure
 
-Data Source Manager follows modern Python packaging standards with a clean src-layout structure:
+Crypto Kline Vision Data follows modern Python packaging standards with a clean src-layout structure:
 
 ```
-data-source-manager/
+crypto-kline-vision-data/
 ├── src/
-│   └── data_source_manager/        # Main package namespace
+│   └── ckvd/        # Main package namespace
 │       ├── __init__.py             # Public API exports (lazy loading)
 │       ├── core/                   # Core functionality
 │       │   ├── sync/               # Synchronous data managers
-│       │   │   ├── data_source_manager.py  # Main DSM class with FCP
-│       │   │   ├── dsm_types.py            # DataSource, DataSourceConfig
-│       │   │   └── dsm_lib.py              # High-level fetch functions
+│       │   │   ├── crypto_kline_vision_data.py  # Main CKVD class with FCP
+│       │   │   ├── ckvd_types.py            # DataSource, CKVDConfig
+│       │   │   └── ckvd_lib.py              # High-level fetch functions
 │       │   └── providers/          # Data provider implementations
 │       │       └── binance/        # Binance-specific clients
 │       └── utils/                  # Utility modules
@@ -41,7 +41,7 @@ data-source-manager/
 
 ## Installation
 
-There are two main ways to install Data Source Manager, depending on your needs:
+There are two main ways to install Crypto Kline Vision Data, depending on your needs:
 
 ### 1. For Development or Running Demos Directly
 
@@ -49,8 +49,8 @@ If you want to run the provided demos directly from the cloned repository or use
 
 ```bash
 # Clone the repository
-git clone https://github.com/terrylica/data-source-manager.git
-cd data-source-manager
+git clone https://github.com/terrylica/crypto-kline-vision-data.git
+cd crypto-kline-vision-data
 
 # Install with uv (recommended, 10-100x faster than pip)
 uv sync --dev
@@ -65,7 +65,7 @@ This method keeps all the source files in your workspace and includes necessary 
 
 ### 2. As a Dependency in Your Project (`pyproject.toml`)
 
-If you want to use Data Source Manager as a library in your own Python project (managed with `pyproject.toml`) without including its entire source code in your project's directory, you can add it as a Git dependency.
+If you want to use Crypto Kline Vision Data as a library in your own Python project (managed with `pyproject.toml`) without including its entire source code in your project's directory, you can add it as a Git dependency.
 
 Add the following to your project's `pyproject.toml` file under the `[project.dependencies]` array (as per PEP 621):
 
@@ -74,28 +74,28 @@ Add the following to your project's `pyproject.toml` file under the `[project.de
 # ... other project configurations like name, version ...
 dependencies = [
     # ... other dependencies ...
-    "data-source-manager @ git+https://github.com/terrylica/data-source-manager.git"
+    "crypto-kline-vision-data @ git+https://github.com/terrylica/crypto-kline-vision-data.git"
     # You can also specify a particular branch, tag, or commit hash:
-    # "data-source-manager @ git+https://github.com/terrylica/data-source-manager.git@main"
-    # "data-source-manager @ git+https://github.com/terrylica/data-source-manager.git@<version>"
+    # "crypto-kline-vision-data @ git+https://github.com/terrylica/crypto-kline-vision-data.git@main"
+    # "crypto-kline-vision-data @ git+https://github.com/terrylica/crypto-kline-vision-data.git@<version>"
 ]
 ```
 
-This will install Data Source Manager into your Python environment's `site-packages` directory, keeping your project workspace clean.
+This will install Crypto Kline Vision Data into your Python environment's `site-packages` directory, keeping your project workspace clean.
 
 **Note on CLI Tools:**
-The installation process (through either method) automatically registers the CLI commands (`dsm-demo-cli` and `dsm-demo-module`) as executable scripts in your Python environment. These commands will be available in your terminal after successful installation.
+The installation process (through either method) automatically registers the CLI commands (`ckvd-demo-cli` and `ckvd-demo-module`) as executable scripts in your Python environment. These commands will be available in your terminal after successful installation.
 
 ## Usage
 
 ### Basic Usage
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 from datetime import datetime, timedelta, timezone
 
 # Create a manager for USDT-margined futures
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
 # Fetch recent BTCUSDT data with automatic failover
 # IMPORTANT: Always use UTC timezone-aware datetimes
@@ -116,7 +116,7 @@ manager.close()  # Always close when done
 
 ### Failover Control Protocol (FCP)
 
-The DSM automatically handles data retrieval through multiple sources:
+The CKVD automatically handles data retrieval through multiple sources:
 
 ```python
 # The FCP follows this sequence automatically:
@@ -125,7 +125,7 @@ The DSM automatically handles data retrieval through multiple sources:
 # 3. 🔄 REST API fallback (real-time)
 
 # All with automatic retry, data validation, and gap detection
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
 # This single call handles all the complexity:
 data = manager.get_data("ETHUSDT", start_time, end_time, Interval.MINUTE_5)
@@ -135,39 +135,39 @@ data = manager.get_data("ETHUSDT", start_time, end_time, Interval.MINUTE_5)
 ### Advanced Configuration
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
-from data_source_manager.core.sync.data_source_manager import DataSource
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
+from ckvd.core.sync.crypto_kline_vision_data import DataSource
 
 # Force specific data source (bypass FCP)
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     provider=DataProvider.BINANCE,
     market_type=MarketType.FUTURES_USDT,
     enforce_source=DataSource.VISION,  # Force Vision API only
 )
 
 # Multiple market types supported
-spot_manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
-futures_manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
-coin_manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+spot_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+futures_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+coin_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 ```
 
 ## Running the Demos
 
 Once installed, you can run the demos using the command-line tools:
 
-### DSM Demo CLI
+### CKVD Demo CLI
 
 The CLI demonstration provides an interactive way to explore the Failover Control Protocol:
 
 ```bash
-# Run the DSM Demo CLI with default parameters
-dsm-demo-cli
+# Run the CKVD Demo CLI with default parameters
+ckvd-demo-cli
 
 # Run with specific parameters (get BTC data for a 10-day period)
-dsm-demo-cli -s BTCUSDT -i 1m -d 10
+ckvd-demo-cli -s BTCUSDT -i 1m -d 10
 
 # Get help and see all available options
-dsm-demo-cli --help
+ckvd-demo-cli --help
 ```
 
 The CLI tool will automatically:
@@ -177,18 +177,18 @@ The CLI tool will automatically:
 3. Fall back to REST API for data not available in cache or Vision API
 4. Save retrieved data to cache for future use
 
-### DSM Demo Module
+### CKVD Demo Module
 
 The module demo provides a programmatic interface:
 
 ```bash
-# Run the DSM Demo Module to see examples
-dsm-demo-module
+# Run the CKVD Demo Module to see examples
+ckvd-demo-module
 ```
 
 ## Using as a Library
 
-The core data fetching functionality of Data Source Manager is available for direct import and use in your Python projects after installation.
+The core data fetching functionality of Crypto Kline Vision Data is available for direct import and use in your Python projects after installation.
 
 The main function for retrieving market data is `fetch_market_data`.
 
@@ -196,7 +196,7 @@ The main function for retrieving market data is `fetch_market_data`.
 
 ```python
 from datetime import datetime, timezone
-from data_source_manager import fetch_market_data, MarketType, DataProvider, Interval, ChartType
+from ckvd import fetch_market_data, MarketType, DataProvider, Interval, ChartType
 
 # Define parameters
 provider = DataProvider.BINANCE
@@ -232,7 +232,7 @@ This example demonstrates how to fetch data backward from a precise end time in 
 
 ```python
 import pendulum
-from data_source_manager import fetch_market_data, MarketType, DataProvider, Interval, ChartType
+from ckvd import fetch_market_data, MarketType, DataProvider, Interval, ChartType
 
 # Define parameters
 provider = DataProvider.BINANCE
@@ -265,20 +265,20 @@ if df is not None:
     print(df.head())
 ```
 
-You can import `fetch_market_data` directly from the `data_source_manager` package. The necessary enums (`MarketType`, `DataProvider`, `ChartType`, `Interval`, `DataSource`) and `DataSourceConfig` are also exposed at the top level for easy access.
+You can import `fetch_market_data` directly from the `ckvd` package. The necessary enums (`MarketType`, `DataProvider`, `ChartType`, `Interval`, `DataSource`) and `CKVDConfig` are also exposed at the top level for easy access.
 
-Refer to the source code of `data_source_manager.core.sync.dsm_lib.fetch_market_data` and `data_source_manager.core.sync.data_source_manager.DataSourceConfig` for detailed parameter information and usage.
+Refer to the source code of `ckvd.core.sync.ckvd_lib.fetch_market_data` and `ckvd.core.sync.crypto_kline_vision_data.CKVDConfig` for detailed parameter information and usage.
 
-## Data Source Manager (DSM) Demo
+## Crypto Kline Vision Data (CKVD) Demo
 
 ### Quick Start
 
-- **[DSM Demo CLI Documentation](examples/sync/)**: Interactive demonstration of the Failover Control Protocol mechanism, the core data retrieval strategy that ensures robust and efficient data collection from multiple sources.
-- **[DSM Demo Module Documentation](examples/lib_module/)**: Programmatic interface to `src/data_source_manager/core/sync/dsm_lib.py` functions, complementing the CLI tool by providing a library approach to implement the same data retrieval functionality in custom applications.
+- **[CKVD Demo CLI Documentation](examples/sync/)**: Interactive demonstration of the Failover Control Protocol mechanism, the core data retrieval strategy that ensures robust and efficient data collection from multiple sources.
+- **[CKVD Demo Module Documentation](examples/lib_module/)**: Programmatic interface to `src/ckvd/core/sync/ckvd_lib.py` functions, complementing the CLI tool by providing a library approach to implement the same data retrieval functionality in custom applications.
 
 ### Understanding Data Sources
 
-The DSM implements a Failover Control Protocol (FCP) that follows this sequence:
+The CKVD implements a Failover Control Protocol (FCP) that follows this sequence:
 
 1. **Cache**: First checks local Arrow files for requested data
 2. **VISION API**: For missing data, attempts to download from Binance Vision API
@@ -290,7 +290,7 @@ Note that recent data (within ~48 hours) is typically not available in the Visio
 
 ### Core Principles
 
-- **[Focus DSM FCP Demo Rule](.cursor/rules/focus-dsm-fcp-demo.mdc)**: The authoritative instruction file guiding the Cursor Agent to strictly adhere to the demo plan and maintain focus on the Failover Control Protocol demonstration.
+- **[Focus CKVD FCP Demo Rule](.cursor/rules/focus-ckvd-fcp-demo.mdc)**: The authoritative instruction file guiding the Cursor Agent to strictly adhere to the demo plan and maintain focus on the Failover Control Protocol demonstration.
 - [scripts/dev](scripts/dev): Contains various scripts for development and maintenance tasks.
 
 ## API Documentation
@@ -323,58 +323,58 @@ Explore the scripts and their individual READMEs within the [`scripts/dev`](scri
 
 ## Logging Control
 
-DSM now supports **loguru** for much easier log level control:
+CKVD now supports **loguru** for much easier log level control:
 
-### DSM Logging Suppression for Feature Engineering
+### CKVD Logging Suppression for Feature Engineering
 
-**Problem**: DSM produces extensive logging that clutters console output during feature engineering workflows.
+**Problem**: CKVD produces extensive logging that clutters console output during feature engineering workflows.
 
-**Solution**: Use `DSM_LOG_LEVEL=CRITICAL` to suppress all non-critical DSM logs:
+**Solution**: Use `CKVD_LOG_LEVEL=CRITICAL` to suppress all non-critical CKVD logs:
 
 ```python
 # Clean feature engineering code - no boilerplate needed!
 import os
-os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
+os.environ["CKVD_LOG_LEVEL"] = "CRITICAL"
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 
-# Create DSM instance - minimal logging
-dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+# Create CKVD instance - minimal logging
+ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
 # Fetch data - clean output, only your logs visible
-data = dsm.get_data(
+data = ckvd.get_data(
     symbol="SOLUSDT",
     start_time=start_time,
     end_time=end_time,
     interval=Interval.MINUTE_1,
 )
-# ✅ Clean output - no more cluttered DSM logs!
+# ✅ Clean output - no more cluttered CKVD logs!
 ```
 
 **Benefits**:
 
 - ✅ **No Boilerplate**: Eliminates 15+ lines of logging suppression code
 - ✅ **Clean Output**: Professional console output for feature engineering
-- ✅ **Easy Control**: Single environment variable controls all DSM logging
+- ✅ **Easy Control**: Single environment variable controls all CKVD logging
 - ✅ **Cleaner Default**: Default ERROR level provides quieter operation
 
 ### Simple Environment Variable Control
 
 ```bash
-# Clean output for feature engineering (suppress DSM logs)
-export DSM_LOG_LEVEL=CRITICAL
+# Clean output for feature engineering (suppress CKVD logs)
+export CKVD_LOG_LEVEL=CRITICAL
 
 # Normal development with basic info
-export DSM_LOG_LEVEL=INFO
+export CKVD_LOG_LEVEL=INFO
 
 # Default behavior (errors and critical only)
 # No need to set anything - ERROR is the default
 
 # Detailed debugging
-export DSM_LOG_LEVEL=DEBUG
+export CKVD_LOG_LEVEL=DEBUG
 
 # Optional: Log to file with automatic rotation
-export DSM_LOG_FILE=./logs/dsm.log
+export CKVD_LOG_FILE=./logs/ckvd.log
 
 # Run your application
 python your_script.py
@@ -383,13 +383,13 @@ python your_script.py
 ### Programmatic Control
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Set log level
 logger.configure_level("DEBUG")
 
 # Enable file logging
-logger.configure_file("./logs/dsm.log")
+logger.configure_file("./logs/ckvd.log")
 
 # Use rich formatting
 logger.info("Status: <green>SUCCESS</green>")
@@ -400,12 +400,12 @@ logger.info("Status: <green>SUCCESS</green>")
 Try the logging demos to see the benefits:
 
 ```bash
-# DSM logging control demo
+# CKVD logging control demo
 python examples/dsm_logging_demo.py
 
-# Test different log levels with actual DSM
-python examples/dsm_logging_demo.py --log-level CRITICAL --test-dsm
-python examples/dsm_logging_demo.py --log-level DEBUG --test-dsm
+# Test different log levels with actual CKVD
+python examples/dsm_logging_demo.py --log-level CRITICAL --test-ckvd
+python examples/dsm_logging_demo.py --log-level DEBUG --test-ckvd
 
 # Clean feature engineering example
 python examples/clean_feature_engineering_example.py
@@ -414,13 +414,13 @@ python examples/clean_feature_engineering_example.py
 python examples/loguru_demo.py
 
 # Environment variable control
-DSM_LOG_LEVEL=CRITICAL python examples/clean_feature_engineering_example.py
-DSM_LOG_LEVEL=DEBUG python examples/dsm_logging_demo.py --test-dsm
+CKVD_LOG_LEVEL=CRITICAL python examples/clean_feature_engineering_example.py
+CKVD_LOG_LEVEL=DEBUG python examples/dsm_logging_demo.py --test-ckvd
 ```
 
 ## Benefits of Loguru
 
-- **🎯 Easy Control**: `DSM_LOG_LEVEL=DEBUG` vs complex logging configuration
+- **🎯 Easy Control**: `CKVD_LOG_LEVEL=DEBUG` vs complex logging configuration
 - **🚀 Better Performance**: Loguru is faster than Python's standard logging
 - **🔄 Auto Rotation**: Built-in log file rotation and compression
 - **🎨 Rich Formatting**: Beautiful colored output with module/function info
@@ -428,7 +428,7 @@ DSM_LOG_LEVEL=DEBUG python examples/dsm_logging_demo.py --test-dsm
 
 ## Feature Flags
 
-DSM supports an optional feature flag for output format optimization.
+CKVD supports an optional feature flag for output format optimization.
 
 **Note**: The Polars pipeline is always active internally (`USE_POLARS_PIPELINE` was removed — see [CHANGELOG](CHANGELOG.md) for details). The only remaining flag controls the API output format.
 
@@ -437,13 +437,13 @@ DSM supports an optional feature flag for output format optimization.
 When combined with `return_polars=True`, skip pandas conversion entirely for 10-15% memory savings:
 
 ```bash
-export DSM_USE_POLARS_OUTPUT=true
+export CKVD_USE_POLARS_OUTPUT=true
 ```
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
 # Returns pl.DataFrame directly (zero-copy, skips pandas conversion)
 df = manager.get_data(
@@ -459,7 +459,7 @@ df = manager.get_data(
 
 | Flag                | Environment Variable    | Effect                  |
 | ------------------- | ----------------------- | ----------------------- |
-| `USE_POLARS_OUTPUT` | `DSM_USE_POLARS_OUTPUT` | Zero-copy Polars output |
+| `USE_POLARS_OUTPUT` | `CKVD_USE_POLARS_OUTPUT` | Zero-copy Polars output |
 
 Defaults to `False` for backward compatibility. Set to `true`, `1`, or `yes` to enable.
 

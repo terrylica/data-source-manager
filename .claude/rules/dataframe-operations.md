@@ -1,21 +1,21 @@
 ---
 paths:
-  - "src/data_source_manager/**/*.py"
+  - "src/ckvd/**/*.py"
   - "examples/**/*.py"
   - "tests/**/*.py"
 ---
 
 # DataFrame Operations Rules
 
-Guidelines for working with market data DataFrames in DSM.
+Guidelines for working with market data DataFrames in CKVD.
 
 ## Library Preference
 
-**DSM public API returns Pandas DataFrames** for backward compatibility.
+**CKVD public API returns Pandas DataFrames** for backward compatibility.
 
 ```python
-# DSM returns pd.DataFrame
-from data_source_manager import DataSourceManager
+# CKVD returns pd.DataFrame
+from ckvd import CryptoKlineVisionData
 df = manager.get_data(...)  # Returns pd.DataFrame
 
 # Internal utilities may use Polars for performance
@@ -69,7 +69,7 @@ For large datasets:
 # Use Arrow for disk storage (pandas)
 df.to_parquet("data.parquet")
 
-# For reading cached data, DSM uses memory-mapped Arrow files internally
+# For reading cached data, CKVD uses memory-mapped Arrow files internally
 # Direct parquet reading with pandas:
 df = pd.read_parquet("data.parquet")
 ```

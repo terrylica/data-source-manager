@@ -1,8 +1,8 @@
-# Data Source Manager
+# Crypto Kline Vision Data
 
 Professional market data integration with Failover Control Protocol (FCP).
 
-**Current Version**: See [GitHub Releases](https://github.com/terrylica/data-source-manager/releases)
+**Current Version**: See [GitHub Releases](https://github.com/terrylica/crypto-kline-vision-data/releases)
 
 ## Navigation
 
@@ -44,7 +44,7 @@ Run `mise run help` for full task list.
 
 ## Code Style
 
-- **Imports**: Use absolute imports with `data_source_manager.` prefix
+- **Imports**: Use absolute imports with `ckvd.` prefix
 - **Type hints**: Required for all public functions
 - **Docstrings**: Google style (enforced by ruff)
 - **Line length**: 120 characters max
@@ -55,12 +55,12 @@ Run `mise run help` for full task list.
 ## Package Architecture
 
 ```
-src/data_source_manager/
+src/ckvd/
 ├── core/
 │   ├── sync/                  # Synchronous data managers
-│   │   ├── data_source_manager.py   # Main DSM class with FCP
-│   │   ├── dsm_types.py             # DataSource, DataSourceConfig
-│   │   └── dsm_lib.py               # High-level fetch functions
+│   │   ├── crypto_kline_vision_data.py   # Main CKVD class with FCP
+│   │   ├── ckvd_types.py             # DataSource, CKVDConfig
+│   │   └── ckvd_lib.py               # High-level fetch functions
 │   └── providers/
 │       └── binance/           # Binance-specific implementations
 │           ├── vision_data_client.py    # Binance Vision API
@@ -78,8 +78,8 @@ src/data_source_manager/
 
 **Key classes**:
 
-- `DataSourceManager` - Main entry point with FCP
-- `DataSourceConfig` - Configuration for DSM instances (in `dsm_types.py`)
+- `CryptoKlineVisionData` - Main entry point with FCP
+- `CKVDConfig` - Configuration for CKVD instances (in `ckvd_types.py`)
 - `DataSource` - Enum for data source selection (AUTO, REST, VISION, CACHE)
 - `DataProvider`, `MarketType`, `Interval` - Core enums (from `utils/market/`)
 
@@ -184,7 +184,7 @@ uv sync --dev
 mise trust
 
 # Verify setup
-uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"
+uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 ```
 
 **Required for release**: Create `.mise.local.toml` from `.mise.local.toml.example` with GH_TOKEN.
@@ -203,7 +203,7 @@ uv run -p 3.13 ruff check --fix .
 uv run -p 3.13 pytest tests/unit/ -v
 
 # 3. Import check (must succeed)
-uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"
+uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 ```
 
 For data-related changes, also verify:
@@ -234,10 +234,10 @@ See `~/.claude/CLAUDE.md` for process storm prevention with subprocess calls.
 
 For detailed usage guidance, see @docs/skills/:
 
-- @docs/skills/dsm-usage/SKILL.md - DataSourceManager API usage with FCP
-- @docs/skills/dsm-testing/SKILL.md - Testing patterns and pytest markers
-- @docs/skills/dsm-research/SKILL.md - Codebase research (runs in subagent)
-- @docs/skills/dsm-fcp-monitor/SKILL.md - FCP monitoring and diagnostics
+- @docs/skills/ckvd-usage/SKILL.md - CryptoKlineVisionData API usage with FCP
+- @docs/skills/ckvd-testing/SKILL.md - Testing patterns and pytest markers
+- @docs/skills/ckvd-research/SKILL.md - Codebase research (runs in subagent)
+- @docs/skills/ckvd-fcp-monitor/SKILL.md - FCP monitoring and diagnostics
 
 ---
 
@@ -264,7 +264,7 @@ Specialized subagents for delegation (in `.claude/agents/`):
 | silent-failure-hunter | Finds silent failures and bare excepts |
 | fcp-debugger          | Diagnoses FCP issues                   |
 | api-reviewer          | Reviews code for API consistency       |
-| test-writer           | Writes tests following DSM patterns    |
+| test-writer           | Writes tests following CKVD patterns    |
 | data-fetcher          | Fetches data with proper FCP handling  |
 
 ---
@@ -277,7 +277,7 @@ Slash commands in `.claude/commands/`:
 | -------------- | --------------------------------- |
 | /debug-fcp     | Debug FCP behavior for a symbol   |
 | /quick-test    | Run quick verification tests      |
-| /review-dsm    | Review code against DSM patterns  |
+| /review-ckvd    | Review code against CKVD patterns  |
 | /fetch-data    | Fetch market data with validation |
 | /validate-data | Validate DataFrame structure      |
 | /feature-dev   | Guided feature development        |
@@ -325,7 +325,7 @@ Slash commands in `.claude/commands/`:
 
 **2026-02-01**: DRY audit identified consolidation opportunities - dual logger systems, cache function wrappers, scattered symbol validation. [RESUME.md](/docs/RESUME.md)
 
-**2026-02-01**: Example files must use `data_source_manager.` prefix imports, not relative imports from `__init__`.
+**2026-02-01**: Example files must use `ckvd.` prefix imports, not relative imports from `__init__`.
 
 **2026-01-30**: Lazy-loaded CLAUDE.md in subdirs (src/, docs/, examples/, tests/, scripts/).
 

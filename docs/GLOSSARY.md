@@ -1,12 +1,12 @@
 # Glossary
 
-Key terminology used in Data Source Manager.
+Key terminology used in Crypto Kline Vision Data.
 
 ## Core Concepts
 
 | Term       | Definition                                                                                     |
 | ---------- | ---------------------------------------------------------------------------------------------- |
-| **DSM**    | Data Source Manager - the main orchestrator class for market data retrieval                    |
+| **CKVD**    | Crypto Kline Vision Data - the main orchestrator class for market data retrieval                    |
 | **FCP**    | Failover Control Protocol - the priority-based data retrieval strategy (Cache → Vision → REST) |
 | **Klines** | Candlestick/OHLCV data (Open, High, Low, Close, Volume)                                        |
 | **OHLCV**  | Open, High, Low, Close, Volume - standard candlestick data columns                             |
@@ -79,4 +79,4 @@ Key terminology used in Data Source Manager.
 | **ChartType**        | Enum for chart data types (KLINES, FUNDING_RATE, OKX_CANDLES, OKX_HISTORY_CANDLES) |
 | **Interval**         | Enum for candle timeframes (1s to 1M)                                              |
 | **DataSource**       | Enum for FCP source selection (AUTO, CACHE, VISION, REST)                          |
-| **DataSourceConfig** | Configuration dataclass for DSM instances                                          |
+| **CKVDConfig** | Configuration dataclass for CKVD instances                                          |

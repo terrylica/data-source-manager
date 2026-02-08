@@ -4,7 +4,7 @@
 
 <!-- SSoT-OK: Version references are documentation of test environment -->
 
-**DSM Version**: 2.0.2
+**CKVD Version**: 2.0.2
 **Test Environment**: macOS darwin/arm64
 
 ---

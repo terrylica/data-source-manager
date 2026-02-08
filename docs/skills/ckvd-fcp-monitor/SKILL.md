@@ -1,5 +1,5 @@
 ---
-name: dsm-fcp-monitor
+name: ckvd-fcp-monitor
 description: Monitor and diagnose FCP (Failover Control Protocol) behavior, cache health, and data source performance. TRIGGERS - FCP issues, cache problems, slow data, Vision API errors, REST fallback, data source debugging.
 argument-hint: "[symbol] [market-type]"
 user-invocable: true
@@ -16,13 +16,13 @@ Monitor and diagnose Failover Control Protocol behavior for: $ARGUMENTS
 
 ```bash
 # Check FCP behavior for a symbol
-uv run -p 3.13 python docs/skills/dsm-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h
 
 # Check cache health
-uv run -p 3.13 python docs/skills/dsm-fcp-monitor/scripts/cache_health.py
+uv run -p 3.13 python docs/skills/ckvd-fcp-monitor/scripts/cache_health.py
 
 # Monitor FCP source distribution
-uv run -p 3.13 python docs/skills/dsm-fcp-monitor/scripts/fcp_stats.py --symbol BTCUSDT
+uv run -p 3.13 python docs/skills/ckvd-fcp-monitor/scripts/fcp_stats.py --symbol BTCUSDT
 ```
 
 ## FCP Decision Flow
@@ -61,10 +61,10 @@ Raise DataSourceError
 
 ```bash
 # Check cache directory exists and has data
-ls -la ~/.cache/data_source_manager/binance/futures_usdt/klines/daily/BTCUSDT/1h/
+ls -la ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/1h/
 
 # Verify cache permissions
-stat ~/.cache/data_source_manager/
+stat ~/.cache/ckvd/
 ```
 
 **Solutions**:
@@ -105,10 +105,10 @@ Pre-populate cache for frequently accessed symbols:
 
 ```python
 from datetime import datetime, timedelta, timezone
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 
 symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
 end = datetime.now(timezone.utc) - timedelta(days=2)  # Avoid recent data
 start = end - timedelta(days=365)
@@ -129,7 +129,7 @@ Fetch multiple symbols efficiently:
 from concurrent.futures import ThreadPoolExecutor
 
 def fetch_symbol(symbol: str) -> tuple[str, int]:
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
     df = manager.get_data(symbol=symbol, start_time=start, end_time=end, interval=Interval.HOUR_1)
     manager.close()
     return symbol, len(df)
@@ -150,5 +150,5 @@ with ThreadPoolExecutor(max_workers=3) as executor:
 
 - @.claude/rules/fcp-protocol.md - FCP decision logic
 - @.claude/rules/caching-patterns.md - Cache structure
-- @docs/skills/dsm-usage/references/debugging.md - General debugging
+- @docs/skills/ckvd-usage/references/debugging.md - General debugging
 - @./references/evolution-log.md - Skill improvement history

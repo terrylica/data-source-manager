@@ -117,7 +117,7 @@ def try_unblock_task(task):
 1. **Always Use**:
 
    ```python
-   from data_source_manager.utils.network_utils import safely_close_client
+   from ckvd.utils.network_utils import safely_close_client
 
    async with AsyncSession() as client:
        # client usage

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# DSM Bash Guard - PreToolUse hook for data-source-manager
-# Validates bash commands before execution for DSM-specific safety
+# CKVD Bash Guard - PreToolUse hook for crypto-kline-vision-data
+# Validates bash commands before execution for CKVD-specific safety
 #
 # Exit codes:
 #   0 = allow execution
@@ -21,14 +21,14 @@ if [[ -z "$COMMAND" ]]; then
 fi
 
 # Check 1: Block destructive cache operations without confirmation
-if echo "$COMMAND" | grep -qE 'rm\s+-rf.*\.cache/data_source_manager'; then
+if echo "$COMMAND" | grep -qE 'rm\s+-rf.*\.cache/ckvd'; then
     echo '{"decision": "block", "reason": "🛑 Destructive cache operation detected. Use mise run cache:clear instead."}' >&2
     exit 2
 fi
 
 # Check 2: Warn about Python version changes
 if echo "$COMMAND" | grep -qE '(pyenv|mise)\s+(global|local)\s+python'; then
-    echo '{"decision": "block", "reason": "🛑 Python version change detected. DSM requires Python 3.13 ONLY. Do not change the Python version."}' >&2
+    echo '{"decision": "block", "reason": "🛑 Python version change detected. CKVD requires Python 3.13 ONLY. Do not change the Python version."}' >&2
     exit 2
 fi
 

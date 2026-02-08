@@ -1,6 +1,6 @@
 # Examples
 
-Runnable examples demonstrating Data Source Manager functionality.
+Runnable examples demonstrating Crypto Kline Vision Data functionality.
 
 ## Quick Start
 
@@ -43,7 +43,7 @@ All examples use Python 3.13:
 uv run -p 3.13 python examples/<example_name>.py
 
 # Run with debug logging
-DSM_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/quick_start.py
+CKVD_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/quick_start.py
 ```
 
 ## Key Patterns
@@ -64,7 +64,7 @@ end_time = datetime.now()  # No timezone info!
 ### Always Close Manager
 
 ```python
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 try:
     df = manager.get_data(symbol="BTCUSDT", ...)
 finally:
@@ -82,5 +82,5 @@ finally:
 ## Related Documentation
 
 - [CLAUDE.md](/CLAUDE.md) - Main project reference
-- [docs/skills/dsm-usage/](/docs/skills/dsm-usage/) - Usage skill with examples
+- [docs/skills/ckvd-usage/](/docs/skills/ckvd-usage/) - Usage skill with examples
 - [docs/TROUBLESHOOTING.md](/docs/TROUBLESHOOTING.md) - Common issues

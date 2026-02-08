@@ -1,6 +1,6 @@
-# Applying Python Package Principles to Data Source Manager
+# Applying Python Package Principles to Crypto Kline Vision Data
 
-This guide provides a step-by-step approach to applying Python package principles to the Data Source Manager codebase. It includes specific examples from the codebase and practical advice for implementation.
+This guide provides a step-by-step approach to applying Python package principles to the Crypto Kline Vision Data codebase. It includes specific examples from the codebase and practical advice for implementation.
 
 ## Getting Started
 
@@ -9,12 +9,12 @@ This guide provides a step-by-step approach to applying Python package principle
 Start by prioritizing modules for documentation enhancement:
 
 1. **Core API Modules**: Focus first on modules directly exposed to users
-   - `src/data_source_manager/core/sync/dsm_lib.py` (contains `fetch_market_data`)
-   - `src/data_source_manager/core/sync/data_source_manager.py` (core implementation)
+   - `src/ckvd/core/sync/ckvd_lib.py` (contains `fetch_market_data`)
+   - `src/ckvd/core/sync/crypto_kline_vision_data.py` (core implementation)
 
 2. **Public Interface Modules**: Modules that define public interfaces
-   - `src/data_source_manager/utils/market_constraints.py` (defines enums used in the API)
-   - `src/data_source_manager/utils/dataframe_types.py` (defines data types)
+   - `src/ckvd/utils/market_constraints.py` (defines enums used in the API)
+   - `src/ckvd/utils/dataframe_types.py` (defines data types)
 
 3. **Example Modules**: Modules that demonstrate usage
    - `examples/sync/dsm_demo_cli.py`
@@ -25,7 +25,7 @@ Start by prioritizing modules for documentation enhancement:
 Ensure the top-level `__init__.py` file provides a clear overview of the package:
 
 ```python
-"""Data Source Manager package for efficient market data retrieval.
+"""Crypto Kline Vision Data package for efficient market data retrieval.
 
 This package provides tools for downloading and caching market data from Binance Vision.
 The primary interface is the fetch_market_data function, which implements the
@@ -39,7 +39,7 @@ Key Features:
 - Column-based data access
 
 Example:
-    >>> from data_source_manager import fetch_market_data, MarketType, DataProvider, Interval, ChartType
+    >>> from ckvd import fetch_market_data, MarketType, DataProvider, Interval, ChartType
     >>> from datetime import datetime
     >>>
     >>> df, elapsed_time, records_count = fetch_market_data(
@@ -55,17 +55,17 @@ Example:
 """
 
 # Import and expose public API
-from data_source_manager.core.providers.binance.vision_data_client import VisionDataClient
-from data_source_manager.core.sync.data_source_manager import DataSource, DataSourceConfig
-from data_source_manager.core.sync.dsm_lib import fetch_market_data
-from data_source_manager.utils.dataframe_types import TimestampedDataFrame
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.core.providers.binance.vision_data_client import VisionDataClient
+from ckvd.core.sync.crypto_kline_vision_data import DataSource, CKVDConfig
+from ckvd.core.sync.ckvd_lib import fetch_market_data
+from ckvd.utils.dataframe_types import TimestampedDataFrame
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 __all__ = [
     "ChartType",
     "DataProvider",
     "DataSource",
-    "DataSourceConfig",
+    "CKVDConfig",
     "Interval",
     "MarketType",
     "TimestampedDataFrame",
@@ -78,12 +78,12 @@ __all__ = [
 
 ### Example: Enhancing a Core Module
 
-Here's how to enhance documentation for a core module like `dsm_lib.py`:
+Here's how to enhance documentation for a core module like `ckvd_lib.py`:
 
 ```python
-"""Data Source Manager library interface module.
+"""Crypto Kline Vision Data library interface module.
 
-This module provides the primary high-level interface for the Data Source Manager,
+This module provides the primary high-level interface for the Crypto Kline Vision Data,
 implementing the Failover Control Protocol (FCP) for robust data retrieval.
 
 The FCP mechanism consists of three integrated phases:
@@ -95,7 +95,7 @@ The main entry point is the fetch_market_data function, which orchestrates
 data retrieval from all available sources based on the provided parameters.
 
 Example:
-    >>> from data_source_manager import fetch_market_data, MarketType, DataProvider, Interval, ChartType
+    >>> from ckvd import fetch_market_data, MarketType, DataProvider, Interval, ChartType
     >>> from datetime import datetime
     >>>
     >>> df, elapsed_time, records_count = fetch_market_data(
@@ -176,7 +176,7 @@ For configuration objects, use `attrs` with validators and clear documentation:
 
 ```python
 @attr.s(auto_attribs=True, slots=True, frozen=True)
-class DataSourceConfig:
+class CKVDConfig:
     """Configuration for data source retrieval.
 
     This class encapsulates the configuration for data source retrieval,
@@ -194,7 +194,7 @@ class DataSourceConfig:
         timeout_seconds: Timeout for network operations in seconds
 
     Example:
-        >>> config = DataSourceConfig(
+        >>> config = CKVDConfig(
         ...     provider=DataProvider.BINANCE,
         ...     market_type=MarketType.SPOT,
         ...     chart_type=ChartType.KLINES,
@@ -254,7 +254,7 @@ from typing import Optional
 from datetime import datetime
 
 app = typer.Typer(
-    help="Data Source Manager CLI demo tool",
+    help="Crypto Kline Vision Data CLI demo tool",
     add_completion=False,
 )
 
@@ -289,7 +289,7 @@ def main(
 ):
     """Fetch and display market data using the Failover Control Protocol.
 
-    This demo tool demonstrates the Data Source Manager's ability to retrieve
+    This demo tool demonstrates the Crypto Kline Vision Data's ability to retrieve
     market data from multiple sources using a progressive approach that
     prioritizes speed and reliability:
 
@@ -299,9 +299,9 @@ def main(
 
     Example usage:
 
-        dsm-demo-cli -s BTCUSDT -i 1m -d 10
+        ckvd-demo-cli -s BTCUSDT -i 1m -d 10
 
-        dsm-demo-cli --symbol ETHUSDT --interval 1h --days 5 --no-cache
+        ckvd-demo-cli --symbol ETHUSDT --interval 1h --days 5 --no-cache
     """
     # Command implementation...
 ```

@@ -1,15 +1,15 @@
-# Data Source Manager Overview
+# Crypto Kline Vision Data Overview
 
 ## Data Retrieval Process
 
-The Data Source Manager (DSM) acts as a central mediator between the application and various data sources across different providers. It supports flexible data retrieval for multiple market types and chart types, ensuring a unified interface regardless of the underlying data source.
+The Crypto Kline Vision Data (CKVD) acts as a central mediator between the application and various data sources across different providers. It supports flexible data retrieval for multiple market types and chart types, ensuring a unified interface regardless of the underlying data source.
 
 ### Architecture Overview
 
 ```diagram
 ┌─────────────────┐     ┌───────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                   │     │                 │     │                 │
-│  Application    │────▶│  DataSourceManager│────▶│ DataClientFactory ───▶│Specific DataClient│
+│  Application    │────▶│  CryptoKlineVisionData│────▶│ DataClientFactory ───▶│Specific DataClient│
 │                 │     │                   │     │                 │     │                 │
 └─────────────────┘     └───────────────────┘     └─────────────────┘     └─────────────────┘
                                                                                    │
@@ -33,7 +33,7 @@ The Data Source Manager (DSM) acts as a central mediator between the application
 
 ### Multi-Provider Support
 
-The DSM now supports multiple data providers through:
+The CKVD now supports multiple data providers through:
 
 1. **Provider Enum**: A hierarchical enum structure in `market_constraints.py` defines available providers
 2. **Abstract Interface**: All data clients implement the `DataClientInterface` abstract base class
@@ -49,7 +49,7 @@ Different chart types are supported through:
 
 ### REST API Pathway
 
-For recent data, DSM utilizes REST API clients:
+For recent data, CKVD utilizes REST API clients:
 
 1. Start and end timestamps are passed directly to the REST API
 2. Appropriate API endpoint is selected based on market type, provider, and chart type
@@ -57,7 +57,7 @@ For recent data, DSM utilizes REST API clients:
 
 ### Vision API Pathway
 
-For historical data, DSM utilizes Vision API clients:
+For historical data, CKVD utilizes Vision API clients:
 
 1. Vision API is used for data older than `VISION_DATA_DELAY_HOURS` (48 hours)
 2. Organized by provider, market type, and chart type
@@ -105,7 +105,7 @@ The revised architecture offers several improvements:
 3. **Unified Interface**: Consistent API regardless of underlying provider
 4. **Optimized Performance**: Provider-specific optimizations without interface changes
 
-By using a factory pattern with abstract interfaces, the DSM isolates clients from the specifics of data retrieval while maintaining a consistent, predictable interface.
+By using a factory pattern with abstract interfaces, the CKVD isolates clients from the specifics of data retrieval while maintaining a consistent, predictable interface.
 
 ## Centralized Timeout Handling
 
@@ -130,7 +130,7 @@ The system implements a robust centralized timeout handling architecture to ensu
 
 ### Timeout Configuration
 
-A centralized timeout constant `MAX_TIMEOUT` in `src/data_source_manager/utils/config.py` provides a system-wide maximum timeout value (currently 9.0 seconds).
+A centralized timeout constant `MAX_TIMEOUT` in `src/ckvd/utils/config.py` provides a system-wide maximum timeout value (currently 9.0 seconds).
 
 ### Client-Specific Implementation
 

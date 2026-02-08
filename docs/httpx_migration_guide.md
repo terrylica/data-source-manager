@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how to migrate from `curl_cffi` to `httpx` to resolve hanging issues in the Data Source Manager library, particularly in Python 3.13.
+This guide explains how to migrate from `curl_cffi` to `httpx` to resolve hanging issues in the Crypto Kline Vision Data library, particularly in Python 3.13.
 
 ## Background
 
@@ -22,14 +22,14 @@ Switching to `httpx` provides a more reliable alternative that:
 
 ### Option 1: Use the Built-in Parameter
 
-The simplest way to switch is to use the `use_httpx` parameter when creating a `DataSourceManager`:
+The simplest way to switch is to use the `use_httpx` parameter when creating a `CryptoKlineVisionData`:
 
 ```python
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.market_constraints import MarketType
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.market_constraints import MarketType
 
-# Create a DataSourceManager with httpx
-manager = DataSourceManager(
+# Create a CryptoKlineVisionData with httpx
+manager = CryptoKlineVisionData(
     market_type=MarketType.SPOT,
     use_httpx=True  # Use httpx instead of curl_cffi
 )
@@ -43,8 +43,8 @@ with manager:
 This parameter is also available on the `RestDataClient` class:
 
 ```python
-from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
-from data_source_manager.utils.market_constraints import MarketType
+from ckvd.core.providers.binance.rest_data_client import RestDataClient
+from ckvd.utils.market_constraints import MarketType
 
 # Create a RestDataClient with httpx
 client = RestDataClient(
@@ -63,9 +63,9 @@ with client:
 For more control, you can create a custom `httpx` client:
 
 ```python
-from data_source_manager.utils.network_utils import create_httpx_client
-from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
-from data_source_manager.utils.market_constraints import MarketType
+from ckvd.utils.network_utils import create_httpx_client
+from ckvd.core.providers.binance.rest_data_client import RestDataClient
+from ckvd.utils.market_constraints import MarketType
 
 # Create a custom httpx client
 custom_client = create_httpx_client(

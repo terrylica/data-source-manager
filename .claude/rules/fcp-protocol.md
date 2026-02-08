@@ -1,9 +1,9 @@
 ---
 adr: docs/adr/2025-01-30-failover-control-protocol.md
 paths:
-  - "src/data_source_manager/core/sync/**/*.py"
-  - "src/data_source_manager/core/providers/**/*.py"
-  - "docs/skills/dsm-fcp-monitor/**/*"
+  - "src/ckvd/core/sync/**/*.py"
+  - "src/ckvd/core/providers/**/*.py"
+  - "docs/skills/ckvd-fcp-monitor/**/*"
   - "tests/**/test_fcp*.py"
 ---
 
@@ -72,13 +72,13 @@ Enable debug logging:
 
 ```python
 import os
-# Set before importing DSM
-os.environ["DSM_LOG_LEVEL"] = "DEBUG"
+# Set before importing CKVD
+os.environ["CKVD_LOG_LEVEL"] = "DEBUG"
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
 # Or configure after creation
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT,
     log_level="DEBUG",
@@ -93,7 +93,7 @@ Check FCP decisions:
 
 ```bash
 # Run diagnostic script
-uv run -p 3.13 python docs/skills/dsm-usage/scripts/diagnose_fcp.py BTCUSDT FUTURES_USDT 1h
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT FUTURES_USDT 1h
 ```
 
 ## Common FCP Issues

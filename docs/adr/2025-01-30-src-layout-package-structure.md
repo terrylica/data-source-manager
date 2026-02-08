@@ -10,7 +10,7 @@ research-method: Codebase analysis + Python packaging best practices
 
 ## Context and Problem Statement
 
-The data-source-manager package needed a professional package structure that:
+The crypto-kline-vision-data package needed a professional package structure that:
 
 - Prevents accidental imports from the development directory
 - Ensures installed package matches the source exactly
@@ -20,14 +20,14 @@ The data-source-manager package needed a professional package structure that:
 ## Decision Drivers
 
 - Prevent test code from accidentally importing from wrong location
-- Ensure `python -c "import data_source_manager"` always loads installed version
+- Ensure `python -c "import ckvd"` always loads installed version
 - Follow PEP 517/518 build system standards
-- Support proper namespace for `data_source_manager.core.sync.*` imports
+- Support proper namespace for `ckvd.core.sync.*` imports
 
 ## Considered Options
 
-1. **Flat layout** - Package at repository root (`data_source_manager/`)
-2. **src-layout** - Package in `src/` subdirectory (`src/data_source_manager/`)
+1. **Flat layout** - Package at repository root (`ckvd/`)
+2. **src-layout** - Package in `src/` subdirectory (`src/ckvd/`)
 
 ## Decision Outcome
 
@@ -50,9 +50,9 @@ Chosen option: **src-layout** because it prevents the common "works in dev, fail
 ## Implementation
 
 ```
-data-source-manager/
+crypto-kline-vision-data/
 ├── src/
-│   └── data_source_manager/      # The actual package
+│   └── ckvd/      # The actual package
 │       ├── __init__.py
 │       ├── core/
 │       └── utils/
@@ -66,7 +66,7 @@ pyproject.toml configuration:
 ```toml
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["data_source_manager*"]
+include = ["ckvd*"]
 
 [tool.setuptools.package-dir]
 "" = "src"

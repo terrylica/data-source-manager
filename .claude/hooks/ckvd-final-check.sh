@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DSM Final Validation Hook (Stop)
+# CKVD Final Validation Hook (Stop)
 # Runs final checks when Claude Code session ends or task completes
 #
 # Exit codes:
@@ -17,11 +17,11 @@ CHECKS_FAILED=0
 MESSAGES=()
 
 # Check 1: Verify imports work
-if uv run -p 3.13 python -c "from data_source_manager import DataSourceManager" >/dev/null 2>&1; then
+if uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData" >/dev/null 2>&1; then
     ((CHECKS_PASSED++))
 else
     ((CHECKS_FAILED++))
-    MESSAGES+=("❌ Import check failed - run: uv run -p 3.13 python -c 'from data_source_manager import DataSourceManager'")
+    MESSAGES+=("❌ Import check failed - run: uv run -p 3.13 python -c 'from ckvd import CryptoKlineVisionData'")
 fi
 
 # Check 2: Quick lint check (non-blocking, just informational)

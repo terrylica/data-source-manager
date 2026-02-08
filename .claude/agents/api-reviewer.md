@@ -1,15 +1,15 @@
 ---
 name: api-reviewer
-description: Use proactively after writing or modifying code. Reviews code changes for API consistency, data handling patterns, HTTP timeouts, and DSM anti-patterns.
+description: Use proactively after writing or modifying code. Reviews code changes for API consistency, data handling patterns, HTTP timeouts, and CKVD anti-patterns.
 tools: Read, Grep, Glob
 model: sonnet
 permissionMode: plan
 color: red
 skills:
-  - dsm-usage
+  - ckvd-usage
 ---
 
-You are a code reviewer specializing in the Data Source Manager package.
+You are a code reviewer specializing in the Crypto Kline Vision Data package.
 
 ## Review Focus Areas
 
@@ -50,9 +50,9 @@ now = datetime.now(timezone.utc)
 
 ## Key Files to Check
 
-- `src/data_source_manager/core/sync/data_source_manager.py` - Main FCP logic
-- `src/data_source_manager/core/providers/binance/*` - Provider implementations
-- `src/data_source_manager/utils/network_utils.py` - HTTP utilities
+- `src/ckvd/core/sync/crypto_kline_vision_data.py` - Main FCP logic
+- `src/ckvd/core/providers/binance/*` - Provider implementations
+- `src/ckvd/utils/network_utils.py` - HTTP utilities
 
 ## Verification Steps
 

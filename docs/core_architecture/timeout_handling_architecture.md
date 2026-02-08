@@ -2,7 +2,7 @@
 
 ## Overview
 
-The centralized timeout handling system in Data Source Manager provides a consistent, reliable approach to managing network operations with proper time constraints. This architecture ensures that all data retrieval operations have uniform timeout behavior, detailed logging of timeout incidents, and clean resource management when timeouts occur.
+The centralized timeout handling system in Crypto Kline Vision Data provides a consistent, reliable approach to managing network operations with proper time constraints. This architecture ensures that all data retrieval operations have uniform timeout behavior, detailed logging of timeout incidents, and clean resource management when timeouts occur.
 
 ```diagram
 ┌─────────────────┐      ┌─────────────────────┐      ┌─────────────────────────┐
@@ -25,7 +25,7 @@ The centralized timeout handling system in Data Source Manager provides a consis
 
 ### 1. Centralized Timeout Configuration
 
-The system uses a centralized timeout constant defined in `src/data_source_manager/utils/config.py`:
+The system uses a centralized timeout constant defined in `src/ckvd/utils/config.py`:
 
 ```python
 MAX_TIMEOUT: Final = 9.0  # Maximum timeout for any individual operation
@@ -39,7 +39,7 @@ Key features:
 
 ### 2. Specialized Timeout Logging
 
-The `src/data_source_manager/utils/logger_setup.py` module implements specialized logging for timeout events:
+The `src/ckvd/utils/logger_setup.py` module implements specialized logging for timeout events:
 
 ```python
 def log_timeout(self, operation: str, timeout_value: float, details: dict = None):

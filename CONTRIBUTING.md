@@ -1,4 +1,4 @@
-# Contributing to Data Source Manager
+# Contributing to Crypto Kline Vision Data
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -15,8 +15,8 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # Clone the repository
-git clone https://github.com/terrylica/data-source-manager.git
-cd data-source-manager
+git clone https://github.com/terrylica/crypto-kline-vision-data.git
+cd crypto-kline-vision-data
 
 # Install dependencies
 uv sync --dev
@@ -25,7 +25,7 @@ uv sync --dev
 mise trust
 
 # Verify setup
-uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"
+uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 ```
 
 ## Development Workflow
@@ -94,7 +94,7 @@ feat: implement new feature
 Description of what was done.
 
 SRED-Type: support-work
-SRED-Claim: DSM-FEATURE
+SRED-Claim: CKVD-FEATURE
 ```
 
 Valid SRED-Type values:
@@ -106,7 +106,7 @@ Valid SRED-Type values:
 ## Code Style
 
 - **Python version**: 3.13 ONLY (never use other versions)
-- **Imports**: Absolute imports with `data_source_manager.` prefix
+- **Imports**: Absolute imports with `ckvd.` prefix
 - **Type hints**: Required for all public functions
 - **Docstrings**: Google style
 - **Line length**: 120 characters
@@ -115,9 +115,9 @@ Valid SRED-Type values:
 ## Project Structure
 
 ```
-src/data_source_manager/
+src/ckvd/
 ├── core/
-│   ├── sync/              # Synchronous data managers (DSM, dsm_lib)
+│   ├── sync/              # Synchronous data managers (CKVD, ckvd_lib)
 │   └── providers/         # Data provider implementations (Binance, etc.)
 └── utils/                 # Utility modules
 ```

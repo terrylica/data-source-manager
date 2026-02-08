@@ -7,10 +7,10 @@ Minimal examples for common data retrieval tasks.
 ```python
 from datetime import datetime, timedelta, timezone
 
-from data_source_manager import DataSourceManager, DataProvider, Interval, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, Interval, MarketType
 
 # Create manager
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT
 )
@@ -51,19 +51,19 @@ for symbol in symbols:
 
 ```python
 # Spot market
-spot_manager = DataSourceManager.create(
+spot_manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.SPOT
 )
 
 # USDT-margined futures
-usdt_manager = DataSourceManager.create(
+usdt_manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT
 )
 
 # Coin-margined futures (different symbol format!)
-coin_manager = DataSourceManager.create(
+coin_manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_COIN
 )
@@ -80,7 +80,7 @@ df = coin_manager.get_data(
 ## Available Intervals
 
 ```python
-from data_source_manager import Interval
+from ckvd import Interval
 
 # Common intervals
 Interval.MINUTE_1    # 1 minute

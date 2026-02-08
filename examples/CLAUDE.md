@@ -1,6 +1,6 @@
 # Examples Directory
 
-Context-specific instructions for working with DSM examples.
+Context-specific instructions for working with CKVD examples.
 
 **Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [src/](../src/CLAUDE.md) | [tests/](../tests/CLAUDE.md) | [docs/](../docs/CLAUDE.md)
 
@@ -13,7 +13,7 @@ Context-specific instructions for working with DSM examples.
 uv run -p 3.13 python examples/quick_start.py
 
 # Run with debug logging
-DSM_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/dsm_logging_demo.py
+CKVD_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/dsm_logging_demo.py
 ```
 
 ---
@@ -32,7 +32,7 @@ DSM_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/dsm_logging_demo.py
 
 ## Example Conventions
 
-1. **Use package imports**: `from data_source_manager import ...` (NOT relative imports)
+1. **Use package imports**: `from ckvd import ...` (NOT relative imports)
 2. **Always use UTC datetimes**: `datetime.now(timezone.utc)`
 3. **Always close managers**: `manager.close()` or use context managers
 4. **Include helpful comments**: Examples are documentation
@@ -46,10 +46,10 @@ DSM_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/dsm_logging_demo.py
 ### Basic Fetch
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 from datetime import datetime, timedelta, timezone
 
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 end = datetime.now(timezone.utc)
 start = end - timedelta(days=7)
 
@@ -61,7 +61,7 @@ manager.close()
 ### With Error Handling
 
 ```python
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
+from ckvd.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
 
 try:
     df = manager.get_data(symbol, start, end, interval)
@@ -77,5 +77,5 @@ finally:
 
 ## Related
 
-- @docs/skills/dsm-usage/SKILL.md - Full API usage guide
-- @docs/skills/dsm-usage/examples/ - More detailed examples
+- @docs/skills/ckvd-usage/SKILL.md - Full API usage guide
+- @docs/skills/ckvd-usage/examples/ - More detailed examples

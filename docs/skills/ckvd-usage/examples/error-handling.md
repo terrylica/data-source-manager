@@ -1,17 +1,17 @@
 # Error Handling Examples
 
-Proper error handling patterns for DSM operations.
+Proper error handling patterns for CKVD operations.
 
 ## Basic Try/Except Pattern
 
 ```python
 from datetime import datetime, timedelta, timezone
 
-from data_source_manager import DataSourceManager, DataProvider, Interval, MarketType
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
-from data_source_manager.utils.for_core.vision_exceptions import VisionDataNotFoundError
+from ckvd import CryptoKlineVisionData, DataProvider, Interval, MarketType
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.for_core.vision_exceptions import VisionDataNotFoundError
 
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT
 )
@@ -41,7 +41,7 @@ except Exception as e:
 ## Validate Symbol Format Before Fetch
 
 ```python
-from data_source_manager.utils.market_constraints import validate_symbol_for_market_type
+from ckvd.utils.market_constraints import validate_symbol_for_market_type
 
 symbol = "BTCUSDT"
 market_type = MarketType.FUTURES_COIN
@@ -80,13 +80,13 @@ assert not df.index.has_duplicates, "Duplicate timestamps"
 ## Timeout Handling
 
 ```python
-# DSM uses httpx internally with retry logic
+# CKVD uses httpx internally with retry logic
 # The retry_count parameter controls how many times failed requests are retried
 
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
 # Create manager with higher retry count for unreliable networks
-manager = DataSourceManager.create(
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT,
     retry_count=5  # Number of retry attempts (default is 3)

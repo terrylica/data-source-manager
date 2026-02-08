@@ -1,6 +1,6 @@
 # Performance Benchmarks
 
-Comprehensive performance benchmarks for Data Source Manager v2.0+.
+Comprehensive performance benchmarks for Crypto Kline Vision Data v2.0+.
 
 ## Executive Summary
 
@@ -51,7 +51,7 @@ Compares Polars `.collect(engine='streaming')` vs `.collect()` (in-memory).
 
 **Summary**: In-Memory is 1.07x faster for pure CPU-bound operations
 
-#### Part 2: Real DSM Data (Full FCP Flow)
+#### Part 2: Real CKVD Data (Full FCP Flow)
 
 | Scenario | In-Memory | Streaming | Speedup   |
 | -------- | --------- | --------- | --------- |
@@ -108,7 +108,7 @@ uv run -p 3.13 python docs/benchmarks/scripts/benchmark_streaming_real_data.py
 
 ## Test Environment
 
-- **DSM Version**: 2.0.2
+- **CKVD Version**: 2.0.2
 - **Platform**: macOS darwin/arm64
 - **Python**: 3.13
 - **Date**: 2026-02-05

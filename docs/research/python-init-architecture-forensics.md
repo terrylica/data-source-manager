@@ -12,10 +12,10 @@ tools: []
 
 # REQUIRED for Claude Code backtracking + context
 claude_code_uuid: b63ee484-f521-4239-8b4d-c1b1c7655bd4
-claude_code_project_path: "~/.claude/projects/-Users-terryli-eon-data-source-manager/b63ee484-f521-4239-8b4d-c1b1c7655bd4"
+claude_code_project_path: "~/.claude/projects/-Users-terryli-eon-crypto-kline-vision-data/b63ee484-f521-4239-8b4d-c1b1c7655bd4"
 
 # REQUIRED backlink metadata
-github_issue_url: https://github.com/terrylica/data-source-manager/issues/17
+github_issue_url: https://github.com/terrylica/crypto-kline-vision-data/issues/17
 ---
 
 [Sign in](https://accounts.google.com/ServiceLogin?passive=1209600&continue=https://gemini.google.com/share/e68da53f87b3&followup=https://gemini.google.com/share/e68da53f87b3&ec=GAZAkgU)

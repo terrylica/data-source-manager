@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines a plan to enhance the DataSourceManager to intelligently split data retrieval between multiple sources using a Failover Control Protocol (FCP) approach:
+This document outlines a plan to enhance the CryptoKlineVisionData to intelligently split data retrieval between multiple sources using a Failover Control Protocol (FCP) approach:
 
 1. **Cache** (highest priority) - Local Arrow files
 2. **Vision API** (for historical data, including 1s intervals in SPOT markets)
@@ -77,7 +77,7 @@ The fallback mechanism (if Vision API fails, try REST API) is already implemente
 
 1. The `_should_use_vision_api` method has been removed as it was redundant (always returning `True`).
 
-2. The DataSourceManager code now directly uses Vision API for all missing segments without conditional logic:
+2. The CryptoKlineVisionData code now directly uses Vision API for all missing segments without conditional logic:
 
    ```python
    # All missing ranges are processed by Vision API
@@ -109,7 +109,7 @@ The fallback mechanism (if Vision API fails, try REST API) is already implemente
 
 #### A. Time Range Splitting Logic
 
-Create a new method in `DataSourceManager`:
+Create a new method in `CryptoKlineVisionData`:
 
 ```python
 def _split_time_range(
@@ -522,7 +522,7 @@ async def _update_cache_with_merged_data(
 
 ## Conclusion
 
-This refactoring will enhance the DataSourceManager to intelligently retrieve data from the most appropriate sources following the Failover Control Protocol (FCP) approach: Cache first, then Vision API, followed by REST API as needed. By implementing this approach while ensuring Liskov Substitution Principle (LSP) compliance, we create a robust and efficient data retrieval system that:
+This refactoring will enhance the CryptoKlineVisionData to intelligently retrieve data from the most appropriate sources following the Failover Control Protocol (FCP) approach: Cache first, then Vision API, followed by REST API as needed. By implementing this approach while ensuring Liskov Substitution Principle (LSP) compliance, we create a robust and efficient data retrieval system that:
 
 1. Minimizes API calls by using cache whenever possible
 2. Prefers Vision API for historical data (including 1s intervals in SPOT markets)
@@ -534,5 +534,5 @@ The result will be a more resilient system that optimizes data retrieval while p
 
 ### Cleanup Tasks
 
-- **Remove `VISION_DATA_DELAY_HOURS`**: This constant is no longer needed due to the FCP approach. Ensure it is removed from `src/data_source_manager/utils/config.py` and any related logic in `src/data_source_manager/core/data_source_manager.py` is updated.
+- **Remove `VISION_DATA_DELAY_HOURS`**: This constant is no longer needed due to the FCP approach. Ensure it is removed from `src/ckvd/utils/config.py` and any related logic in `src/ckvd/core/crypto_kline_vision_data.py` is updated.
 - **Update Documentation**: Ensure all Markdown documentation referencing `VISION_DATA_DELAY_HOURS` is updated to reflect the FCP approach.

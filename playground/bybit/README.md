@@ -126,9 +126,9 @@ The downloaded data is saved to a platform-specific location determined by the `
 
 ```shell
 # Platform-specific data locations
-macOS:     ~/Documents/data_source_manager/data/bybit/{category}/{symbol}/{interval}m/
-Linux:     ~/.local/share/data_source_manager/data/bybit/{category}/{symbol}/{interval}m/
-Windows:   C:\Users\<username>\Documents\data_source_manager\data\bybit\{category}\{symbol}\{interval}m\
+macOS:     ~/Documents/ckvd/data/bybit/{category}/{symbol}/{interval}m/
+Linux:     ~/.local/share/ckvd/data/bybit/{category}/{symbol}/{interval}m/
+Windows:   C:\Users\<username>\Documents\ckvd\data\bybit\{category}\{symbol}\{interval}m\
 ```
 
 The filename follows the format: `bybit-{symbol}-{interval}m.csv` for spot markets or `bybit-{category}-{symbol}-{interval}m.csv` for other markets.
@@ -181,9 +181,9 @@ The log files are stored in platform-specific locations determined by the `platf
 
 ```shell
 # Platform-specific log locations
-macOS:     ~/Library/Logs/data_source_manager/bybit_download.log
-Linux:     ~/.local/state/data_source_manager/bybit_download.log
-Windows:   C:\Users\<username>\AppData\Local\data_source_manager\data_source_manager\Logs\bybit_download.log
+macOS:     ~/Library/Logs/ckvd/bybit_download.log
+Linux:     ~/.local/state/ckvd/bybit_download.log
+Windows:   C:\Users\<username>\AppData\Local\ckvd\ckvd\Logs\bybit_download.log
 ```
 
 Rotated logs follow the naming convention `bybit_download.{timestamp}.log.zip` and are stored in the same directory.

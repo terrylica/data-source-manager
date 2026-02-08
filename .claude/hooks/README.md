@@ -1,10 +1,10 @@
-# DSM Hooks
+# CKVD Hooks
 
-Project-specific Claude Code hooks for data-source-manager.
+Project-specific Claude Code hooks for crypto-kline-vision-data.
 
 ## Available Hooks
 
-### dsm-session-start.sh (SessionStart)
+### ckvd-session-start.sh (SessionStart)
 
 Loads FCP context at session start for immediate awareness.
 
@@ -16,31 +16,31 @@ Loads FCP context at session start for immediate awareness.
 
 **Behavior**: Adds context to Claude's initial state (stdout → context).
 
-### dsm-skill-suggest.sh (UserPromptSubmit)
+### ckvd-skill-suggest.sh (UserPromptSubmit)
 
-Analyzes user prompts and suggests relevant DSM skills based on keywords.
+Analyzes user prompts and suggests relevant CKVD skills based on keywords.
 
 **Trigger Keywords:**
 
 | Skill           | Keywords                                          |
 | --------------- | ------------------------------------------------- |
-| dsm-usage       | fetch, data, klines, OHLCV, market data, Binance  |
-| dsm-testing     | test, pytest, mock, fixture, coverage             |
-| dsm-fcp-monitor | FCP, failover, cache miss/hit, slow, diagnos      |
-| dsm-research    | how does, understand, find, explore, architecture |
+| ckvd-usage       | fetch, data, klines, OHLCV, market data, Binance  |
+| ckvd-testing     | test, pytest, mock, fixture, coverage             |
+| ckvd-fcp-monitor | FCP, failover, cache miss/hit, slow, diagnos      |
+| ckvd-research    | how does, understand, find, explore, architecture |
 
 **Behavior**: Provides suggestions via feedback (non-blocking).
 
-### dsm-bash-guard.sh (PreToolUse)
+### ckvd-bash-guard.sh (PreToolUse)
 
-Validates bash commands BEFORE execution for DSM-specific safety.
+Validates bash commands BEFORE execution for CKVD-specific safety.
 
 **Blocked Operations (exit code 2):**
 
 | Pattern                               | Reason                             |
 | ------------------------------------- | ---------------------------------- |
-| `rm -rf .cache/data_source_manager`   | Use `mise run cache:clear` instead |
-| Python version changes via pyenv/mise | DSM requires Python 3.13 ONLY      |
+| `rm -rf .cache/ckvd`   | Use `mise run cache:clear` instead |
+| Python version changes via pyenv/mise | CKVD requires Python 3.13 ONLY      |
 | Force push to main/master             | Use feature branches               |
 | Direct `pip install`                  | Use `uv add <package>`             |
 | `git reset --hard` without ref        | Dangerous without explicit commit  |
@@ -49,7 +49,7 @@ Validates bash commands BEFORE execution for DSM-specific safety.
 
 - pytest without `uv run -p 3.13`
 
-### dsm-code-guard.sh (PostToolUse)
+### ckvd-code-guard.sh (PostToolUse)
 
 Detects silent failure patterns in Python code AFTER file writes.
 
@@ -60,12 +60,12 @@ Detects silent failure patterns in Python code AFTER file writes.
 - **S110**: Silent `except: pass`
 - **PLW1510**: subprocess without `check=True`
 
-**DSM-Specific Patterns:**
+**CKVD-Specific Patterns:**
 
 - Naive `datetime.now()` without timezone
 - HTTP requests without explicit `timeout=`
-- `DataSourceManager.create()` without `manager.close()`
-- Async functions using sync `DataSourceManager` (mixing patterns)
+- `CryptoKlineVisionData.create()` without `manager.close()`
+- Async functions using sync `CryptoKlineVisionData` (mixing patterns)
 - COIN-margined symbol format (`_PERP`) with wrong market type
 - Returning DataFrame without validation (`len(df) > 0` or `df.empty`)
 - Using Pandas when Polars preferred (informational, use `# polars-exception` to suppress)
@@ -76,7 +76,7 @@ The hooks are configured in `hooks.json` with descriptions and notes:
 
 ```json
 {
-  "description": "DSM-specific hooks - enforces FCP patterns, silent failure detection",
+  "description": "CKVD-specific hooks - enforces FCP patterns, silent failure detection",
   "notes": [
     "SessionStart: Loads FCP context into every session",
     "PreToolUse: BLOCKS dangerous operations",
@@ -86,14 +86,14 @@ The hooks are configured in `hooks.json` with descriptions and notes:
     "SessionStart": [
       {
         "description": "Load FCP context at session start",
-        "hooks": [{ "command": "dsm-session-start.sh" }]
+        "hooks": [{ "command": "ckvd-session-start.sh" }]
       }
     ],
     "PreToolUse": [
       {
         "description": "Block dangerous Bash commands",
         "matcher": "Bash",
-        "hooks": [{ "command": "dsm-bash-guard.sh" }]
+        "hooks": [{ "command": "ckvd-bash-guard.sh" }]
       }
     ]
   }
@@ -142,7 +142,7 @@ Each hook entry supports a `description` field for documentation purposes.
 
 Following [cc-skills Code Correctness Policy](https://github.com/terrylica/cc-skills/blob/main/plugins/itp-hooks/CLAUDE.md#code-correctness-philosophy)
 
-### dsm-final-check.sh (Stop)
+### ckvd-final-check.sh (Stop)
 
 Runs final validation when Claude Code session ends or task completes.
 
@@ -150,7 +150,7 @@ Runs final validation when Claude Code session ends or task completes.
 
 | Check        | Purpose                               |
 | ------------ | ------------------------------------- |
-| Import check | Verify `DataSourceManager` importable |
+| Import check | Verify `CryptoKlineVisionData` importable |
 | Lint check   | Report silent failure patterns        |
 
 **Behavior**: Provides summary via feedback (non-blocking).

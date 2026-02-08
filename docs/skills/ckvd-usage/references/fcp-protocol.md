@@ -14,7 +14,7 @@ FCP automatically retrieves market data from the best available source:
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │              1. CHECK LOCAL CACHE                       │
-│  - Arrow files in ~/.cache/data_source_manager/         │
+│  - Arrow files in ~/.cache/ckvd/         │
 │  - Fastest (~1ms lookup)                                │
 │  - Returns immediately if complete                      │
 └────────────────────────┬────────────────────────────────┘
@@ -43,11 +43,11 @@ FCP automatically retrieves market data from the best available source:
 The `enforce_source` parameter is passed to `get_data()`, not `create()`:
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
-from data_source_manager.core.sync.data_source_manager import DataSource
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
+from ckvd.core.sync.crypto_kline_vision_data import DataSource
 from datetime import datetime, timedelta, timezone
 
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
 end = datetime.now(timezone.utc)
 start = end - timedelta(days=7)
@@ -85,7 +85,7 @@ manager.close()
 ## Cache Structure
 
 ```
-~/.cache/data_source_manager/
+~/.cache/ckvd/
 └── binance/
     ├── spot/
     │   └── klines/
@@ -132,7 +132,7 @@ Enable debug logging to see FCP decisions:
 
 ```python
 import os
-os.environ["DSM_LOG_LEVEL"] = "DEBUG"
+os.environ["CKVD_LOG_LEVEL"] = "DEBUG"
 
 # Now get_data() will log:
 # DEBUG - Cache hit for 2024-01-01

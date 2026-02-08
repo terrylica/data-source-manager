@@ -16,12 +16,12 @@ Implementation details for the Failover Control Protocol (FCP) that manages auto
 
 ## Core Components
 
-### DataSourceManager
+### CryptoKlineVisionData
 
-**File**: `src/data_source_manager/core/sync/data_source_manager.py`
+**File**: `src/ckvd/core/sync/crypto_kline_vision_data.py`
 
 ```python
-class DataSourceManager:
+class CryptoKlineVisionData:
     """Main entry point with FCP implementation."""
 
     def get_data(
@@ -36,15 +36,15 @@ class DataSourceManager:
 
 ### Cache Manager
 
-**File**: `src/data_source_manager/core/providers/binance/cache_manager.py`
+**File**: `src/ckvd/core/providers/binance/cache_manager.py`
 
 - Uses Apache Arrow for fast mmap reads
 - One file per day per symbol/interval
-- Path: `~/.cache/data_source_manager/{provider}/{market}/{symbol}/{interval}/{date}.arrow`
+- Path: `~/.cache/ckvd/{provider}/{market}/{symbol}/{interval}/{date}.arrow`
 
 ### Vision Client
 
-**File**: `src/data_source_manager/core/providers/binance/vision_data_client.py`
+**File**: `src/ckvd/core/providers/binance/vision_data_client.py`
 
 - FSSpec-based S3 access to Binance Vision
 - ~48h delay for new data availability
@@ -52,7 +52,7 @@ class DataSourceManager:
 
 ### REST Client
 
-**File**: `src/data_source_manager/core/providers/binance/rest_data_client.py`
+**File**: `src/ckvd/core/providers/binance/rest_data_client.py`
 
 - httpx with retry logic
 - 1200 requests/minute rate limit
@@ -62,7 +62,7 @@ class DataSourceManager:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 DataSourceManager.get_data()                │
+│                 CryptoKlineVisionData.get_data()                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼

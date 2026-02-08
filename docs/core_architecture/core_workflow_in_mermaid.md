@@ -5,7 +5,7 @@
 ```mermaid
 flowchart TD
     %% Main application flow
-    A[Application] --> B[DataSourceManager.get_data]
+    A[Application] --> B[CryptoKlineVisionData.get_data]
     B --> C[Check Cache]
 
     %% Cache handling
@@ -69,7 +69,7 @@ flowchart TD
 
 ```mermaid
 graph TD
-    A[Application] --> B[DataSourceManager]
+    A[Application] --> B[CryptoKlineVisionData]
     B --> D[Create client via DataClientFactory]
 
     D -->|VisionClient| F[Vision API Client]
@@ -108,7 +108,7 @@ graph TD
 
 ```mermaid
 graph TD
-    A[DataSourceManager.get_data] --> B{Override provider/chart_type?}
+    A[CryptoKlineVisionData.get_data] --> B{Override provider/chart_type?}
     B -->|Yes| C[Use Overridden Values]
     B -->|No| D[Use Manager Defaults]
 
@@ -172,7 +172,7 @@ graph TD
 
 ```mermaid
 graph TD
-    A[DataSourceManager.get_data] --> B{Try Source}
+    A[CryptoKlineVisionData.get_data] --> B{Try Source}
     B -->|Success| C[Return Data]
     B -->|Failure| D{Error Type}
 

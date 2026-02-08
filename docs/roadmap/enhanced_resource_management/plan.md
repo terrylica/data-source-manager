@@ -46,7 +46,7 @@ Total timeline: 3 months (Q3 2025)
 
 ### 1. Resource Tracking Framework
 
-#### 1.1 `src/data_source_manager/utils/resource_tracker.py`
+#### 1.1 `src/ckvd/utils/resource_tracker.py`
 
 Create a core module for resource tracking:
 
@@ -209,13 +209,13 @@ class ResourceAwareMemoryMonitor(MemoryMonitor):
         self._log_resource_correlation(resource_counts)
 ```
 
-#### 3.2 Integration with Data Source Manager
+#### 3.2 Integration with Crypto Kline Vision Data
 
-Enhance DataSourceManager with resource tracking:
+Enhance CryptoKlineVisionData with resource tracking:
 
 ```python
-class ResourceAwareDataSourceManager(DataSourceManager):
-    """DataSourceManager with integrated resource tracking."""
+class ResourceAwareCryptoKlineVisionData(CryptoKlineVisionData):
+    """CryptoKlineVisionData with integrated resource tracking."""
 
     def __init__(self, *args, resource_tracker=None, **kwargs):
         super().__init__(*args, **kwargs)

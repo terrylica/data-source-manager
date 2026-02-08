@@ -5,7 +5,7 @@ alwaysApply: true
 ---
 # Failover Control Protocol (FCP) Mechanism
 
-The file `core/sync/data_source_manager.py` is the orchestrator responsible for retrieving **1-minute Bitcoin data** for SPOT, UM, or CM markets. This mechanism holistically revises data retrieval by extending the legacy **Failover Control Protocol (FCP)** into an iterative merging strategy, dubbed **Failover Control Protocol (FCP)**.
+The file `core/sync/ckvd.py` is the orchestrator responsible for retrieving **1-minute Bitcoin data** for SPOT, UM, or CM markets. This mechanism holistically revises data retrieval by extending the legacy **Failover Control Protocol (FCP)** into an iterative merging strategy, dubbed **Failover Control Protocol (FCP)**.
 
 ## Mechanism Overview
 

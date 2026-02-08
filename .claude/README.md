@@ -1,6 +1,6 @@
 # Claude Code Infrastructure
 
-This directory contains Claude Code extensions for AI-assisted development of data-source-manager.
+This directory contains Claude Code extensions for AI-assisted development of crypto-kline-vision-data.
 
 ## Directory Structure
 
@@ -43,7 +43,7 @@ Agents run in separate context windows for specialized tasks.
 | --------------------- | ------ | -------------------------------------- | ---------------------------- |
 | api-reviewer          | red    | Reviews code for API consistency       | Read, Grep, Glob             |
 | data-fetcher          | green  | Fetches data with proper FCP handling  | Read, Grep, Glob, Bash       |
-| test-writer           | blue   | Writes tests following DSM patterns    | Read, Write, Edit, Bash, ... |
+| test-writer           | blue   | Writes tests following CKVD patterns    | Read, Write, Edit, Bash, ... |
 | silent-failure-hunter | red    | Finds silent failures and bare excepts | Read, Grep, Glob             |
 | fcp-debugger          | yellow | Diagnoses FCP issues                   | Read, Grep, Glob, Bash       |
 
@@ -62,7 +62,7 @@ Slash commands for common workflows.
 | -------------- | --------------------------------- |
 | /debug-fcp     | Debug FCP behavior for a symbol   |
 | /quick-test    | Run quick verification tests      |
-| /review-dsm    | Review code against DSM patterns  |
+| /review-ckvd    | Review code against CKVD patterns  |
 | /fetch-data    | Fetch market data with validation |
 | /validate-data | Validate DataFrame structure      |
 | /feature-dev   | Guided feature development        |
@@ -87,11 +87,11 @@ Project-specific hooks for code quality and safety (5 total).
 
 | Hook                 | Event            | Purpose                                    |
 | -------------------- | ---------------- | ------------------------------------------ |
-| dsm-session-start.sh | SessionStart     | Load FCP context at session start          |
-| dsm-skill-suggest.sh | UserPromptSubmit | Suggest relevant skills based on keywords  |
-| dsm-bash-guard.sh    | PreToolUse       | Block dangerous commands before execution  |
-| dsm-code-guard.sh    | PostToolUse      | Detect silent failure patterns (11 checks) |
-| dsm-final-check.sh   | Stop             | Final validation at session end            |
+| ckvd-session-start.sh | SessionStart     | Load FCP context at session start          |
+| ckvd-skill-suggest.sh | UserPromptSubmit | Suggest relevant skills based on keywords  |
+| ckvd-bash-guard.sh    | PreToolUse       | Block dangerous commands before execution  |
+| ckvd-code-guard.sh    | PostToolUse      | Detect silent failure patterns (11 checks) |
+| ckvd-final-check.sh   | Stop             | Final validation at session end            |
 
 **Blocked by PreToolUse:**
 
@@ -105,11 +105,11 @@ Project-specific hooks for code quality and safety (5 total).
 - Bare except, except Exception, except: pass
 - Subprocess without check=True
 - Naive datetime, HTTP without timeout
-- DSM-specific patterns (symbol format, DataFrame validation)
+- CKVD-specific patterns (symbol format, DataFrame validation)
 
 ## Architecture Pattern
 
-This infrastructure follows the **DSM Claude Code Infrastructure Pattern**, which can be adopted by other projects.
+This infrastructure follows the **CKVD Claude Code Infrastructure Pattern**, which can be adopted by other projects.
 
 ### Component Hierarchy
 

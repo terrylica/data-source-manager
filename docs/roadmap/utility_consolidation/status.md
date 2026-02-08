@@ -12,7 +12,7 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 
 ✅ **Status: Complete**
 
-- Created `src/data_source_manager/utils/time_utils.py` module
+- Created `src/ckvd/utils/time_utils.py` module
 - Consolidated time-related functions from:
   - `time_alignment.py`
   - `api_boundary_validator.py`
@@ -24,7 +24,7 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 
 ✅ **Status: Complete**
 
-- Created `src/data_source_manager/utils/validation_utils.py` module
+- Created `src/ckvd/utils/validation_utils.py` module
 - Consolidated validation functions from:
   - `cache_validator.py`
   - `validation.py`
@@ -36,7 +36,7 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 
 ✅ **Status: Complete**
 
-- Created `src/data_source_manager/utils/network_utils.py` module
+- Created `src/ckvd/utils/network_utils.py` module
 - Consolidated network-related functions from:
   - `http_client_factory.py`
   - `download_handler.py`
@@ -54,12 +54,12 @@ The consolidation project aims to reduce code duplication, improve maintainabili
 The following core modules have been updated to use consolidated utility modules directly:
 
 1. **Core Modules**
-   - `src/data_source_manager/core/vision_data_client.py` - Now uses consolidated utility modules directly
-   - `src/data_source_manager/core/data_source_manager.py` - Now uses consolidated utility modules directly
-   - `src/data_source_manager/core/cache_manager.py` - Now uses consolidated utility modules directly
-   - `src/data_source_manager/utils/download_handler.py` - Now uses consolidated utility modules directly
-   - `src/data_source_manager/core/vision_constraints.py` - Now uses consolidated utility modules directly
-   - `src/data_source_manager/core/rest_data_client.py` - Now uses consolidated utility modules directly
+   - `src/ckvd/core/vision_data_client.py` - Now uses consolidated utility modules directly
+   - `src/ckvd/core/crypto_kline_vision_data.py` - Now uses consolidated utility modules directly
+   - `src/ckvd/core/cache_manager.py` - Now uses consolidated utility modules directly
+   - `src/ckvd/utils/download_handler.py` - Now uses consolidated utility modules directly
+   - `src/ckvd/core/vision_constraints.py` - Now uses consolidated utility modules directly
+   - `src/ckvd/core/rest_data_client.py` - Now uses consolidated utility modules directly
 
 2. **Test Modules**
    - `tests/time_boundary/test_dsm_time_boundary_comprehensive.py` - Now uses consolidated utility modules directly
@@ -89,7 +89,7 @@ We've successfully updated several core modules to use the consolidated utility 
    - Added a backward-compatible `TimeRangeManager` class that wraps the functions from `time_utils` with deprecation warnings
    - Updated all function calls to use the consolidated functions directly
 
-2. **DataSourceManager**:
+2. **CryptoKlineVisionData**:
    - Updated imports to include functions directly from `time_utils`
    - Replaced all calls to `TimeRangeManager` functions with direct calls to the corresponding functions
    - Maintained backward compatibility by keeping the import of TimeRangeManager
@@ -210,7 +210,7 @@ scripts/op/run_tests_parallel.sh tests/time_utils
    - Successfully addressed deprecation warnings in core modules and test files
 
 4. **Core Module Updates**:
-   - Updated `vision_data_client.py`, `data_source_manager.py`, `cache_manager.py`, `download_handler.py`, `vision_constraints.py`, and `rest_data_client.py` to use consolidated modules directly
+   - Updated `vision_data_client.py`, `crypto_kline_vision_data.py`, `cache_manager.py`, `download_handler.py`, `vision_constraints.py`, and `rest_data_client.py` to use consolidated modules directly
    - Updated key test files to use consolidated functions instead of deprecated wrappers
    - Significantly reduced deprecation warnings throughout the codebase
    - Maintained backward compatibility while promoting cleaner code practices

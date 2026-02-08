@@ -1,6 +1,6 @@
 # Documentation Guide
 
-Context for working with data-source-manager documentation.
+Context for working with crypto-kline-vision-data documentation.
 
 **Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [src/](../src/CLAUDE.md) | [tests/](../tests/CLAUDE.md) | [examples/](../examples/CLAUDE.md)
 
@@ -14,7 +14,7 @@ docs/
 ├── cache_diagnostics/      ← Cache debugging and validation
 ├── core_architecture/      ← System architecture and design
 ├── data_client_interface/  ← Provider interface specifications
-├── data_source_manager/    ← DSM class documentation
+├── ckvd/    ← CKVD class documentation
 ├── debugging/              ← Debugging techniques
 ├── design/                 ← Implementation specifications (1:1 with ADRs)
 ├── howto/                  ← Step-by-step guides
@@ -61,10 +61,10 @@ Progressive disclosure skills in `docs/skills/`:
 
 | Skill                                              | Purpose                     |
 | -------------------------------------------------- | --------------------------- |
-| [dsm-usage](skills/dsm-usage/SKILL.md)             | DataSourceManager API usage |
-| [dsm-testing](skills/dsm-testing/SKILL.md)         | Testing patterns            |
-| [dsm-research](skills/dsm-research/SKILL.md)       | Codebase research           |
-| [dsm-fcp-monitor](skills/dsm-fcp-monitor/SKILL.md) | FCP monitoring              |
+| [ckvd-usage](skills/ckvd-usage/SKILL.md)             | CryptoKlineVisionData API usage |
+| [ckvd-testing](skills/ckvd-testing/SKILL.md)         | Testing patterns            |
+| [ckvd-research](skills/ckvd-research/SKILL.md)       | Codebase research           |
+| [ckvd-fcp-monitor](skills/ckvd-fcp-monitor/SKILL.md) | FCP monitoring              |
 
 ## Benchmarks
 

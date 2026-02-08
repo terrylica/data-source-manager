@@ -1,6 +1,6 @@
 ---
 name: fetch-data
-description: Fetch market data using DataSourceManager
+description: Fetch market data using CryptoKlineVisionData
 argument-hint: "[symbol] [days] [interval: 1m|5m|15m|1h|4h|1d]"
 allowed-tools: Bash, Read
 disable-model-invocation: true
@@ -19,7 +19,7 @@ Example: `BTCUSDT 7 1h` or just `ETHUSDT 30`
 ## Implementation
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 from datetime import datetime, timedelta, timezone
 
 # Parse arguments
@@ -48,7 +48,7 @@ else:
     market_type = MarketType.SPOT
 
 # Create manager and fetch
-manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 end_time = datetime.now(timezone.utc)
 start_time = end_time - timedelta(days=days)
 

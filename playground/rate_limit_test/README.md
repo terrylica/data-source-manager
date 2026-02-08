@@ -6,7 +6,7 @@ This directory contains tools for testing and analyzing Binance's API rate limit
 
 - **direct_api_test.py**: Asynchronous script that tests direct API calls to fetch kline data for multiple symbols
 - **run_direct_test.sh**: Shell script to run the API test with configurable parameters
-- **rate_limit_tester.py**: Alternative implementation using the DataSourceManager for testing
+- **rate_limit_tester.py**: Alternative implementation using the CryptoKlineVisionData for testing
 - **extract_symbols.py**: Helper script to extract symbols from CSV files
 - **symbols.txt**: List of symbols used for testing (50 symbols by default)
 

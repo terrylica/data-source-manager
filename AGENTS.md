@@ -1,4 +1,4 @@
-# AI Agent Instructions - Data Source Manager
+# AI Agent Instructions - Crypto Kline Vision Data
 
 > This file is synced with CLAUDE.md for Claude Code compatibility.
 > For Claude Code-specific features (skills, commands, agents), see CLAUDE.md.
@@ -23,15 +23,15 @@ Professional market data integration package with Failover Control Protocol (FCP
 ## Package Structure
 
 ```
-src/data_source_manager/
-├── core/sync/data_source_manager.py  # Main DSM class with FCP
+src/ckvd/
+├── core/sync/crypto_kline_vision_data.py  # Main CKVD class with FCP
 ├── core/providers/binance/           # Binance API implementations
 └── utils/market_constraints.py       # Core enums
 ```
 
 ## Code Style
 
-- Absolute imports: `from data_source_manager.utils import ...`
+- Absolute imports: `from ckvd.utils import ...`
 - Type hints required for public functions
 - Google-style docstrings
 - 120 char line length
@@ -50,7 +50,7 @@ Before completing any task:
 
 1. `uv run -p 3.13 ruff check --fix .` - Lint must pass
 2. `uv run -p 3.13 pytest tests/unit/ -v` - Tests must pass
-3. Import check: `python -c "from data_source_manager import DataSourceManager"`
+3. Import check: `python -c "from ckvd import CryptoKlineVisionData"`
 
 ## Key Documentation
 

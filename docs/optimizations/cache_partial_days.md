@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes a critical optimization in the DataSourceManager's cache handling system.
+This document describes a critical optimization in the CryptoKlineVisionData's cache handling system.
 
 ## TEST_CASE_ID: CACHE-OPT-001
 
@@ -26,11 +26,11 @@ The optimization implements a smarter check that:
 
 ### Implementation
 
-The optimization is implemented in `src/data_source_manager/utils/for_core/dsm_cache_utils.py` in the `get_from_cache` function. The critical code block is marked with `@critical_optimization: TEST_CASE_ID:CACHE-OPT-001`.
+The optimization is implemented in `src/ckvd/utils/for_core/ckvd_cache_utils.py` in the `get_from_cache` function. The critical code block is marked with `@critical_optimization: TEST_CASE_ID:CACHE-OPT-001`.
 
 ### Configuration
 
-This optimization can be enabled or disabled via the `OPTIMIZE_CACHE_PARTIAL_DAYS` feature flag in `src/data_source_manager/utils/config.py`.
+This optimization can be enabled or disabled via the `OPTIMIZE_CACHE_PARTIAL_DAYS` feature flag in `src/ckvd/utils/config.py`.
 
 ```python
 # Feature flags for critical optimizations
@@ -45,7 +45,7 @@ FEATURE_FLAGS = {
 
 This optimization is protected by:
 
-1. Unit tests in `tests/test_dsm_cache_utils.py`
+1. Unit tests in `tests/test_ckvd_cache_utils.py`
 2. Integration tests in `tests/integration/test_dsm_cache_optimization.py`
 
 All tests must pass before making any modifications to this code.
@@ -69,7 +69,7 @@ When working with this code:
 
 ## Related Components
 
-- `src/data_source_manager/utils/for_core/dsm_cache_utils.py`: Contains the optimization implementation
-- `src/data_source_manager/utils/config.py`: Contains the feature flag
-- `tests/test_dsm_cache_utils.py`: Contains unit tests
+- `src/ckvd/utils/for_core/ckvd_cache_utils.py`: Contains the optimization implementation
+- `src/ckvd/utils/config.py`: Contains the feature flag
+- `tests/test_ckvd_cache_utils.py`: Contains unit tests
 - `tests/integration/test_dsm_cache_optimization.py`: Contains integration tests

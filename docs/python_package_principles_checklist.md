@@ -1,6 +1,6 @@
 # Python Package Documentation Checklist
 
-Use this checklist to verify that modules, classes, and functions in the Data Source Manager package comply with the Python package principles.
+Use this checklist to verify that modules, classes, and functions in the Crypto Kline Vision Data package comply with the Python package principles.
 
 ## Module-Level Documentation
 

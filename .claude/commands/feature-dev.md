@@ -1,13 +1,13 @@
 ---
 name: feature-dev
-description: Guided DSM feature development with FCP-aware architecture
+description: Guided CKVD feature development with FCP-aware architecture
 argument-hint: "[feature-description]"
 allowed-tools: Read, Grep, Glob, Bash, Write, Edit
 ---
 
-# DSM Feature Development Workflow
+# CKVD Feature Development Workflow
 
-Structured approach to building features for data-source-manager with FCP awareness.
+Structured approach to building features for crypto-kline-vision-data with FCP awareness.
 
 ## Usage
 
@@ -36,9 +36,9 @@ Explore relevant existing code:
 
 **Key areas to investigate:**
 
-- `src/data_source_manager/core/sync/data_source_manager.py` - FCP logic
-- `src/data_source_manager/core/providers/binance/` - Provider implementations
-- `src/data_source_manager/utils/` - Utilities and helpers
+- `src/ckvd/core/sync/crypto_kline_vision_data.py` - FCP logic
+- `src/ckvd/core/providers/binance/` - Provider implementations
+- `src/ckvd/utils/` - Utilities and helpers
 
 **Use subagents to explore:**
 
@@ -50,7 +50,7 @@ Explore relevant existing code:
 
 Fill in gaps before designing:
 
-**DSM-specific questions to consider:**
+**CKVD-specific questions to consider:**
 
 1. Does this affect FCP fallback order?
 2. What happens if cache is corrupted?
@@ -64,7 +64,7 @@ Fill in gaps before designing:
 
 Design the implementation:
 
-**DSM architecture principles:**
+**CKVD architecture principles:**
 
 - FCP priority: Cache → Vision → REST
 - All timestamps must be UTC
@@ -103,7 +103,7 @@ uv run -p 3.13 ruff check --fix .
 uv run -p 3.13 pytest tests/unit/ -v
 
 # 3. Import check
-uv run -p 3.13 python -c "from data_source_manager import DataSourceManager; print('OK')"
+uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 ```
 
 **Use review agents:**
@@ -122,7 +122,7 @@ Document what was built:
 4. Files modified
 5. Next steps / follow-up work
 
-## DSM-Specific Checks
+## CKVD-Specific Checks
 
 Before marking complete, verify:
 

@@ -1,12 +1,12 @@
 ---
-name: dsm-usage
-description: Fetch market data using DataSourceManager with Failover Control Protocol (cache → Vision API → REST API). TRIGGERS - fetch market data, use DSM, access Binance, get klines, OHLCV data, DataSourceManager API.
+name: ckvd-usage
+description: Fetch market data using CryptoKlineVisionData with Failover Control Protocol (cache → Vision API → REST API). TRIGGERS - fetch market data, use CKVD, access Binance, get klines, OHLCV data, CryptoKlineVisionData API.
 argument-hint: "[symbol] [market-type]"
 user-invocable: true
 allowed-tools: Read, Bash
 ---
 
-# DataSourceManager Usage
+# CryptoKlineVisionData Usage
 
 Fetch market data for: $ARGUMENTS
 
@@ -15,11 +15,11 @@ Use automatic failover between data sources.
 ## Quick Start
 
 ```python
-from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
 from datetime import datetime, timedelta, timezone
 
 # Create manager for USDT-margined futures
-manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
 # Fetch data with automatic failover (cache → Vision → REST)
 # IMPORTANT: Always use UTC timezone-aware datetimes
@@ -51,7 +51,7 @@ manager.close()
 For simpler use cases, use `fetch_market_data`:
 
 ```python
-from data_source_manager import fetch_market_data, DataProvider, MarketType, Interval, ChartType
+from ckvd import fetch_market_data, DataProvider, MarketType, Interval, ChartType
 from datetime import datetime, timedelta, timezone
 
 df, elapsed_time, records_count = fetch_market_data(
@@ -79,13 +79,13 @@ Utility scripts for common operations:
 
 ```bash
 # Validate symbol format
-uv run -p 3.13 python docs/skills/dsm-usage/scripts/validate_symbol.py BTCUSDT FUTURES_COIN
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/validate_symbol.py BTCUSDT FUTURES_COIN
 
 # Check cache status
-uv run -p 3.13 python docs/skills/dsm-usage/scripts/check_cache.py BTCUSDT futures_usdt 1h
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/check_cache.py BTCUSDT futures_usdt 1h
 
 # Diagnose FCP behavior (with debug logging)
-uv run -p 3.13 python docs/skills/dsm-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h --days 3
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h --days 3
 ```
 
 ## Detailed References

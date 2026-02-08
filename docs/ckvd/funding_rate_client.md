@@ -78,24 +78,24 @@ Parameters:
 ```python
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from data_source_manager.utils.market_constraints import Interval, MarketType, ChartType, DataProvider
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
+from ckvd.utils.market_constraints import Interval, MarketType, ChartType, DataProvider
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
 
 # Set time range for data retrieval
 end_time = datetime.now(timezone.utc)
 start_time = end_time - timedelta(days=30)  # Last 30 days of funding rate data
 
 def funding_rate_example():
-    # Initialize DataSourceManager for funding rate data
-    with DataSourceManager(
+    # Initialize CryptoKlineVisionData for funding rate data
+    with CryptoKlineVisionData(
         market_type=MarketType.FUTURES_USDT,
         provider=DataProvider.BINANCE,
         chart_type=ChartType.FUNDING_RATE,
         cache_dir=Path("./cache"),
         use_cache=True,
-    ) as dsm:
+    ) as ckvd:
         # Fetch funding rate data
-        df = dsm.get_data(
+        df = ckvd.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -170,6 +170,6 @@ The design allows for easy extension:
 
 - `DataClientInterface`: Abstract base class implemented by this client
 - `DataClientFactory`: Factory that creates instances of this client
-- `DataSourceManager`: Uses this client via the factory
-- `src/data_source_manager/utils/config.py`: Contains funding rate column definitions
-- `src/data_source_manager/utils/market_constraints.py`: Contains enum definitions
+- `CryptoKlineVisionData`: Uses this client via the factory
+- `src/ckvd/utils/config.py`: Contains funding rate column definitions
+- `src/ckvd/utils/market_constraints.py`: Contains enum definitions

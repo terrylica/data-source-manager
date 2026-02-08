@@ -1,12 +1,12 @@
 # Loguru Logger Usage
 
-The DSM package uses loguru for logging. This provides better log level control and improved logging experience.
+The CKVD package uses loguru for logging. This provides better log level control and improved logging experience.
 
 ## Why Loguru?
 
 Loguru provides:
 
-- **Simple log level control**: Just set `DSM_LOG_LEVEL=DEBUG`
+- **Simple log level control**: Just set `CKVD_LOG_LEVEL=DEBUG`
 - **Better performance**: More efficient than Python's standard logging
 - **Automatic log rotation**: Built-in file rotation and compression
 - **Rich formatting**: Beautiful colored output with module/function info
@@ -15,7 +15,7 @@ Loguru provides:
 ## Basic Usage
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Standard logging calls
 logger.debug("Debug message")
@@ -33,25 +33,25 @@ The easiest way to control logging:
 
 ```bash
 # Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-export DSM_LOG_LEVEL=DEBUG
+export CKVD_LOG_LEVEL=DEBUG
 
 # Optional: Log to file with automatic rotation
-export DSM_LOG_FILE=./logs/dsm.log
+export CKVD_LOG_FILE=./logs/ckvd.log
 
 # Optional: Disable colors
-export DSM_DISABLE_COLORS=true
+export CKVD_DISABLE_COLORS=true
 ```
 
 ### Programmatic Configuration
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Set log level
 logger.configure_level("DEBUG")
 
 # Enable file logging with rotation
-logger.configure_file("./logs/dsm.log")
+logger.configure_file("./logs/ckvd.log")
 
 # Disable colors
 logger.disable_colors(True)
@@ -65,7 +65,7 @@ logger.configure_level("INFO").configure_file("./logs/app.log")
 ### Basic Usage
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Set log level for your session
 logger.configure_level("DEBUG")
@@ -84,12 +84,12 @@ logger.exception("Error with traceback")
 
 ```bash
 # In your shell or .env file
-export DSM_LOG_LEVEL=INFO
-export DSM_LOG_FILE=./logs/dsm.log
+export CKVD_LOG_LEVEL=INFO
+export CKVD_LOG_FILE=./logs/ckvd.log
 
 # Now just import and use
 python -c "
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 logger.info('Configured from environment!')
 "
 ```
@@ -97,7 +97,7 @@ logger.info('Configured from environment!')
 ### Advanced Features
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Bind context to all log messages
 contextual_logger = logger.bind(user_id=123, session="abc")
@@ -112,7 +112,7 @@ logger.opt(colors=True).info("Force <red>colored</red> output")
 After migration, test your logging:
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Test different levels
 logger.configure_level("DEBUG")
@@ -146,7 +146,7 @@ logger.configure_level("DEBUG")
 
 # Also correct
 import os
-os.environ["DSM_LOG_LEVEL"] = "DEBUG"
+os.environ["CKVD_LOG_LEVEL"] = "DEBUG"
 ```
 
 ### Colors Not Showing
@@ -158,7 +158,7 @@ Check your terminal supports colors and:
 logger.disable_colors(False)
 
 # Or via environment
-export DSM_DISABLE_COLORS=false
+export CKVD_DISABLE_COLORS=false
 ```
 
 ## Rollback
@@ -170,7 +170,7 @@ If you need to rollback, restore from the backup files:
 find . -name "*.py.backup"
 
 # Restore a specific file
-mv core/sync/data_source_manager.py.backup core/sync/data_source_manager.py
+mv core/sync/crypto_kline_vision_data.py.backup core/sync/crypto_kline_vision_data.py
 
 # Or restore all files
 find . -name "*.py.backup" -exec sh -c 'mv "$1" "${1%.backup}"' _ {} \;
@@ -178,7 +178,7 @@ find . -name "*.py.backup" -exec sh -c 'mv "$1" "${1%.backup}"' _ {} \;
 
 ## Benefits After Migration
 
-- **Easier log control**: `export DSM_LOG_LEVEL=DEBUG` vs complex logging configuration
+- **Easier log control**: `export CKVD_LOG_LEVEL=DEBUG` vs complex logging configuration
 - **Better performance**: Loguru is faster than standard logging
 - **Automatic file rotation**: No more manual log file management
 - **Rich output**: Beautiful colored logs with module/function info

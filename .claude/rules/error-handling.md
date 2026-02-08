@@ -1,12 +1,12 @@
 ---
 paths:
-  - "src/data_source_manager/**/*.py"
+  - "src/ckvd/**/*.py"
   - "tests/**/*.py"
 ---
 
 # Error Handling Rules
 
-Error handling patterns specific to Data Source Manager.
+Error handling patterns specific to Crypto Kline Vision Data.
 
 ## Exception Hierarchy
 
@@ -45,8 +45,8 @@ Request → Cache → Vision → REST → Error
 
 ```python
 # ✅ CORRECT - Use actual exception classes
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
-from data_source_manager.utils.for_core.vision_exceptions import VisionAPIError
+from ckvd.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
+from ckvd.utils.for_core.vision_exceptions import VisionAPIError
 import pandas as pd
 
 try:
@@ -73,7 +73,7 @@ except:  # Bare except
 
 ```python
 # Validate symbols to get helpful error messages
-from data_source_manager.utils.market_constraints import validate_symbol_for_market_type
+from ckvd.utils.market_constraints import validate_symbol_for_market_type
 
 try:
     validate_symbol_for_market_type("BTCUSDT", MarketType.FUTURES_COIN)
@@ -95,7 +95,7 @@ Binance rate limits:
 ```python
 # FCP automatically handles retries
 # For manual rate limit handling:
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
 
 try:
     df = manager.get_data(...)
@@ -108,8 +108,8 @@ except RateLimitError as e:
 ### Timeout Configuration
 
 ```python
-# DSM uses configurable retry_count for network operations
-manager = DataSourceManager.create(
+# CKVD uses configurable retry_count for network operations
+manager = CryptoKlineVisionData.create(
     DataProvider.BINANCE,
     MarketType.FUTURES_USDT,
     retry_count=3,  # Number of retries for failed requests
@@ -133,7 +133,7 @@ manager = DataSourceManager.create(
 ## Logging Errors
 
 ```python
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Include context for debugging
 logger.error(

@@ -1,20 +1,20 @@
 ---
 name: test-writer
-description: Use proactively after implementing new features. Writes and improves unit tests for DataSourceManager with proper mocking, coverage analysis, and test isolation.
+description: Use proactively after implementing new features. Writes and improves unit tests for CryptoKlineVisionData with proper mocking, coverage analysis, and test isolation.
 tools: Read, Bash, Grep, Glob, Write, Edit
 model: sonnet
 color: blue
 skills:
-  - dsm-testing
+  - ckvd-testing
 hooks:
   PostToolUse:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "${CLAUDE_PROJECT_ROOT}/.claude/hooks/dsm-code-guard.sh"
+          command: "${CLAUDE_PROJECT_ROOT}/.claude/hooks/ckvd-code-guard.sh"
 ---
 
-You are a testing specialist for the Data Source Manager package.
+You are a testing specialist for the Crypto Kline Vision Data package.
 
 ## Primary Tasks
 
@@ -40,7 +40,7 @@ tests/
 ```python
 import pytest
 from unittest.mock import patch, MagicMock
-from data_source_manager import DataSourceManager, DataProvider, MarketType
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 
 class TestNewFeature:
     """Tests for new feature."""
@@ -62,8 +62,8 @@ class TestNewFeature:
 Always mock external dependencies in unit tests:
 
 ```python
-@patch("data_source_manager.core.sync.data_source_manager.FSSpecVisionHandler")
-@patch("data_source_manager.core.sync.data_source_manager.UnifiedCacheManager")
+@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
+@patch("ckvd.core.sync.crypto_kline_vision_data.UnifiedCacheManager")
 def test_isolated(mock_cache, mock_handler):
     mock_cache.return_value = MagicMock()
     mock_handler.return_value = MagicMock()
@@ -74,17 +74,17 @@ def test_isolated(mock_cache, mock_handler):
 
 ```bash
 # Run with coverage
-uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-report=term-missing
+uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=term-missing
 
 # HTML report
-uv run -p 3.13 pytest tests/unit/ --cov=src/data_source_manager --cov-report=html
+uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=html
 ```
 
 ## Key Files to Cover
 
-- `src/data_source_manager/core/sync/data_source_manager.py` - Main DSM logic
-- `src/data_source_manager/utils/market_constraints.py` - Enum validation
-- `src/data_source_manager/core/providers/binance/` - Provider implementations
+- `src/ckvd/core/sync/crypto_kline_vision_data.py` - Main CKVD logic
+- `src/ckvd/utils/market_constraints.py` - Enum validation
+- `src/ckvd/core/providers/binance/` - Provider implementations
 
 ## Anti-Patterns to Avoid
 
