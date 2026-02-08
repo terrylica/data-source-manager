@@ -13,8 +13,8 @@ from datetime import datetime
 
 import pandas as pd
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.time.conversion import enforce_utc_timezone
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.time.conversion import enforce_utc_timezone
 
 __all__ = [
     "filter_dataframe_by_time",
@@ -54,7 +54,7 @@ def filter_dataframe_by_time(
     Example:
         >>> import pandas as pd
         >>> from datetime import datetime, timezone, timedelta
-        >>> from data_source_manager.utils.time.filtering import filter_dataframe_by_time
+        >>> from ckvd.utils.time.filtering import filter_dataframe_by_time
         >>>
         >>> # Create sample data
         >>> now = datetime.now(timezone.utc)
@@ -89,7 +89,7 @@ def filter_dataframe_by_time(
     logger.debug(f"Before filtering: {len(df)} rows")
 
     # FAIL-FAST: Timezone-aware timestamp debugging with rich exception context
-    from data_source_manager.utils.time.timestamp_debug import (
+    from ckvd.utils.time.timestamp_debug import (
         analyze_filter_conditions,
         compare_filtered_results,
         trace_dataframe_timestamps,

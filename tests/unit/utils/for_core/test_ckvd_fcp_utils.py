@@ -17,20 +17,20 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from data_source_manager.utils.for_core.dsm_fcp_utils import (
+from ckvd.utils.for_core.ckvd_fcp_utils import (
     handle_error,
     process_rest_step,
     process_vision_step,
     validate_interval,
     verify_final_data,
 )
-from data_source_manager.utils.for_core.dsm_time_range_utils import (
+from ckvd.utils.for_core.ckvd_time_range_utils import (
     identify_missing_segments,
     merge_adjacent_ranges,
     merge_dataframes,
 )
-from data_source_manager.utils.for_core.vision_exceptions import UnsupportedIntervalError
-from data_source_manager.utils.market_constraints import Interval, MarketType
+from ckvd.utils.for_core.vision_exceptions import UnsupportedIntervalError
+from ckvd.utils.market_constraints import Interval, MarketType
 
 
 # =============================================================================

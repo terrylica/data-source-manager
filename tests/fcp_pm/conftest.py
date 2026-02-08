@@ -8,8 +8,8 @@ Time fixtures (utc_now, one_week_range, etc.) are inherited from tests/conftest.
 
 import pytest
 
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.market_constraints import (
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     MarketType,
@@ -17,14 +17,14 @@ from data_source_manager.utils.market_constraints import (
 
 
 # =============================================================================
-# DataSourceManager Fixtures
+# CryptoKlineVisionData Fixtures
 # =============================================================================
 
 
 @pytest.fixture
 def fcp_manager_spot():
-    """DataSourceManager for SPOT market with cache enabled."""
-    manager = DataSourceManager(
+    """CryptoKlineVisionData for SPOT market with cache enabled."""
+    manager = CryptoKlineVisionData(
         provider=DataProvider.BINANCE,
         market_type=MarketType.SPOT,
         chart_type=ChartType.KLINES,
@@ -36,8 +36,8 @@ def fcp_manager_spot():
 
 @pytest.fixture
 def fcp_manager_futures():
-    """DataSourceManager for USDT futures with cache enabled."""
-    manager = DataSourceManager(
+    """CryptoKlineVisionData for USDT futures with cache enabled."""
+    manager = CryptoKlineVisionData(
         provider=DataProvider.BINANCE,
         market_type=MarketType.FUTURES_USDT,
         chart_type=ChartType.KLINES,
@@ -49,8 +49,8 @@ def fcp_manager_futures():
 
 @pytest.fixture
 def fcp_manager_coin():
-    """DataSourceManager for coin-margined futures with cache enabled."""
-    manager = DataSourceManager(
+    """CryptoKlineVisionData for coin-margined futures with cache enabled."""
+    manager = CryptoKlineVisionData(
         provider=DataProvider.BINANCE,
         market_type=MarketType.FUTURES_COIN,
         chart_type=ChartType.KLINES,
@@ -62,8 +62,8 @@ def fcp_manager_coin():
 
 @pytest.fixture
 def fcp_manager_no_cache():
-    """DataSourceManager with cache disabled for isolation."""
-    manager = DataSourceManager(
+    """CryptoKlineVisionData with cache disabled for isolation."""
+    manager = CryptoKlineVisionData(
         provider=DataProvider.BINANCE,
         market_type=MarketType.FUTURES_USDT,
         chart_type=ChartType.KLINES,

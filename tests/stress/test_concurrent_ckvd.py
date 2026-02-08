@@ -1,4 +1,4 @@
-"""Concurrent stress tests for DataSourceManager.
+"""Concurrent stress tests for CryptoKlineVisionData.
 
 Tests that verify thread safety and cache race condition handling:
 - Multiple threads fetching same symbol
@@ -17,11 +17,11 @@ from threading import Lock
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
-from data_source_manager.utils.for_core.rest_exceptions import RestAPIError
-from data_source_manager.utils.for_core.vision_exceptions import VisionAPIError
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
+from ckvd.utils.for_core.rest_exceptions import RestAPIError
+from ckvd.utils.for_core.vision_exceptions import VisionAPIError
 
-# Exception types that can occur during DSM operations
+# Exception types that can occur during CKVD operations
 DSM_ERRORS = (RestAPIError, VisionAPIError, ValueError, RuntimeError, OSError)
 
 
@@ -41,7 +41,7 @@ class TestConcurrentSameSymbol:
 
         def fetch_data(thread_id: int):
             try:
-                manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+                manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
                 df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
                 manager.close()
                 return thread_id, len(df), df["close"].iloc[-1] if len(df) > 0 else None
@@ -76,7 +76,7 @@ class TestConcurrentSameSymbol:
         memory_readings = []
 
         def fetch_and_track():
-            manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+            manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
             df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
             current = tracemalloc.get_traced_memory()[0] if tracemalloc.is_tracing() else 0
             manager.close()
@@ -115,7 +115,7 @@ class TestConcurrentDifferentSymbols:
 
         def fetch_symbol(symbol: str):
             try:
-                manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+                manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
                 df = manager.get_data(symbol, start, end, Interval.HOUR_1)
                 manager.close()
                 return symbol, len(df), True
@@ -146,7 +146,7 @@ class TestConcurrentDifferentSymbols:
         This tests internal state management with shared manager instance.
         """
         start, end = historical_time_range
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
         results = {}
         errors = []
         results_lock = Lock()
@@ -191,7 +191,7 @@ class TestConcurrentCacheWrite:
         def populate_cache(thread_id: int):
             try:
                 # Each thread creates its own manager to populate cache
-                manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+                manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
                 df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
                 row_count = len(df)
                 manager.close()
@@ -212,7 +212,7 @@ class TestConcurrentCacheWrite:
         assert len(errors) == 0, f"Cache write errors: {errors}"
 
         # Verify cache is consistent by re-reading
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
         df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
         manager.close()
 
@@ -228,7 +228,7 @@ class TestConcurrentCacheWrite:
 
         def read_or_write(symbol: str, operation: str):
             try:
-                manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+                manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
                 df = manager.get_data(symbol, start, end, Interval.HOUR_1)
                 manager.close()
                 return symbol, operation, len(df), True
@@ -265,7 +265,7 @@ class TestConcurrentMemoryStability:
         start, end = historical_time_range
 
         def fetch_data():
-            manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+            manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
             df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
             manager.close()
             return len(df)
@@ -291,7 +291,7 @@ class TestConcurrentMemoryStability:
             results = []
             with ThreadPoolExecutor(max_workers=3) as executor:
                 for _ in range(3):
-                    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+                    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
                     future = executor.submit(manager.get_data, "BTCUSDT", start, end, Interval.HOUR_1)
                     df = future.result()
                     results.append(len(df))

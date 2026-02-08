@@ -2,7 +2,7 @@
 """Market constraints and configuration subpackage.
 
 This subpackage provides market-specific enums, capabilities, validation,
-and endpoint construction for the Data Source Manager.
+and endpoint construction for the Crypto Kline Vision Data.
 
 Modules:
     enums: Core enum definitions (DataProvider, MarketType, ChartType, Interval)
@@ -14,21 +14,21 @@ Modules:
 # Refactoring: Split from market_constraints.py (1009 lines) for modularity
 """
 
-from data_source_manager.utils.market.capabilities import (
+from ckvd.utils.market.capabilities import (
     MARKET_CAPABILITIES,
     OKX_MARKET_CAPABILITIES,
     MarketCapabilities,
     get_market_capabilities,
 )
-from data_source_manager.utils.market.endpoints import get_endpoint_url
-from data_source_manager.utils.market.enums import (
+from ckvd.utils.market.endpoints import get_endpoint_url
+from ckvd.utils.market.enums import (
     ChartType,
     DataProvider,
     Interval,
     MarketType,
     safe_enum_compare,
 )
-from data_source_manager.utils.market.validation import (
+from ckvd.utils.market.validation import (
     get_default_symbol,
     get_market_symbol_format,
     get_minimum_interval,

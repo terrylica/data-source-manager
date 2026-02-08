@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """
-Quick Start Example for Data Source Manager.
+Quick Start Example for Crypto Kline Vision Data.
 
 Run with:
     uv run -p 3.13 python examples/quick_start.py
 
-This demonstrates basic DSM usage with automatic FCP fallback.
+This demonstrates basic CKVD usage with automatic FCP fallback.
 """
 
 from datetime import datetime, timedelta, timezone
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 def main() -> None:
     """Fetch recent BTCUSDT hourly data."""
     # Create manager for USDT-margined futures
-    manager = DataSourceManager.create(
+    manager = CryptoKlineVisionData.create(
         DataProvider.BINANCE,
         MarketType.FUTURES_USDT,
     )

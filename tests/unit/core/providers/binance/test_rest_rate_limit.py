@@ -14,9 +14,9 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
-from data_source_manager.utils.market_constraints import MarketType
+from ckvd.core.providers.binance.rest_data_client import RestDataClient
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.market_constraints import MarketType
 
 
 # Sample kline data (Binance format: list of lists)
@@ -41,8 +41,8 @@ def _make_kline_row(open_time_ms: int) -> list:
 class TestReraisePropagatesRateLimitError:
     """P1.1: Verify reraise=True makes RateLimitError catchable."""
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_rate_limit_error_not_wrapped_in_retry_error(
         self,
         mock_create_client,
@@ -89,8 +89,8 @@ class TestDefaultRetryAfter:
 class TestPartialChunksOnRateLimit:
     """P1.3: Verify partial chunk data is returned on rate limit."""
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_partial_chunks_returned_on_429(
         self,
         mock_create_client,
@@ -134,8 +134,8 @@ class TestPartialChunksOnRateLimit:
         assert len(df) > 0
         assert df.attrs.get("_rate_limited") is True
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_rate_limit_first_chunk_raises(
         self,
         mock_create_client,
@@ -158,8 +158,8 @@ class TestPartialChunksOnRateLimit:
                 end_time=end_time,
             )
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_no_rate_limit_no_flag(
         self,
         mock_create_client,

@@ -6,8 +6,8 @@ from pathlib import Path
 import httpx
 import pandas as pd
 
-from data_source_manager.utils.config import HTTP_OK
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.config import HTTP_OK
+from ckvd.utils.loguru_setup import logger
 
 # No need to initialize logger with get_logger anymore
 

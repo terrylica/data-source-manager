@@ -12,9 +12,9 @@ import re
 
 import pandas as pd
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
-from data_source_manager.utils.time_utils import detect_timestamp_unit
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
+from ckvd.utils.time_utils import detect_timestamp_unit
 
 # Pre-compiled regex pattern for parsing interval strings
 INTERVAL_PATTERN = re.compile(r"(\d+)([smhdwM])")

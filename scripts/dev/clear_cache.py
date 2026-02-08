@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Clear cache and log directories for testing the DSM Demo.
+Clear cache and log directories for testing the CKVD Demo.
 Supports local and remote filesystems via fsspec.
 """
 
@@ -13,7 +13,7 @@ import fsspec
 import typer
 from rich import print
 
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 logger.setLevel(logging.DEBUG)
 

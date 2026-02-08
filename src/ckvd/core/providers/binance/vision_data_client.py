@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# polars-exception: VisionDataClient returns pandas DataFrames for DSM pipeline compatibility
+# polars-exception: VisionDataClient returns pandas DataFrames for CKVD pipeline compatibility
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 r"""VisionDataClient provides direct access to Binance Vision API for historical data.
 
@@ -11,10 +11,10 @@ Functionality:
 - Validate data integrity and structure
 - Process data into pandas DataFrames for analysis
 
-The VisionDataClient is primarily used through the DataSourceManager, which provides
+The VisionDataClient is primarily used through the CryptoKlineVisionData, which provides
 a unified interface for data retrieval with automatic source selection and caching.
 
-For most use cases, users should interact with the DataSourceManager rather than
+For most use cases, users should interact with the CryptoKlineVisionData rather than
 directly with this client.
 
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
@@ -38,11 +38,11 @@ from tenacity import (
     wait_incrementing,
 )
 
-from data_source_manager.core.providers.binance.data_client_interface import DataClientInterface
-from data_source_manager.core.providers.binance.vision_path_mapper import (
+from ckvd.core.providers.binance.data_client_interface import DataClientInterface
+from ckvd.core.providers.binance.vision_path_mapper import (
     FSSpecVisionHandler,
 )
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     CONCURRENT_DOWNLOADS_LIMIT_1S,
     HTTP_NOT_FOUND,
     HTTP_OK,
@@ -53,28 +53,28 @@ from data_source_manager.utils.config import (
     VISION_DATA_DELAY_HOURS,
     FileType,
 )
-from data_source_manager.utils.dataframe_types import TimestampedDataFrame
-from data_source_manager.utils.dataframe_utils import ensure_open_time_as_column
-from data_source_manager.utils.for_core.vision_constraints import (
+from ckvd.utils.dataframe_types import TimestampedDataFrame
+from ckvd.utils.dataframe_utils import ensure_open_time_as_column
+from ckvd.utils.for_core.vision_constraints import (
     get_vision_url,
     is_date_too_fresh_for_vision,
 )
-from data_source_manager.utils.for_core.vision_file_utils import (
+from ckvd.utils.for_core.vision_file_utils import (
     fill_boundary_gaps_with_rest,
     find_day_boundary_gaps,
 )
-from data_source_manager.utils.for_core.vision_timestamp import parse_interval, process_timestamp_columns
-from data_source_manager.utils.gap_detector import detect_gaps
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import (
+from ckvd.utils.for_core.vision_timestamp import parse_interval, process_timestamp_columns
+from ckvd.utils.gap_detector import detect_gaps
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     Interval,
     MarketType,
     get_market_capabilities,
 )
-from data_source_manager.utils.time_utils import filter_dataframe_by_time
-from data_source_manager.utils.validation import DataFrameValidator
+from ckvd.utils.time_utils import filter_dataframe_by_time
+from ckvd.utils.validation import DataFrameValidator
 
 # Pre-compiled regex pattern for SHA256 checksum extraction
 SHA256_HASH_PATTERN = re.compile(r"([a-fA-F0-9]{64})")
@@ -113,7 +113,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
     Examples:
         >>> from core.providers.binance.vision_data_client import VisionDataClient
-        >>> from data_source_manager.utils.market_constraints import MarketType, ChartType
+        >>> from ckvd.utils.market_constraints import MarketType, ChartType
         >>> from datetime import datetime, timedelta
         >>>
         >>> # Create a client for BTC/USDT 1-minute data
@@ -172,7 +172,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
 
         Example:
             >>> from core.providers.binance.vision_data_client import VisionDataClient
-            >>> from data_source_manager.utils.market_constraints import MarketType, ChartType
+            >>> from ckvd.utils.market_constraints import MarketType, ChartType
             >>>
             >>> # Basic initialization
             >>> client = VisionDataClient("BTCUSDT", "1m")
@@ -286,7 +286,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
             Empty TimestampedDataFrame with the correct columns
         """
         # Use the standardized empty dataframe function from config
-        from data_source_manager.utils.config import create_empty_dataframe
+        from ckvd.utils.config import create_empty_dataframe
 
         # Create empty dataframe and convert to TimestampedDataFrame format
         df = create_empty_dataframe()
@@ -372,7 +372,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                         f"Consider using {min_interval.value} (minimum supported interval) or another supported interval from the list."
                     )
 
-                    from data_source_manager.utils.for_core.vision_exceptions import (
+                    from ckvd.utils.for_core.vision_exceptions import (
                         UnsupportedIntervalError,
                     )
 
@@ -463,7 +463,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
                     try:
                         import time
 
-                        from data_source_manager.utils.for_core.vision_checksum import (
+                        from ckvd.utils.for_core.vision_checksum import (
                             calculate_sha256_direct,
                         )
 
@@ -1061,7 +1061,7 @@ class VisionDataClient(DataClientInterface, Generic[T]):
         Example:
             >>> from core.providers.binance.vision_data_client import VisionDataClient
             >>> from datetime import datetime, timezone, timedelta
-            >>> from data_source_manager.utils.market_constraints import MarketType
+            >>> from ckvd.utils.market_constraints import MarketType
             >>>
             >>> # Set up time range for the last week
             >>> end = datetime.now(timezone.utc)

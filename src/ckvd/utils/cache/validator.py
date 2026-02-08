@@ -18,16 +18,16 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 import pyarrow as pa
 
-from data_source_manager.utils.cache.errors import ERROR_TYPES, CacheValidationError
-from data_source_manager.utils.cache.memory_map import SafeMemoryMap
-from data_source_manager.utils.cache.options import AlignmentOptions, ValidationOptions
-from data_source_manager.utils.dataframe_utils import ensure_open_time_as_index
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
-from data_source_manager.utils.validation import DataFrameValidator
+from ckvd.utils.cache.errors import ERROR_TYPES, CacheValidationError
+from ckvd.utils.cache.memory_map import SafeMemoryMap
+from ckvd.utils.cache.options import AlignmentOptions, ValidationOptions
+from ckvd.utils.dataframe_utils import ensure_open_time_as_index
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
+from ckvd.utils.validation import DataFrameValidator
 
 if TYPE_CHECKING:
-    from data_source_manager.utils.api_boundary_validator import ApiBoundaryValidator
+    from ckvd.utils.api_boundary_validator import ApiBoundaryValidator
 
 __all__ = [
     "CacheValidator",

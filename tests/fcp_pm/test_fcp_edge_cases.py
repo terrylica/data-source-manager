@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ADR: docs/adr/2025-01-30-failover-control-protocol.md
-# polars-exception: DataSourceManager.get_data() returns Pandas DataFrame (upstream API)
+# polars-exception: CryptoKlineVisionData.get_data() returns Pandas DataFrame (upstream API)
 """
 FCP Edge Case Test Suite - Real-world scenarios for Failover Control Protocol.
 
@@ -35,9 +35,9 @@ from rich import print as rprint
 from rich.panel import Panel
 from rich.table import Table
 
-from data_source_manager.core.sync.data_source_manager import DataSource, DataSourceManager
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
-from data_source_manager.utils.market_constraints import (
+from ckvd.core.sync.crypto_kline_vision_data import DataSource, CryptoKlineVisionData
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     Interval,
@@ -227,7 +227,7 @@ class TestFCPRestOnly:
         end_time = utc_now
         start_time = end_time - timedelta(hours=1)
 
-        with DataSourceManager(
+        with CryptoKlineVisionData(
             provider=DataProvider.BINANCE,
             market_type=MarketType.FUTURES_USDT,
             chart_type=ChartType.KLINES,
@@ -353,7 +353,7 @@ class TestFCPFutureTimestamp:
 
         Real-world scenario: Bug in caller passes end_time = now + 1 day.
 
-        Note: Current DSM behavior raises RuntimeError when REST API returns no data
+        Note: Current CKVD behavior raises RuntimeError when REST API returns no data
         for pure future timestamp requests. This is acceptable - the error is explicit.
         """
         end_time = utc_now + timedelta(days=1)  # FUTURE!
@@ -370,7 +370,7 @@ class TestFCPFutureTimestamp:
             )
 
             # If no exception, verify we got valid data for the PAST portion
-            # AUDIT NOTE: DSM may return data for start_time to now, ignoring future portion
+            # AUDIT NOTE: CKVD may return data for start_time to now, ignoring future portion
             assert df is not None, "Future timestamp fetch returned None"
             rprint(f"[cyan]Returned {len(df)} rows for request including future timestamps[/cyan]")
 
@@ -384,7 +384,7 @@ class TestFCPFutureTimestamp:
             rprint("[green]✓ Future timestamp request handled gracefully (returned past data)[/green]")
 
         except RuntimeError as e:
-            # DSM raises RuntimeError when REST API returns no data - acceptable
+            # CKVD raises RuntimeError when REST API returns no data - acceptable
             # Error may be "REST API returned no data" or "could not be handled properly"
             error_msg = str(e)
             if "REST API" in error_msg:
@@ -426,7 +426,7 @@ class TestFCPSymbolValidation:
         end_time = utc_now - timedelta(days=3)
         start_time = end_time - timedelta(days=1)
 
-        with DataSourceManager(
+        with CryptoKlineVisionData(
             provider=DataProvider.BINANCE,
             market_type=MarketType.FUTURES_COIN,
             chart_type=ChartType.KLINES,
@@ -477,7 +477,7 @@ class TestFCPRateLimitHandling:
         """
         # This test verifies the mock pattern works - actual propagation
         # depends on FCP implementation which may retry before failing
-        with patch("data_source_manager.core.providers.binance.rest_data_client.RestDataClient") as mock_client:
+        with patch("ckvd.core.providers.binance.rest_data_client.RestDataClient") as mock_client:
             mock_instance = MagicMock()
             mock_instance.fetch_klines.side_effect = RateLimitError("Rate limit exceeded: 429")
             mock_client.return_value = mock_instance
@@ -486,7 +486,7 @@ class TestFCPRateLimitHandling:
             assert mock_client.return_value.fetch_klines.side_effect is not None
             rprint("[cyan]Mock configured to raise RateLimitError on fetch_klines[/cyan]")
 
-            # NOTE: Actually calling DSM with this mock would require more complex
+            # NOTE: Actually calling CKVD with this mock would require more complex
             # setup due to FCP's retry logic. This test verifies the pattern.
             rprint("[green]✓ RateLimitError mock pattern verified[/green]")
 
@@ -518,7 +518,7 @@ class TestFCPIntervalCoverage:
         # For DAY_1, use REST directly to avoid Vision API empty CSV issues
         enforce = DataSource.REST if interval == Interval.DAY_1 else DataSource.AUTO
 
-        with DataSourceManager(
+        with CryptoKlineVisionData(
             provider=DataProvider.BINANCE,
             market_type=MarketType.FUTURES_USDT,
             chart_type=ChartType.KLINES,
@@ -557,7 +557,7 @@ class TestFCPEmptyResult:
 
         Real-world scenario: User typos symbol as "BTCUSDTT".
 
-        Note: Current DSM behavior may:
+        Note: Current CKVD behavior may:
         1. Raise RetryError after exhausting retries
         2. Return empty DataFrame
         3. Emit symbol mismatch warning (Vision client detects mismatch)
@@ -565,7 +565,7 @@ class TestFCPEmptyResult:
         All outcomes are acceptable - the key is no SILENT failure.
         """
         # Create fresh manager for this test to avoid fixture symbol mismatch issues
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end_time = utc_now - timedelta(days=3)
         start_time = end_time - timedelta(days=1)
@@ -625,7 +625,7 @@ class TestFCPCachePartialHit:
         Real-world scenario: Yesterday's backtest cached 5 days, today needs 7 days.
         """
         # First, populate cache with 3-5 days ago
-        with DataSourceManager(
+        with CryptoKlineVisionData(
             provider=DataProvider.BINANCE,
             market_type=MarketType.FUTURES_USDT,
             chart_type=ChartType.KLINES,
@@ -646,7 +646,7 @@ class TestFCPCachePartialHit:
             rprint(f"[cyan]Initial cache population: {len(df1) if df1 is not None else 0} bars[/cyan]")
 
         # Now request broader range (should use cache + fetch missing)
-        with DataSourceManager(
+        with CryptoKlineVisionData(
             provider=DataProvider.BINANCE,
             market_type=MarketType.FUTURES_USDT,
             chart_type=ChartType.KLINES,
@@ -712,7 +712,7 @@ class TestFCPPolarsIntegration:
     @pytest.fixture(autouse=True)
     def setup_polars_flags(self, monkeypatch):
         """Enable zero-copy Polars output for all tests in this class."""
-        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "true")
+        monkeypatch.setenv("CKVD_USE_POLARS_OUTPUT", "true")
 
     def test_polars_fcp_cache_hit(self, fcp_manager_futures, historical_range):
         """Cache hit should work correctly with Polars pipeline."""
@@ -839,7 +839,7 @@ class TestFCPPolarsIntegration:
         """Polars FCP should work across all market types."""
         start_time, end_time = historical_range
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df = manager.get_data(
             symbol=symbol,

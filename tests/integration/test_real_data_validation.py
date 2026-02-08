@@ -1,4 +1,4 @@
-"""Real data validation tests for DataSourceManager.
+"""Real data validation tests for CryptoKlineVisionData.
 
 Integration tests with real data to validate output correctness.
 
@@ -17,7 +17,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 # =============================================================================
@@ -74,7 +74,7 @@ class TestDataFrameStructure:
         self, market_type, symbol, expected_columns, expected_dtypes
     ):
         """Validate DataFrame structure across all market types."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df = manager.get_data(
             symbol=symbol,
@@ -114,7 +114,7 @@ class TestDataFrameStructure:
     )
     def test_polars_output_structure(self, market_type, symbol):
         """Validate Polars output structure."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df_pandas = manager.get_data(
             symbol=symbol,
@@ -159,7 +159,7 @@ class TestDataIntegrity:
     )
     def test_timestamp_monotonicity(self, market_type, symbol):
         """Timestamps must be strictly increasing (no duplicates, no reversals)."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df = manager.get_data(
             symbol=symbol,
@@ -185,7 +185,7 @@ class TestDataIntegrity:
     )
     def test_ohlcv_value_constraints(self, market_type, symbol):
         """OHLCV values must satisfy logical constraints."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df = manager.get_data(
             symbol=symbol,
@@ -223,7 +223,7 @@ class TestDataIntegrity:
     )
     def test_no_gaps_in_data(self, market_type, symbol, interval):
         """Data should have no missing candles for liquid pairs."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df = manager.get_data(
             symbol=symbol,
@@ -259,7 +259,7 @@ class TestCrossSourceConsistency:
 
     def test_cache_vs_fresh_fetch_consistency(self):
         """Cache and fresh fetch should return identical data for same range."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # First fetch populates cache
         df_first = manager.get_data(
@@ -291,7 +291,7 @@ class TestCrossSourceConsistency:
 
     def test_multiple_symbols_consistent_structure(self):
         """Different symbols should return consistent DataFrame structure."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
         dataframes = {}
@@ -330,8 +330,8 @@ class TestCrossMarketConsistency:
         Same underlying asset (BTC) on different markets should have
         near-identical prices.
         """
-        spot_manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
-        futures_manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        spot_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+        futures_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         df_spot = spot_manager.get_data(
             symbol="BTCUSDT",
@@ -366,8 +366,8 @@ class TestCrossMarketConsistency:
 
         Basis (futures premium/discount) is typically small for liquid markets.
         """
-        spot_manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
-        futures_manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        spot_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+        futures_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         df_spot = spot_manager.get_data(
             symbol="BTCUSDT",
@@ -412,7 +412,7 @@ class TestCrossMarketConsistency:
         ]
 
         for market_type, symbol in market_configs:
-            manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+            manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
             df = manager.get_data(
                 symbol=symbol,
@@ -449,7 +449,7 @@ class TestIntervalValidation:
     )
     def test_interval_produces_correct_spacing(self, interval):
         """Each interval should produce correctly spaced candles."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Use shorter range for minute intervals
         if interval.to_seconds() < 3600:
@@ -491,14 +491,14 @@ class TestEdgeCases:
 
     def test_ancient_date_returns_empty_or_error(self):
         """Date before exchange launch should return empty or raise error."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Use a date before Binance existed (2010)
         ancient_start = datetime(2010, 1, 1, tzinfo=timezone.utc)
         ancient_end = datetime(2010, 1, 2, tzinfo=timezone.utc)
 
         # Import DataNotAvailableError for fail-loud behavior (GitHub Issue #10)
-        from data_source_manager.utils.for_core.vision_exceptions import DataNotAvailableError
+        from ckvd.utils.for_core.vision_exceptions import DataNotAvailableError
 
         try:
             df = manager.get_data(
@@ -518,7 +518,7 @@ class TestEdgeCases:
 
     def test_coin_margined_symbol_format(self):
         """FUTURES_COIN requires USD_PERP format, not USDT."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 
         # Correct format
         df_correct = manager.get_data(
@@ -549,7 +549,7 @@ class TestProviderValidation:
         defined in the enum but not yet implemented.
         """
         with pytest.raises(ValueError) as exc_info:
-            DataSourceManager.create(DataProvider.TRADESTATION, MarketType.SPOT)
+            CryptoKlineVisionData.create(DataProvider.TRADESTATION, MarketType.SPOT)
 
         error_msg = str(exc_info.value).lower()
         assert "not supported" in error_msg
@@ -557,7 +557,7 @@ class TestProviderValidation:
 
     def test_binance_provider_supported(self):
         """Binance provider should work without error."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
         assert manager is not None
         assert manager.provider == DataProvider.BINANCE
         manager.close()

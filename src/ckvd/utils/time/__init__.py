@@ -14,11 +14,11 @@ All functions are re-exported here for backwards compatibility.
 # Refactoring: Split time_utils.py (991 lines) into focused modules under 400 lines
 """
 
-from data_source_manager.utils.time.bars import (
+from ckvd.utils.time.bars import (
     get_bar_close_time,
     is_bar_complete,
 )
-from data_source_manager.utils.time.conversion import (
+from ckvd.utils.time.conversion import (
     MICROSECOND_DIGITS,
     MILLISECOND_DIGITS,
     TIMESTAMP_UNIT,
@@ -30,10 +30,10 @@ from data_source_manager.utils.time.conversion import (
     standardize_timestamp_precision,
     validate_timestamp_unit,
 )
-from data_source_manager.utils.time.filtering import (
+from ckvd.utils.time.filtering import (
     filter_dataframe_by_time,
 )
-from data_source_manager.utils.time.intervals import (
+from ckvd.utils.time.intervals import (
     align_time_boundaries,
     estimate_record_count,
     get_interval_ceiling,
@@ -43,7 +43,7 @@ from data_source_manager.utils.time.intervals import (
     get_interval_timedelta,
     get_smaller_units,
 )
-from data_source_manager.utils.time.processor import (
+from ckvd.utils.time.processor import (
     TimeseriesDataProcessor,
 )
 

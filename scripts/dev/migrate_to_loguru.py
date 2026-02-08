@@ -2,7 +2,7 @@
 """
 Migration Script: Convert from utils.logger_setup to utils.loguru_setup
 
-This script automatically updates import statements throughout the DSM codebase
+This script automatically updates import statements throughout the CKVD codebase
 to use the new loguru-based logging system instead of the old logger_setup.
 
 Usage:
@@ -116,11 +116,11 @@ def main(
     no_backup: bool = typer.Option(False, "--no-backup", help="Don't create backup files"),
     verbose: bool = typer.Option(False, "-v", "--verbose", help="Show verbose output"),
 ):
-    """Migrate DSM codebase from utils.logger_setup to utils.loguru_setup."""
+    """Migrate CKVD codebase from utils.logger_setup to utils.loguru_setup."""
 
     console.print(
         Panel.fit(
-            "[bold blue]DSM Logger Migration Tool[/bold blue]\nConverting from utils.logger_setup to utils.loguru_setup",
+            "[bold blue]CKVD Logger Migration Tool[/bold blue]\nConverting from utils.logger_setup to utils.loguru_setup",
             border_style="blue",
         )
     )
@@ -212,8 +212,8 @@ def main(
         console.print("\n[green]Migration completed![/green]")
         console.print("[blue]Next steps:[/blue]")
         console.print("1. Test your application to ensure everything works")
-        console.print("2. Set log level with: export DSM_LOG_LEVEL=DEBUG")
-        console.print("3. Optional: Set log file with: export DSM_LOG_FILE=./logs/dsm.log")
+        console.print("2. Set log level with: export CKVD_LOG_LEVEL=DEBUG")
+        console.print("3. Optional: Set log file with: export CKVD_LOG_FILE=./logs/ckvd.log")
 
         if not no_backup:
             console.print("\n[yellow]Note:[/yellow] Backup files (.backup) were created for all modified files")

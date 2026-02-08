@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from data_source_manager.utils.cache.options import CachePathOptions
+from ckvd.utils.cache.options import CachePathOptions
 
 __all__ = [
     "CacheKeyManager",

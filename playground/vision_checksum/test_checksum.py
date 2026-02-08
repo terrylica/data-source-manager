@@ -12,9 +12,9 @@ from rich.console import Console
 from rich.progress import Progress
 from rich.table import Table
 
-from data_source_manager.utils.config import HTTP_OK, TEXT_PREVIEW_LENGTH
-from data_source_manager.utils.for_core.vision_checksum import extract_checksum_from_file
-from data_source_manager.utils.validation import DataValidation
+from ckvd.utils.config import HTTP_OK, TEXT_PREVIEW_LENGTH
+from ckvd.utils.for_core.vision_checksum import extract_checksum_from_file
+from ckvd.utils.validation import DataValidation
 
 console = Console()
 

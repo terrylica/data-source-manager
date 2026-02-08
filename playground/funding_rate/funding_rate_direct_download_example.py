@@ -14,7 +14,7 @@ from scripts.funding_rate_downloader.download_funding_rate import (
     fetch_funding_rate_history,
     save_to_csv,
 )
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # No need to initialize logger with get_logger anymore
 
@@ -70,13 +70,13 @@ def download_funding_rate_example():
         logger.info(f"  {symbol}: {status}")
 
     logger.info(
-        "\nCompare this direct API approach with the DataSourceManager example (funding_rate_example.py)"
+        "\nCompare this direct API approach with the CryptoKlineVisionData example (funding_rate_example.py)"
     )
     logger.info(
         "The direct API method is simpler for one-off downloads but lacks caching and advanced features"
     )
     logger.info(
-        "For production use, consider using the DataSourceManager approach for better robustness"
+        "For production use, consider using the CryptoKlineVisionData approach for better robustness"
     )
 
 

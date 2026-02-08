@@ -19,8 +19,8 @@ from typing import Any
 
 import pandas as pd
 
-from data_source_manager.utils.cache.errors import CacheValidationError
-from data_source_manager.utils.cache.validator import CacheValidator
+from ckvd.utils.cache.errors import CacheValidationError
+from ckvd.utils.cache.validator import CacheValidator
 
 __all__ = [
     "safely_read_arrow_file_async",

@@ -2,7 +2,7 @@
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
 # Memory optimization: Polars LazyFrame for predicate pushdown (2026-02-04)
-"""Cache utilities for DataSourceManager.
+"""Cache utilities for CryptoKlineVisionData.
 
 Provides provider-agnostic cache path generation and cache I/O operations.
 Uses Polars LazyFrame for memory-efficient file reading with predicate pushdown.
@@ -16,11 +16,11 @@ import pendulum
 import polars as pl
 import pyarrow as pa
 
-from data_source_manager.core.providers.binance.vision_path_mapper import (
+from ckvd.core.providers.binance.vision_path_mapper import (
     FSSpecVisionHandler,
 )
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 def _scan_cache_file(cache_path: str | Path) -> pl.LazyFrame:
@@ -91,7 +91,7 @@ def get_cache_path(
     Example:
         >>> from pathlib import Path
         >>> from datetime import date
-        >>> from data_source_manager import DataProvider, MarketType, Interval, ChartType
+        >>> from ckvd import DataProvider, MarketType, Interval, ChartType
         >>>
         >>> path = get_cache_path(
         ...     provider=DataProvider.BINANCE,
@@ -99,9 +99,9 @@ def get_cache_path(
         ...     symbol="BTCUSDT",
         ...     interval=Interval.HOUR_1,
         ...     cache_date=date(2024, 1, 15),
-        ...     cache_root=Path("~/.cache/dsm"),
+        ...     cache_root=Path("~/.cache/ckvd"),
         ... )
-        >>> # Returns: ~/.cache/dsm/binance/futures_usdt/klines/daily/BTCUSDT/1h/2024-01-15.arrow
+        >>> # Returns: ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/1h/2024-01-15.arrow
     """
     # Normalize values for path construction
     # Note: DataProvider uses int values, so use .name for string representation
@@ -357,7 +357,7 @@ def get_from_cache(
 
         # Use the proper gap detection function to identify missing segments
         # This will detect both missing days and intraday gaps
-        from data_source_manager.utils.for_core.dsm_time_range_utils import identify_missing_segments
+        from ckvd.utils.for_core.ckvd_time_range_utils import identify_missing_segments
 
         logger.debug(f"[CACHE] Using gap detection to find missing ranges between {start_time} and {end_time}")
         missing_ranges = identify_missing_segments(result_df, start_time, end_time, interval)

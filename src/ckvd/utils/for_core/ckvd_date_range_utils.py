@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Date range calculation utilities for DataSourceManager.
+"""Date range calculation utilities for CryptoKlineVisionData.
 
 This module provides robust date range calculation functions that support
 various scenarios including:
@@ -19,10 +19,10 @@ import pendulum
 from pendulum import DateTime
 from pendulum.parsing.exceptions import ParserError
 
-from data_source_manager.utils.config import DATE_STRING_LENGTH
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
-from data_source_manager.utils.time_utils import align_time_boundaries
+from ckvd.utils.config import DATE_STRING_LENGTH
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
+from ckvd.utils.time_utils import align_time_boundaries
 
 
 def parse_datetime_string(dt_str: str | None) -> DateTime | None:

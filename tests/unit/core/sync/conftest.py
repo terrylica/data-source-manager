@@ -1,10 +1,10 @@
-"""Local conftest for data_source_manager unit tests.
+"""Local conftest for ckvd unit tests.
 
 This provides auto-use fixtures that mock the factory pattern,
 allowing legacy @patch decorators to work with the new architecture.
 
 ADR: docs/adr/2025-01-30-failover-control-protocol.md
-Related: Factory pattern wiring to DSM (Task #99)
+Related: Factory pattern wiring to CKVD (Task #99)
 """
 
 from unittest.mock import MagicMock, patch
@@ -18,12 +18,12 @@ def mock_provider_factory():
     """Auto-mock the provider factory for all tests in this directory.
 
     This fixture automatically patches get_provider_clients so that
-    DataSourceManager can be instantiated without actual provider clients.
+    CryptoKlineVisionData can be instantiated without actual provider clients.
     The legacy @patch decorators for FSSpecVisionHandler and UnifiedCacheManager
     will be no-ops but the factory mock handles initialization.
     """
-    from data_source_manager import DataProvider, MarketType
-    from data_source_manager.core.providers import ProviderClients
+    from ckvd import DataProvider, MarketType
+    from ckvd.core.providers import ProviderClients
 
     def _create_mock_clients(provider=DataProvider.BINANCE, market_type=MarketType.SPOT, **kwargs):
         """Create mock ProviderClients for testing."""
@@ -40,6 +40,6 @@ def mock_provider_factory():
             market_type=market_type,
         )
 
-    with patch("data_source_manager.core.sync.data_source_manager.get_provider_clients") as mock:
+    with patch("ckvd.core.sync.crypto_kline_vision_data.get_provider_clients") as mock:
         mock.side_effect = _create_mock_clients
         yield mock

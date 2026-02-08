@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import attrs
 
-from data_source_manager.utils.market.enums import DataProvider, Interval, MarketType
+from ckvd.utils.market.enums import DataProvider, Interval, MarketType
 
 __all__ = [
     "MARKET_CAPABILITIES",

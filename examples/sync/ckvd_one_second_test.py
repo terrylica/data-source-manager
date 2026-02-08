@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-second data retrieval test script.
 
-This script tests the Data Source Manager's ability to handle one-second
+This script tests the Crypto Kline Vision Data's ability to handle one-second
 data intervals without any deprecation warnings related to frequency strings.
 """
 
@@ -19,11 +19,11 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 # Project imports (after path setup)
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.dataframe_utils import verify_data_completeness
-from data_source_manager.utils.for_core.dsm_utilities import safely_reindex_dataframe
-from data_source_manager.utils.loguru_setup import configure_session_logging, logger
-from data_source_manager.utils.market_constraints import DataProvider, Interval, MarketType
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.dataframe_utils import verify_data_completeness
+from ckvd.utils.for_core.ckvd_utilities import safely_reindex_dataframe
+from ckvd.utils.loguru_setup import configure_session_logging, logger
+from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
 
 # Console for rich output
 console = Console()
@@ -38,8 +38,8 @@ def main():
     main_log, error_log, _ = configure_session_logging("dsm_one_second_test", "INFO")
     logger.info(f"Logs: {main_log} and {error_log}")
 
-    # Create DSM instance
-    dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    # Create CKVD instance
+    ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
     # Use one-second interval
     interval = Interval.SECOND_1
@@ -52,7 +52,7 @@ def main():
 
     try:
         # Retrieve data
-        df = dsm.get_data(
+        df = ckvd.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,

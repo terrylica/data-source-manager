@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pytest
 
-from data_source_manager.utils.for_core.dsm_time_range_utils import merge_dataframes
+from ckvd.utils.for_core.ckvd_time_range_utils import merge_dataframes
 
 
 # =============================================================================

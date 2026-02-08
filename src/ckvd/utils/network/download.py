@@ -22,7 +22,7 @@ from tenacity import (
     wait_incrementing,
 )
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     API_MAX_RETRIES,
     API_RETRY_DELAY,
     DEFAULT_HTTP_TIMEOUT_SECONDS,
@@ -32,9 +32,9 @@ from data_source_manager.utils.config import (
     MEDIUM_BATCH_SIZE,
     SMALL_BATCH_SIZE,
 )
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.network.client_factory import create_client, safely_close_client
-from data_source_manager.utils.network.exceptions import (
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.network.client_factory import create_client, safely_close_client
+from ckvd.utils.network.exceptions import (
     DownloadException,
     DownloadStalledException,
     RateLimitException,

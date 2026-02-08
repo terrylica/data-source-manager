@@ -18,8 +18,8 @@ import pandas as pd
 from rich import print
 from rich.console import Console
 
-from data_source_manager.utils.config import HTTP_OK, SECONDS_IN_MINUTE
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.config import HTTP_OK, SECONDS_IN_MINUTE
+from ckvd.utils.loguru_setup import logger
 
 # Configure logging
 logger.setup_root(level="INFO")

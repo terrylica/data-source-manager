@@ -7,8 +7,8 @@ providers (OKX, TradeStation) would silently use Binance clients.
 ADR: docs/adr/2025-01-30-failover-control-protocol.md
 
 Usage:
-    >>> from data_source_manager.core.providers import get_provider_clients
-    >>> from data_source_manager import DataProvider, MarketType
+    >>> from ckvd.core.providers import get_provider_clients
+    >>> from ckvd import DataProvider, MarketType
     >>>
     >>> clients = get_provider_clients(DataProvider.BINANCE, MarketType.FUTURES_USDT)
     >>> print(clients.vision)  # Vision API client
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from data_source_manager.utils.market_constraints import DataProvider, MarketType
+from ckvd.utils.market_constraints import DataProvider, MarketType
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     import pandas as pd
     import polars as pl
 
-    from data_source_manager.utils.market_constraints import Interval
+    from ckvd.utils.market_constraints import Interval
 
 
 # =============================================================================
@@ -270,16 +270,16 @@ class BinanceProviderFactory:
             ProviderClients with Binance implementations
         """
         # Import here to avoid circular imports and allow lazy loading
-        from data_source_manager.core.providers.binance.cache_manager import (
+        from ckvd.core.providers.binance.cache_manager import (
             UnifiedCacheManager,
         )
-        from data_source_manager.core.providers.binance.rest_data_client import (
+        from ckvd.core.providers.binance.rest_data_client import (
             RestDataClient,
         )
-        from data_source_manager.core.providers.binance.vision_data_client import (
+        from ckvd.core.providers.binance.vision_data_client import (
             VisionDataClient,
         )
-        from data_source_manager.utils.app_paths import get_cache_dir
+        from ckvd.utils.app_paths import get_cache_dir
 
         # Use default cache directory if not specified
         if cache_dir is None:
@@ -349,13 +349,13 @@ class OKXProviderFactory:
             ProviderClients with OKX implementations (vision=None)
         """
         # Import here to avoid circular imports and allow lazy loading
-        from data_source_manager.core.providers.binance.cache_manager import (
+        from ckvd.core.providers.binance.cache_manager import (
             UnifiedCacheManager,
         )
-        from data_source_manager.core.providers.okx.okx_rest_client import (
+        from ckvd.core.providers.okx.okx_rest_client import (
             OKXRestClient,
         )
-        from data_source_manager.utils.app_paths import get_cache_dir
+        from ckvd.utils.app_paths import get_cache_dir
 
         # Use default cache directory if not specified
         if cache_dir is None:

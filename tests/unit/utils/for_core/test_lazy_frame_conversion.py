@@ -355,7 +355,7 @@ class TestPolarsToAndFromPandas:
         """LazyFrame collect then to_pandas should work correctly.
 
         Pattern: lf.collect().to_pandas()
-        This is the current DSM pattern for returning pandas from Polars pipeline.
+        This is the current CKVD pattern for returning pandas from Polars pipeline.
         """
         pl_df = make_polars_df(base_time, hours=6, source="CACHE")
         lf = pl_df.lazy()

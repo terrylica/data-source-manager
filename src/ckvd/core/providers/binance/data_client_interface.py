@@ -8,14 +8,14 @@ from datetime import datetime
 
 import pandas as pd
 
-from data_source_manager.utils.market_constraints import ChartType, DataProvider
+from ckvd.utils.market_constraints import ChartType, DataProvider
 
 
 class DataClientInterface(ABC):
     """Interface for data clients to implement.
 
     This abstract base class defines the common interface that all data clients
-    must implement to be used with the DataSourceManager.
+    must implement to be used with the CryptoKlineVisionData.
 
     Implementation Guidelines:
     1. All concrete implementations should properly validate parameters

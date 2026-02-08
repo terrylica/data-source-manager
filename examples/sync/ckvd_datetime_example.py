@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Example demonstrating proper datetime handling with Data Source Manager.
+"""Example demonstrating proper datetime handling with Crypto Kline Vision Data.
 
 This example shows best practices for:
 1. Working with timezone-aware datetimes
@@ -23,14 +23,14 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 # Project imports (after path setup)
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.dataframe_utils import verify_data_completeness
-from data_source_manager.utils.for_core.dsm_utilities import (
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.dataframe_utils import verify_data_completeness
+from ckvd.utils.for_core.ckvd_utilities import (
     check_window_data_completeness,
     safely_reindex_dataframe,
 )
-from data_source_manager.utils.loguru_setup import configure_session_logging, logger
-from data_source_manager.utils.market_constraints import DataProvider, Interval, MarketType
+from ckvd.utils.loguru_setup import configure_session_logging, logger
+from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
 
 # Console for rich output
 console = Console()
@@ -42,11 +42,11 @@ def setup():
     main_log, error_log, _ = configure_session_logging("dsm_datetime_example", "INFO")
     logger.info(f"Logs: {main_log} and {error_log}")
 
-    # Create DSM instance
-    return DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    # Create CKVD instance
+    return CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
 
-def example_timezone_aware_retrieval(dsm):
+def example_timezone_aware_retrieval(ckvd):
     """Demonstrate retrieval with proper timezone handling."""
     console.print(Panel("Example 1: Timezone-Aware DateTime Retrieval", style="green"))
 
@@ -57,7 +57,7 @@ def example_timezone_aware_retrieval(dsm):
     logger.info(f"Retrieving data from {start_time} to {end_time}")
 
     # Retrieve data
-    df = dsm.get_data(
+    df = ckvd.get_data(
         symbol="BTCUSDT",
         start_time=start_time,
         end_time=end_time,
@@ -181,14 +181,14 @@ def main():
     """Run the examples."""
     try:
         # Setup
-        dsm = setup()
+        ckvd = setup()
 
         # Always use timezone-aware datetimes
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(days=3)
 
         # Example 1: Basic retrieval
-        df = example_timezone_aware_retrieval(dsm)
+        df = example_timezone_aware_retrieval(ckvd)
 
         # Example 2: Check data completeness
         example_check_data_completeness(df, start_time, end_time)

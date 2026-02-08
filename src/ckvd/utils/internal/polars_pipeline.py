@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -50,7 +50,7 @@ class PolarsDataPipeline:
     dsm_time_range_utils.py but using Polars LazyFrame operations for
     better memory efficiency and predicate pushdown.
 
-    The pipeline is always active internally in DataSourceManager
+    The pipeline is always active internally in CryptoKlineVisionData
     (USE_POLARS_PIPELINE flag was removed in v3.1.0).
     """
 
@@ -255,21 +255,21 @@ class PolarsDataPipeline:
         """
         if self.is_empty():
             logger.warning("Pipeline is empty, returning empty pandas DataFrame")
-            from data_source_manager.utils.config import create_empty_dataframe
+            from ckvd.utils.config import create_empty_dataframe
 
             return create_empty_dataframe()
 
         pl_df = self.collect_polars(use_streaming=use_streaming)
 
         if pl_df.is_empty():
-            from data_source_manager.utils.config import create_empty_dataframe
+            from ckvd.utils.config import create_empty_dataframe
 
             return create_empty_dataframe()
 
         # Convert to pandas
         pd_df = pl_df.to_pandas()
 
-        # Set open_time as index (standard DSM format)
+        # Set open_time as index (standard CKVD format)
         if "open_time" in pd_df.columns:
             pd_df = pd_df.set_index("open_time")
 

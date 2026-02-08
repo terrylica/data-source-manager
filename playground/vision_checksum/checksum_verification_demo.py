@@ -29,13 +29,13 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from data_source_manager.utils.config import HTTP_OK
-from data_source_manager.utils.for_core.vision_checksum import (
+from ckvd.utils.config import HTTP_OK
+from ckvd.utils.for_core.vision_checksum import (
     extract_checksum_from_file,
     verify_file_checksum,
 )
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.validation import DataValidation
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.validation import DataValidation
 
 
 def setup_argparse() -> argparse.ArgumentParser:

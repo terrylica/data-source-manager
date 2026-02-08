@@ -14,7 +14,7 @@ from pathlib import Path
 import polars as pl
 import pyarrow as pa
 
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 __all__ = [
     "SafeMemoryMap",

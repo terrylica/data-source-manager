@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-# polars-exception: DSM utilities work with pandas DataFrames for reindexing and validation
+# polars-exception: CKVD utilities work with pandas DataFrames for reindexing and validation
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
-"""Utility functions for working with DataSourceManager data.
+"""Utility functions for working with CryptoKlineVisionData data.
 
 This module provides helper functions for:
 1. Reindexing DataFrames across different data sources
@@ -15,10 +15,10 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from data_source_manager.utils.config import CANONICAL_INDEX_NAME
-from data_source_manager.utils.dataframe_utils import ensure_open_time_as_index
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
+from ckvd.utils.config import CANONICAL_INDEX_NAME
+from ckvd.utils.dataframe_utils import ensure_open_time_as_index
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
 
 
 def safely_reindex_dataframe(

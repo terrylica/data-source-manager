@@ -1,4 +1,4 @@
-"""Unit tests for DataSourceManager.get_data() core path.
+"""Unit tests for CryptoKlineVisionData.get_data() core path.
 
 Tests the Failover Control Protocol (FCP) orchestration logic:
 1. Initialization tests
@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 # =============================================================================
@@ -52,13 +52,13 @@ def historical_time_range():
 # =============================================================================
 
 
-@patch("data_source_manager.core.sync.data_source_manager.get_provider_clients")
-class TestDataSourceManagerInitialization:
-    """Tests for DataSourceManager initialization."""
+@patch("ckvd.core.sync.crypto_kline_vision_data.get_provider_clients")
+class TestCryptoKlineVisionDataInitialization:
+    """Tests for CryptoKlineVisionData initialization."""
 
     def _create_mock_clients(self, provider=DataProvider.BINANCE, market_type=MarketType.SPOT):
         """Helper to create mock ProviderClients."""
-        from data_source_manager.core.providers import ProviderClients
+        from ckvd.core.providers import ProviderClients
 
         return ProviderClients(
             vision=MagicMock(),
@@ -74,7 +74,7 @@ class TestDataSourceManagerInitialization:
             DataProvider.BINANCE, MarketType.SPOT
         )
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         assert manager is not None
         assert manager.market_type == MarketType.SPOT
@@ -87,7 +87,7 @@ class TestDataSourceManagerInitialization:
             DataProvider.BINANCE, MarketType.FUTURES_USDT
         )
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         assert manager is not None
         assert manager.market_type == MarketType.FUTURES_USDT
@@ -99,7 +99,7 @@ class TestDataSourceManagerInitialization:
             DataProvider.BINANCE, MarketType.FUTURES_COIN
         )
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 
         assert manager is not None
         assert manager.market_type == MarketType.FUTURES_COIN
@@ -109,7 +109,7 @@ class TestDataSourceManagerInitialization:
         """Verify manager creation with cache disabled."""
         mock_get_clients.return_value = self._create_mock_clients()
 
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.SPOT,
             use_cache=False,
@@ -125,7 +125,7 @@ class TestInputValidation:
 
     def test_invalid_time_range_raises_error(self):
         """start_time >= end_time should raise RuntimeError (wrapping ValueError)."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
         now = datetime.now(timezone.utc)
 
         # ValueError is wrapped in RuntimeError by the error handler
@@ -141,7 +141,7 @@ class TestInputValidation:
 
     def test_manager_creation_succeeds(self):
         """Manager creation should succeed with valid parameters."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
         assert manager is not None
         assert manager.provider == DataProvider.BINANCE
         assert manager.market_type == MarketType.SPOT
@@ -156,14 +156,14 @@ class TestInputValidation:
 class TestFundingRateRouting:
     """Tests for ChartType.FUNDING_RATE routing to _fetch_funding_rate()."""
 
-    @patch("data_source_manager.core.sync.data_source_manager.BinanceFundingRateClient")
+    @patch("ckvd.core.sync.crypto_kline_vision_data.BinanceFundingRateClient")
     def test_funding_rate_routes_to_dedicated_method(
         self,
         mock_funding_client,
         historical_time_range,
     ):
         """get_data with ChartType.FUNDING_RATE should route to _fetch_funding_rate."""
-        from data_source_manager.utils.market_constraints import ChartType
+        from ckvd.utils.market_constraints import ChartType
 
         # Arrange
         start_time, end_time = historical_time_range
@@ -177,7 +177,7 @@ class TestFundingRateRouting:
         })
         mock_funding_client.return_value = mock_client_instance
 
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.FUTURES_USDT,
         )
@@ -202,12 +202,12 @@ class TestFundingRateRouting:
         historical_time_range,
     ):
         """Funding rate with SPOT market should raise ValueError."""
-        from data_source_manager.utils.market_constraints import ChartType
+        from ckvd.utils.market_constraints import ChartType
 
         # Arrange
         start_time, end_time = historical_time_range
 
-        manager = DataSourceManager.create(
+        manager = CryptoKlineVisionData.create(
             DataProvider.BINANCE,
             MarketType.SPOT,  # Invalid for funding rate
         )

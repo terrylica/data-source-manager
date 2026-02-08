@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for DSM logging improvements.
+"""Unit tests for CKVD logging improvements.
 
 This test module verifies that the new logging control features work correctly:
 1. HTTP debug logging is suppressed by default
@@ -12,17 +12,17 @@ import logging
 import pytest
 from unittest.mock import patch, MagicMock
 
-from data_source_manager.core.sync.data_source_manager import DataSourceManager, DataSourceConfig
-from data_source_manager.utils.loguru_setup import suppress_http_logging
-from data_source_manager.utils.market_constraints import DataProvider, MarketType
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData, CKVDConfig
+from ckvd.utils.loguru_setup import suppress_http_logging
+from ckvd.utils.market_constraints import DataProvider, MarketType
 
 
-class TestDataSourceConfig:
-    """Test the enhanced DataSourceConfig with logging parameters."""
+class TestCKVDConfig:
+    """Test the enhanced CKVDConfig with logging parameters."""
     
     def test_default_logging_config(self):
         """Test that default logging configuration is correct."""
-        config = DataSourceConfig(
+        config = CKVDConfig(
             market_type=MarketType.SPOT,
             provider=DataProvider.BINANCE
         )
@@ -33,7 +33,7 @@ class TestDataSourceConfig:
     
     def test_custom_logging_config(self):
         """Test custom logging configuration."""
-        config = DataSourceConfig(
+        config = CKVDConfig(
             market_type=MarketType.SPOT,
             provider=DataProvider.BINANCE,
             log_level="DEBUG",
@@ -48,7 +48,7 @@ class TestDataSourceConfig:
     def test_log_level_validation(self):
         """Test that invalid log levels are rejected."""
         with pytest.raises(ValueError):
-            DataSourceConfig(
+            CKVDConfig(
                 market_type=MarketType.SPOT,
                 provider=DataProvider.BINANCE,
                 log_level="INVALID"
@@ -56,7 +56,7 @@ class TestDataSourceConfig:
     
     def test_log_level_case_conversion(self):
         """Test that log levels are converted to uppercase."""
-        config = DataSourceConfig(
+        config = CKVDConfig(
             market_type=MarketType.SPOT,
             provider=DataProvider.BINANCE,
             log_level="debug"
@@ -65,14 +65,14 @@ class TestDataSourceConfig:
         assert config.log_level == "DEBUG"
 
 
-class TestDataSourceManagerLogging:
-    """Test DataSourceManager logging functionality."""
+class TestCryptoKlineVisionDataLogging:
+    """Test CryptoKlineVisionData logging functionality."""
 
-    @patch("data_source_manager.core.sync.data_source_manager.get_provider_clients")
+    @patch("ckvd.core.sync.crypto_kline_vision_data.get_provider_clients")
     def test_default_logging_configuration(self, mock_get_clients):
-        """Test that DataSourceManager configures logging correctly by default."""
+        """Test that CryptoKlineVisionData configures logging correctly by default."""
         # Mock the factory
-        from data_source_manager.core.providers import ProviderClients
+        from ckvd.core.providers import ProviderClients
 
         mock_get_clients.return_value = ProviderClients(
             vision=MagicMock(),
@@ -95,8 +95,8 @@ class TestDataSourceManagerLogging:
 
             mock_get_logger.side_effect = get_logger_side_effect
 
-            # Create DSM with default settings
-            dsm = DataSourceManager(
+            # Create CKVD with default settings
+            ckvd = CryptoKlineVisionData(
                 provider=DataProvider.BINANCE,
                 market_type=MarketType.SPOT
             )
@@ -105,13 +105,13 @@ class TestDataSourceManagerLogging:
             mock_httpcore_logger.setLevel.assert_called_with(logging.WARNING)
             mock_httpx_logger.setLevel.assert_called_with(logging.WARNING)
 
-            dsm.close()
+            ckvd.close()
 
-    @patch("data_source_manager.core.sync.data_source_manager.get_provider_clients")
+    @patch("ckvd.core.sync.crypto_kline_vision_data.get_provider_clients")
     def test_debug_logging_configuration(self, mock_get_clients):
         """Test that debug mode enables HTTP logging."""
         # Mock the factory
-        from data_source_manager.core.providers import ProviderClients
+        from ckvd.core.providers import ProviderClients
 
         mock_get_clients.return_value = ProviderClients(
             vision=MagicMock(),
@@ -134,8 +134,8 @@ class TestDataSourceManagerLogging:
 
             mock_get_logger.side_effect = get_logger_side_effect
 
-            # Create DSM with debug logging
-            dsm = DataSourceManager(
+            # Create CKVD with debug logging
+            ckvd = CryptoKlineVisionData(
                 provider=DataProvider.BINANCE,
                 market_type=MarketType.SPOT,
                 log_level="DEBUG",
@@ -146,13 +146,13 @@ class TestDataSourceManagerLogging:
             mock_httpcore_logger.setLevel.assert_called_with(logging.DEBUG)
             mock_httpx_logger.setLevel.assert_called_with(logging.DEBUG)
 
-            dsm.close()
+            ckvd.close()
 
-    @patch("data_source_manager.core.sync.data_source_manager.get_provider_clients")
+    @patch("ckvd.core.sync.crypto_kline_vision_data.get_provider_clients")
     def test_dynamic_reconfiguration(self, mock_get_clients):
         """Test dynamic logging reconfiguration."""
         # Mock the factory
-        from data_source_manager.core.providers import ProviderClients
+        from ckvd.core.providers import ProviderClients
 
         mock_get_clients.return_value = ProviderClients(
             vision=MagicMock(),
@@ -172,27 +172,27 @@ class TestDataSourceManagerLogging:
 
             mock_get_logger.side_effect = get_logger_side_effect
 
-            # Create DSM with default settings
-            dsm = DataSourceManager(
+            # Create CKVD with default settings
+            ckvd = CryptoKlineVisionData(
                 provider=DataProvider.BINANCE,
                 market_type=MarketType.SPOT
             )
 
             # Verify initial configuration
-            assert dsm.log_level == "WARNING"
-            assert dsm.suppress_http_debug is True
+            assert ckvd.log_level == "WARNING"
+            assert ckvd.suppress_http_debug is True
 
             # Reconfigure to debug mode
-            dsm.reconfigure_logging(log_level="DEBUG", suppress_http_debug=False)
+            ckvd.reconfigure_logging(log_level="DEBUG", suppress_http_debug=False)
 
             # Verify configuration changed
-            assert dsm.log_level == "DEBUG"
-            assert dsm.suppress_http_debug is False
+            assert ckvd.log_level == "DEBUG"
+            assert ckvd.suppress_http_debug is False
 
             # Verify HTTP logger was reconfigured
             mock_httpcore_logger.setLevel.assert_called_with(logging.DEBUG)
 
-            dsm.close()
+            ckvd.close()
 
 
 class TestCleanLoggingUtilities:
@@ -227,7 +227,7 @@ class TestBackwardCompatibility:
     def test_create_method_backward_compatibility(self):
         """Test that the create method still works with old parameters."""
         # This should work without any logging parameters
-        config = DataSourceConfig.create(
+        config = CKVDConfig.create(
             DataProvider.BINANCE,
             MarketType.SPOT,
             use_cache=True,
@@ -239,11 +239,11 @@ class TestBackwardCompatibility:
         assert config.suppress_http_debug is True
         assert config.quiet_mode is False
 
-    @patch("data_source_manager.core.sync.data_source_manager.get_provider_clients")
+    @patch("ckvd.core.sync.crypto_kline_vision_data.get_provider_clients")
     def test_old_init_signature(self, mock_get_clients):
         """Test that old __init__ signature still works."""
         # Mock the factory
-        from data_source_manager.core.providers import ProviderClients
+        from ckvd.core.providers import ProviderClients
 
         mock_get_clients.return_value = ProviderClients(
             vision=MagicMock(),
@@ -255,7 +255,7 @@ class TestBackwardCompatibility:
 
         with patch("logging.getLogger"):
             # This should work with old-style parameters
-            dsm = DataSourceManager(
+            ckvd = CryptoKlineVisionData(
                 provider=DataProvider.BINANCE,
                 market_type=MarketType.SPOT,
                 use_cache=True,
@@ -263,11 +263,11 @@ class TestBackwardCompatibility:
             )
 
             # Should use default logging values
-            assert dsm.log_level == "WARNING"
-            assert dsm.suppress_http_debug is True
-            assert dsm.quiet_mode is False
+            assert ckvd.log_level == "WARNING"
+            assert ckvd.suppress_http_debug is True
+            assert ckvd.quiet_mode is False
 
-            dsm.close()
+            ckvd.close()
 
 
 if __name__ == "__main__":

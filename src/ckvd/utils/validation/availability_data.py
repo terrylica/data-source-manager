@@ -18,8 +18,8 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import MarketType
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import MarketType
 
 __all__ = [
     "FuturesAvailabilityWarning",
@@ -31,10 +31,10 @@ __all__ = [
 ]
 
 # Path to CSV reports directory (relative to this file)
-# From: src/data_source_manager/utils/validation/availability_data.py
+# From: src/ckvd/utils/validation/availability_data.py
 # To:   scripts/binance_vision_api_aws_s3/reports/
-# Need: .parent (validation) -> .parent (utils) -> .parent (data_source_manager)
-#       -> .parent (src) -> .parent (data-source-manager repo root)
+# Need: .parent (validation) -> .parent (utils) -> .parent (ckvd)
+#       -> .parent (src) -> .parent (crypto-kline-vision-data repo root)
 REPORTS_DIR = (
     Path(__file__).parent.parent.parent.parent.parent
     / "scripts"

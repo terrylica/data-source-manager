@@ -2,17 +2,17 @@
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Note: This file uses pandas due to tight integration with standardize_columns
 # and FCP merge logic. Full Polars migration would require broader changes.
-"""Utility functions for DataSourceManager time range and data segment operations."""
+"""Utility functions for CryptoKlineVisionData time range and data segment operations."""
 
 from datetime import datetime, timedelta
 
 import pandas as pd
 
-from data_source_manager.utils.config import REST_IS_STANDARD
-from data_source_manager.utils.dataframe_utils import ensure_open_time_as_column, standardize_dataframe
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
-from data_source_manager.utils.time_utils import standardize_timestamp_precision
+from ckvd.utils.config import REST_IS_STANDARD
+from ckvd.utils.dataframe_utils import ensure_open_time_as_column, standardize_dataframe
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
+from ckvd.utils.time_utils import standardize_timestamp_precision
 
 
 def merge_adjacent_ranges(ranges: list[tuple[datetime, datetime]], interval: Interval) -> list[tuple[datetime, datetime]]:
@@ -180,7 +180,7 @@ def identify_missing_segments(
     min_time, max_time = df["open_time"].min(), df["open_time"].max()
     logger.debug(f"Data spans from {min_time} to {max_time}")
 
-    from data_source_manager.utils.gap_detector import detect_gaps
+    from ckvd.utils.gap_detector import detect_gaps
 
     gaps, stats = detect_gaps(
         df=df,
@@ -232,7 +232,7 @@ def merge_dataframes(dfs: list[pd.DataFrame]) -> pd.DataFrame:
     """
     if not dfs:
         logger.warning("Empty list of DataFrames to merge")
-        from data_source_manager.utils.config import create_empty_dataframe
+        from ckvd.utils.config import create_empty_dataframe
 
         return create_empty_dataframe()
 

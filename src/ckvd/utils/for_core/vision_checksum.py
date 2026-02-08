@@ -15,8 +15,8 @@ from pathlib import Path
 
 from rich import print as rprint
 
-from data_source_manager.utils.config import SHA256_HASH_LENGTH
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.config import SHA256_HASH_LENGTH
+from ckvd.utils.loguru_setup import logger
 
 # Pre-compiled regex patterns for SHA256 checksum validation
 SHA256_PATTERN = re.compile(r"([a-fA-F0-9]{64})")

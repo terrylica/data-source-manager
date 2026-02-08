@@ -2,7 +2,7 @@
 """Market constraints and configuration for data retrieval operations.
 
 DEPRECATED: This module is a backward-compatibility re-export from the market/ subpackage.
-Import directly from data_source_manager.utils.market for new code.
+Import directly from ckvd.utils.market for new code.
 
 This module re-exports all symbols from the market/ subpackage to maintain
 backward compatibility with existing code that imports from this location.
@@ -12,7 +12,7 @@ backward compatibility with existing code that imports from this location.
 """
 
 # Re-export everything from the market subpackage
-from data_source_manager.utils.market import (
+from ckvd.utils.market import (
     MARKET_CAPABILITIES,
     OKX_MARKET_CAPABILITIES,
     ChartType,

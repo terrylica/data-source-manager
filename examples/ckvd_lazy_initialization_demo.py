@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
-"""Demonstration of DSM Import and Initialization Performance.
+"""Demonstration of CKVD Import and Initialization Performance.
 
-This script demonstrates DSM's import performance and initialization patterns.
+This script demonstrates CKVD's import performance and initialization patterns.
 It shows:
 
 1. Fast imports (similar to pandas, SQLAlchemy)
@@ -17,13 +17,13 @@ import time
 
 
 def benchmark_import_speed() -> tuple[float, float]:
-    """Benchmark DSM import speed vs industry standards."""
-    print("🚀 DSM Import Speed Benchmark")
+    """Benchmark CKVD import speed vs industry standards."""
+    print("🚀 CKVD Import Speed Benchmark")
     print("=" * 50)
 
-    # Benchmark DSM import
+    # Benchmark CKVD import
     start_time = time.time()
-    from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType  # noqa: F401
+    from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType  # noqa: F401
 
     dsm_import_time = time.time() - start_time
 
@@ -33,21 +33,21 @@ def benchmark_import_speed() -> tuple[float, float]:
 
     pandas_import_time = time.time() - start_time
 
-    print(f"📊 DSM import time:    {dsm_import_time:.3f}s")
+    print(f"📊 CKVD import time:    {dsm_import_time:.3f}s")
     print(f"📊 Pandas import time: {pandas_import_time:.3f}s")
 
     # Avoid division by zero - if pandas imported instantly, use a small epsilon
     if pandas_import_time > 0.001:
         ratio = dsm_import_time / pandas_import_time
-        print(f"📊 Ratio (DSM/Pandas): {ratio:.2f}x")
+        print(f"📊 Ratio (CKVD/Pandas): {ratio:.2f}x")
     else:
-        print("📊 Ratio (DSM/Pandas): Both imports very fast (<1ms)")
+        print("📊 Ratio (CKVD/Pandas): Both imports very fast (<1ms)")
 
     # Should be similar speed to pandas
     if dsm_import_time < 0.5:
-        print("✅ PASS: DSM import is fast (<500ms)")
+        print("✅ PASS: CKVD import is fast (<500ms)")
     else:
-        print("⚠️  WARN: DSM import is slower than expected (>500ms)")
+        print("⚠️  WARN: CKVD import is slower than expected (>500ms)")
 
     print()
     return dsm_import_time, pandas_import_time
@@ -58,10 +58,10 @@ def demonstrate_factory_creation() -> None:
     print("🔄 Factory Creation Demonstration")
     print("=" * 50)
 
-    from data_source_manager import DataProvider, DataSourceManager, MarketType
+    from ckvd import DataProvider, CryptoKlineVisionData, MarketType
 
     # Factory creation
-    print("Creating DSM manager instances...")
+    print("Creating CKVD manager instances...")
     start_time = time.time()
 
     managers = []
@@ -69,7 +69,7 @@ def demonstrate_factory_creation() -> None:
 
     for i, market_type in enumerate(market_types):
         create_start = time.time()
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
         managers.append(manager)
         create_time = time.time() - create_start
         print(f"  Manager {i + 1} ({market_type.name}): Created in {create_time:.4f}s")
@@ -91,12 +91,12 @@ def demonstrate_configuration_patterns() -> None:
     print("⚙️  Configuration Pattern Demonstration")
     print("=" * 50)
 
-    from data_source_manager import DataProvider, DataSourceManager, MarketType
-    from data_source_manager.core.sync.data_source_manager import DataSource
+    from ckvd import DataProvider, CryptoKlineVisionData, MarketType
+    from ckvd.core.sync.crypto_kline_vision_data import DataSource
 
     # Basic configuration - default FCP
     print("1. Basic Configuration (FCP: Cache → Vision → REST):")
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
     print(f"   Provider: {DataProvider.BINANCE.name}")
     print(f"   Market: {MarketType.SPOT.name}")
     print("   FCP: Cache → Vision → REST (default)")
@@ -125,7 +125,7 @@ def demonstrate_configuration_patterns() -> None:
 
 
 def test_import_after_scipy() -> None:
-    """Test that DSM imports work after scipy (original problem)."""
+    """Test that CKVD imports work after scipy (original problem)."""
     print("🧪 Import After SciPy Test")
     print("=" * 50)
 
@@ -136,51 +136,51 @@ def test_import_after_scipy() -> None:
 
         print("✅ SciPy modules imported successfully")
 
-        # Now import DSM - measure time
-        print("Importing DSM after scipy...")
+        # Now import CKVD - measure time
+        print("Importing CKVD after scipy...")
         start_time = time.time()
 
-        from data_source_manager import DataProvider, DataSourceManager, MarketType
+        from ckvd import DataProvider, CryptoKlineVisionData, MarketType
 
         import_time = time.time() - start_time
-        print(f"📊 DSM import after scipy: {import_time:.3f}s")
+        print(f"📊 CKVD import after scipy: {import_time:.3f}s")
 
         if import_time < 1.0:
-            print("✅ PASS: DSM imports quickly after scipy")
+            print("✅ PASS: CKVD imports quickly after scipy")
         else:
-            print("⚠️  WARN: DSM import slower than expected after scipy")
+            print("⚠️  WARN: CKVD import slower than expected after scipy")
 
         # Test functionality
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
         manager.close()
-        print("✅ SUCCESS: DSM manager created successfully after scipy")
+        print("✅ SUCCESS: CKVD manager created successfully after scipy")
 
     except ImportError as e:
         print(f"⚠️  SKIP: SciPy not available ({e})")
         print("   (Install with 'uv pip install scipy' to run this test)")
-        print("   Continuing with DSM-only test...")
+        print("   Continuing with CKVD-only test...")
 
-        # Test DSM import directly
-        from data_source_manager import DataProvider, DataSourceManager, MarketType
+        # Test CKVD import directly
+        from ckvd import DataProvider, CryptoKlineVisionData, MarketType
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
         manager.close()
-        print("✅ DSM imports and creates managers successfully")
+        print("✅ CKVD imports and creates managers successfully")
 
     print()
 
 
 def demonstrate_industry_comparisons() -> None:
-    """Compare DSM patterns with industry standards."""
+    """Compare CKVD patterns with industry standards."""
     print("🏭 Industry Standard Comparisons")
     print("=" * 50)
 
-    print("DSM follows the same patterns as:")
+    print("CKVD follows the same patterns as:")
     print()
 
     print("1. 📊 SQLAlchemy Pattern:")
-    print("   from data_source_manager import DataSourceManager")
-    print("   manager = DataSourceManager.create(provider, market_type)")
+    print("   from ckvd import CryptoKlineVisionData")
+    print("   manager = CryptoKlineVisionData.create(provider, market_type)")
     print("   🔗 Similar to: engine = create_engine(...)")
     print()
 
@@ -208,16 +208,16 @@ def demonstrate_backwards_compatibility() -> None:
     print("🔄 High-Level API Compatibility Test")
     print("=" * 50)
 
-    # The primary API is DataSourceManager.create() + get_data()
+    # The primary API is CryptoKlineVisionData.create() + get_data()
     # fetch_market_data is a convenience wrapper
-    print("Primary API: DataSourceManager.create() + get_data()")
+    print("Primary API: CryptoKlineVisionData.create() + get_data()")
     print("  - Factory pattern for manager creation")
     print("  - FCP-enabled data retrieval")
     print("  - Explicit resource cleanup with close()")
 
     print("\nAlternative: fetch_market_data() high-level wrapper")
     print("  - Single function for simple use cases")
-    print("  - Uses DataSourceManager internally with FCP")
+    print("  - Uses CryptoKlineVisionData internally with FCP")
 
     print("\n✅ Both APIs follow industry standard patterns")
     print()
@@ -225,9 +225,9 @@ def demonstrate_backwards_compatibility() -> None:
 
 def run_comprehensive_demo() -> None:
     """Run the complete demonstration."""
-    print("🎯 DSM Import and Initialization Demo")
+    print("🎯 CKVD Import and Initialization Demo")
     print("=" * 60)
-    print("This demonstrates DSM's import performance and")
+    print("This demonstrates CKVD's import performance and")
     print("initialization patterns following industry standards.")
     print("=" * 60)
     print()
@@ -247,7 +247,7 @@ def run_comprehensive_demo() -> None:
     print("✅ Configuration system: Complete")
     print("✅ Industry patterns: Implemented")
     print()
-    print("🚀 DSM is ready for production use!")
+    print("🚀 CKVD is ready for production use!")
     print("   Follows industry best practices!")
 
 

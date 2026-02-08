@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from data_source_manager.utils.config import SECONDS_IN_HOUR
+from ckvd.utils.config import SECONDS_IN_HOUR
 from tests.okx.conftest import (
     CANDLES_ENDPOINT,
     HISTORY_CANDLES_ENDPOINT as HISTORY_ENDPOINT,

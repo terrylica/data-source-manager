@@ -6,10 +6,10 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from data_source_manager.utils.config import KLINE_COLUMNS
-from data_source_manager.utils.for_core.vision_timestamp import process_timestamp_columns
-from data_source_manager.utils.market_constraints import Interval
-from data_source_manager.utils.time_utils import filter_dataframe_by_time
+from ckvd.utils.config import KLINE_COLUMNS
+from ckvd.utils.for_core.vision_timestamp import process_timestamp_columns
+from ckvd.utils.market_constraints import Interval
+from ckvd.utils.time_utils import filter_dataframe_by_time
 
 
 class TestTimestampSemantics(unittest.TestCase):

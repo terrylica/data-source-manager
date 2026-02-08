@@ -19,7 +19,7 @@ from tenacity import (
     wait_incrementing,
 )
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     API_MAX_RETRIES,
     API_RETRY_DELAY,
     API_TIMEOUT,
@@ -27,9 +27,9 @@ from data_source_manager.utils.config import (
     HTTP_ERROR_CODE_THRESHOLD,
     HTTP_OK,
 )
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.network.client_factory import create_client, safely_close_client
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.network.client_factory import create_client, safely_close_client
 
 __all__ = [
     "make_api_request",

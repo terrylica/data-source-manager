@@ -15,13 +15,13 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
-from data_source_manager.utils.for_core.rest_exceptions import (
+from ckvd.core.providers.binance.rest_data_client import RestDataClient
+from ckvd.utils.for_core.rest_exceptions import (
     HTTPError,
     JSONDecodeError,
     RateLimitError,
 )
-from data_source_manager.utils.market_constraints import Interval, MarketType
+from ckvd.utils.market_constraints import Interval, MarketType
 
 
 class TestRestDataClientInitialization:
@@ -134,8 +134,8 @@ class TestRestDataClientFetch:
             ],
         ]
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_successful_fetch_returns_dataframe(
         self,
         mock_create_client,
@@ -171,8 +171,8 @@ class TestRestDataClientFetch:
         assert "close" in df.columns
         assert "volume" in df.columns
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_empty_response_returns_empty_dataframe(
         self,
         mock_create_client,
@@ -203,8 +203,8 @@ class TestRestDataClientFetch:
 class TestRestDataClientErrorHandling:
     """Tests for RestDataClient error handling."""
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_rate_limit_error_propagates(
         self,
         mock_create_client,
@@ -229,8 +229,8 @@ class TestRestDataClientErrorHandling:
                     end_time=end_time,
                 )
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_http_403_returns_empty_dataframe(
         self,
         mock_create_client,
@@ -258,8 +258,8 @@ class TestRestDataClientErrorHandling:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 0
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_json_decode_error_returns_empty_dataframe(
         self,
         mock_create_client,
@@ -286,8 +286,8 @@ class TestRestDataClientErrorHandling:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 0
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_timeout_error_returns_empty_dataframe(
         self,
         mock_create_client,
@@ -370,8 +370,8 @@ class TestRestDataClientInputValidation:
                     end_time=end_time,
                 )
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_interval_string_parsed_correctly(
         self,
         mock_create_client,
@@ -398,8 +398,8 @@ class TestRestDataClientInputValidation:
 
         assert isinstance(df, pd.DataFrame)
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_interval_enum_accepted(
         self,
         mock_create_client,
@@ -465,8 +465,8 @@ class TestRestDataClientParallelFetch:
         with pytest.raises(ValueError, match="max_workers must be at least 1"):
             client.fetch_klines_parallel("BTCUSDT", "1h", ranges, max_workers=0)
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_parallel_fetch_single_range(
         self,
         mock_create_client,
@@ -509,8 +509,8 @@ class TestRestDataClientParallelFetch:
         for result in results:
             assert isinstance(result, pd.DataFrame)
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_parallel_fetch_rate_limit_propagates(
         self,
         mock_create_client,
@@ -530,8 +530,8 @@ class TestRestDataClientParallelFetch:
         with pytest.raises(RateLimitError):
             client.fetch_klines_parallel("BTCUSDT", "1h", ranges, max_workers=2)
 
-    @patch("data_source_manager.core.providers.binance.rest_data_client.fetch_chunk")
-    @patch("data_source_manager.core.providers.binance.rest_data_client.create_optimized_client")
+    @patch("ckvd.core.providers.binance.rest_data_client.fetch_chunk")
+    @patch("ckvd.core.providers.binance.rest_data_client.create_optimized_client")
     def test_parallel_fetch_handles_partial_failures(
         self,
         mock_create_client,

@@ -16,14 +16,14 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     CANONICAL_CLOSE_TIME,
     CANONICAL_INDEX_NAME,
     MICROSECOND_DIGITS,
     MILLISECOND_DIGITS,
     TIMESTAMP_PRECISION,
 )
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Constants for timestamp format detection
 TIMESTAMP_UNIT = "us"  # Default unit for timestamp parsing

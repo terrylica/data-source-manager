@@ -8,15 +8,15 @@ Philosophy: FAIL-FAST with MAXIMUM DEBUG INFORMATION
 - Rich exception details for rapid debugging
 - Aggressive validation with informative error messages
 
-For TiRex Context Stability experiments and DSM time filtering operations.
+For TiRex Context Stability experiments and CKVD time filtering operations.
 """
 
 import pandas as pd
 from datetime import datetime
 from typing import Union
 
-# Use DSM's loguru setup for consistent logging
-from data_source_manager.utils.loguru_setup import logger
+# Use CKVD's loguru setup for consistent logging
+from ckvd.utils.loguru_setup import logger
 
 
 class TimezoneDebugError(Exception):

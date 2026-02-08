@@ -28,10 +28,10 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from rich import print
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     HTTP_OK,
 )
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 app = typer.Typer(
     help="Benchmark ZIP file handling methods for Binance Vision API data",

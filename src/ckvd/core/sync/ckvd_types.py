@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""Data Source Manager types and configuration.
+"""Crypto Kline Vision Data types and configuration.
 
 This module contains the type definitions and configuration classes for the
-DataSourceManager, extracted for better modularity.
+CryptoKlineVisionData, extracted for better modularity.
 
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
-# Refactoring: Extract from data_source_manager.py (1182 lines) for modularity
+# Refactoring: Extract from ckvd.py (1182 lines) for modularity
 """
 
 from __future__ import annotations
@@ -17,14 +17,14 @@ from typing import TypeVar
 
 import attr
 
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, MarketType
+from ckvd.utils.market_constraints import ChartType, DataProvider, MarketType
 
 # Default HTTP timeout in seconds
 DEFAULT_HTTP_TIMEOUT = 30.0
 
 __all__ = [
     "DataSource",
-    "DataSourceConfig",
+    "CKVDConfig",
 ]
 
 
@@ -51,11 +51,11 @@ T = TypeVar("T")
 
 
 @attr.define(slots=True, frozen=True)
-class DataSourceConfig:
-    """Configuration for DataSourceManager.
+class CKVDConfig:
+    """Configuration for CryptoKlineVisionData.
 
     This immutable configuration class uses attrs to provide a strongly typed,
-    validated configuration for the DataSourceManager with proper defaults.
+    validated configuration for the CryptoKlineVisionData with proper defaults.
 
     Attributes:
         market_type: Market type (SPOT, FUTURES_USDT, FUTURES_COIN).
@@ -70,7 +70,7 @@ class DataSourceConfig:
             Default is True. Set to False to always fetch fresh data.
         retry_count: Number of retries for failed requests.
             Default is 5. Increase for less stable networks.
-        log_level: Logging level for DSM operations.
+        log_level: Logging level for CKVD operations.
             Default is 'WARNING'. Can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
         suppress_http_debug: Whether to suppress HTTP debug logging.
             Default is True. Set to False to see detailed HTTP request/response logs.
@@ -84,17 +84,17 @@ class DataSourceConfig:
             Default is [CACHE, VISION, REST]. Customize for different fallback behavior.
 
     Example:
-        >>> from data_source_manager import DataProvider, MarketType, ChartType
+        >>> from ckvd import DataProvider, MarketType, ChartType
         >>> from pathlib import Path
         >>>
         >>> # Basic configuration for SPOT market
-        >>> config = DataSourceConfig(
+        >>> config = CKVDConfig(
         ...     market_type=MarketType.SPOT,
         ...     provider=DataProvider.BINANCE
         ... )
         >>>
         >>> # Configuration with custom logging settings
-        >>> config = DataSourceConfig(
+        >>> config = CKVDConfig(
         ...     market_type=MarketType.FUTURES_USDT,
         ...     provider=DataProvider.BINANCE,
         ...     chart_type=ChartType.FUNDING_RATE,
@@ -105,7 +105,7 @@ class DataSourceConfig:
         ... )
         >>>
         >>> # Configuration for quiet operation
-        >>> config = DataSourceConfig(
+        >>> config = CKVDConfig(
         ...     market_type=MarketType.SPOT,
         ...     provider=DataProvider.BINANCE,
         ...     quiet_mode=True  # Only show errors
@@ -147,7 +147,7 @@ class DataSourceConfig:
 
     @classmethod
     def create(cls: type[T], provider: DataProvider, market_type: MarketType, **kwargs) -> T:
-        """Create a DataSourceConfig with the given provider, market_type and optional overrides.
+        """Create a CKVDConfig with the given provider, market_type and optional overrides.
 
         This is a convenience builder method that allows for a more fluent interface.
 
@@ -157,24 +157,24 @@ class DataSourceConfig:
             **kwargs: Optional parameter overrides
 
         Returns:
-            Configured DataSourceConfig instance
+            Configured CKVDConfig instance
 
         Raises:
             TypeError: If market_type is not a MarketType enum or provider is not a DataProvider enum
             ValueError: If any parameter values are invalid
 
         Example:
-            >>> from data_source_manager import DataProvider, MarketType
+            >>> from ckvd import DataProvider, MarketType
             >>> from pathlib import Path
             >>>
             >>> # Basic configuration for SPOT market
-            >>> config = DataSourceConfig(
+            >>> config = CKVDConfig(
             ...     market_type=MarketType.SPOT,
             ...     provider=DataProvider.BINANCE
             ... )
             >>>
             >>> # Configuration with custom settings
-            >>> config = DataSourceConfig(
+            >>> config = CKVDConfig(
             ...     market_type=MarketType.FUTURES_USDT,
             ...     provider=DataProvider.BINANCE,
             ...     chart_type=ChartType.FUNDING_RATE,

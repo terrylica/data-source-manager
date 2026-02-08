@@ -1,4 +1,4 @@
-"""Performance latency benchmarks for DataSourceManager.
+"""Performance latency benchmarks for CryptoKlineVisionData.
 
 Tests that establish baseline latencies for regression detection:
 - Cache hit latency (target: <10ms)
@@ -14,8 +14,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
-from data_source_manager.core.sync.dsm_types import DataSource
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
+from ckvd.core.sync.ckvd_types import DataSource
 
 
 @pytest.mark.stress
@@ -29,7 +29,7 @@ class TestCacheLatency:
         Actual cache reads are typically <20ms but can vary with system load.
         """
         start, end = historical_time_range
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Warm-up: populate cache
         manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
@@ -55,7 +55,7 @@ class TestCacheLatency:
     def test_cache_latency_consistent(self, historical_time_range):
         """Cache latency should be consistent across repeated reads."""
         start, end = historical_time_range
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Warm-up
         manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
@@ -97,7 +97,7 @@ class TestVisionLatency:
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 7, tzinfo=timezone.utc)  # 1 day
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         start_time = time.perf_counter()
         df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
@@ -113,7 +113,7 @@ class TestVisionLatency:
 
     def test_historical_fetch_scales_with_range(self):
         """Historical fetch time should scale roughly linearly with date range."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # 1 day fetch
         end_1d = datetime(2024, 1, 8, tzinfo=timezone.utc)
@@ -153,7 +153,7 @@ class TestRESTLatency:
         end = datetime.now(timezone.utc) - timedelta(hours=1)
         start = end - timedelta(hours=2)
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         start_time = time.perf_counter()
         df = manager.get_data("BTCUSDT", start, end, Interval.MINUTE_1, enforce_source=DataSource.REST)
@@ -173,7 +173,7 @@ class TestRESTLatency:
         end = datetime.now(timezone.utc) - timedelta(hours=1)
         start = end - timedelta(hours=1)
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         latencies = []
         for _ in range(3):
@@ -203,7 +203,7 @@ class TestFCPTotalLatency:
     def test_fcp_auto_selection_latency(self, historical_time_range):
         """FCP auto source selection should complete efficiently."""
         start, end = historical_time_range
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # First fetch (may hit any source)
         start_time = time.perf_counter()
@@ -233,7 +233,7 @@ class TestFCPTotalLatency:
     def test_fcp_with_source_tracking(self, historical_time_range):
         """FCP with source tracking should report sources used."""
         start, end = historical_time_range
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         start_time = time.perf_counter()
         df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, include_source_info=True)
@@ -262,7 +262,7 @@ class TestFCPTotalLatency:
         end = datetime(2024, 1, 15, tzinfo=timezone.utc)
         start = datetime(2024, 1, 10, tzinfo=timezone.utc)
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         start_time = time.perf_counter()
         df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)

@@ -23,7 +23,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Initialize console for rich output
 console = Console()
@@ -192,7 +192,7 @@ def generate_file_summary(issues, sort_by="count"):
     for file, count in items:
         # Make the path relative to the workspace
         try:
-            rel_path = Path(file).relative_to("/workspaces/data-source-manager")
+            rel_path = Path(file).relative_to("/workspaces/crypto-kline-vision-data")
         except ValueError:
             rel_path = file  # Fall back to full path if relative path fails
 
@@ -261,7 +261,7 @@ def generate_file_error_combinations(issues, sort_by="count"):
 
             # Make the path relative to the workspace
             try:
-                rel_path = Path(file).relative_to("/workspaces/data-source-manager")
+                rel_path = Path(file).relative_to("/workspaces/crypto-kline-vision-data")
             except ValueError:
                 rel_path = file  # Fall back to full path if relative path fails
 
@@ -302,7 +302,7 @@ def generate_file_error_breakdown(issues, sort_by="count"):
 
     for file, errors in items:
         try:
-            rel_path = Path(file).relative_to("/workspaces/data-source-manager")
+            rel_path = Path(file).relative_to("/workspaces/crypto-kline-vision-data")
         except ValueError:
             rel_path = file  # Fall back to full path if relative path fails
 
@@ -355,7 +355,7 @@ def generate_fix_suggestions(issues):
         if issues_list:
             sample = issues_list[0]
             if "filename" in sample and "line_start" in sample:
-                file_path = Path(sample["filename"]).relative_to("/workspaces/data-source-manager")
+                file_path = Path(sample["filename"]).relative_to("/workspaces/crypto-kline-vision-data")
                 line = sample.get("line_start", "?")
                 console.print(f"[yellow]Sample location:[/yellow] {file_path}:{line}")
 

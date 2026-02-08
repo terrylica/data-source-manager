@@ -11,8 +11,8 @@ Tests cover:
 from datetime import datetime, timezone
 
 
-from data_source_manager import MarketType
-from data_source_manager.utils.validation.availability_data import (
+from ckvd import MarketType
+from ckvd.utils.validation.availability_data import (
     FuturesAvailabilityWarning,
     SymbolAvailability,
     _load_csv_data,

@@ -20,8 +20,8 @@ from tenacity import (
     wait_exponential,
 )
 
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
+from ckvd.utils.loguru_setup import logger
 
 # Maximum wait time between retries (seconds)
 MAX_RETRY_WAIT_SECONDS = 120

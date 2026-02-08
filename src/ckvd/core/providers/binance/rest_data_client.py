@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# polars-exception: RestDataClient returns pandas DataFrames for DSM pipeline compatibility
+# polars-exception: RestDataClient returns pandas DataFrames for CKVD pipeline compatibility
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
 """Client for fetching market data from REST APIs with synchronous implementation."""
@@ -10,12 +10,12 @@ from typing import Any
 
 import pandas as pd
 
-from data_source_manager.core.providers.binance.data_client_interface import DataClientInterface
-from data_source_manager.utils.config import (
+from ckvd.core.providers.binance.data_client_interface import DataClientInterface
+from ckvd.utils.config import (
     DEFAULT_HTTP_TIMEOUT_SECONDS,
     REST_MAX_CHUNKS,
 )
-from data_source_manager.utils.for_core.rest_client_utils import (
+from ckvd.utils.for_core.rest_client_utils import (
     calculate_chunks,
     create_optimized_client,
     fetch_chunk,
@@ -24,11 +24,11 @@ from data_source_manager.utils.for_core.rest_client_utils import (
     parse_interval_string,
     validate_request_params,
 )
-from data_source_manager.utils.for_core.rest_data_processing import (
+from ckvd.utils.for_core.rest_data_processing import (
     create_empty_dataframe,
     process_kline_data,
 )
-from data_source_manager.utils.for_core.rest_exceptions import (
+from ckvd.utils.for_core.rest_exceptions import (
     APIError,
     HTTPError,
     JSONDecodeError,
@@ -36,21 +36,21 @@ from data_source_manager.utils.for_core.rest_exceptions import (
     RateLimitError,
     RestAPIError,
 )
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import (
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     Interval,
     MarketType,
     get_market_capabilities,
 )
-from data_source_manager.utils.time_utils import (
+from ckvd.utils.time_utils import (
     align_time_boundaries,
     datetime_to_milliseconds,
     filter_dataframe_by_time,
     milliseconds_to_datetime,
 )
-from data_source_manager.utils.validation import DataFrameValidator
+from ckvd.utils.validation import DataFrameValidator
 
 
 class RestDataClient(DataClientInterface):

@@ -4,7 +4,7 @@
 
 from rich import print
 
-from data_source_manager.utils.market_constraints import MarketType
+from ckvd.utils.market_constraints import MarketType
 
 
 def get_market_type_str(market_type: MarketType) -> str:

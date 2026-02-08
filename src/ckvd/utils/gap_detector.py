@@ -16,9 +16,9 @@ from typing import Any
 import pandas as pd
 from rich import print
 
-from data_source_manager.utils.config import MIN_ROWS_FOR_GAP_DETECTION
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
+from ckvd.utils.config import MIN_ROWS_FOR_GAP_DETECTION
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
 
 
 @dataclass(slots=True)

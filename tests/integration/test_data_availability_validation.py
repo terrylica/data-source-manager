@@ -12,8 +12,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
-from data_source_manager.utils.for_core.vision_exceptions import DataNotAvailableError
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
+from ckvd.utils.for_core.vision_exceptions import DataNotAvailableError
 
 
 @pytest.mark.integration
@@ -22,7 +22,7 @@ class TestDataNotAvailableError:
 
     def test_requesting_data_before_listing_raises_error(self):
         """Requesting BTCUSDT futures data before 2019-12-31 should raise DataNotAvailableError."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # BTCUSDT futures listed 2019-12-31
         ancient_start = datetime(2015, 1, 1, tzinfo=timezone.utc)
@@ -45,7 +45,7 @@ class TestDataNotAvailableError:
 
     def test_requesting_data_after_listing_succeeds(self):
         """Requesting data after listing date should succeed (not raise error)."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Use a historical range that's after listing but old enough for Vision API
         end_time = datetime.now(timezone.utc) - timedelta(days=7)
@@ -63,7 +63,7 @@ class TestDataNotAvailableError:
 
     def test_error_attributes_accessible(self):
         """DataNotAvailableError should have accessible attributes for programmatic handling."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         ancient_start = datetime(2018, 1, 1, tzinfo=timezone.utc)
         ancient_end = datetime(2018, 1, 2, tzinfo=timezone.utc)
@@ -91,7 +91,7 @@ class TestCrossMarketFuturesWarning:
 
     def test_spot_request_before_futures_listing_emits_warning(self, capsys):
         """SPOT request before futures listing should emit stderr warning."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Request 2018 spot data - before BTCUSDT futures was listed (2019-12-31)
         # Note: This may fail if spot data doesn't exist that far back,
@@ -124,7 +124,7 @@ class TestCrossMarketFuturesWarning:
 
     def test_spot_request_after_futures_listing_no_warning(self, capsys):
         """SPOT request after futures listing should NOT emit warning."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Use recent date range where both spot and futures exist
         end_time = datetime.now(timezone.utc) - timedelta(days=7)
@@ -141,7 +141,7 @@ class TestCrossMarketFuturesWarning:
 
     def test_futures_request_no_cross_market_warning(self, capsys):
         """FUTURES_USDT request should NOT emit cross-market warning (even for old dates)."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Use a valid date range after futures listing
         end_time = datetime.now(timezone.utc) - timedelta(days=7)
@@ -163,7 +163,7 @@ class TestTraceIdLogging:
 
     def test_trace_id_generation_works(self):
         """Verify trace_id generation method works correctly."""
-        from data_source_manager.utils.loguru_setup import logger
+        from ckvd.utils.loguru_setup import logger
 
         # Verify trace_id generation works
         trace_id = logger.generate_trace_id()
@@ -175,7 +175,7 @@ class TestTraceIdLogging:
 
     def test_get_data_completes_with_trace_id_binding(self):
         """get_data() should complete successfully with trace_id binding enabled."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end_time = datetime.now(timezone.utc) - timedelta(days=7)
         start_time = end_time - timedelta(days=1)
@@ -199,7 +199,7 @@ class TestUnknownSymbolBehavior:
         """Unknown symbols should be allowed (not blocked by availability check)."""
         import tenacity
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Use a very recent date range to avoid Vision API issues
         end_time = datetime.now(timezone.utc) - timedelta(hours=1)

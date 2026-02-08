@@ -15,7 +15,7 @@ Internally uses Polars for efficient processing, converts to pandas at API bound
 import pandas as pd
 import polars as pl
 
-from data_source_manager.utils.config import OUTPUT_DTYPES
+from ckvd.utils.config import OUTPUT_DTYPES
 
 # Define the column names as a constant for REST API output
 REST_OUTPUT_COLUMNS = [

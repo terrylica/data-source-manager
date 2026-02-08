@@ -15,9 +15,9 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from data_source_manager.core.sync.data_source_manager import DataSource, DataSourceManager
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.core.sync.crypto_kline_vision_data import DataSource, CryptoKlineVisionData
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 from tests.utils.data_integrity import analyze_data_integrity
 
 # Set log level to DEBUG to see detailed logging
@@ -65,8 +65,8 @@ def test_fcp_mechanism():
 
             start_time_retrieval = time.time()
 
-            # Initialize a DataSourceManager instance with caching disabled
-            with DataSourceManager(
+            # Initialize a CryptoKlineVisionData instance with caching disabled
+            with CryptoKlineVisionData(
                 provider=DataProvider.BINANCE,
                 market_type=market_type,
                 chart_type=chart_type,
@@ -238,7 +238,7 @@ def main():
         print(
             Panel(
                 "[bold green]Failover Control Protocol (FCP) Test Passed[/bold green]\n"
-                "The DataSourceManager correctly implemented the FCP mechanism by:\n"
+                "The CryptoKlineVisionData correctly implemented the FCP mechanism by:\n"
                 "1. Retrieving available data from Vision API\n"
                 "2. Identifying missing segments\n"
                 "3. Fetching missing segments from REST API\n"
@@ -251,7 +251,7 @@ def main():
         print(
             Panel(
                 "[bold red]Failover Control Protocol (FCP) Test Failed[/bold red]\n"
-                "The DataSourceManager failed to implement the FCP mechanism correctly.",
+                "The CryptoKlineVisionData failed to implement the FCP mechanism correctly.",
                 border_style="red",
             )
         )

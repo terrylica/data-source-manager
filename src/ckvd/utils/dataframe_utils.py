@@ -20,13 +20,13 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_COLUMN_ORDER,
     FUNDING_RATE_DTYPES,
     OUTPUT_DTYPES,
 )
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 
 def _create_synthetic_timestamps(count: int) -> list[datetime]:

@@ -1,2 +1,2 @@
 #!/usr/bin/env python
-"""Tests package for Data Source Manager."""
+"""Tests package for Crypto Kline Vision Data."""

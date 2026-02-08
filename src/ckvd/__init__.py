@@ -1,9 +1,9 @@
-"""Data Source Manager - Professional market data integration.
+"""Crypto Kline Vision Data - Professional market data integration.
 
 This package provides a unified interface for retrieving and managing market data
 from multiple sources including Binance Vision API, REST APIs, and local cache.
 
-The main entry point is the DataSourceManager class which implements the
+The main entry point is the CryptoKlineVisionData class which implements the
 Failover Control Protocol (FCP) for reliable data retrieval with automatic
 failover, retry logic, and data validation.
 
@@ -15,11 +15,11 @@ Key Features:
 - **High Performance**: Apache Arrow caching and memory-mapped files
 
 Quick Start:
-    >>> from data_source_manager import DataSourceManager, DataProvider, MarketType, Interval
+    >>> from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
     >>> from datetime import datetime, timedelta
     >>>
     >>> # Create a manager for USDT-margined futures
-    >>> manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+    >>> manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
     >>>
     >>> # Fetch recent data with automatic failover (always use UTC)
     >>> from datetime import timezone
@@ -46,18 +46,18 @@ from typing import Any
 # Lazy imports to avoid dependency issues during package discovery
 def __getattr__(name: str) -> Any:
     """Lazy import for main package exports."""
-    if name == "DataSourceManager":
-        from .core.sync.data_source_manager import DataSourceManager
+    if name == "CryptoKlineVisionData":
+        from .core.sync.crypto_kline_vision_data import CryptoKlineVisionData
 
-        return DataSourceManager
+        return CryptoKlineVisionData
     if name == "DataSource":
-        from .core.sync.data_source_manager import DataSource
+        from .core.sync.crypto_kline_vision_data import DataSource
 
         return DataSource
-    if name == "DataSourceConfig":
-        from .core.sync.data_source_manager import DataSourceConfig
+    if name == "CKVDConfig":
+        from .core.sync.crypto_kline_vision_data import CKVDConfig
 
-        return DataSourceConfig
+        return CKVDConfig
     if name == "DataProvider":
         from .utils.market_constraints import DataProvider
 
@@ -75,18 +75,18 @@ def __getattr__(name: str) -> Any:
 
         return ChartType
     if name == "fetch_market_data":
-        from .core.sync.dsm_lib import fetch_market_data
+        from .core.sync.ckvd_lib import fetch_market_data
 
         return fetch_market_data
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 __all__ = [
+    "CKVDConfig",
     "ChartType",
+    "CryptoKlineVisionData",
     "DataProvider",
     "DataSource",
-    "DataSourceConfig",
-    "DataSourceManager",
     "Interval",
     "MarketType",
     "fetch_market_data",

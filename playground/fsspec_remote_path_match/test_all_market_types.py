@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 from vision_path_mapper import FSSpecVisionHandler, VisionPathMapper
 
-from data_source_manager.utils.market_constraints import MarketType
+from ckvd.utils.market_constraints import MarketType
 
 # Create a console for rich output
 console = Console()

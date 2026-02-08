@@ -18,12 +18,12 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from data_source_manager.utils.api_boundary_validator import ApiBoundaryValidator
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
+from ckvd.utils.api_boundary_validator import ApiBoundaryValidator
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
 
 # Re-export from new modules for backward compatibility
-from data_source_manager.utils.validation.availability_validation import (
+from ckvd.utils.validation.availability_validation import (
     is_data_likely_available,
 )
 
@@ -129,7 +129,7 @@ class DataValidation:
         Returns:
             UTC timezone-aware datetime
         """
-        from data_source_manager.utils.time.conversion import enforce_utc_timezone
+        from ckvd.utils.time.conversion import enforce_utc_timezone
 
         return enforce_utc_timezone(dt)
 

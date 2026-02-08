@@ -26,14 +26,14 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
+from ckvd.core.providers.binance.rest_data_client import RestDataClient
 
 # For API access
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.config import SECONDS_IN_MINUTE
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import DataProvider, Interval, MarketType
-from data_source_manager.utils.network_utils import create_httpx_client
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.config import SECONDS_IN_MINUTE
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
+from ckvd.utils.network_utils import create_httpx_client
 
 
 # Rate limit tracking
@@ -108,7 +108,7 @@ class RateLimitTester:
 
     def setup(self):
         """Set up the data source manager and REST client."""
-        self.manager = DataSourceManager(
+        self.manager = CryptoKlineVisionData(
             market_type=MarketType.SPOT,
             provider=DataProvider.BINANCE,
             use_cache=False,
@@ -295,7 +295,7 @@ class RateLimitTester:
 
     def cleanup(self):
         """Clean up resources."""
-        # Clean up DataSourceManager
+        # Clean up CryptoKlineVisionData
         if hasattr(self, "manager"):
             self.manager.__exit__(None, None, None)
 

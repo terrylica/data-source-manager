@@ -43,10 +43,10 @@ import pandas as pd
 import polars as pl
 from rich import print
 
-from data_source_manager.utils.config import MAX_PREVIEW_ITEMS, MIN_FILES_FOR_README
-from data_source_manager.utils.dataframe_utils import ensure_open_time_as_index
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.utils.config import MAX_PREVIEW_ITEMS, MIN_FILES_FOR_README
+from ckvd.utils.dataframe_utils import ensure_open_time_as_index
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 class ArrowCacheReader:
@@ -569,7 +569,7 @@ if __name__ == "__main__":
 
             # Try to convert string interval to Interval enum for better code example
             try:
-                from data_source_manager.utils.market_constraints import Interval
+                from ckvd.utils.market_constraints import Interval
 
                 interval_enum = next(i for i in Interval if i.value == interval)
                 print(f"Interval string '{interval}' converted to enum: {interval_enum}")

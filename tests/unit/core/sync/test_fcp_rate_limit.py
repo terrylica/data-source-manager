@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 
-from data_source_manager.utils.for_core.dsm_fcp_utils import process_rest_step
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.for_core.ckvd_fcp_utils import process_rest_step
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
 
 
 def _make_ohlcv_df(start: datetime, count: int, freq_minutes: int = 60) -> pd.DataFrame:
@@ -52,7 +52,7 @@ class TestProcessRestStepRateLimit:
             (start + timedelta(days=5), start + timedelta(days=7)),
         ]
 
-        from data_source_manager.utils.market_constraints import Interval
+        from ckvd.utils.market_constraints import Interval
 
         result = process_rest_step(
             fetch_from_rest_func=mock_fetch_rest,
@@ -77,7 +77,7 @@ class TestProcessRestStepRateLimit:
             (start, start + timedelta(days=7)),
         ]
 
-        from data_source_manager.utils.market_constraints import Interval
+        from ckvd.utils.market_constraints import Interval
 
         result = process_rest_step(
             fetch_from_rest_func=mock_fetch_rest,
@@ -117,7 +117,7 @@ class TestProcessRestStepRateLimit:
             (start + timedelta(days=5), start + timedelta(days=6)),
         ]
 
-        from data_source_manager.utils.market_constraints import Interval
+        from ckvd.utils.market_constraints import Interval
 
         result = process_rest_step(
             fetch_from_rest_func=mock_fetch_rest,
@@ -144,7 +144,7 @@ class TestProcessRestStepRateLimit:
             (start, start + timedelta(days=1)),
         ]
 
-        from data_source_manager.utils.market_constraints import Interval
+        from ckvd.utils.market_constraints import Interval
 
         result = process_rest_step(
             fetch_from_rest_func=mock_fetch_rest,

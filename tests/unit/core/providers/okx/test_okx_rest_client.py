@@ -16,14 +16,14 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from data_source_manager.core.providers import get_provider_clients, get_supported_providers
-from data_source_manager.core.providers.okx.okx_rest_client import (
+from ckvd.core.providers import get_provider_clients, get_supported_providers
+from ckvd.core.providers.okx.okx_rest_client import (
     OKX_INTERVAL_MAP,
     OKXRestClient,
     _convert_interval_to_okx,
     _convert_symbol_to_okx,
 )
-from data_source_manager.utils.market_constraints import (
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     Interval,
@@ -88,7 +88,7 @@ class TestSymbolConversion:
 
 
 class TestIntervalConversion:
-    """Tests for DSM Interval → OKX interval string conversion."""
+    """Tests for CKVD Interval → OKX interval string conversion."""
 
     @pytest.mark.parametrize(
         "interval,expected",

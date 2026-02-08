@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Core market enum definitions.
 
-This module defines the core enums used throughout the Data Source Manager:
+This module defines the core enums used throughout the Crypto Kline Vision Data:
 - DataProvider: Data provider types (Binance, OKX, etc.)
 - MarketType: Market types (SPOT, FUTURES_USDT, FUTURES_COIN, etc.)
 - ChartType: Chart data types (klines, funding rate, etc.)

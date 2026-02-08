@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# polars-exception: FCP utilities process pandas DataFrames from DSM pipeline
+# polars-exception: FCP utilities process pandas DataFrames from CKVD pipeline
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
 """Utility functions for Failover Control Protocol (FCP) implementation."""
@@ -8,15 +8,15 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from data_source_manager.utils.for_core.dsm_time_range_utils import (
+from ckvd.utils.for_core.ckvd_time_range_utils import (
     identify_missing_segments,
     merge_adjacent_ranges,
     merge_dataframes,
 )
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
-from data_source_manager.utils.for_core.vision_exceptions import UnsupportedIntervalError
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import (
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.for_core.vision_exceptions import UnsupportedIntervalError
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import (
     Interval,
     MarketType,
     get_market_capabilities,
@@ -291,7 +291,7 @@ def handle_error(e: Exception) -> None:
         RuntimeError: For other errors, re-raises with sanitized error message
     """
     # Import here to avoid circular imports
-    from data_source_manager.utils.for_core.vision_exceptions import DataNotAvailableError
+    from ckvd.utils.for_core.vision_exceptions import DataNotAvailableError
 
     # DataNotAvailableError should be re-raised directly for fail-loud behavior
     # This allows callers to catch and handle this specific exception
@@ -300,7 +300,7 @@ def handle_error(e: Exception) -> None:
 
     safe_error_message = ""
     try:
-        from data_source_manager.utils.for_core.dsm_api_utils import _log_critical_error_with_traceback
+        from ckvd.utils.for_core.ckvd_api_utils import _log_critical_error_with_traceback
 
         safe_error_message = _log_critical_error_with_traceback("get_data", e)
     except (ValueError, TypeError, AttributeError, UnicodeDecodeError) as nested_error:

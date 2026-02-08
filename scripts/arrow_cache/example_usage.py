@@ -5,9 +5,9 @@ from datetime import datetime
 
 from rich import print
 
-from data_source_manager.utils.arrow_cache_reader import ArrowCacheReader
-from data_source_manager.utils.config import MAX_PREVIEW_ITEMS
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.utils.arrow_cache_reader import ArrowCacheReader
+from ckvd.utils.config import MAX_PREVIEW_ITEMS
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 def main():

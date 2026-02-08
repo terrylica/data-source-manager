@@ -13,8 +13,8 @@ boundaries.
 import re
 from datetime import datetime, timedelta, timezone
 
-from data_source_manager.utils.deprecation_rules import TimeUnit
-from data_source_manager.utils.market_constraints import Interval as MarketInterval
+from ckvd.utils.deprecation_rules import TimeUnit
+from ckvd.utils.market_constraints import Interval as MarketInterval
 
 # Pre-compiled regex pattern for parsing interval strings (performance optimization)
 INTERVAL_VALUE_PATTERN = re.compile(r"(\d+)([a-zA-Z]+)")
@@ -49,8 +49,8 @@ def get_interval_micros(interval: MarketInterval) -> int:
         ValueError: If the interval format is invalid or unsupported
 
     Example:
-        >>> from data_source_manager.utils.market_constraints import Interval
-        >>> from data_source_manager.utils.time.intervals import get_interval_micros
+        >>> from ckvd.utils.market_constraints import Interval
+        >>> from ckvd.utils.time.intervals import get_interval_micros
         >>>
         >>> # Convert different intervals to microseconds
         >>> minute_micros = get_interval_micros(Interval.MINUTE_1)
@@ -109,8 +109,8 @@ def get_interval_seconds(interval: MarketInterval) -> int:
         int: Interval duration in seconds
 
     Example:
-        >>> from data_source_manager.utils.market_constraints import Interval
-        >>> from data_source_manager.utils.time.intervals import get_interval_seconds
+        >>> from ckvd.utils.market_constraints import Interval
+        >>> from ckvd.utils.time.intervals import get_interval_seconds
         >>>
         >>> # Compare interval durations in seconds
         >>> intervals = [Interval.MINUTE_1, Interval.MINUTE_5, Interval.HOUR_1, Interval.DAY_1]
@@ -140,8 +140,8 @@ def get_interval_timedelta(interval: MarketInterval) -> timedelta:
 
     Example:
         >>> from datetime import datetime, timezone
-        >>> from data_source_manager.utils.market_constraints import Interval
-        >>> from data_source_manager.utils.time.intervals import get_interval_timedelta
+        >>> from ckvd.utils.market_constraints import Interval
+        >>> from ckvd.utils.time.intervals import get_interval_timedelta
         >>>
         >>> # Add different intervals to a datetime
         >>> now = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -229,8 +229,8 @@ def align_time_boundaries(start_time: datetime, end_time: datetime, interval: Ma
 
     Example:
         >>> from datetime import datetime, timezone
-        >>> from data_source_manager.utils.market_constraints import Interval
-        >>> from data_source_manager.utils.time.intervals import align_time_boundaries
+        >>> from ckvd.utils.market_constraints import Interval
+        >>> from ckvd.utils.time.intervals import align_time_boundaries
         >>>
         >>> # Align a 1-hour interval request
         >>> start = datetime(2023, 1, 1, 14, 30, 0, tzinfo=timezone.utc)
@@ -242,8 +242,8 @@ def align_time_boundaries(start_time: datetime, end_time: datetime, interval: Ma
         Original: 2023-01-01T14:30:00+00:00 to 2023-01-01T16:45:00+00:00
         Aligned: 2023-01-01T14:00:00+00:00 to 2023-01-01T17:00:00+00:00
     """
-    from data_source_manager.utils.loguru_setup import logger
-    from data_source_manager.utils.time.conversion import enforce_utc_timezone
+    from ckvd.utils.loguru_setup import logger
+    from ckvd.utils.time.conversion import enforce_utc_timezone
 
     # Ensure timezone awareness
     start_time = enforce_utc_timezone(start_time)
@@ -321,8 +321,8 @@ def estimate_record_count(start_time: datetime, end_time: datetime, interval: Ma
 
     Example:
         >>> from datetime import datetime, timezone, timedelta
-        >>> from data_source_manager.utils.market_constraints import Interval
-        >>> from data_source_manager.utils.time.intervals import estimate_record_count
+        >>> from ckvd.utils.market_constraints import Interval
+        >>> from ckvd.utils.time.intervals import estimate_record_count
         >>>
         >>> # Calculate records for different time spans and intervals
         >>> now = datetime.now(timezone.utc)
@@ -342,7 +342,7 @@ def estimate_record_count(start_time: datetime, end_time: datetime, interval: Ma
         has multiple fields (open, high, low, close, volume, etc.), so the total
         storage needed will be: record_count * fields_per_record * bytes_per_field.
     """
-    from data_source_manager.utils.time.conversion import enforce_utc_timezone
+    from ckvd.utils.time.conversion import enforce_utc_timezone
 
     # Ensure timezone awareness
     start_time = enforce_utc_timezone(start_time)

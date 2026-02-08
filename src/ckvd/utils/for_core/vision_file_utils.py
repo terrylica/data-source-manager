@@ -12,10 +12,10 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from data_source_manager.core.providers.binance.rest_data_client import RestDataClient
-from data_source_manager.utils.gap_detector import Gap
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval, MarketType
+from ckvd.core.providers.binance.rest_data_client import RestDataClient
+from ckvd.utils.gap_detector import Gap
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval, MarketType
 
 
 def fill_boundary_gaps_with_rest(

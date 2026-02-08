@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 @pytest.mark.stress
@@ -24,7 +24,7 @@ class TestSequentialFetches:
 
         This tests for resource cleanup and GC pressure.
         """
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -52,7 +52,7 @@ class TestSequentialFetches:
 
     def test_repeated_same_symbol_stable(self, memory_tracker):
         """Repeated fetches of same symbol should have stable memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -85,7 +85,7 @@ class TestSequentialFetches:
         # Test 1: Reusing manager
         gc.collect()
         tracemalloc.start()
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
         for _ in range(3):
             df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
             del df
@@ -99,7 +99,7 @@ class TestSequentialFetches:
         gc.collect()
         tracemalloc.start()
         for _ in range(3):
-            m = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+            m = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
             df = m.get_data("BTCUSDT", start, end, Interval.HOUR_1)
             m.close()
             del df
@@ -130,7 +130,7 @@ class TestResourceCleanup:
         tracemalloc.start()
         tracemalloc.get_traced_memory()[0]
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
         df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
         after_fetch = tracemalloc.get_traced_memory()[0]
 
@@ -146,7 +146,7 @@ class TestResourceCleanup:
 
     def test_dataframe_deletion_frees_memory(self, memory_tracker):
         """Deleting DataFrame should free memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)

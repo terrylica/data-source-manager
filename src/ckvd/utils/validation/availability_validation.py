@@ -10,8 +10,8 @@ This module provides validation for data availability including:
 
 from datetime import datetime, timedelta, timezone
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
 
 __all__ = [
     "is_data_likely_available",
@@ -30,7 +30,7 @@ def enforce_utc_timestamp(dt: datetime) -> datetime:
     Returns:
         UTC timezone-aware datetime
     """
-    from data_source_manager.utils.time.conversion import enforce_utc_timezone
+    from ckvd.utils.time.conversion import enforce_utc_timezone
 
     return enforce_utc_timezone(dt)
 
@@ -104,7 +104,7 @@ def is_data_likely_available(
                 consolidation_delay = timedelta(minutes=5)
         else:
             try:
-                from data_source_manager.utils.time_utils import (
+                from ckvd.utils.time_utils import (
                     align_time_boundaries,
                     get_interval_seconds,
                 )

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# polars-exception: OKXRestClient returns pandas DataFrames for DSM pipeline compatibility
+# polars-exception: OKXRestClient returns pandas DataFrames for CKVD pipeline compatibility
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """OKX REST API client for fetching market data.
 
@@ -21,9 +21,9 @@ from typing import Any
 import httpx
 import pandas as pd
 
-from data_source_manager.core.providers.binance.data_client_interface import DataClientInterface
-from data_source_manager.utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS
-from data_source_manager.utils.for_core.rest_exceptions import (
+from ckvd.core.providers.binance.data_client_interface import DataClientInterface
+from ckvd.utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS
+from ckvd.utils.for_core.rest_exceptions import (
     APIError,
     HTTPError,
     JSONDecodeError,
@@ -31,15 +31,15 @@ from data_source_manager.utils.for_core.rest_exceptions import (
     RateLimitError,
     RestAPIError,
 )
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import (
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     Interval,
     MarketType,
     get_market_capabilities,
 )
-from data_source_manager.utils.time_utils import (
+from ckvd.utils.time_utils import (
     datetime_to_milliseconds,
 )
 
@@ -67,7 +67,7 @@ OKX_VOLUME_IDX = 5
 # OKX_TURNOVER_IDX = 7    # Not used in standard OHLCV
 # OKX_CONFIRM_IDX = 8     # Not used in standard OHLCV
 
-# OKX interval mapping (DSM Interval → OKX API string)
+# OKX interval mapping (CKVD Interval → OKX API string)
 # OKX requires uppercase for hour+ intervals (1H, 1D, etc.)
 OKX_INTERVAL_MAP = {
     Interval.MINUTE_1: "1m",
@@ -117,10 +117,10 @@ def _convert_symbol_to_okx(symbol: str, market_type: MarketType) -> str:
 
 
 def _convert_interval_to_okx(interval: Interval) -> str:
-    """Convert DSM Interval to OKX API interval string.
+    """Convert CKVD Interval to OKX API interval string.
 
     Args:
-        interval: DSM Interval enum
+        interval: CKVD Interval enum
 
     Returns:
         OKX interval string (e.g., "1H" not "1h")

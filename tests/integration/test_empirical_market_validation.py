@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 # =============================================================================
@@ -84,7 +84,7 @@ TEST_INTERVALS = [
 @pytest.fixture
 def spot_manager():
     """SPOT market manager."""
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
     yield manager
     manager.close()
 
@@ -92,7 +92,7 @@ def spot_manager():
 @pytest.fixture
 def futures_usdt_manager():
     """FUTURES_USDT market manager."""
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
     yield manager
     manager.close()
 
@@ -100,7 +100,7 @@ def futures_usdt_manager():
 @pytest.fixture
 def futures_coin_manager():
     """FUTURES_COIN market manager."""
-    manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
     yield manager
     manager.close()
 
@@ -558,7 +558,7 @@ class TestFCPSourceTracking:
     )
     def test_source_tracking_enabled(self, market_type, symbol):
         """Verify _data_source column is present when requested."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df = manager.get_data(
             symbol=symbol,
@@ -684,7 +684,7 @@ class TestPolarsPipelineE2E:
     @pytest.fixture(autouse=True)
     def setup_polars_flags(self, monkeypatch):
         """Enable zero-copy Polars output for all tests in this class."""
-        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "true")
+        monkeypatch.setenv("CKVD_USE_POLARS_OUTPUT", "true")
 
     @pytest.mark.parametrize(
         "market_type,symbol",
@@ -699,7 +699,7 @@ class TestPolarsPipelineE2E:
     )
     def test_polars_pipeline_data_integrity(self, market_type, symbol):
         """Verify Polars pipeline returns valid OHLCV data across markets."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         df = manager.get_data(
             symbol=symbol,
@@ -733,7 +733,7 @@ class TestPolarsPipelineE2E:
     )
     def test_polars_pipeline_interval_coverage(self, interval, expected_min_rows):
         """Verify Polars pipeline works correctly across all intervals."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         df = manager.get_data(
             symbol="BTCUSDT",
@@ -763,7 +763,7 @@ class TestPolarsPipelineE2E:
         """Verify return_polars=True returns Polars DataFrame."""
         import polars as pl
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         result = manager.get_data(
             symbol="BTCUSDT",
@@ -788,7 +788,7 @@ class TestPolarsPipelineE2E:
 
     def test_polars_pipeline_source_tracking(self):
         """Verify _data_source column tracks FCP sources correctly."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         df = manager.get_data(
             symbol="BTCUSDT",
@@ -819,7 +819,7 @@ class TestPolarsPipelineE2E:
 
     def test_polars_pipeline_memory_efficiency(self):
         """Verify Polars pipeline memory usage is reasonable."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         gc.collect()
         tracemalloc.start()
@@ -853,7 +853,7 @@ class TestPolarsPipelineE2E:
     )
     def test_polars_pipeline_multi_symbol_sequential(self, market_type, symbols):
         """Verify Polars pipeline handles sequential multi-symbol fetches."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         all_valid = True
         issues = []

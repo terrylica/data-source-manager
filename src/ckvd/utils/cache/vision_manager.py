@@ -17,8 +17,8 @@ from typing import Any
 import pandas as pd
 import pyarrow as pa
 
-from data_source_manager.utils.cache.validator import CacheValidator
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.cache.validator import CacheValidator
+from ckvd.utils.loguru_setup import logger
 
 __all__ = [
     "VisionCacheManager",

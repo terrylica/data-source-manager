@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import pytest
 from tenacity import RetryError
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 @pytest.mark.stress
@@ -26,7 +26,7 @@ class TestEmptyResults:
 
     def test_empty_result_no_memory_leak(self, memory_tracker):
         """Empty result should not allocate unnecessary memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Date before BTC existed on Binance
         ancient_start = datetime(2010, 1, 1, tzinfo=timezone.utc)
@@ -38,7 +38,7 @@ class TestEmptyResults:
 
         # Expect DataNotAvailableError (fail-loud behavior) or other errors
         # DataNotAvailableError is raised when requesting data before symbol listing date
-        from data_source_manager.utils.for_core.vision_exceptions import DataNotAvailableError
+        from ckvd.utils.for_core.vision_exceptions import DataNotAvailableError
 
         with contextlib.suppress(RuntimeError, ValueError, RetryError, DataNotAvailableError):
             df = manager.get_data("BTCUSDT", ancient_start, ancient_end, Interval.DAY_1)
@@ -55,7 +55,7 @@ class TestEmptyResults:
 
     def test_invalid_symbol_no_memory_leak(self, memory_tracker):
         """Invalid symbol should fail without memory leak."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -83,7 +83,7 @@ class TestErrorRecovery:
 
     def test_recovery_after_error_no_leak(self, memory_tracker):
         """Manager should recover cleanly after an error."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -115,7 +115,7 @@ class TestErrorRecovery:
 
     def test_multiple_errors_stable_memory(self, memory_tracker):
         """Multiple errors should not accumulate memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -149,12 +149,12 @@ class TestSymbolValidation:
     def test_wrong_symbol_format_for_market(self, memory_tracker):
         """Wrong symbol format should handle gracefully (either data, empty, or error).
 
-        Note: DSM may return data for "wrong" symbol formats if the underlying
+        Note: CKVD may return data for "wrong" symbol formats if the underlying
         Vision API has data available. This test verifies memory bounds regardless
         of the outcome.
         """
         # FUTURES_COIN typically expects USD_PERP format, but BTCUSDT may exist
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -178,7 +178,7 @@ class TestSymbolValidation:
 
     def test_correct_coin_margined_symbol(self, memory_tracker):
         """Correct coin-margined symbol should work."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)

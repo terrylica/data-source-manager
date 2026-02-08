@@ -22,8 +22,8 @@ import httpx
 import pandas as pd
 import pyarrow as pa
 
-from data_source_manager.utils.cache_validator import CacheKeyManager
-from data_source_manager.utils.config import (
+from ckvd.utils.cache_validator import CacheKeyManager
+from ckvd.utils.config import (
     CANONICAL_INDEX_NAME,
     CONSOLIDATION_DELAY,
     DEFAULT_TIMEZONE,
@@ -32,8 +32,8 @@ from data_source_manager.utils.config import (
     VISION_DATA_DELAY_HOURS,
     FileType,
 )
-from data_source_manager.utils.market_constraints import MarketType, get_market_symbol_format
-from data_source_manager.utils.time_utils import (
+from ckvd.utils.market_constraints import MarketType, get_market_symbol_format
+from ckvd.utils.time_utils import (
     MICROSECOND_DIGITS,
     MILLISECOND_DIGITS,
     TimestampUnit,
@@ -43,7 +43,7 @@ from data_source_manager.utils.time_utils import (
 )
 
 # Import centralized validation utilities
-from data_source_manager.utils.validation import DataFrameValidator, DataValidation
+from ckvd.utils.validation import DataFrameValidator, DataValidation
 
 # Type definitions for semantic clarity and safety
 TimeseriesIndex = NewType("TimeseriesIndex", pd.DatetimeIndex)
@@ -188,7 +188,7 @@ def get_vision_url(
     # Format date string
     date_str = date.strftime("%Y-%m-%d")
 
-    from data_source_manager.utils.loguru_setup import logger
+    from ckvd.utils.loguru_setup import logger
 
     logger.debug(f"Creating Vision API URL for {symbol} {interval} on {date_str} (market: {market_type})")
 
@@ -273,7 +273,7 @@ def validate_data_availability(start_time: datetime, end_time: datetime) -> None
     cutoff = now - CONSOLIDATION_DELAY
 
     if end_time > cutoff:
-        from data_source_manager.utils.loguru_setup import logger
+        from ckvd.utils.loguru_setup import logger
 
         logger.warning(
             f"Requested data includes recent time ({end_time}) that may not be fully consolidated. "

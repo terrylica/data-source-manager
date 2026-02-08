@@ -2,7 +2,7 @@
 # polars-exception: API utilities return pandas DataFrames from Vision/REST APIs
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
-"""Utility functions for DataSourceManager API operations."""
+"""Utility functions for CryptoKlineVisionData API operations."""
 
 import traceback
 from datetime import datetime
@@ -10,12 +10,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from data_source_manager.utils.config import VISION_DATA_DELAY_HOURS, create_empty_dataframe
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
-from data_source_manager.utils.for_core.vision_constraints import is_date_too_fresh_for_vision
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, Interval, MarketType
-from data_source_manager.utils.time_utils import align_time_boundaries, filter_dataframe_by_time
+from ckvd.utils.config import VISION_DATA_DELAY_HOURS, create_empty_dataframe
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.for_core.vision_constraints import is_date_too_fresh_for_vision
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, Interval, MarketType
+from ckvd.utils.time_utils import align_time_boundaries, filter_dataframe_by_time
 
 
 def _log_critical_error_with_traceback(context: str, error: BaseException) -> str:

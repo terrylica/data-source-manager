@@ -1,4 +1,4 @@
-"""Small interval stress tests for DataSourceManager.
+"""Small interval stress tests for CryptoKlineVisionData.
 
 Tests that verify high-frequency data handling:
 - 1s interval (SPOT only) with large row counts
@@ -16,8 +16,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
-from data_source_manager.core.sync.dsm_types import DataSource
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
+from ckvd.core.sync.ckvd_types import DataSource
 
 
 @pytest.mark.stress
@@ -34,7 +34,7 @@ class TestOneSecondInterval:
         Uses REST API directly since Vision API doesn't support 1s interval.
         Reduced from 4 hours to minimize REST API load.
         """
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Use recent data for REST API (within last 30 days)
         end = datetime.now(timezone.utc) - timedelta(hours=2)
@@ -54,7 +54,7 @@ class TestOneSecondInterval:
 
     def test_1s_data_timestamps_monotonic(self, memory_tracker):
         """1s data should have monotonic, no-duplicate timestamps."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Use recent data for REST API
         end = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -79,7 +79,7 @@ class TestOneMinuteInterval:
 
     def test_1m_7_days_completes(self, memory_tracker):
         """7 days of 1m data (~10,080 rows) should complete without OOM."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # 7 days * 24 hours * 60 minutes = 10,080 rows expected
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -102,7 +102,7 @@ class TestOneMinuteInterval:
         Uses same 7-day range as test_1m_7_days_completes but validates
         data quality for 10k+ rows.
         """
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # 7 days * 24 hours * 60 minutes = 10,080 rows expected
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -127,7 +127,7 @@ class TestOneMinuteInterval:
 
     def test_1m_data_timestamps_monotonic(self, memory_tracker):
         """1m data should have monotonic, no-duplicate timestamps."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
         end = datetime(2024, 1, 3, tzinfo=timezone.utc)
@@ -143,7 +143,7 @@ class TestOneMinuteInterval:
 
     def test_1m_ohlcv_constraints_valid(self, memory_tracker):
         """1m OHLCV data should satisfy logical constraints."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
         end = datetime(2024, 1, 2, tzinfo=timezone.utc)
@@ -168,7 +168,7 @@ class TestSmallIntervalMemory:
 
     def test_memory_scales_linearly_with_rows(self, memory_tracker):
         """Memory should scale roughly linearly with row count."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Fetch 1 day (1440 rows)
         start_1d = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -207,7 +207,7 @@ class TestSmallIntervalMemory:
         import gc
         import tracemalloc
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
         end = datetime(2024, 1, 2, tzinfo=timezone.utc)

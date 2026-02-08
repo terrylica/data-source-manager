@@ -15,8 +15,8 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.time.conversion import (
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.time.conversion import (
     TIMESTAMP_UNIT,
     detect_timestamp_unit,
     enforce_utc_timezone,

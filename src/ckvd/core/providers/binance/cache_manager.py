@@ -15,8 +15,8 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.ipc
 
-from data_source_manager.utils.config import MIN_CACHE_KEY_COMPONENTS
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.config import MIN_CACHE_KEY_COMPONENTS
+from ckvd.utils.loguru_setup import logger
 
 
 class UnifiedCacheManager:

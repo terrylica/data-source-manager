@@ -12,11 +12,11 @@ import hashlib
 from datetime import timedelta
 from pathlib import Path
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     MAX_CACHE_AGE,
     MIN_VALID_FILE_SIZE,
 )
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 __all__ = [
     "calculate_checksum",
@@ -57,7 +57,7 @@ def validate_file_with_checksum(
     Returns:
         True if file passes all integrity checks, False otherwise
     """
-    from data_source_manager.utils.validation.dataframe_validation import DataFrameValidator
+    from ckvd.utils.validation.dataframe_validation import DataFrameValidator
 
     integrity_result = DataFrameValidator.validate_cache_integrity(file_path, min_size, max_age)
     if integrity_result is not None:

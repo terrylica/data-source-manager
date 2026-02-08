@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
 def fetch_funding_rates():
@@ -17,16 +17,16 @@ def fetch_funding_rates():
     cache_dir = Path("tmp/funding_rate_cache")
     cache_dir.mkdir(exist_ok=True, parents=True)
 
-    logger.info("Creating DataSourceManager with FUTURES_USDT market type")
+    logger.info("Creating CryptoKlineVisionData with FUTURES_USDT market type")
 
-    # Create a DataSourceManager configured for funding rate data
-    with DataSourceManager(
+    # Create a CryptoKlineVisionData configured for funding rate data
+    with CryptoKlineVisionData(
         provider=DataProvider.BINANCE,
         market_type=MarketType.FUTURES_USDT,
         chart_type=ChartType.FUNDING_RATE,
         cache_dir=cache_dir,
         use_cache=True,
-    ) as dsm:
+    ) as ckvd:
         # Define time range (5 days ago until now)
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(days=5)
@@ -36,7 +36,7 @@ def fetch_funding_rates():
         )
 
         # Fetch funding rate data
-        df = dsm.get_data(
+        df = ckvd.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -66,7 +66,7 @@ def fetch_funding_rates():
 
         # You can also fetch for multiple symbols if needed
         logger.info("Fetching funding rate data for ETHUSDT")
-        df_eth = dsm.get_data(
+        df_eth = ckvd.get_data(
             symbol="ETHUSDT",
             start_time=start_time,
             end_time=end_time,

@@ -1,4 +1,4 @@
-"""Cache resilience stress tests for DataSourceManager.
+"""Cache resilience stress tests for CryptoKlineVisionData.
 
 Tests that verify graceful handling of cache issues:
 - Corrupted Arrow file recovery
@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
-# Known DSM errors that can occur during cache recovery
+# Known CKVD errors that can occur during cache recovery
 CACHE_RECOVERY_ERRORS = (RuntimeError, ValueError, OSError)
 
 
@@ -29,7 +29,7 @@ class TestCorruptedCacheRecovery:
     def test_corrupted_arrow_file_graceful_fallback(self, memory_tracker):
         """Corrupted Arrow file should trigger graceful fallback to REST.
 
-        This test creates a corrupted cache file and verifies DSM
+        This test creates a corrupted cache file and verifies CKVD
         handles it gracefully without crashing.
         """
         # Use temp directory for cache
@@ -42,8 +42,8 @@ class TestCorruptedCacheRecovery:
             corrupted_file = cache_path / "2024-01-01.arrow"
             corrupted_file.write_bytes(b"THIS IS NOT A VALID ARROW FILE - CORRUPTED DATA")
 
-            # DSM should handle this gracefully (may log warning, fallback to REST)
-            manager = DataSourceManager.create(
+            # CKVD should handle this gracefully (may log warning, fallback to REST)
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=temp_cache,
@@ -71,7 +71,7 @@ class TestCorruptedCacheRecovery:
             empty_file = cache_path / "2024-01-01.arrow"
             empty_file.write_bytes(b"")
 
-            manager = DataSourceManager.create(
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=temp_cache,
@@ -106,7 +106,7 @@ class TestPartialWriteRecovery:
             truncated_file = cache_path / "2024-01-01.arrow"
             truncated_file.write_bytes(b"ARROW1\x00\x00")  # Incomplete header
 
-            manager = DataSourceManager.create(
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=temp_cache,
@@ -133,7 +133,7 @@ class TestPartialWriteRecovery:
                 corrupted_file = cache_path / f"2024-01-0{day}.arrow"
                 corrupted_file.write_bytes(b"CORRUPTED DATA")
 
-            manager = DataSourceManager.create(
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=temp_cache,
@@ -160,7 +160,7 @@ class TestCacheDirectoryIssues:
             # Use a path that doesn't exist yet
             cache_dir = Path(temp_base) / "new_cache_dir" / "nested"
 
-            manager = DataSourceManager.create(
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=str(cache_dir),
@@ -181,7 +181,7 @@ class TestCacheDirectoryIssues:
             cache_dir = Path(temp_base) / "cache dir with spaces"
             cache_dir.mkdir(parents=True, exist_ok=True)
 
-            manager = DataSourceManager.create(
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=str(cache_dir),
@@ -209,7 +209,7 @@ class TestCacheRecoveryMemory:
             corrupted_file = cache_path / "2024-01-01.arrow"
             corrupted_file.write_bytes(b"CORRUPTED")
 
-            manager = DataSourceManager.create(
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=temp_cache,
@@ -237,7 +237,7 @@ class TestCacheRecoveryMemory:
             cache_path = Path(temp_cache) / "binance" / "futures_usdt" / "klines" / "daily" / "BTCUSDT" / "1h"
             cache_path.mkdir(parents=True, exist_ok=True)
 
-            manager = DataSourceManager.create(
+            manager = CryptoKlineVisionData.create(
                 DataProvider.BINANCE,
                 MarketType.FUTURES_USDT,
                 cache_dir=temp_cache,

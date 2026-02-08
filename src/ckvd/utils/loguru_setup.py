@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
-"""Loguru-based Logging System for Data Source Manager.
+"""Loguru-based Logging System for Crypto Kline Vision Data.
 
 This module provides a simple, powerful loguru-based logging system that addresses
-user complaints about log level control in the DSM package.
+user complaints about log level control in the CKVD package.
 
 Key Features:
 - Simple log level control via environment variables or direct API calls
@@ -14,13 +14,13 @@ Key Features:
 
 Basic Usage Examples:
     # Import the logger (drop-in replacement)
-    from data_source_manager.utils.loguru_setup import logger
+    from ckvd.utils.loguru_setup import logger
 
     # Set log level (much simpler than standard logging)
     logger.configure_level("INFO")  # or DEBUG, WARNING, ERROR, CRITICAL
 
     # Or use environment variable
-    # export DSM_LOG_LEVEL=DEBUG
+    # export CKVD_LOG_LEVEL=DEBUG
 
     # All standard logging calls work
     logger.debug("Debug message")
@@ -34,9 +34,9 @@ Basic Usage Examples:
     logger.error("Error: <red>FAILED</red>")
 
 Environment Variables:
-    DSM_LOG_LEVEL: Set the global log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    DSM_LOG_FILE: Optional log file path for file output
-    DSM_DISABLE_COLORS: Set to "true" to disable colored output
+    CKVD_LOG_LEVEL: Set the global log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    CKVD_LOG_FILE: Optional log file path for file output
+    CKVD_DISABLE_COLORS: Set to "true" to disable colored output
 
 Migration from utils.logger_setup:
     Simply change the import:
@@ -58,9 +58,9 @@ from loguru import logger as _loguru_logger
 _loguru_logger.remove()
 
 # Configuration from environment
-DEFAULT_LOG_LEVEL = os.getenv("DSM_LOG_LEVEL", "ERROR").upper()
-LOG_FILE = os.getenv("DSM_LOG_FILE")
-DISABLE_COLORS = os.getenv("DSM_DISABLE_COLORS", "false").lower() == "true"
+DEFAULT_LOG_LEVEL = os.getenv("CKVD_LOG_LEVEL", "ERROR").upper()
+LOG_FILE = os.getenv("CKVD_LOG_FILE")
+DISABLE_COLORS = os.getenv("CKVD_DISABLE_COLORS", "false").lower() == "true"
 
 # Format template with colors and module info
 LOG_FORMAT = (
@@ -74,11 +74,11 @@ LOG_FORMAT = (
 SIMPLE_FORMAT = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}"
 
 
-class DSMLogger:
+class CKVDLogger:
     """Simple wrapper around loguru that provides easy configuration and compatibility."""
 
     def __init__(self) -> None:
-        """Initialize the DSM logger with environment-based configuration."""
+        """Initialize the CKVD logger with environment-based configuration."""
         self._current_level = DEFAULT_LOG_LEVEL
         self._log_file = LOG_FILE
         self._disable_colors = DISABLE_COLORS
@@ -118,7 +118,7 @@ class DSMLogger:
                 diagnose=True,
             )
 
-    def configure_level(self, level: str) -> "DSMLogger":
+    def configure_level(self, level: str) -> "CKVDLogger":
         """Configure the log level.
 
         Args:
@@ -131,7 +131,7 @@ class DSMLogger:
         self._setup_logger()
         return self
 
-    def configure_file(self, log_file: str | Path | None) -> "DSMLogger":
+    def configure_file(self, log_file: str | Path | None) -> "CKVDLogger":
         """Configure file logging.
 
         Args:
@@ -144,7 +144,7 @@ class DSMLogger:
         self._setup_logger()
         return self
 
-    def disable_colors(self, disable: bool = True) -> "DSMLogger":
+    def disable_colors(self, disable: bool = True) -> "CKVDLogger":
         """Enable or disable colored output.
 
         Args:
@@ -237,7 +237,7 @@ class DSMLogger:
 
 
 # Create the global logger instance
-logger = DSMLogger()
+logger = CKVDLogger()
 
 
 # Convenience functions for quick configuration
@@ -276,7 +276,7 @@ def configure_session_logging(session_name: str, log_level: str = "DEBUG"):
 
     Args:
         session_name: Name of the session (used in log filenames)
-        log_level: Logging level to use (ignored if DSM_LOG_LEVEL environment variable is set)
+        log_level: Logging level to use (ignored if CKVD_LOG_LEVEL environment variable is set)
 
     Returns:
         tuple: (main_log_path, error_log_path, timestamp) for reference
@@ -296,7 +296,7 @@ def configure_session_logging(session_name: str, log_level: str = "DEBUG"):
     error_log_path = error_log_dir / f"{session_name}_errors_{timestamp}.log"
 
     # Respect environment variable if set, otherwise use the passed log_level
-    env_log_level = os.getenv("DSM_LOG_LEVEL")
+    env_log_level = os.getenv("CKVD_LOG_LEVEL")
     effective_log_level = env_log_level.upper() if env_log_level else log_level.upper()
 
     # Configure the logger with both main and error files
@@ -330,7 +330,7 @@ def suppress_http_logging(suppress: bool = True) -> None:
     """Control HTTP library logging globally.
 
     Sets logging level for httpcore, httpx, urllib3, and requests loggers.
-    Used by DSM's internal _configure_logging() and as a standalone
+    Used by CKVD's internal _configure_logging() and as a standalone
     utility for users who want clean output.
 
     Args:
@@ -344,7 +344,7 @@ def suppress_http_logging(suppress: bool = True) -> None:
 # Example usage and testing
 if __name__ == "__main__":
     # Demo script showing loguru logger capabilities
-    print("=== DSM Loguru Logger Demo ===")
+    print("=== CKVD Loguru Logger Demo ===")
 
     # Test different log levels
     logger.configure_level("DEBUG")

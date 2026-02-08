@@ -2,7 +2,7 @@
 """
 Clean Feature Engineering Example
 
-This example demonstrates how to use DSM with suppressed logging for clean,
+This example demonstrates how to use CKVD with suppressed logging for clean,
 professional output in feature engineering workflows.
 
 Before: 15+ lines of logging boilerplate + cluttered output
@@ -18,18 +18,18 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ============================================================================
-# SOLUTION: Single line to suppress DSM logging noise
+# SOLUTION: Single line to suppress CKVD logging noise
 # ============================================================================
-os.environ["DSM_LOG_LEVEL"] = "CRITICAL"
+os.environ["CKVD_LOG_LEVEL"] = "CRITICAL"
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
-# Now import DSM - no more logging boilerplate needed!
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.market_constraints import DataProvider, Interval, MarketType
+# Now import CKVD - no more logging boilerplate needed!
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
 
 
 def main():
@@ -38,9 +38,9 @@ def main():
     print("🚀 Starting feature engineering workflow...")
     print("=" * 50)
 
-    # Create DSM instance - minimal logging
-    print("📊 Initializing Data Source Manager...")
-    dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    # Create CKVD instance - minimal logging
+    print("📊 Initializing Crypto Kline Vision Data...")
+    ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
     # Define time range for feature extraction
     end_time = datetime.now(timezone.utc)
@@ -59,8 +59,8 @@ def main():
         print(f"[{i}/{len(symbols)}] Processing {symbol}...", end=" ")
 
         try:
-            # Fetch data - DSM logs are suppressed, only our output shows
-            data = dsm.get_data(
+            # Fetch data - CKVD logs are suppressed, only our output shows
+            data = ckvd.get_data(
                 symbol=symbol,
                 start_time=start_time,
                 end_time=end_time,
@@ -86,7 +86,7 @@ def main():
             results[symbol] = None
 
     # Clean up resources
-    dsm.close()
+    ckvd.close()
 
     print()
     print("📈 Feature Engineering Results:")
@@ -106,16 +106,16 @@ def main():
 
     print()
     print("✅ Feature engineering workflow completed successfully!")
-    print("🎯 Notice: Clean output with no DSM logging noise")
+    print("🎯 Notice: Clean output with no CKVD logging noise")
 
     # Show the difference
     print()
-    print("💡 What you DON'T see (thanks to DSM_LOG_LEVEL=CRITICAL):")
+    print("💡 What you DON'T see (thanks to CKVD_LOG_LEVEL=CRITICAL):")
     print("   - Cache checking messages")
     print("   - FCP step-by-step logs")
     print("   - DataFrame processing details")
     print("   - API call debugging info")
-    print("   - Hundreds of internal DSM logs")
+    print("   - Hundreds of internal CKVD logs")
     print()
     print("🚀 Perfect for feature engineering pipelines!")
 

@@ -19,9 +19,9 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from data_source_manager.core.sync.dsm_lib import fetch_market_data
-from data_source_manager.utils.for_core.vision_exceptions import UnsupportedIntervalError
-from data_source_manager.utils.market_constraints import (
+from ckvd.core.sync.ckvd_lib import fetch_market_data
+from ckvd.utils.for_core.vision_exceptions import UnsupportedIntervalError
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     Interval,
@@ -36,8 +36,8 @@ from data_source_manager.utils.market_constraints import (
 
 @pytest.fixture
 def mock_dsm():
-    """Mock DataSourceManager to avoid network calls."""
-    with patch("data_source_manager.core.sync.dsm_lib.DataSourceManager") as mock_cls:
+    """Mock CryptoKlineVisionData to avoid network calls."""
+    with patch("ckvd.core.sync.ckvd_lib.CryptoKlineVisionData") as mock_cls:
         mock_manager = MagicMock()
         mock_cls.return_value = mock_manager
         # Context manager protocol
@@ -86,8 +86,8 @@ def sample_polars_df():
 class TestFetchMarketDataTimeInputs:
     """Tests that fetch_market_data accepts various time input types."""
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_accepts_datetime_objects(self, mock_date_range, mock_validate, mock_dsm, sample_pandas_df):
         """fetch_market_data() should accept plain datetime objects without crashing.
 
@@ -115,8 +115,8 @@ class TestFetchMarketDataTimeInputs:
         assert elapsed > 0
         mock_date_range.assert_called_once_with(start, end, 3, Interval.HOUR_1)
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_accepts_string_times(self, mock_date_range, mock_validate, mock_dsm, sample_pandas_df):
         """fetch_market_data() should accept ISO format string times."""
         _mock_cls, mock_manager = mock_dsm
@@ -139,8 +139,8 @@ class TestFetchMarketDataTimeInputs:
         assert count == 6
         mock_date_range.assert_called_once_with("2024-01-01T00:00:00Z", "2024-01-10T00:00:00Z", 3, Interval.HOUR_1)
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_accepts_none_with_days(self, mock_date_range, mock_validate, mock_dsm, sample_pandas_df):
         """fetch_market_data() should accept None times with days parameter."""
         _mock_cls, mock_manager = mock_dsm
@@ -161,8 +161,8 @@ class TestFetchMarketDataTimeInputs:
         assert isinstance(df, pd.DataFrame)
         mock_date_range.assert_called_once_with(None, None, 7, Interval.HOUR_1)
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_accepts_pendulum_datetime(self, mock_date_range, mock_validate, mock_dsm, sample_pandas_df):
         """fetch_market_data() should accept pendulum DateTime objects."""
         import pendulum
@@ -195,8 +195,8 @@ class TestFetchMarketDataTimeInputs:
 class TestFetchMarketDataReturnTypes:
     """Tests that return_polars flows through to get_data() correctly."""
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_return_polars_true(self, mock_date_range, mock_validate, mock_dsm, sample_polars_df):
         """return_polars=True should pass through and return pl.DataFrame."""
         _mock_cls, mock_manager = mock_dsm
@@ -222,8 +222,8 @@ class TestFetchMarketDataReturnTypes:
         call_kwargs = mock_manager.get_data.call_args[1]
         assert call_kwargs["return_polars"] is True
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_return_polars_false(self, mock_date_range, mock_validate, mock_dsm, sample_pandas_df):
         """return_polars=False (default) should return pd.DataFrame."""
         _mock_cls, mock_manager = mock_dsm
@@ -257,7 +257,7 @@ class TestFetchMarketDataReturnTypes:
 class TestFetchMarketDataErrors:
     """Tests for error handling in fetch_market_data."""
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
     def test_invalid_interval_raises_unsupported_error(self, mock_validate):
         """Invalid interval should raise UnsupportedIntervalError, not SystemExit."""
         mock_validate.side_effect = UnsupportedIntervalError(
@@ -283,8 +283,8 @@ class TestFetchMarketDataErrors:
 class TestFetchMarketDataTupleStructure:
     """Tests for the return tuple structure (df, float, int)."""
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_return_tuple_structure(self, mock_date_range, mock_validate, mock_dsm, sample_pandas_df):
         """Return value should be (DataFrame, float, int) tuple."""
         _mock_cls, mock_manager = mock_dsm
@@ -310,8 +310,8 @@ class TestFetchMarketDataTupleStructure:
         assert isinstance(elapsed, float)
         assert isinstance(count, int)
 
-    @patch("data_source_manager.core.sync.dsm_lib.validate_interval")
-    @patch("data_source_manager.core.sync.dsm_lib.calculate_date_range")
+    @patch("ckvd.core.sync.ckvd_lib.validate_interval")
+    @patch("ckvd.core.sync.ckvd_lib.calculate_date_range")
     def test_return_tuple_none_df(self, mock_date_range, mock_validate, mock_dsm):
         """When get_data returns None, count should be 0."""
         _mock_cls, mock_manager = mock_dsm

@@ -91,10 +91,10 @@ def mock_provider_clients():
     """Mock get_provider_clients factory for offline tests.
 
     Creates mock ProviderClients with mock vision, rest, and cache clients.
-    Use this fixture for testing DSM initialization with factory pattern.
+    Use this fixture for testing CKVD initialization with factory pattern.
     """
-    from data_source_manager import DataProvider, MarketType
-    from data_source_manager.core.providers import ProviderClients
+    from ckvd import DataProvider, MarketType
+    from ckvd.core.providers import ProviderClients
 
     def _create_mock_clients(provider=DataProvider.BINANCE, market_type=MarketType.SPOT):
         mock_vision = MagicMock()
@@ -110,7 +110,7 @@ def mock_provider_clients():
             market_type=market_type,
         )
 
-    with patch("data_source_manager.core.sync.data_source_manager.get_provider_clients") as mock:
+    with patch("ckvd.core.sync.crypto_kline_vision_data.get_provider_clients") as mock:
         mock.side_effect = lambda provider, market_type, **kwargs: _create_mock_clients(
             provider, market_type
         )

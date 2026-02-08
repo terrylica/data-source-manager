@@ -14,27 +14,27 @@ This subpackage provides centralized cache validation utilities including:
 # Refactoring: Split from cache_validator.py (808 lines) for modularity
 """
 
-from data_source_manager.utils.cache.errors import (
+from ckvd.utils.cache.errors import (
     ERROR_TYPES,
     TEST_SYMBOL,
     CacheValidationError,
 )
-from data_source_manager.utils.cache.functions import (
+from ckvd.utils.cache.functions import (
     safely_read_arrow_file_async,
     validate_cache_checksum,
     validate_cache_integrity,
     validate_cache_metadata,
     validate_cache_records,
 )
-from data_source_manager.utils.cache.key_manager import CacheKeyManager
-from data_source_manager.utils.cache.memory_map import SafeMemoryMap
-from data_source_manager.utils.cache.options import (
+from ckvd.utils.cache.key_manager import CacheKeyManager
+from ckvd.utils.cache.memory_map import SafeMemoryMap
+from ckvd.utils.cache.options import (
     AlignmentOptions,
     CachePathOptions,
     ValidationOptions,
 )
-from data_source_manager.utils.cache.validator import CacheValidator
-from data_source_manager.utils.cache.vision_manager import VisionCacheManager
+from ckvd.utils.cache.validator import CacheValidator
+from ckvd.utils.cache.vision_manager import VisionCacheManager
 
 __all__ = [
     "ERROR_TYPES",

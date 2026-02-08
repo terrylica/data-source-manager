@@ -20,18 +20,18 @@ from typing import Any
 import httpx
 import pandas as pd
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     HTTP_ERROR_CODE_THRESHOLD,
     HTTP_OK,
     MILLISECOND_TOLERANCE,
 )
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, Interval, MarketType, get_endpoint_url
-from data_source_manager.utils.network_utils import create_client, safely_close_client
-from data_source_manager.utils.time_utils import (
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, Interval, MarketType, get_endpoint_url
+from ckvd.utils.network_utils import create_client, safely_close_client
+from ckvd.utils.time_utils import (
     align_time_boundaries as time_utils_align_time_boundaries,
 )
-from data_source_manager.utils.time_utils import (
+from ckvd.utils.time_utils import (
     enforce_utc_timezone,
 )
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Integration tests for DataSourceManager cache optimization."""
+"""Integration tests for CryptoKlineVisionData cache optimization."""
 
 import unittest
 from pathlib import Path
@@ -8,10 +8,10 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pendulum
 
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.config import FEATURE_FLAGS
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.config import FEATURE_FLAGS
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 logger.configure_level("DEBUG")
 
@@ -51,7 +51,7 @@ class TestDsmCacheUtils(unittest.TestCase):
         from pathlib import Path
 
         # Import cache utilities with correct package prefix
-        from data_source_manager.utils.for_core.dsm_cache_utils import get_from_cache, save_to_cache
+        from ckvd.utils.for_core.ckvd_cache_utils import get_from_cache, save_to_cache
 
         test_cache_dir = Path(tempfile.mkdtemp())
 
@@ -183,7 +183,7 @@ class TestDsmCacheUtils(unittest.TestCase):
 
 class TestDsmCacheOptimization(unittest.TestCase):
     """
-    Integration tests for the DataSourceManager cache optimization feature.
+    Integration tests for the CryptoKlineVisionData cache optimization feature.
 
     This test suite verifies the end-to-end functionality of the OPTIMIZE_CACHE_PARTIAL_DAYS
     feature flag, ensuring it properly prevents unnecessary API calls when cache has
@@ -284,25 +284,25 @@ class TestDsmCacheOptimization(unittest.TestCase):
             current_time = current_time.add(minutes=5)
         complete_df = pd.DataFrame(all_records)
 
-        # Create a DSM instance with patched methods
+        # Create a CKVD instance with patched methods
         with (
             patch.object(
-                DataSourceManager, "_get_from_cache", return_value=(complete_df, [])
+                CryptoKlineVisionData, "_get_from_cache", return_value=(complete_df, [])
             ),
             patch.object(
-                DataSourceManager, "_fetch_from_vision", side_effect=mock_vision_get
+                CryptoKlineVisionData, "_fetch_from_vision", side_effect=mock_vision_get
             ),
             patch.object(
-                DataSourceManager, "_fetch_from_rest", side_effect=mock_rest_get
+                CryptoKlineVisionData, "_fetch_from_rest", side_effect=mock_rest_get
             ),
         ):
-            # Initialize DSM directly
-            dsm = DataSourceManager(
+            # Initialize CKVD directly
+            ckvd = CryptoKlineVisionData(
                 provider=DataProvider.BINANCE, cache_dir=self.cache_dir
             )
 
             # Get data for the time range
-            df = dsm.get_data(
+            df = ckvd.get_data(
                 symbol=self.symbol,
                 start_time=self.start_time,
                 end_time=self.end_time,
@@ -420,27 +420,27 @@ class TestDsmCacheOptimization(unittest.TestCase):
             api_called["rest"] = True
             return rest_df  # Return the test data
 
-        # Create a DSM instance with patched methods
+        # Create a CKVD instance with patched methods
         with (
             patch.object(
-                DataSourceManager,
+                CryptoKlineVisionData,
                 "_get_from_cache",
                 return_value=(incomplete_df, missing_ranges),
             ),
             patch.object(
-                DataSourceManager, "_fetch_from_vision", side_effect=mock_vision_get
+                CryptoKlineVisionData, "_fetch_from_vision", side_effect=mock_vision_get
             ),
             patch.object(
-                DataSourceManager, "_fetch_from_rest", side_effect=mock_rest_get
+                CryptoKlineVisionData, "_fetch_from_rest", side_effect=mock_rest_get
             ),
         ):
-            # Initialize DSM directly
-            dsm = DataSourceManager(
+            # Initialize CKVD directly
+            ckvd = CryptoKlineVisionData(
                 provider=DataProvider.BINANCE, cache_dir=self.cache_dir
             )
 
             # Get data for the time range
-            df = dsm.get_data(
+            df = ckvd.get_data(
                 symbol=self.symbol,
                 start_time=self.start_time,
                 end_time=self.end_time,

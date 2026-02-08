@@ -16,8 +16,8 @@ from typing import Any
 
 import requests
 
-from data_source_manager.utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS, HTTP_OK
-from data_source_manager.utils.for_core.rest_exceptions import (
+from ckvd.utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS, HTTP_OK
+from ckvd.utils.for_core.rest_exceptions import (
     APIError,
     HTTPError,
     JSONDecodeError,
@@ -26,10 +26,10 @@ from data_source_manager.utils.for_core.rest_exceptions import (
     RestAPIError,
     RestTimeoutError,
 )
-from data_source_manager.utils.for_core.rest_metrics import metrics_tracker, track_api_call
-from data_source_manager.utils.for_core.rest_retry import create_retry_decorator
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import Interval
+from ckvd.utils.for_core.rest_metrics import metrics_tracker, track_api_call
+from ckvd.utils.for_core.rest_retry import create_retry_decorator
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import Interval
 
 
 def create_optimized_client() -> requests.Session:

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
-"""Data Source Manager library interface module.
+"""Crypto Kline Vision Data library interface module.
 
-This module provides the primary high-level interface for the Data Source Manager,
+This module provides the primary high-level interface for the Crypto Kline Vision Data,
 implementing the Failover Control Protocol (FCP) for robust data retrieval.
 
 The main entry point is the fetch_market_data function, which delegates to
-DataSourceManager.get_data() for all FCP logic including cache, Vision API,
+CryptoKlineVisionData.get_data() for all FCP logic including cache, Vision API,
 and REST API fallback.
 
 Example:
-    >>> from data_source_manager import fetch_market_data, MarketType, DataProvider, Interval, ChartType
+    >>> from ckvd import fetch_market_data, MarketType, DataProvider, Interval, ChartType
     >>> from datetime import datetime, timezone
     >>>
     >>> df, elapsed_time, records_count = fetch_market_data(
@@ -32,11 +32,11 @@ from typing import Literal, overload
 import pandas as pd
 import polars as pl
 
-from data_source_manager.core.sync.data_source_manager import DataSource, DataSourceManager
-from data_source_manager.utils.for_core.dsm_date_range_utils import calculate_date_range
-from data_source_manager.utils.for_core.dsm_fcp_utils import validate_interval
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import (
+from ckvd.core.sync.crypto_kline_vision_data import DataSource, CryptoKlineVisionData
+from ckvd.utils.for_core.ckvd_date_range_utils import calculate_date_range
+from ckvd.utils.for_core.ckvd_fcp_utils import validate_interval
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     Interval,
@@ -141,7 +141,7 @@ def fetch_market_data(
     enforce_source_enum = DataSource[enforce_source.upper()]
 
     # Create manager and fetch data — Polars pipeline flows through get_data()
-    with DataSourceManager(
+    with CryptoKlineVisionData(
         provider=provider,
         market_type=market_type,
         chart_type=chart_type,

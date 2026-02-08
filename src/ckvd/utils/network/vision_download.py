@@ -18,10 +18,10 @@ from typing import Any
 import attrs
 import httpx
 
-from data_source_manager.utils.config import API_TIMEOUT
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.network.client_factory import safely_close_client
-from data_source_manager.utils.network.download import DownloadHandler
+from ckvd.utils.config import API_TIMEOUT
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.network.client_factory import safely_close_client
+from ckvd.utils.network.download import DownloadHandler
 
 __all__ = [
     "VisionDownloadManager",

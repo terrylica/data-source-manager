@@ -15,13 +15,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from data_source_manager.utils.for_core.rest_exceptions import (
+from ckvd.utils.for_core.rest_exceptions import (
     HTTPError,
     NetworkError,
     RateLimitError,
     RestAPIError,
 )
-from data_source_manager.utils.for_core.rest_retry import (
+from ckvd.utils.for_core.rest_retry import (
     MAX_RETRY_WAIT_SECONDS,
     _RetryIfNotRateLimit,
     create_retry_decorator,
@@ -31,7 +31,7 @@ from data_source_manager.utils.for_core.rest_retry import (
 class TestCreateRetryDecorator:
     """Tests for the create_retry_decorator factory."""
 
-    @patch("data_source_manager.utils.for_core.rest_retry.logger")
+    @patch("ckvd.utils.for_core.rest_retry.logger")
     def test_retries_on_rest_api_error(self, _mock_logger):
         """RestAPIError triggers retry up to retry_count."""
         call_count = 0
@@ -48,7 +48,7 @@ class TestCreateRetryDecorator:
         assert result == "success"
         assert call_count == 3
 
-    @patch("data_source_manager.utils.for_core.rest_retry.logger")
+    @patch("ckvd.utils.for_core.rest_retry.logger")
     def test_retries_on_network_error(self, _mock_logger):
         """NetworkError (RestAPIError subclass) triggers retry."""
         call_count = 0
@@ -82,7 +82,7 @@ class TestCreateRetryDecorator:
         assert call_count == 1
         assert exc_info.value.retry_after == 60
 
-    @patch("data_source_manager.utils.for_core.rest_retry.logger")
+    @patch("ckvd.utils.for_core.rest_retry.logger")
     def test_retry_count_wired(self, _mock_logger):
         """retry_count parameter controls number of attempts."""
         call_count = 0
@@ -98,7 +98,7 @@ class TestCreateRetryDecorator:
 
         assert call_count == 5
 
-    @patch("data_source_manager.utils.for_core.rest_retry.logger")
+    @patch("ckvd.utils.for_core.rest_retry.logger")
     def test_reraise_propagates_original_exception(self, _mock_logger):
         """reraise=True ensures original exception type propagates (not RetryError)."""
 
@@ -112,7 +112,7 @@ class TestCreateRetryDecorator:
 
         assert exc_info.value.status_code == 503
 
-    @patch("data_source_manager.utils.for_core.rest_retry.logger")
+    @patch("ckvd.utils.for_core.rest_retry.logger")
     def test_retries_on_requests_exception(self, _mock_logger):
         """requests.RequestException triggers retry."""
         call_count = 0
@@ -193,7 +193,7 @@ class TestMetricsRateLimitTracking:
 
     def test_rate_limit_error_tracked_in_metrics(self):
         """RateLimitError should increment rate_limited_calls counter."""
-        from data_source_manager.utils.for_core.rest_metrics import RestMetricsTracker
+        from ckvd.utils.for_core.rest_metrics import RestMetricsTracker
 
         tracker = RestMetricsTracker()
         tracker.reset()
@@ -214,7 +214,7 @@ class TestMetricsRateLimitTracking:
 
     def test_track_api_call_decorator_detects_rate_limit_error(self):
         """track_api_call decorator should pass status_code=429 for RateLimitError."""
-        from data_source_manager.utils.for_core.rest_metrics import (
+        from ckvd.utils.for_core.rest_metrics import (
             RestMetricsTracker,
             track_api_call,
         )
@@ -243,7 +243,7 @@ class TestApiRateLimitFix:
 
     def test_429_raises_rate_limit_error(self):
         """HTTP 429 should raise RateLimitError, not TimeoutError."""
-        from data_source_manager.utils.network.api import make_api_request
+        from ckvd.utils.network.api import make_api_request
 
         mock_client = MagicMock()
         mock_response = MagicMock()
@@ -258,7 +258,7 @@ class TestApiRateLimitFix:
 
     def test_418_raises_rate_limit_error(self):
         """HTTP 418 (IP ban) should raise RateLimitError."""
-        from data_source_manager.utils.network.api import make_api_request
+        from ckvd.utils.network.api import make_api_request
 
         mock_client = MagicMock()
         mock_response = MagicMock()
@@ -274,7 +274,7 @@ class TestApiRateLimitFix:
 
     def test_429_default_retry_after_is_60(self):
         """Missing retry-after header should default to 60s (not 1s)."""
-        from data_source_manager.utils.network.api import make_api_request
+        from ckvd.utils.network.api import make_api_request
 
         mock_client = MagicMock()
         mock_response = MagicMock()

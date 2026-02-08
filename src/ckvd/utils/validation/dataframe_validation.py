@@ -17,7 +17,7 @@ from typing import Any
 
 import pandas as pd
 
-from data_source_manager.utils.config import (
+from ckvd.utils.config import (
     CANONICAL_INDEX_NAME,
     DEFAULT_TIMEZONE,
     MAX_CACHE_AGE,
@@ -26,7 +26,7 @@ from data_source_manager.utils.config import (
     OUTPUT_DTYPES,
     TIMESTAMP_PRECISION,
 )
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 
 class DataFrameValidator:
@@ -280,7 +280,7 @@ class DataFrameValidator:
         if df.empty:
             return
 
-        from data_source_manager.utils.validation.time_validation import DataValidation
+        from ckvd.utils.validation.time_validation import DataValidation
 
         start_time = DataValidation.enforce_utc_timestamp(start_time)
         end_time = DataValidation.enforce_utc_timestamp(end_time)

@@ -10,9 +10,9 @@ for different market types and data providers.
 
 from __future__ import annotations
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market.capabilities import get_market_capabilities
-from data_source_manager.utils.market.enums import ChartType, DataProvider, MarketType
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market.capabilities import get_market_capabilities
+from ckvd.utils.market.enums import ChartType, DataProvider, MarketType
 
 __all__ = [
     "get_endpoint_url",

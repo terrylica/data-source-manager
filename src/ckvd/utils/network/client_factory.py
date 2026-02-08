@@ -13,8 +13,8 @@ from typing import Any
 import httpx
 from httpx import Limits, Timeout
 
-from data_source_manager.utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.config import DEFAULT_HTTP_TIMEOUT_SECONDS
+from ckvd.utils.loguru_setup import logger
 
 __all__ = [
     "Client",

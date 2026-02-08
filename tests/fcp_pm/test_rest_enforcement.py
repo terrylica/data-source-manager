@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify that REST API enforcement works correctly in the DataSourceManager.
+Test script to verify that REST API enforcement works correctly in the CryptoKlineVisionData.
 This script enforces the use of REST API and verifies that the resulting data has the correct source tag.
 """
 
@@ -11,20 +11,20 @@ from rich import print
 from rich.panel import Panel
 from rich.table import Table
 
-from data_source_manager.core.sync.data_source_manager import DataSource, DataSourceManager
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.core.sync.crypto_kline_vision_data import DataSource, CryptoKlineVisionData
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 # Set log level to DEBUG to see detailed logging
 logger.setLevel("DEBUG")
 
 
 def test_rest_enforcement():
-    """Test REST API enforcement in the DataSourceManager."""
+    """Test REST API enforcement in the CryptoKlineVisionData."""
     print(
         Panel(
             "[bold green]Testing REST API Enforcement[/bold green]\n"
-            "This script verifies that the DataSourceManager correctly enforces the REST API source\n"
+            "This script verifies that the CryptoKlineVisionData correctly enforces the REST API source\n"
             "by checking the _data_source column in the returned DataFrame.",
             expand=False,
             border_style="green",
@@ -51,8 +51,8 @@ def test_rest_enforcement():
     print("Enforce Source: REST\n")
 
     try:
-        # Create DataSourceManager with cache disabled
-        with DataSourceManager(
+        # Create CryptoKlineVisionData with cache disabled
+        with CryptoKlineVisionData(
             provider=DataProvider.BINANCE,
             market_type=market_type,
             chart_type=chart_type,
@@ -137,7 +137,7 @@ def main():
         print(
             Panel(
                 "[bold green]REST API Enforcement Test Passed[/bold green]\n"
-                "The DataSourceManager correctly enforced the REST API source for all data.",
+                "The CryptoKlineVisionData correctly enforced the REST API source for all data.",
                 border_style="green",
             )
         )
@@ -146,7 +146,7 @@ def main():
         print(
             Panel(
                 "[bold red]REST API Enforcement Test Failed[/bold red]\n"
-                "The DataSourceManager did not correctly enforce the REST API source.",
+                "The CryptoKlineVisionData did not correctly enforce the REST API source.",
                 border_style="red",
             )
         )

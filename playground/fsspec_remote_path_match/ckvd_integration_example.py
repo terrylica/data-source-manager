@@ -10,12 +10,12 @@ from rich.console import Console
 from rich.table import Table
 from vision_path_mapper import FSSpecVisionHandler, VisionPathMapper
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
 
 
-class DataSourceManagerExample:
-    """Simplified example showing how to integrate VisionPathMapper with DataSourceManager."""
+class CryptoKlineVisionDataExample:
+    """Simplified example showing how to integrate VisionPathMapper with CryptoKlineVisionData."""
 
     def __init__(
         self,
@@ -142,7 +142,7 @@ def demo_all_market_types(
 ):
     """Demonstrate data retrieval across all market types."""
     console = Console()
-    console.print("[bold green]DataSourceManager - All Market Types Demo[/bold green]")
+    console.print("[bold green]CryptoKlineVisionData - All Market Types Demo[/bold green]")
     console.print("")
 
     # Define parameters
@@ -164,8 +164,8 @@ def demo_all_market_types(
             f"[bold magenta]Processing {market['name']} Market[/bold magenta]"
         )
 
-        # Create DSM for this market
-        dsm = DataSourceManagerExample(
+        # Create CKVD for this market
+        ckvd = CryptoKlineVisionDataExample(
             market_type=market["type"],
             provider=DataProvider.BINANCE,
             chart_type=ChartType.KLINES,
@@ -188,7 +188,7 @@ def demo_all_market_types(
 
         # Get data
         console.print(f"[bold blue]Retrieving {market['name']} data...[/bold blue]")
-        df = dsm.get_data(
+        df = ckvd.get_data(
             symbol=market["symbol"],
             start_time=start_time.in_timezone("UTC"),
             end_time=end_time.in_timezone("UTC"),
@@ -223,15 +223,15 @@ def demo_all_market_types(
         paths_table.add_column("Local Path", style="green")
         paths_table.add_column("Remote URL", style="blue")
 
-        components = dsm.path_mapper.create_components_from_params(
+        components = ckvd.path_mapper.create_components_from_params(
             symbol=market["symbol"],
             interval=interval_str,
             date=start_time,
             market_type=market["type"],
         )
 
-        local_path = dsm.path_mapper.get_local_path(components)
-        remote_url = dsm.path_mapper.get_remote_url(components)
+        local_path = ckvd.path_mapper.get_local_path(components)
+        remote_url = ckvd.path_mapper.get_remote_url(components)
 
         paths_table.add_row(
             start_time.format("YYYY-MM-DD"),
@@ -256,13 +256,13 @@ def main(
         False, "--all-markets", "-a", help="Demo all market types"
     ),
 ):
-    """Demonstrates using the VisionPathMapper with a simplified DataSourceManager."""
+    """Demonstrates using the VisionPathMapper with a simplified CryptoKlineVisionData."""
     if all_markets:
         demo_all_market_types(days=days, use_cache=use_cache, cache_dir=cache_dir)
         return
 
     console = Console()
-    console.print("[bold green]DataSourceManager Integration Example[/bold green]")
+    console.print("[bold green]CryptoKlineVisionData Integration Example[/bold green]")
     console.print("")
 
     # Parse market type
@@ -307,8 +307,8 @@ def main(
     end_time = pendulum.now().start_of("day")
     start_time = end_time.subtract(days=days)
 
-    # Create DataSourceManager
-    dsm = DataSourceManagerExample(
+    # Create CryptoKlineVisionData
+    ckvd = CryptoKlineVisionDataExample(
         market_type=market_enum,
         provider=DataProvider.BINANCE,
         chart_type=ChartType.KLINES,
@@ -326,7 +326,7 @@ def main(
     config_table.add_row("Interval", interval)
     config_table.add_row("Start Time", start_time.format("YYYY-MM-DD HH:mm:ss"))
     config_table.add_row("End Time", end_time.format("YYYY-MM-DD HH:mm:ss"))
-    config_table.add_row("Cache Directory", str(dsm.cache_dir))
+    config_table.add_row("Cache Directory", str(ckvd.cache_dir))
     config_table.add_row("Use Cache", str(use_cache))
 
     console.print(config_table)
@@ -334,7 +334,7 @@ def main(
 
     # Get data
     console.print("[bold blue]Retrieving data...[/bold blue]")
-    df = dsm.get_data(
+    df = ckvd.get_data(
         symbol=symbol,
         start_time=start_time.in_timezone("UTC"),
         end_time=end_time.in_timezone("UTC"),
@@ -377,15 +377,15 @@ def main(
     # Show paths for a few dates
     demo_date = start_time
     for _ in range(min(3, days)):
-        components = dsm.path_mapper.create_components_from_params(
+        components = ckvd.path_mapper.create_components_from_params(
             symbol=symbol,
             interval=interval,
             date=demo_date,
             market_type=market_enum,
         )
 
-        local_path = dsm.path_mapper.get_local_path(components)
-        remote_url = dsm.path_mapper.get_remote_url(components)
+        local_path = ckvd.path_mapper.get_local_path(components)
+        remote_url = ckvd.path_mapper.get_remote_url(components)
 
         paths_table.add_row(
             demo_date.format("YYYY-MM-DD"),

@@ -15,7 +15,7 @@ API endpoints:
 - /api/v5/market/history-candles - Historical data (up to 100 records)
 """
 
-from data_source_manager.core.providers.okx.okx_rest_client import OKXRestClient
+from ckvd.core.providers.okx.okx_rest_client import OKXRestClient
 
 __all__ = [
     "OKXRestClient",

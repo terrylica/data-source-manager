@@ -19,7 +19,7 @@ Package structure:
 - dataframe_validation.py: DataFrame structure validation
 """
 
-from data_source_manager.utils.validation.availability_data import (
+from ckvd.utils.validation.availability_data import (
     FuturesAvailabilityWarning,
     SymbolAvailability,
     check_futures_counterpart_availability,
@@ -27,24 +27,24 @@ from data_source_manager.utils.validation.availability_data import (
     get_symbol_availability,
     is_symbol_available_at,
 )
-from data_source_manager.utils.validation.availability_validation import (
+from ckvd.utils.validation.availability_validation import (
     is_data_likely_available,
     validate_data_availability,
 )
-from data_source_manager.utils.validation.dataframe_validation import (
+from ckvd.utils.validation.dataframe_validation import (
     DataFrameValidator,
 )
-from data_source_manager.utils.validation.file_validation import (
+from ckvd.utils.validation.file_validation import (
     calculate_checksum,
     validate_file_with_checksum,
 )
-from data_source_manager.utils.validation.time_validation import (
+from ckvd.utils.validation.time_validation import (
     DataValidation,
     ValidationError,
 )
 
 # Constants re-exported for backward compatibility
-from data_source_manager.utils.validation.time_validation import (
+from ckvd.utils.validation.time_validation import (
     ALL_COLUMNS,
     INTERVAL_PATTERN,
     OHLCV_COLUMNS,

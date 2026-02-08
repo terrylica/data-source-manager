@@ -11,8 +11,8 @@ checking if bars are complete based on current time.
 
 from datetime import datetime, timedelta, timezone
 
-from data_source_manager.utils.market_constraints import Interval as MarketInterval
-from data_source_manager.utils.time.intervals import get_interval_timedelta
+from ckvd.utils.market_constraints import Interval as MarketInterval
+from ckvd.utils.time.intervals import get_interval_timedelta
 
 __all__ = [
     "get_bar_close_time",

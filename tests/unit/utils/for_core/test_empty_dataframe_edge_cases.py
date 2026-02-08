@@ -19,7 +19,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from data_source_manager.utils.for_core.dsm_time_range_utils import merge_dataframes
+from ckvd.utils.for_core.ckvd_time_range_utils import merge_dataframes
 
 
 # =============================================================================

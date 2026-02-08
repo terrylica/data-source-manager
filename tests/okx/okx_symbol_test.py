@@ -8,7 +8,7 @@ for OKX data provider using the market_constraints utilities.
 
 import pytest
 
-from data_source_manager.utils.market_constraints import (
+from ckvd.utils.market_constraints import (
     ChartType,
     DataProvider,
     MarketType,

@@ -1,5 +1,5 @@
 """Core data source management functionality."""
 
-from .sync.data_source_manager import DataSourceManager, DataSource, DataSourceConfig
+from .sync.crypto_kline_vision_data import CryptoKlineVisionData, DataSource, CKVDConfig
 
-__all__ = ["DataSource", "DataSourceConfig", "DataSourceManager"]
+__all__ = ["CKVDConfig", "CryptoKlineVisionData", "DataSource"]

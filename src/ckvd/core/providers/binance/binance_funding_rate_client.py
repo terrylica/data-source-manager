@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# polars-exception: FundingRateClient returns pandas DataFrames for DSM pipeline compatibility
+# polars-exception: FundingRateClient returns pandas DataFrames for CKVD pipeline compatibility
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 # Refactoring: Fix silent failure patterns (BLE001)
 """Client for Binance funding rate data."""
@@ -10,19 +10,19 @@ from pathlib import Path
 
 import pandas as pd
 
-from data_source_manager.core.providers.binance.cache_manager import UnifiedCacheManager
-from data_source_manager.core.providers.binance.data_client_interface import DataClientInterface
-from data_source_manager.utils.config import (
+from ckvd.core.providers.binance.cache_manager import UnifiedCacheManager
+from ckvd.core.providers.binance.data_client_interface import DataClientInterface
+from ckvd.utils.config import (
     FUNDING_RATE_DTYPES,
     MAX_FUNDING_RATE,
     MIN_FUNDING_RATE,
     create_empty_funding_rate_dataframe,
 )
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
-from data_source_manager.utils.market_utils import get_market_type_str
-from data_source_manager.utils.network_utils import create_client
-from data_source_manager.utils.time_utils import filter_dataframe_by_time
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.utils.market_utils import get_market_type_str
+from ckvd.utils.network_utils import create_client
+from ckvd.utils.time_utils import filter_dataframe_by_time
 
 
 class BinanceFundingRateClient(DataClientInterface):

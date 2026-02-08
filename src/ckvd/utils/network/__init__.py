@@ -12,27 +12,27 @@ This subpackage provides network-related utilities including:
 # Refactoring: Split from network_utils.py (761 lines) for modularity
 """
 
-from data_source_manager.utils.network.api import (
+from ckvd.utils.network.api import (
     make_api_request,
     test_connectivity,
 )
-from data_source_manager.utils.network.client_factory import (
+from ckvd.utils.network.client_factory import (
     Client,
     create_client,
     create_httpx_client,
     safely_close_client,
 )
-from data_source_manager.utils.network.download import (
+from ckvd.utils.network.download import (
     DownloadHandler,
     DownloadProgressTracker,
     download_files_concurrently,
 )
-from data_source_manager.utils.network.exceptions import (
+from ckvd.utils.network.exceptions import (
     DownloadException,
     DownloadStalledException,
     RateLimitException,
 )
-from data_source_manager.utils.network.vision_download import (
+from ckvd.utils.network.vision_download import (
     VisionDownloadManager,
 )
 

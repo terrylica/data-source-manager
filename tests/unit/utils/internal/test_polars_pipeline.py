@@ -19,7 +19,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from data_source_manager.utils.internal.polars_pipeline import (
+from ckvd.utils.internal.polars_pipeline import (
     SOURCE_PRIORITY,
     PolarsDataPipeline,
 )
@@ -56,7 +56,7 @@ def sample_polars_df(base_time):
 def sample_pandas_df(base_time):
     """Create a sample pandas DataFrame for testing.
 
-    Note: The DataFrame has open_time as the index (standard DSM format),
+    Note: The DataFrame has open_time as the index (standard CKVD format),
     not as both index and column.
     """
     timestamps = [base_time + timedelta(hours=i) for i in range(6)]

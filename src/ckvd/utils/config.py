@@ -245,7 +245,7 @@ class FeatureFlags:
     The USE_POLARS_PIPELINE flag was removed in v3.1.0.
 
     Environment variables:
-    - DSM_USE_POLARS_OUTPUT=true/false
+    - CKVD_USE_POLARS_OUTPUT=true/false
     """
 
     ENABLE_CACHE: bool = attrs.field(default=True)
@@ -256,10 +256,10 @@ class FeatureFlags:
     # Zero-copy Polars output
     # When True AND return_polars=True, skips pandas conversion entirely
     # Provides maximum memory efficiency for Polars consumers
-    # Default: True (v2.1.0+) - opt-out with DSM_USE_POLARS_OUTPUT=false
+    # Default: True (v2.1.0+) - opt-out with CKVD_USE_POLARS_OUTPUT=false
     USE_POLARS_OUTPUT: bool = attrs.field(
         default=True,
-        converter=lambda x: _parse_bool_env("DSM_USE_POLARS_OUTPUT", x),
+        converter=lambda x: _parse_bool_env("CKVD_USE_POLARS_OUTPUT", x),
     )
 
     @classmethod
@@ -297,8 +297,8 @@ def create_empty_dataframe(chart_type=None) -> pd.DataFrame:
     Returns:
         An empty DataFrame with correct column types and index
     """
-    from data_source_manager.utils.loguru_setup import logger
-    from data_source_manager.utils.market_constraints import ChartType
+    from ckvd.utils.loguru_setup import logger
+    from ckvd.utils.market_constraints import ChartType
 
     # Determine chart type
     if isinstance(chart_type, str):
@@ -355,7 +355,7 @@ def create_empty_funding_rate_dataframe() -> pd.DataFrame:
         This function is maintained for backward compatibility.
         New code should use create_empty_dataframe(ChartType.FUNDING_RATE) instead.
     """
-    from data_source_manager.utils.market_constraints import ChartType
+    from ckvd.utils.market_constraints import ChartType
 
     return create_empty_dataframe(ChartType.FUNDING_RATE)
 

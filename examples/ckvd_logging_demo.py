@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-DSM Logging Control Demo
+CKVD Logging Control Demo
 
-This demo shows how to control DSM logging levels for clean feature engineering workflows.
+This demo shows how to control CKVD logging levels for clean feature engineering workflows.
 It demonstrates the solution to the user's request for configurable logging levels.
 
 Usage:
-    # Clean output for feature engineering (suppress DSM logs)
-    DSM_LOG_LEVEL=CRITICAL python examples/dsm_logging_demo.py
+    # Clean output for feature engineering (suppress CKVD logs)
+    CKVD_LOG_LEVEL=CRITICAL python examples/dsm_logging_demo.py
 
-    # Normal output with DSM info logs
-    DSM_LOG_LEVEL=INFO python examples/dsm_logging_demo.py
+    # Normal output with CKVD info logs
+    CKVD_LOG_LEVEL=INFO python examples/dsm_logging_demo.py
 
     # Detailed debugging output
-    DSM_LOG_LEVEL=DEBUG python examples/dsm_logging_demo.py
+    CKVD_LOG_LEVEL=DEBUG python examples/dsm_logging_demo.py
 
     # Using command line options
     python examples/dsm_logging_demo.py --log-level CRITICAL
@@ -35,20 +35,20 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
-# Import DSM components
-from data_source_manager.core.sync.data_source_manager import DataSourceManager
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import DataProvider, Interval, MarketType
+# Import CKVD components
+from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
 
 console = Console()
 
 
 def demonstrate_logging_levels():
-    """Show how different log levels affect DSM output."""
-    console.print(Panel.fit("[bold blue]DSM Logging Levels Demo[/bold blue]", border_style="blue"))
+    """Show how different log levels affect CKVD output."""
+    console.print(Panel.fit("[bold blue]CKVD Logging Levels Demo[/bold blue]", border_style="blue"))
 
     # Create a table showing log level effects
-    table = Table(title="DSM Log Level Effects")
+    table = Table(title="CKVD Log Level Effects")
     table.add_column("Log Level", style="cyan", no_wrap=True)
     table.add_column("What You See", style="magenta")
     table.add_column("Use Case", style="green")
@@ -68,23 +68,23 @@ def demonstrate_environment_control():
     console.print(Panel.fit("[bold green]Environment Variable Control[/bold green]", border_style="green"))
 
     console.print("[bold]Current environment:[/bold]")
-    current_level = os.getenv("DSM_LOG_LEVEL", "ERROR")
-    console.print(f"  DSM_LOG_LEVEL = {current_level}")
+    current_level = os.getenv("CKVD_LOG_LEVEL", "ERROR")
+    console.print(f"  CKVD_LOG_LEVEL = {current_level}")
     console.print(f"  Effective level: {logger.getEffectiveLevel()}")
     console.print()
 
-    console.print("[bold]To control DSM logging:[/bold]")
+    console.print("[bold]To control CKVD logging:[/bold]")
     console.print("  [cyan]# Clean output for feature engineering[/cyan]")
-    console.print("  export DSM_LOG_LEVEL=CRITICAL")
+    console.print("  export CKVD_LOG_LEVEL=CRITICAL")
     console.print()
     console.print("  [cyan]# Normal development[/cyan]")
-    console.print("  export DSM_LOG_LEVEL=INFO")
+    console.print("  export CKVD_LOG_LEVEL=INFO")
     console.print()
     console.print("  [cyan]# Default behavior (errors and critical only)[/cyan]")
     console.print("  # No need to set anything - ERROR is the default")
     console.print()
     console.print("  [cyan]# Detailed debugging[/cyan]")
-    console.print("  export DSM_LOG_LEVEL=DEBUG")
+    console.print("  export CKVD_LOG_LEVEL=DEBUG")
     console.print()
 
 
@@ -95,16 +95,16 @@ def demonstrate_programmatic_control():
     console.print("[bold]Option 1: Configure logger directly[/bold]")
     console.print("```python")
     console.print("from utils.loguru_setup import logger")
-    console.print("logger.configure_level('CRITICAL')  # Suppress DSM logs")
+    console.print("logger.configure_level('CRITICAL')  # Suppress CKVD logs")
     console.print("```")
     console.print()
 
     console.print("[bold]Option 2: Set environment in code[/bold]")
     console.print("```python")
     console.print("import os")
-    console.print("os.environ['DSM_LOG_LEVEL'] = 'CRITICAL'")
-    console.print("# Import DSM after setting environment")
-    console.print("from core.sync.data_source_manager import DataSourceManager")
+    console.print("os.environ['CKVD_LOG_LEVEL'] = 'CRITICAL'")
+    console.print("# Import CKVD after setting environment")
+    console.print("from core.sync.crypto_kline_vision_data import CryptoKlineVisionData")
     console.print("```")
     console.print()
 
@@ -120,7 +120,7 @@ def demonstrate_feature_engineering_workflow():
     console.print("[dim]... (hundreds of similar lines)")
     console.print()
 
-    console.print("[bold]After (clean output with DSM_LOG_LEVEL=CRITICAL):[/bold]")
+    console.print("[bold]After (clean output with CKVD_LOG_LEVEL=CRITICAL):[/bold]")
     console.print("[green]✓ Feature extraction started")
     console.print("[green]✓ Processing SOLUSDT data...")
     console.print("[green]✓ Feature engineering complete: 1440 records processed")
@@ -130,14 +130,14 @@ def demonstrate_feature_engineering_workflow():
     console.print("```python")
     console.print("# Clean feature engineering code")
     console.print("import os")
-    console.print("os.environ['DSM_LOG_LEVEL'] = 'CRITICAL'")
+    console.print("os.environ['CKVD_LOG_LEVEL'] = 'CRITICAL'")
     console.print("")
-    console.print("from core.sync.data_source_manager import DataSourceManager")
+    console.print("from core.sync.crypto_kline_vision_data import CryptoKlineVisionData")
     console.print("from utils.market_constraints import DataProvider, MarketType, Interval")
     console.print("")
     console.print("# No more logging boilerplate needed!")
-    console.print("dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)")
-    console.print("data = dsm.get_data(")
+    console.print("ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)")
+    console.print("data = ckvd.get_data(")
     console.print("    symbol='SOLUSDT',")
     console.print("    start_time=start_time,")
     console.print("    end_time=end_time,")
@@ -149,19 +149,19 @@ def demonstrate_feature_engineering_workflow():
 
 
 def test_actual_dsm_logging(log_level: str):
-    """Test actual DSM logging with the specified level."""
-    console.print(Panel.fit(f"[bold cyan]Testing DSM with {log_level} Level[/bold cyan]", border_style="cyan"))
+    """Test actual CKVD logging with the specified level."""
+    console.print(Panel.fit(f"[bold cyan]Testing CKVD with {log_level} Level[/bold cyan]", border_style="cyan"))
 
     # Configure the logger to the specified level
     logger.configure_level(log_level)
-    console.print(f"[green]Set DSM log level to: {log_level}[/green]")
+    console.print(f"[green]Set CKVD log level to: {log_level}[/green]")
     console.print(f"[green]Effective level: {logger.getEffectiveLevel()}[/green]")
     console.print()
 
     try:
-        # Create DSM instance (this will generate some logs)
-        console.print("[yellow]Creating DataSourceManager...[/yellow]")
-        dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        # Create CKVD instance (this will generate some logs)
+        console.print("[yellow]Creating CryptoKlineVisionData...[/yellow]")
+        ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         # Try to get a small amount of recent data (this will generate logs)
         console.print("[yellow]Fetching small data sample...[/yellow]")
@@ -169,7 +169,7 @@ def test_actual_dsm_logging(log_level: str):
         start_time = end_time - timedelta(hours=1)
 
         # This will demonstrate the logging behavior
-        df = dsm.get_data(
+        df = ckvd.get_data(
             symbol="BTCUSDT",
             start_time=start_time,
             end_time=end_time,
@@ -181,10 +181,10 @@ def test_actual_dsm_logging(log_level: str):
         else:
             console.print("[yellow]⚠ No data retrieved (this is normal for demo)[/yellow]")
 
-        dsm.close()
+        ckvd.close()
 
     except Exception as e:
-        console.print(f"[red]Error during DSM test: {e}[/red]")
+        console.print(f"[red]Error during CKVD test: {e}[/red]")
         console.print("[yellow]This is expected for demo purposes[/yellow]")
 
     console.print()
@@ -193,22 +193,22 @@ def test_actual_dsm_logging(log_level: str):
 def main(
     log_level: str = typer.Option("INFO", "--log-level", "-l", help="Log level to demonstrate"),
     show_all: bool = typer.Option(False, "--show-all", "-a", help="Show all demonstrations"),
-    test_dsm: bool = typer.Option(False, "--test-dsm", "-t", help="Test actual DSM logging"),
+    test_dsm: bool = typer.Option(False, "--test-ckvd", "-t", help="Test actual CKVD logging"),
 ):
-    """Demonstrate DSM logging control capabilities."""
+    """Demonstrate CKVD logging control capabilities."""
 
     console.print(
-        Panel.fit("[bold blue]DSM Logging Control Demo[/bold blue]\nSolution for clean feature engineering workflows", border_style="blue")
+        Panel.fit("[bold blue]CKVD Logging Control Demo[/bold blue]\nSolution for clean feature engineering workflows", border_style="blue")
     )
 
     # Show the benefits
     console.print(
         Panel.fit(
             "[bold green]✅ Problem Solved![/bold green]\n\n"
-            "🎯 [bold]Easy Control:[/bold] DSM_LOG_LEVEL=CRITICAL vs 15+ lines of boilerplate\n"
+            "🎯 [bold]Easy Control:[/bold] CKVD_LOG_LEVEL=CRITICAL vs 15+ lines of boilerplate\n"
             "🚀 [bold]Clean Output:[/bold] No more cluttered console logs in feature engineering\n"
             "🔧 [bold]Configurable:[/bold] Different log levels for different use cases\n"
-            "📝 [bold]No Code Changes:[/bold] Existing DSM code works unchanged",
+            "📝 [bold]No Code Changes:[/bold] Existing CKVD code works unchanged",
             border_style="green",
         )
     )
@@ -228,11 +228,11 @@ def main(
     console.print(
         Panel.fit(
             "[bold magenta]Implementation Status[/bold magenta]\n\n"
-            "✅ [bold]Environment Variable Control:[/bold] DSM_LOG_LEVEL already implemented\n"
+            "✅ [bold]Environment Variable Control:[/bold] CKVD_LOG_LEVEL already implemented\n"
             "✅ [bold]Programmatic Control:[/bold] logger.configure_level() available\n"
-            "✅ [bold]All DSM Components:[/bold] Use centralized loguru logger\n"
+            "✅ [bold]All CKVD Components:[/bold] Use centralized loguru logger\n"
             "✅ [bold]Cleaner Default:[/bold] Default ERROR level for quieter operation\n"
-            "✅ [bold]Feature Engineering Ready:[/bold] Set DSM_LOG_LEVEL=CRITICAL for minimal output\n\n"
+            "✅ [bold]Feature Engineering Ready:[/bold] Set CKVD_LOG_LEVEL=CRITICAL for minimal output\n\n"
             "[cyan]The requested logging control is already implemented and ready to use![/cyan]",
             border_style="magenta",
         )

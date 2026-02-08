@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-# polars-exception: Core FCP implementation - DataSourceManager returns pandas DataFrames
+# polars-exception: Core FCP implementation - CryptoKlineVisionData returns pandas DataFrames
 # for compatibility with all downstream consumers. Coordinated migration needed.
-"""Data Source Manager (DSM) that mediates between different data sources.
+"""Crypto Kline Vision Data (CKVD) that mediates between different data sources.
 
 This module implements the core Failover Control Protocol (FCP) strategy for robust
 data retrieval from multiple sources. It orchestrates the data retrieval process
@@ -11,19 +11,19 @@ through a sequence of increasingly reliable sources:
 2. Vision API: Fetching from Binance Vision API for historical data
 3. REST API: Direct API calls for recent or missing data
 
-The main class is DataSourceManager, which is the core implementation of the FCP strategy.
-DataSource and DataSourceConfig are imported from dsm_types for backward compatibility.
+The main class is CryptoKlineVisionData, which is the core implementation of the FCP strategy.
+DataSource and CKVDConfig are imported from dsm_types for backward compatibility.
 
 # ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
-# Refactoring: Extract DataSource and DataSourceConfig to dsm_types.py
+# Refactoring: Extract DataSource and CKVDConfig to dsm_types.py
 
 Example:
-    >>> from core.sync.data_source_manager import DataSourceManager, DataSource
-    >>> from data_source_manager import DataProvider, MarketType, Interval
+    >>> from core.sync.crypto_kline_vision_data import CryptoKlineVisionData, DataSource
+    >>> from ckvd import DataProvider, MarketType, Interval
     >>> from datetime import datetime
     >>>
     >>> # Create a manager for spot market
-    >>> manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+    >>> manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
     >>>
     >>> # Fetch BTCUSDT data for the last 3 days
     >>> df = manager.get_data(
@@ -41,11 +41,11 @@ from typing import Any, Literal, overload
 import pandas as pd
 import polars as pl
 
-from data_source_manager.core.providers import ProviderClients, get_provider_clients, get_supported_providers
-from data_source_manager.core.providers.binance.binance_funding_rate_client import BinanceFundingRateClient
-from data_source_manager.core.sync.dsm_types import DataSource, DataSourceConfig
-from data_source_manager.utils.app_paths import get_cache_dir
-from data_source_manager.utils.config import (
+from ckvd.core.providers import ProviderClients, get_provider_clients, get_supported_providers
+from ckvd.core.providers.binance.binance_funding_rate_client import BinanceFundingRateClient
+from ckvd.core.sync.ckvd_types import DataSource, CKVDConfig
+from ckvd.utils.app_paths import get_cache_dir
+from ckvd.utils.config import (
     FUNDING_RATE_DTYPES,
     OUTPUT_DTYPES,
     REST_CHUNK_SIZE,
@@ -53,37 +53,37 @@ from data_source_manager.utils.config import (
     VISION_DATA_DELAY_HOURS,
     create_empty_dataframe,
 )
-from data_source_manager.utils.for_core.dsm_api_utils import (
+from ckvd.utils.for_core.ckvd_api_utils import (
     fetch_from_rest,
     fetch_from_vision,
 )
-from data_source_manager.utils.for_core.dsm_date_range_utils import (
+from ckvd.utils.for_core.ckvd_date_range_utils import (
     calculate_date_range,
     get_date_range_description,
 )
-from data_source_manager.utils.config import FeatureFlags
-from data_source_manager.utils.for_core.dsm_fcp_utils import (
+from ckvd.utils.config import FeatureFlags
+from ckvd.utils.for_core.ckvd_fcp_utils import (
     handle_error,
     process_rest_step,
     process_vision_step,
     validate_interval,
     verify_final_data,
 )
-from data_source_manager.utils.internal.polars_pipeline import PolarsDataPipeline
-from data_source_manager.utils.for_core.dsm_time_range_utils import (
+from ckvd.utils.internal.polars_pipeline import PolarsDataPipeline
+from ckvd.utils.for_core.ckvd_time_range_utils import (
     standardize_columns,
 )
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
-from data_source_manager.utils.for_core.vision_exceptions import VisionAPIError
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
-from data_source_manager.utils.time_utils import align_time_boundaries
+from ckvd.utils.for_core.rest_exceptions import RateLimitError, RestAPIError
+from ckvd.utils.for_core.vision_exceptions import VisionAPIError
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, DataProvider, Interval, MarketType
+from ckvd.utils.time_utils import align_time_boundaries
 
 # Re-export for backward compatibility
 __all__ = [
     "DataSource",
-    "DataSourceConfig",
-    "DataSourceManager",
+    "CKVDConfig",
+    "CryptoKlineVisionData",
 ]
 
 # Supported providers - dynamically determined from the provider registry
@@ -92,7 +92,7 @@ __all__ = [
 SUPPORTED_PROVIDERS: frozenset[DataProvider] = get_supported_providers()
 
 
-class DataSourceManager:
+class CryptoKlineVisionData:
     """Mediator between data sources with smart selection and caching.
 
     This class orchestrates data retrieval from different sources following
@@ -117,12 +117,12 @@ class DataSourceManager:
         REST_MAX_CHUNKS (int): Maximum number of chunks to request from REST API
 
     Examples:
-        >>> from core.sync.data_source_manager import DataSourceManager
-        >>> from data_source_manager import DataProvider, MarketType, Interval, ChartType
+        >>> from core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+        >>> from ckvd import DataProvider, MarketType, Interval, ChartType
         >>> from datetime import datetime
         >>>
         >>> # Basic usage
-        >>> manager = DataSourceManager(
+        >>> manager = CryptoKlineVisionData(
         ...     provider=DataProvider.BINANCE,
         ...     market_type=MarketType.SPOT,
         ...     chart_type=ChartType.KLINES
@@ -137,7 +137,7 @@ class DataSourceManager:
         ... )
         >>>
         >>> # Using the context manager pattern for automatic resource cleanup
-        >>> with DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT) as manager:
+        >>> with CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT) as manager:
         ...     df = manager.get_data(
         ...         symbol="ETHUSDT",
         ...         start_time=datetime(2023, 1, 1),
@@ -189,20 +189,20 @@ class DataSourceManager:
 
         Examples:
             >>> # Days only - backwards from now
-            >>> start, end = DataSourceManager.calculate_time_range(days=5)
+            >>> start, end = CryptoKlineVisionData.calculate_time_range(days=5)
             >>> print(f"Duration: {(end - start).days} days")
             Duration: 5 days
 
             >>> # End time with days - backwards from specified date
             >>> from datetime import datetime
             >>> end = datetime(2023, 1, 10)
-            >>> start, _ = DataSourceManager.calculate_time_range(end_time=end, days=7)
+            >>> start, _ = CryptoKlineVisionData.calculate_time_range(end_time=end, days=7)
             >>> print(start.date())
             2023-01-03
 
             >>> # Start time with days - forwards from specified date
             >>> start = datetime(2023, 1, 1)
-            >>> _, end = DataSourceManager.calculate_time_range(start_time=start, days=3)
+            >>> _, end = CryptoKlineVisionData.calculate_time_range(start_time=start, days=3)
             >>> print(end.date())
             2023-01-04
         """
@@ -225,10 +225,10 @@ class DataSourceManager:
         provider: DataProvider | None = None,
         market_type: MarketType | None = None,
         **kwargs: Any,
-    ) -> "DataSourceManager":
-        """Create a DataSourceManager with a more Pythonic interface.
+    ) -> "CryptoKlineVisionData":
+        """Create a CryptoKlineVisionData with a more Pythonic interface.
 
-        This factory method provides a cleaner way to instantiate the DataSourceManager
+        This factory method provides a cleaner way to instantiate the CryptoKlineVisionData
         with proper default values and parameter validation.
 
         Args:
@@ -241,25 +241,25 @@ class DataSourceManager:
                 - cache_dir: Directory to store cache files (default: platform-specific cache dir)
                 - use_cache: Whether to use caching (default: True)
                 - retry_count: Number of retries for failed requests (default: 3)
-                - log_level: Logging level for DSM operations (default: 'WARNING')
+                - log_level: Logging level for CKVD operations (default: 'WARNING')
                 - suppress_http_debug: Whether to suppress HTTP debug logging (default: True)
                 - quiet_mode: Whether to suppress all non-error logging (default: False)
 
         Returns:
-            DataSourceManager: Initialized DataSourceManager instance
+            CryptoKlineVisionData: Initialized CryptoKlineVisionData instance
 
         Raises:
             ValueError: If provider is None
 
         Examples:
             >>> # Basic creation with required parameters (clean output by default)
-            >>> from core.sync.data_source_manager import DataSourceManager
-            >>> from data_source_manager import DataProvider, MarketType
+            >>> from core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+            >>> from ckvd import DataProvider, MarketType
             >>>
-            >>> manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+            >>> manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
             >>>
             >>> # Creation with debug logging for troubleshooting
-            >>> manager = DataSourceManager.create(
+            >>> manager = CryptoKlineVisionData.create(
             ...     DataProvider.BINANCE,
             ...     MarketType.SPOT,
             ...     log_level='DEBUG',
@@ -267,17 +267,17 @@ class DataSourceManager:
             ... )
             >>>
             >>> # Creation for feature engineering (completely quiet)
-            >>> manager = DataSourceManager.create(
+            >>> manager = CryptoKlineVisionData.create(
             ...     DataProvider.BINANCE,
             ...     MarketType.SPOT,
             ...     quiet_mode=True  # Only show errors
             ... )
             >>>
             >>> # Creation with additional parameters
-            >>> from data_source_manager.utils.market_constraints import ChartType
+            >>> from ckvd.utils.market_constraints import ChartType
             >>> from pathlib import Path
             >>>
-            >>> manager = DataSourceManager.create(
+            >>> manager = CryptoKlineVisionData.create(
             ...     DataProvider.BINANCE,
             ...     MarketType.FUTURES_USDT,
             ...     chart_type=ChartType.FUNDING_RATE,
@@ -305,7 +305,7 @@ class DataSourceManager:
             market_type = cls.DEFAULT_MARKET_TYPE
             logger.debug(f"Using default market type: {market_type.name}")
 
-        config = DataSourceConfig.create(provider, market_type, **kwargs)
+        config = CKVDConfig.create(provider, market_type, **kwargs)
         return cls(
             provider=config.provider,
             market_type=config.market_type,
@@ -339,7 +339,7 @@ class DataSourceManager:
             use_cache: Whether to use local cache
             cache_dir: Directory to store cache files (default: platform-specific cache dir)
             retry_count: Number of retries for network operations
-            log_level: Logging level for DSM operations ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
+            log_level: Logging level for CKVD operations ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
             suppress_http_debug: Whether to suppress HTTP debug logging (default: True)
             quiet_mode: Whether to suppress all non-error logging (default: False)
         """
@@ -394,24 +394,24 @@ class DataSourceManager:
 
         This method implements the logging behavior recommendations:
         1. Suppress HTTP debug logging by default
-        2. Allow users to control DSM log levels
+        2. Allow users to control CKVD log levels
         3. Provide quiet mode for feature engineering workflows
         """
-        # Configure DSM's own logging level
+        # Configure CKVD's own logging level
         # In quiet mode, only show errors and critical messages
         effective_level = "ERROR" if self.quiet_mode else self.log_level
 
-        # Configure the main DSM logger
+        # Configure the main CKVD logger
         logger.configure_level(effective_level)
 
         # Configure HTTP library logging via shared SSoT
-        from data_source_manager.utils.loguru_setup import suppress_http_logging
+        from ckvd.utils.loguru_setup import suppress_http_logging
 
         suppress_http_logging(suppress=self.suppress_http_debug)
 
         # Log the configuration for debugging
         if not self.quiet_mode:
-            logger.debug(f"DSM logging configured: level={effective_level}, suppress_http_debug={self.suppress_http_debug}")
+            logger.debug(f"CKVD logging configured: level={effective_level}, suppress_http_debug={self.suppress_http_debug}")
 
     def reconfigure_logging(
         self, log_level: str | None = None, suppress_http_debug: bool | None = None, quiet_mode: bool | None = None
@@ -428,13 +428,13 @@ class DataSourceManager:
 
         Example:
             >>> # Start with default settings (quiet for feature engineering)
-            >>> dsm = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+            >>> ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
             >>>
             >>> # Enable debug mode for troubleshooting
-            >>> dsm.reconfigure_logging(log_level='DEBUG', suppress_http_debug=False)
+            >>> ckvd.reconfigure_logging(log_level='DEBUG', suppress_http_debug=False)
             >>>
             >>> # Return to quiet mode
-            >>> dsm.reconfigure_logging(quiet_mode=True)
+            >>> ckvd.reconfigure_logging(quiet_mode=True)
         """
         # Update configuration if new values provided
         if log_level is not None:
@@ -481,7 +481,7 @@ class DataSourceManager:
             this returns an empty DataFrame and the entire requested time range
             as missing.
         """
-        from data_source_manager.utils.for_core.dsm_cache_utils import get_from_cache
+        from ckvd.utils.for_core.ckvd_cache_utils import get_from_cache
 
         if not self.use_cache or self.cache_dir is None:
             # Return empty DataFrame and the entire date range as missing
@@ -526,7 +526,7 @@ class DataSourceManager:
             - Empty DataFrames are not cached
             - The source parameter is tracked for telemetry but doesn't affect caching behavior
         """
-        from data_source_manager.utils.for_core.dsm_cache_utils import save_to_cache
+        from ckvd.utils.for_core.ckvd_cache_utils import save_to_cache
 
         if not self.use_cache or self.cache_dir is None:
             return
@@ -871,8 +871,8 @@ class DataSourceManager:
             symbol = symbol.upper()
 
             # FAIL-LOUD: Validate symbol availability before any API calls (GitHub Issue #10)
-            from data_source_manager.utils.for_core.vision_exceptions import DataNotAvailableError
-            from data_source_manager.utils.validation.availability_data import (
+            from ckvd.utils.for_core.vision_exceptions import DataNotAvailableError
+            from ckvd.utils.validation.availability_data import (
                 check_futures_counterpart_availability,
                 is_symbol_available_at,
             )
@@ -939,7 +939,7 @@ class DataSourceManager:
 
             if not skip_cache:
                 # Use Polars LazyFrame-based cache retrieval
-                from data_source_manager.utils.for_core.dsm_cache_utils import get_cache_lazyframes
+                from ckvd.utils.for_core.ckvd_cache_utils import get_cache_lazyframes
 
                 logger.info(f"[FCP] STEP 1: Checking local cache for {symbol}")
                 cache_lazyframes = get_cache_lazyframes(
@@ -961,7 +961,7 @@ class DataSourceManager:
                     # Collect cache data to check coverage
                     cache_df = polars_pipeline.collect_pandas(use_streaming=True)
                     if not cache_df.empty:
-                        from data_source_manager.utils.for_core.dsm_time_range_utils import identify_missing_segments
+                        from ckvd.utils.for_core.ckvd_time_range_utils import identify_missing_segments
 
                         missing_ranges = identify_missing_segments(cache_df, aligned_start, aligned_end, interval)
                         result_df = cache_df
@@ -1036,7 +1036,7 @@ class DataSourceManager:
             # CRITICAL FIX: Filter to user's exact time range when auto_reindex=False
             if not auto_reindex and not result_df.empty:
                 # Filter the result to the user's exact requested time range
-                from data_source_manager.utils.time_utils import filter_dataframe_by_time
+                from ckvd.utils.time_utils import filter_dataframe_by_time
 
                 original_length = len(result_df)
                 result_df = filter_dataframe_by_time(result_df, start_time, end_time, "open_time")
@@ -1048,7 +1048,7 @@ class DataSourceManager:
             # Only reindex if explicitly requested AND if we have some data to work with
             if auto_reindex and not result_df.empty:
                 # Import additional utilities for enhanced functionality
-                from data_source_manager.utils.for_core.dsm_utilities import safely_reindex_dataframe
+                from ckvd.utils.for_core.ckvd_utilities import safely_reindex_dataframe
 
                 # Check if we have significant missing ranges that couldn't be filled
                 if missing_ranges:
@@ -1083,7 +1083,7 @@ class DataSourceManager:
             # CRITICAL FIX: Different completeness checks based on auto_reindex
             if auto_reindex:
                 # Original completeness check for reindexed data
-                from data_source_manager.utils.dataframe_utils import verify_data_completeness
+                from ckvd.utils.dataframe_utils import verify_data_completeness
 
                 is_complete, gaps = verify_data_completeness(result_df, aligned_start, aligned_end, interval.value)
 
@@ -1145,17 +1145,17 @@ class DataSourceManager:
             handle_error(e)
             return None  # unreachable, handle_error always raises
 
-    def __enter__(self) -> "DataSourceManager":
+    def __enter__(self) -> "CryptoKlineVisionData":
         """Context manager entry point.
 
-        Allows using the DataSourceManager in a with statement for automatic
+        Allows using the CryptoKlineVisionData in a with statement for automatic
         resource cleanup.
 
         Returns:
-            DataSourceManager: Self reference for use in with statements
+            CryptoKlineVisionData: Self reference for use in with statements
 
         Example:
-            >>> with DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT) as manager:
+            >>> with CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT) as manager:
             ...     df = manager.get_data("BTCUSDT", start_time, end_time, Interval.MINUTE_1)
             ...     # Resources are automatically cleaned up after the block
         """
@@ -1177,7 +1177,7 @@ class DataSourceManager:
     def close(self) -> None:
         """Close all clients and release resources.
 
-        This method should be called when the DataSourceManager is no longer needed
+        This method should be called when the CryptoKlineVisionData is no longer needed
         to properly clean up resources, particularly network clients.
 
         Note:
@@ -1186,7 +1186,7 @@ class DataSourceManager:
 
         Example:
             >>> # Manual resource cleanup
-            >>> manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+            >>> manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
             >>> df = manager.get_data("BTCUSDT", start_time, end_time, Interval.MINUTE_1)
             >>> manager.close()  # Clean up resources
         """

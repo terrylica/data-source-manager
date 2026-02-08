@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from data_source_manager.utils.config import MIN_RECORDS_FOR_COMPARISON
+from ckvd.utils.config import MIN_RECORDS_FOR_COMPARISON
 from tests.okx.conftest import (
     CANDLES_ENDPOINT,
     HISTORY_CANDLES_ENDPOINT,

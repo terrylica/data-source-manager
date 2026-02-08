@@ -23,7 +23,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 # Initialize console for rich output
 console = Console()
@@ -176,7 +176,7 @@ def generate_file_summary(items, sort_by="count"):
     for file, count in items:
         # Make the path relative to the workspace
         try:
-            rel_path = Path(file).relative_to("/workspaces/data-source-manager")
+            rel_path = Path(file).relative_to("/workspaces/crypto-kline-vision-data")
         except ValueError:
             rel_path = file  # Fall back to full path if relative path fails
 
@@ -219,7 +219,7 @@ def generate_high_confidence_report(items):
     for item in sorted_items:
         # Make the path relative to the workspace
         try:
-            rel_path = Path(item["filename"]).relative_to("/workspaces/data-source-manager")
+            rel_path = Path(item["filename"]).relative_to("/workspaces/crypto-kline-vision-data")
         except ValueError:
             rel_path = item["filename"]
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from data_source_manager.utils.market_constraints import Interval
+from ckvd.utils.market_constraints import Interval
 
 __all__ = [
     "AlignmentOptions",

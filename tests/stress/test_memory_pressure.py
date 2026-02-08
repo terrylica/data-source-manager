@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 @pytest.mark.stress
@@ -21,7 +21,7 @@ class TestLargeHistoricalFetch:
 
     def test_30_day_1h_fetch_memory_bounded(self, memory_tracker):
         """30-day 1h fetch must stay under 20MB peak memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 31, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -40,7 +40,7 @@ class TestLargeHistoricalFetch:
 
     def test_7_day_1m_fetch_memory_bounded(self, memory_tracker):
         """7-day 1m fetch must stay under 25MB peak memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -59,7 +59,7 @@ class TestLargeHistoricalFetch:
 
     def test_memory_efficiency_ratio(self, memory_tracker):
         """Peak memory should be < 5x final DataFrame size."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -87,7 +87,7 @@ class TestPolarsVsPandasMemory:
 
     def test_polars_output_memory_comparison(self, memory_tracker):
         """Polars output should use similar or less memory than Pandas."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -127,7 +127,7 @@ class TestMixedSourceMerge:
 
     def test_merge_memory_efficiency(self, memory_tracker):
         """FCP merge from multiple sources should be memory efficient."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Use a range that likely spans cache + Vision + REST
         end = datetime(2024, 1, 15, tzinfo=timezone.utc)
@@ -171,12 +171,12 @@ class TestPolarsFeatureFlagIntegration:
     @pytest.fixture
     def env_without_polars(self, monkeypatch):
         """Environment with Polars zero-copy output disabled."""
-        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "false")
+        monkeypatch.setenv("CKVD_USE_POLARS_OUTPUT", "false")
 
     @pytest.fixture
     def env_with_full_polars(self, monkeypatch):
         """Environment with full Polars optimization (zero-copy output)."""
-        monkeypatch.setenv("DSM_USE_POLARS_OUTPUT", "true")
+        monkeypatch.setenv("CKVD_USE_POLARS_OUTPUT", "true")
 
     def test_polars_pipeline_memory_bounded(self, memory_tracker):
         """Verify Polars pipeline memory stays within bounds.
@@ -184,7 +184,7 @@ class TestPolarsFeatureFlagIntegration:
         The Polars pipeline is always active (USE_POLARS_PIPELINE removed in v3.1.0).
         This test verifies memory usage is reasonable for a standard fetch.
         """
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -217,9 +217,9 @@ class TestPolarsFeatureFlagIntegration:
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
         # Measure WITH conversion (return_polars=True but output flag disabled)
-        os.environ["DSM_USE_POLARS_OUTPUT"] = "false"
+        os.environ["CKVD_USE_POLARS_OUTPUT"] = "false"
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         gc.collect()
         tracemalloc.start()
@@ -231,9 +231,9 @@ class TestPolarsFeatureFlagIntegration:
         gc.collect()
 
         # Measure WITHOUT conversion (zero-copy path)
-        os.environ["DSM_USE_POLARS_OUTPUT"] = "true"
+        os.environ["CKVD_USE_POLARS_OUTPUT"] = "true"
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         gc.collect()
         tracemalloc.start()
@@ -273,7 +273,7 @@ class TestPolarsFeatureFlagIntegration:
         - FUTURES_COIN (BTCUSD_PERP)
         """
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, market_type)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, market_type)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -318,7 +318,7 @@ class TestPolarsFeatureFlagIntegration:
         - Low frequency: 1d
         """
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         end = datetime(2024, 1, 8, tzinfo=timezone.utc)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)

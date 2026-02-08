@@ -14,7 +14,7 @@ from loguru import logger
 
 # Determine log file path using platformdirs
 log_dir = platformdirs.user_log_dir(
-    appname="data_source_manager", appauthor="YourName"
+    appname="ckvd", appauthor="YourName"
 )  # Replace "YourName" if you have a specific author name, otherwise its fine
 log_file = Path(log_dir) / "bybit_download.log"
 log_file.parent.mkdir(parents=True, exist_ok=True)  # Ensure log directory exists
@@ -408,7 +408,7 @@ def main(
     $ python download_spot_klines.py -s BTCUSDT -i 15 -c spot
 
     By default, the script fetches all available data (--fetch-all) with maximum batch size (--limit 1000).
-    Data is saved to a directory in your user documents folder: ~/Documents/data_source_manager/data/bybit/{category}/{symbol}/{interval}m/
+    Data is saved to a directory in your user documents folder: ~/Documents/ckvd/data/bybit/{category}/{symbol}/{interval}m/
 
     The output file follows the format: bybit-{symbol}-{interval}m.csv
     
@@ -474,7 +474,7 @@ def main(
 
     # --- Directory and File Management ---
     data_dir = platformdirs.user_documents_dir()
-    output_subdir = Path(data_dir) / "data_source_manager" / "data" / "bybit" / category / symbol / f"{interval}m"
+    output_subdir = Path(data_dir) / "ckvd" / "data" / "bybit" / category / symbol / f"{interval}m"
     output_subdir.mkdir(parents=True, exist_ok=True)
 
     # Modify filename based on category

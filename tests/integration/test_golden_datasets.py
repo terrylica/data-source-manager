@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Golden dataset regression tests.
 
-Compare current DSM output against pre-validated golden datasets
+Compare current CKVD output against pre-validated golden datasets
 to detect regressions in data retrieval.
 
 The golden datasets must be generated first using:
@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 # Golden fixtures directory
 GOLDEN_DIR = Path(__file__).parent.parent / "fixtures" / "golden"
@@ -34,7 +34,7 @@ def golden_btcusdt_futures_usdt():
     if not filepath.exists():
         pytest.skip(f"Golden dataset not found: {filepath}")
     df = pd.read_parquet(filepath)
-    # Set open_time as index to match DSM output
+    # Set open_time as index to match CKVD output
     return df.set_index("open_time")
 
 
@@ -73,7 +73,7 @@ class TestGoldenDatasetRegression:
 
     def test_futures_usdt_matches_golden(self, golden_btcusdt_futures_usdt):
         """Current FUTURES_USDT output should match golden dataset."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         df = manager.get_data(
             symbol="BTCUSDT",
@@ -103,7 +103,7 @@ class TestGoldenDatasetRegression:
 
     def test_spot_matches_golden(self, golden_btcusdt_spot):
         """Current SPOT output should match golden dataset."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.SPOT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
         df = manager.get_data(
             symbol="BTCUSDT",
@@ -131,7 +131,7 @@ class TestGoldenDatasetRegression:
 
     def test_futures_coin_matches_golden(self, golden_btcusd_perp_coin):
         """Current FUTURES_COIN output should match golden dataset."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 
         df = manager.get_data(
             symbol="BTCUSD_PERP",

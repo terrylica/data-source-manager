@@ -15,8 +15,8 @@ from pathlib import Path
 import fsspec
 import pendulum
 
-from data_source_manager.utils.loguru_setup import logger
-from data_source_manager.utils.market_constraints import ChartType, Interval, MarketType
+from ckvd.utils.loguru_setup import logger
+from ckvd.utils.market_constraints import ChartType, Interval, MarketType
 
 
 @dataclass

@@ -8,7 +8,7 @@ for REST API requests. By using custom exceptions, calling code can catch specif
 error types and handle them appropriately.
 """
 
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 
 class RestAPIError(Exception):

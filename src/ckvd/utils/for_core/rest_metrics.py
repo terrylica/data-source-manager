@@ -13,9 +13,9 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 from typing import Any
 
-from data_source_manager.utils.config import SECONDS_IN_HOUR
-from data_source_manager.utils.for_core.rest_exceptions import RateLimitError
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.config import SECONDS_IN_HOUR
+from ckvd.utils.for_core.rest_exceptions import RateLimitError
+from ckvd.utils.loguru_setup import logger
 
 
 class RestMetricsTracker:

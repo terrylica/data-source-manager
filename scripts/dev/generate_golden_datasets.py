@@ -21,7 +21,7 @@ import typer
 from rich import print
 from rich.table import Table
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 app = typer.Typer(help="Generate golden dataset fixtures for regression testing")
 
@@ -100,7 +100,7 @@ def generate(
             continue
 
         try:
-            manager = DataSourceManager.create(DataProvider.BINANCE, config["market_type"])
+            manager = CryptoKlineVisionData.create(DataProvider.BINANCE, config["market_type"])
 
             df = manager.get_data(
                 symbol=config["symbol"],

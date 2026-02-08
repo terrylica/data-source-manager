@@ -1,4 +1,4 @@
-"""Extreme volume stress tests for DataSourceManager.
+"""Extreme volume stress tests for CryptoKlineVisionData.
 
 Tests that verify handling of very large datasets:
 - Year-long data (365 days x 1440 min = 525,600 rows)
@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from data_source_manager import DataProvider, DataSourceManager, Interval, MarketType
+from ckvd import DataProvider, CryptoKlineVisionData, Interval, MarketType
 
 
 @pytest.mark.stress
@@ -26,7 +26,7 @@ class TestYearLongData:
 
         This is a baseline test for year-long data at hourly resolution.
         """
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Full year of 2024
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -49,7 +49,7 @@ class TestYearLongData:
         Note: Full year of 1m data (525,600 rows) may take too long for CI.
         This tests half-year as a practical extreme volume test.
         """
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # 6 months of data
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -70,7 +70,7 @@ class TestYearLongData:
 
     def test_3_month_1m_data_quality(self, memory_tracker):
         """3 months of 1m data should have consistent quality."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # 3 months of data
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -102,7 +102,7 @@ class TestMemoryScaling:
 
     def test_memory_scales_linearly(self, memory_tracker):
         """Memory should scale linearly, not quadratically, with row count."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Measure memory for 1 week
         start_1w = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -138,7 +138,7 @@ class TestMemoryScaling:
 
     def test_incremental_fetch_memory_stable(self, memory_tracker):
         """Fetching data in increments should not accumulate memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         gc.collect()
         tracemalloc.start()
@@ -174,7 +174,7 @@ class TestMemoryCleanup:
         tracemalloc.start()
         baseline = tracemalloc.get_traced_memory()[0]
 
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         # Fetch 30 days of 1m data (~43,200 rows)
         start = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -205,7 +205,7 @@ class TestMemoryCleanup:
 
     def test_repeated_large_fetches_no_accumulation(self, memory_tracker):
         """Repeated large fetches should not accumulate memory."""
-        manager = DataSourceManager.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
 
         gc.collect()
         tracemalloc.start()

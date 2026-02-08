@@ -17,7 +17,7 @@ import argparse
 from rich.panel import Panel
 from rich.table import Table
 
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.loguru_setup import logger
 
 
 def main():

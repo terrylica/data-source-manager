@@ -15,7 +15,7 @@ timestamp handling and index naming for market data.
 
 Example:
     >>> import pandas as pd
-    >>> from data_source_manager.utils.dataframe_types import TimestampedDataFrame
+    >>> from ckvd.utils.dataframe_types import TimestampedDataFrame
     >>> from datetime import datetime, timezone
     >>>
     >>> # Create a TimestampedDataFrame from a dictionary
@@ -39,8 +39,8 @@ import traceback
 
 import pandas as pd
 
-from data_source_manager.utils.config import CANONICAL_INDEX_NAME
-from data_source_manager.utils.loguru_setup import logger
+from ckvd.utils.config import CANONICAL_INDEX_NAME
+from ckvd.utils.loguru_setup import logger
 
 
 class TimestampedDataFrame(pd.DataFrame):
@@ -67,7 +67,7 @@ class TimestampedDataFrame(pd.DataFrame):
     Example:
         >>> from datetime import datetime, timezone
         >>> import pandas as pd
-        >>> from data_source_manager.utils.dataframe_types import TimestampedDataFrame
+        >>> from ckvd.utils.dataframe_types import TimestampedDataFrame
         >>>
         >>> # Create sample data
         >>> dates = [
@@ -150,7 +150,7 @@ class TimestampedDataFrame(pd.DataFrame):
             Preserves the semantic meaning of open_time as the BEGINNING of each candle period.
         """
         # Import here to avoid circular imports
-        from data_source_manager.utils.dataframe_utils import ensure_open_time_as_index
+        from ckvd.utils.dataframe_utils import ensure_open_time_as_index
 
         try:
             # Use the centralized utility to ensure the index is properly set
@@ -202,7 +202,7 @@ class TimestampedDataFrame(pd.DataFrame):
         Example:
             >>> from datetime import datetime, timezone
             >>> import pandas as pd
-            >>> from data_source_manager.utils.dataframe_types import TimestampedDataFrame
+            >>> from ckvd.utils.dataframe_types import TimestampedDataFrame
             >>>
             >>> # Create TimestampedDataFrame
             >>> dates = [datetime(2023, 1, 1, tzinfo=timezone.utc)]
@@ -216,7 +216,7 @@ class TimestampedDataFrame(pd.DataFrame):
             True
         """
         # Import here to avoid circular imports
-        from data_source_manager.utils.dataframe_utils import ensure_open_time_as_column
+        from ckvd.utils.dataframe_utils import ensure_open_time_as_column
 
         # MEMORY OPTIMIZATION: pd.DataFrame() constructor already copies data when passed a DataFrame
         # No need for explicit .copy() which would create a redundant second copy
