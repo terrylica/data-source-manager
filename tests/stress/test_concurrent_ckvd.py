@@ -22,7 +22,7 @@ from ckvd.utils.for_core.rest_exceptions import RestAPIError
 from ckvd.utils.for_core.vision_exceptions import VisionAPIError
 
 # Exception types that can occur during CKVD operations
-DSM_ERRORS = (RestAPIError, VisionAPIError, ValueError, RuntimeError, OSError)
+CKVD_ERRORS = (RestAPIError, VisionAPIError, ValueError, RuntimeError, OSError)
 
 
 @pytest.mark.stress
@@ -45,7 +45,7 @@ class TestConcurrentSameSymbol:
                 df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
                 manager.close()
                 return thread_id, len(df), df["close"].iloc[-1] if len(df) > 0 else None
-            except DSM_ERRORS as e:
+            except CKVD_ERRORS as e:
                 return thread_id, -1, str(e)
 
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -119,7 +119,7 @@ class TestConcurrentDifferentSymbols:
                 df = manager.get_data(symbol, start, end, Interval.HOUR_1)
                 manager.close()
                 return symbol, len(df), True
-            except DSM_ERRORS as e:
+            except CKVD_ERRORS as e:
                 return symbol, 0, str(e)
 
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -155,7 +155,7 @@ class TestConcurrentDifferentSymbols:
             try:
                 df = manager.get_data(symbol, start, end, Interval.HOUR_1)
                 return symbol, len(df), True
-            except DSM_ERRORS as e:
+            except CKVD_ERRORS as e:
                 return symbol, 0, str(e)
 
         # Use fewer workers since we're sharing a manager
@@ -196,7 +196,7 @@ class TestConcurrentCacheWrite:
                 row_count = len(df)
                 manager.close()
                 return thread_id, row_count, True
-            except DSM_ERRORS as e:
+            except CKVD_ERRORS as e:
                 return thread_id, 0, str(e)
 
         # Run multiple threads that will try to write to cache simultaneously
@@ -232,7 +232,7 @@ class TestConcurrentCacheWrite:
                 df = manager.get_data(symbol, start, end, Interval.HOUR_1)
                 manager.close()
                 return symbol, operation, len(df), True
-            except DSM_ERRORS as e:
+            except CKVD_ERRORS as e:
                 return symbol, operation, 0, str(e)
 
         # Mix of operations: some symbols read (cached), some write (new data)

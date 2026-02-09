@@ -30,7 +30,7 @@ In-Memory uses 26.1% less memory
 
 
 ====================================================================================================
-PART 2: Real DSM Data - Full FCP Flow with Streaming
+PART 2: Real CKVD Data - Full FCP Flow with Streaming
 ====================================================================================================
 
 Scenario                  Engine               Rows    Time (ms)    Memory (MB)

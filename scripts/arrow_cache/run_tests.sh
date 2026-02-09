@@ -510,7 +510,7 @@ EOF
 }
 
 # Function to run CryptoKlineVisionData FCP tests
-run_dsm_orchestration_tests() {
+run_ckvd_orchestration_tests() {
     # These tests focus on the CryptoKlineVisionData Failover Control Protocol (FCP)
     # as described in focus_demo.mdc
     
@@ -537,7 +537,7 @@ run_dsm_orchestration_tests() {
         esac
     done
     
-    print_header "DATA SOURCE MANAGER ORCHESTRATION TESTS"
+    print_header "CKVD FCP ORCHESTRATION TESTS"
     print_info "Testing the CryptoKlineVisionData's Failover Control Protocol (FCP)"
     print_info "This tests the orchestration between cache, VISION API, and REST API"
     print_info "Using historical data from Dec 24, 2024 12:09:03 to Feb 25, 2025 23:56:56"
@@ -599,7 +599,7 @@ run_dsm_orchestration_tests() {
         fi
     done
     
-    print_header "DATA SOURCE MANAGER TESTS COMPLETED"
+    print_header "CKVD FCP TESTS COMPLETED"
     print_info "Test results saved to ${LOGS_DIR}"
     print_info "To visualize and analyze the results, you can open the CSV files"
     
@@ -615,9 +615,9 @@ run_dsm_orchestration_tests() {
 SHOW_HELP=false
 RUN_CACHE_TESTS=true
 RUN_SCHEMA_TESTS=false
-RUN_DSM_TESTS=false
+RUN_CKVD_TESTS=false
 SCHEMA_TEST_ARGS=()
-DSM_TEST_ARGS=()
+CKVD_TEST_ARGS=()
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -629,23 +629,23 @@ while [[ $# -gt 0 ]]; do
         --schema-only)
             RUN_CACHE_TESTS=false
             RUN_SCHEMA_TESTS=true
-            RUN_DSM_TESTS=false
+            RUN_CKVD_TESTS=false
             shift
             ;;
         --ckvd-only|--fcp-only)
             RUN_CACHE_TESTS=false
             RUN_SCHEMA_TESTS=false
-            RUN_DSM_TESTS=true
+            RUN_CKVD_TESTS=true
             shift
             ;;
         --all)
             RUN_CACHE_TESTS=true
             RUN_SCHEMA_TESTS=true
-            RUN_DSM_TESTS=true
+            RUN_CKVD_TESTS=true
             shift
             ;;
         --debug|--spot-only|--um-only|--cm-only)
-            DSM_TEST_ARGS+=("$1")
+            CKVD_TEST_ARGS+=("$1")
             shift
             ;;
         --rest-only|--no-rest|--no-spot|--no-um|--no-sample)
@@ -693,8 +693,8 @@ fi
 print_header "RUNNING TEST SUITE"
 
 # Run CryptoKlineVisionData FCP tests if requested
-if $RUN_DSM_TESTS; then
-    run_dsm_orchestration_tests "${DSM_TEST_ARGS[@]}"
+if $RUN_CKVD_TESTS; then
+    run_ckvd_orchestration_tests "${CKVD_TEST_ARGS[@]}"
 fi
 
 # Run schema standardization tests if requested
@@ -836,7 +836,7 @@ if $RUN_CACHE_TESTS; then
                 ;;
             12)
                 # Run CryptoKlineVisionData FCP Historical Tests
-                run_dsm_orchestration_tests
+                run_ckvd_orchestration_tests
                 ;;
             *)
                 print_warning "Invalid test number: $choice"

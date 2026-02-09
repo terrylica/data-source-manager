@@ -19,7 +19,7 @@ fi
 
 # Check 2: GitHub release exists (using curl, NOT gh CLI - avoids process storms)
 # See: ~/.claude/CLAUDE.md for process storm prevention policy
-REPO_URL="https://api.github.com/repos/terrylica/data-source-manager/releases/tags/v$VERSION"
+REPO_URL="https://api.github.com/repos/terrylica/crypto-kline-vision-data/releases/tags/v$VERSION"
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "Authorization: token ${GH_TOKEN:-$GITHUB_TOKEN}" \
     -H "Accept: application/vnd.github.v3+json" \
@@ -32,7 +32,7 @@ elif [[ "$HTTP_STATUS" == "404" ]]; then
     exit 1
 else
     echo "⚠ Could not verify GitHub release (HTTP $HTTP_STATUS)"
-    echo "  Check manually: https://github.com/terrylica/data-source-manager/releases/tag/v$VERSION"
+    echo "  Check manually: https://github.com/terrylica/crypto-kline-vision-data/releases/tag/v$VERSION"
 fi
 
 # Check 3: CHANGELOG updated
