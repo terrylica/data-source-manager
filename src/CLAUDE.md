@@ -2,7 +2,7 @@
 
 Context-specific instructions for working with CKVD source code.
 
-**Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [tests/](../tests/CLAUDE.md) | [docs/](../docs/CLAUDE.md) | [examples/](../examples/CLAUDE.md)
+**Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [tests/](../tests/CLAUDE.md) | [docs/](../docs/CLAUDE.md) | [examples/](../examples/CLAUDE.md) | [scripts/](../scripts/CLAUDE.md)
 
 ---
 
@@ -10,43 +10,49 @@ Context-specific instructions for working with CKVD source code.
 
 ```
 src/ckvd/
-├── __init__.py              # Public API exports
+├── __init__.py              # Public API exports (lazy loading)
 ├── core/
 │   ├── sync/
 │   │   ├── crypto_kline_vision_data.py  # Main CKVD class with FCP
 │   │   ├── ckvd_types.py            # DataSource, CKVDConfig
-│   │   └── ckvd_lib.py              # High-level functions
+│   │   └── ckvd_lib.py              # High-level functions (fetch_market_data)
 │   └── providers/
 │       └── binance/
 │           ├── vision_data_client.py   # Vision API (S3)
 │           ├── rest_data_client.py     # REST API
 │           └── cache_manager.py        # Arrow cache
 └── utils/
-    ├── market_constraints.py    # Enums and validation
+    ├── market_constraints.py    # Enums and validation (re-export)
+    ├── market/                  # Enums and validation (source)
+    │   ├── enums.py             # DataProvider, MarketType, Interval, ChartType
+    │   ├── validation.py        # Symbol validation functions
+    │   └── capabilities.py      # Market capabilities
     ├── loguru_setup.py          # Logging configuration
-    ├── config.py                # Feature flags (USE_POLARS_OUTPUT)
+    ├── config.py                # Feature flags (USE_POLARS_OUTPUT, ENABLE_CACHE)
     ├── internal/
     │   └── polars_pipeline.py   # PolarsDataPipeline class
     └── for_core/                # Internal utilities
         ├── rest_exceptions.py   # REST API exceptions
         ├── vision_exceptions.py # Vision API exceptions
-        └── ckvd_cache_utils.py   # Cache LazyFrame utilities
+        ├── ckvd_cache_utils.py  # Cache LazyFrame utilities
+        ├── ckvd_api_utils.py    # Vision/REST fetch helpers
+        └── ckvd_fcp_utils.py    # FCP orchestration (local imports to avoid circular deps)
 ```
 
 ---
 
 ## Key Classes
 
-| Class                | Location                            | Purpose                    |
-| -------------------- | ----------------------------------- | -------------------------- |
-| `CryptoKlineVisionData`  | `core/sync/crypto_kline_vision_data.py`  | Main entry point with FCP  |
-| `CKVDConfig`   | `core/sync/ckvd_types.py`            | Configuration dataclass    |
-| `DataSource`         | `core/sync/ckvd_types.py`            | Data source enum           |
-| `DataProvider`       | `utils/market_constraints.py`       | Provider enum (BINANCE)    |
-| `MarketType`         | `utils/market_constraints.py`       | Market type enum           |
-| `Interval`           | `utils/market_constraints.py`       | Timeframe interval enum    |
-| `PolarsDataPipeline` | `utils/internal/polars_pipeline.py` | Internal Polars processing |
-| `FeatureFlags`       | `utils/config.py`                   | Feature flag configuration |
+| Class                   | Location                                | Purpose                    |
+| ----------------------- | --------------------------------------- | -------------------------- |
+| `CryptoKlineVisionData` | `core/sync/crypto_kline_vision_data.py` | Main entry point with FCP  |
+| `CKVDConfig`            | `core/sync/ckvd_types.py`               | Configuration dataclass    |
+| `DataSource`            | `core/sync/ckvd_types.py`               | Data source enum           |
+| `DataProvider`          | `utils/market_constraints.py`           | Provider enum (BINANCE)    |
+| `MarketType`            | `utils/market_constraints.py`           | Market type enum           |
+| `Interval`              | `utils/market_constraints.py`           | Timeframe interval enum    |
+| `PolarsDataPipeline`    | `utils/internal/polars_pipeline.py`     | Internal Polars processing |
+| `FeatureFlags`          | `utils/config.py`                       | Feature flag configuration |
 
 ---
 
@@ -63,9 +69,35 @@ The Failover Control Protocol orchestrates data retrieval:
 Key methods:
 
 - `get_data()` - Main entry point, implements FCP
-- `_get_from_cache()` - Check local Arrow cache
+- `_get_from_cache()` - Check local Arrow cache (no-op when `use_cache=False`)
+- `_save_to_cache()` - Persist to Arrow cache (no-op when `use_cache=False`)
 - `_fetch_from_vision()` - Fetch from Binance Vision
 - `_fetch_from_rest()` - Fall back to REST API
+
+**Cache toggle**: `use_cache=False` disables cache read/write. `CKVD_ENABLE_CACHE=false` env var also disables cache. `enforce_source=DataSource.CACHE` with `use_cache=False` raises `ValueError`.
+
+---
+
+## Data Flow Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     INTERNAL (Polars)                        │
+│  Cache → pl.scan_ipc() → LazyFrame                          │
+│  Vision → pl.LazyFrame                                       │
+│  REST → pl.DataFrame → .lazy()                              │
+│                    ↓                                         │
+│  PolarsDataPipeline.merge_with_priority() → LazyFrame       │
+│                    ↓                                         │
+│  .collect(engine='streaming') → pl.DataFrame                │
+└─────────────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   API BOUNDARY                               │
+│  return_polars=False → .to_pandas() → pd.DataFrame (default)│
+│  return_polars=True  → pl.DataFrame (zero-copy)             │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -92,9 +124,7 @@ except (RestAPIError, VisionAPIError) as e:
 ```python
 # CORRECT: Always UTC
 from datetime import datetime, timezone
-
 now = datetime.now(timezone.utc)
-start = now - timedelta(days=7)
 ```
 
 ### HTTP Requests
@@ -113,31 +143,7 @@ response = httpx.get(url, timeout=30)
 3. **Always add HTTP timeouts** - Explicit `timeout=` parameter
 4. **Match symbol format to market type** - BTCUSDT vs BTCUSD_PERP
 5. **Close managers** - Always call `manager.close()`
-
----
-
----
-
-## Data Flow Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     INTERNAL (Polars)                        │
-│  Cache → pl.scan_ipc() → LazyFrame                          │
-│  Vision → pl.LazyFrame                                       │
-│  REST → pl.DataFrame → .lazy()                              │
-│                    ↓                                         │
-│  PolarsDataPipeline.merge_with_priority() → LazyFrame       │
-│                    ↓                                         │
-│  .collect(engine='streaming') → pl.DataFrame                │
-└─────────────────────────────────────────────────────────────┘
-                         ↓
-┌─────────────────────────────────────────────────────────────┐
-│                   API BOUNDARY                               │
-│  return_polars=False → .to_pandas() → pd.DataFrame (default)│
-│  return_polars=True  → pl.DataFrame (zero-copy)             │
-└─────────────────────────────────────────────────────────────┘
-```
+6. **Local imports in `ckvd_fcp_utils.py`** - Avoids circular deps with `ckvd_api_utils.py`
 
 ---
 

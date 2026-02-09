@@ -2,7 +2,7 @@
 
 Context-specific instructions for working with CKVD tests.
 
-**Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [src/](../src/CLAUDE.md) | [docs/](../docs/CLAUDE.md) | [examples/](../examples/CLAUDE.md)
+**Hub**: [Root CLAUDE.md](../CLAUDE.md) | **Siblings**: [src/](../src/CLAUDE.md) | [docs/](../docs/CLAUDE.md) | [examples/](../examples/CLAUDE.md) | [scripts/](../scripts/CLAUDE.md)
 
 ---
 
@@ -46,7 +46,7 @@ unit/
 │   └── sync/                # CryptoKlineVisionData tests
 ├── utils/                   # Utility function tests
 ├── test_timestamp_semantics.py
-└── test_dsm_logging_improvements.py
+└── test_ckvd_logging_improvements.py
 ```
 
 ---
@@ -122,8 +122,8 @@ def test_rest_response(mock_get):
 
 ### FCP Fixtures (fcp_pm/conftest.py)
 
-| Fixture                | Purpose                                  |
-| ---------------------- | ---------------------------------------- |
+| Fixture                | Purpose                                   |
+| ---------------------- | ----------------------------------------- |
 | `fcp_manager_spot`     | CKVD for SPOT market with cache enabled   |
 | `fcp_manager_futures`  | CKVD for USDT futures with cache enabled  |
 | `fcp_manager_coin`     | CKVD for coin-margined with cache enabled |
