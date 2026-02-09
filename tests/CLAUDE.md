@@ -63,16 +63,29 @@ unit/
 
 ## Mocking Patterns
 
-### Mock CryptoKlineVisionData
+### Mock via Provider Factory (preferred)
+
+The codebase uses `get_provider_clients` factory pattern. Use the `mock_provider_clients` fixture from conftest.py:
+
+```python
+def test_with_factory_mock(mock_provider_clients):
+    """mock_provider_clients patches get_provider_clients automatically."""
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+    # Vision, REST, and cache clients are all mocked
+    manager.close()
+```
+
+### Mock fetch_market_data (ckvd_lib)
 
 ```python
 from unittest.mock import patch, MagicMock
 
-@patch("ckvd.core.sync.crypto_kline_vision_data.FSSpecVisionHandler")
-@patch("ckvd.core.sync.crypto_kline_vision_data.UnifiedCacheManager")
-def test_with_mocks(mock_cache, mock_vision):
-    mock_cache.return_value = MagicMock()
-    mock_vision.return_value = MagicMock()
+@patch("ckvd.core.sync.ckvd_lib.CryptoKlineVisionData")
+def test_fetch(mock_cls):
+    mock_manager = MagicMock()
+    mock_cls.return_value = mock_manager
+    mock_manager.__enter__ = MagicMock(return_value=mock_manager)
+    mock_manager.__exit__ = MagicMock(return_value=False)
     # Test logic here
 ```
 
@@ -106,11 +119,12 @@ def test_rest_response(mock_get):
 
 ### Mock Fixtures
 
-| Fixture               | Purpose                      |
-| --------------------- | ---------------------------- |
-| `mock_vision_handler` | Mock FSSpec Vision API       |
-| `mock_cache_manager`  | Mock cache manager           |
-| `mock_all_sources`    | Combined mocks for isolation |
+| Fixture                 | Purpose                                         |
+| ----------------------- | ----------------------------------------------- |
+| `mock_provider_clients` | Mock `get_provider_clients` factory (preferred) |
+| `mock_vision_handler`   | Mock Vision API (delegates to factory)          |
+| `mock_cache_manager`    | Mock cache manager (delegates to factory)       |
+| `mock_all_sources`      | Combined mocks for isolation                    |
 
 ### Data Fixtures
 
@@ -191,20 +205,20 @@ if "CACHE" in analysis["sources"]:
 
 ## Stress Test Suite (tests/stress/)
 
-Memory efficiency and fault tolerance tests. Run with `mise run test:stress` or `pytest tests/stress/ -v -m stress`.
+Memory efficiency and fault tolerance tests. Run with `uv run -p 3.13 pytest tests/stress/ -v`.
 
-### Test Classes
+### Test Files (8 files)
 
-| Test File              | Class                    | Focus                      |
-| ---------------------- | ------------------------ | -------------------------- |
-| `test_memory_pressure` | TestLargeHistoricalFetch | Large data fetch bounds    |
-| `test_memory_pressure` | TestPolarsVsPandasMemory | Output format comparison   |
-| `test_memory_pressure` | TestMixedSourceMerge     | FCP merge efficiency       |
-| `test_object_churn`    | TestSequentialFetches    | Sequential fetch stability |
-| `test_object_churn`    | TestResourceCleanup      | Resource release           |
-| `test_fault_tolerance` | TestEmptyResults         | Empty/missing data         |
-| `test_fault_tolerance` | TestErrorRecovery        | Error recovery patterns    |
-| `test_fault_tolerance` | TestSymbolValidation     | Symbol format validation   |
+| Test File                        | Focus                            |
+| -------------------------------- | -------------------------------- |
+| `test_memory_pressure.py`        | Large data fetch, memory bounds  |
+| `test_object_churn.py`           | Sequential fetch stability       |
+| `test_fault_tolerance.py`        | Error recovery, empty results    |
+| `test_cache_stress.py`           | Cache read/write under load      |
+| `test_concurrent_ckvd.py`        | Concurrent CKVD instances        |
+| `test_extreme_volumes.py`        | High-volume data handling        |
+| `test_performance_benchmarks.py` | Performance regression detection |
+| `test_small_interval_stress.py`  | Sub-minute interval stress       |
 
 ### Stress Fixtures (stress/conftest.py)
 

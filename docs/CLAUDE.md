@@ -23,11 +23,14 @@ docs/
 ├── skills/                 ← Claude Code progressive disclosure skills
 ├── testing/                ← Test writing guides
 ├── utils/                  ← Utility module documentation
+├── research/               ← Research notes (git-ignored)
 ├── GLOSSARY.md             ← Domain terminology
 ├── INDEX.md                ← Navigation hub
 ├── RESUME.md               ← Session resume context
 └── TROUBLESHOOTING.md      ← Common issues and solutions
 ```
+
+**Local-only directories** (git-ignored): `complaints_to_binance/`, `journals/`, `sr&ed/`, `research/`
 
 ## ADR Conventions
 

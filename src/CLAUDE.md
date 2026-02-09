@@ -17,26 +17,70 @@ src/ckvd/
 │   │   ├── ckvd_types.py            # DataSource, CKVDConfig
 │   │   └── ckvd_lib.py              # High-level functions (fetch_market_data)
 │   └── providers/
-│       └── binance/
-│           ├── vision_data_client.py   # Vision API (S3)
-│           ├── rest_data_client.py     # REST API
-│           └── cache_manager.py        # Arrow cache
+│       ├── __init__.py              # ProviderClients, get_provider_clients factory
+│       ├── binance/
+│       │   ├── vision_data_client.py    # Vision API (S3)
+│       │   ├── rest_data_client.py      # REST API
+│       │   ├── cache_manager.py         # Arrow cache
+│       │   ├── vision_path_mapper.py    # Vision S3 path resolution
+│       │   ├── data_client_interface.py # Provider interface contract
+│       │   └── binance_funding_rate_client.py
+│       └── okx/                     # OKX provider
 └── utils/
     ├── market_constraints.py    # Enums and validation (re-export)
+    ├── config.py                # Feature flags (USE_POLARS_OUTPUT, ENABLE_CACHE)
+    ├── loguru_setup.py          # Logging configuration
     ├── market/                  # Enums and validation (source)
     │   ├── enums.py             # DataProvider, MarketType, Interval, ChartType
     │   ├── validation.py        # Symbol validation functions
-    │   └── capabilities.py      # Market capabilities
-    ├── loguru_setup.py          # Logging configuration
-    ├── config.py                # Feature flags (USE_POLARS_OUTPUT, ENABLE_CACHE)
+    │   ├── capabilities.py      # Market capabilities
+    │   └── endpoints.py         # API endpoint URLs
+    ├── cache/                   # Cache subsystem
+    │   ├── key_manager.py       # Cache key generation
+    │   ├── memory_map.py        # Memory-mapped Arrow reads
+    │   ├── vision_manager.py    # Vision cache coordination
+    │   ├── validator.py         # Cache integrity checks
+    │   ├── functions.py         # Cache utility functions
+    │   ├── options.py           # Cache configuration
+    │   └── errors.py            # Cache-specific exceptions
+    ├── network/                 # Network utilities
+    │   ├── client_factory.py    # HTTP client creation
+    │   ├── api.py               # API request helpers
+    │   ├── download.py          # File download utilities
+    │   ├── vision_download.py   # Vision-specific downloads
+    │   └── exceptions.py        # Network exceptions
+    ├── time/                    # Time utilities
+    │   ├── bars.py              # Bar count calculations
+    │   ├── conversion.py        # Timestamp conversions
+    │   ├── filtering.py         # Time range filtering
+    │   ├── intervals.py         # Interval math
+    │   ├── processor.py         # Time processing pipeline
+    │   └── timestamp_debug.py   # Timestamp debugging helpers
+    ├── validation/              # Data validation
+    │   ├── dataframe_validation.py   # DataFrame integrity checks
+    │   ├── file_validation.py        # File format validation
+    │   ├── time_validation.py        # Time range validation
+    │   ├── availability_data.py      # Data availability checks
+    │   └── availability_validation.py
     ├── internal/
     │   └── polars_pipeline.py   # PolarsDataPipeline class
-    └── for_core/                # Internal utilities
-        ├── rest_exceptions.py   # REST API exceptions
-        ├── vision_exceptions.py # Vision API exceptions
-        ├── ckvd_cache_utils.py  # Cache LazyFrame utilities
+    └── for_core/                # FCP internal utilities
+        ├── ckvd_fcp_utils.py    # FCP orchestration (local imports for circular deps)
         ├── ckvd_api_utils.py    # Vision/REST fetch helpers
-        └── ckvd_fcp_utils.py    # FCP orchestration (local imports to avoid circular deps)
+        ├── ckvd_cache_utils.py  # Cache LazyFrame utilities
+        ├── ckvd_date_range_utils.py  # Date range calculations
+        ├── ckvd_time_range_utils.py  # Time range splitting
+        ├── ckvd_utilities.py    # General CKVD helpers
+        ├── rest_exceptions.py   # REST API exceptions
+        ├── rest_client_utils.py # REST client helpers
+        ├── rest_data_processing.py  # REST response parsing
+        ├── rest_metrics.py      # REST performance metrics
+        ├── rest_retry.py        # REST retry logic
+        ├── vision_exceptions.py # Vision API exceptions
+        ├── vision_checksum.py   # Checksum verification
+        ├── vision_constraints.py    # Vision data constraints
+        ├── vision_file_utils.py     # Vision file handling
+        └── vision_timestamp.py      # Vision timestamp parsing
 ```
 
 ---

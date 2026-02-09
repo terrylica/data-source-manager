@@ -49,12 +49,12 @@ uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"  
 
 ### Essential Commands
 
-| Command                | Purpose                   |
-| ---------------------- | ------------------------- |
-| `mise run test`        | Run unit tests            |
-| `mise run check:all`   | Lint + format + typecheck |
-| `mise run quick`       | Quick validation          |
-| `mise run release:dry` | Preview semantic-release  |
+| Command               | Purpose                   |
+| --------------------- | ------------------------- |
+| `mise run test`       | Run unit tests            |
+| `mise run check:all`  | Lint + format + typecheck |
+| `mise run quick`      | Quick validation          |
+| `npm run release:dry` | Preview semantic-release  |
 
 ### FCP Priority
 
@@ -78,7 +78,7 @@ Internal processing always uses Polars (LazyFrames + streaming engine).
 
 - **Imports**: Absolute with `ckvd.` prefix
 - **Type hints**: Required for all public functions
-- **Formatting**: `ruff format` (120 char line length)
+- **Formatting**: `ruff format` (140 char line length)
 - **Timestamps**: Always `datetime.now(timezone.utc)` — never naive
 
 ### Pattern Preferences
@@ -100,9 +100,14 @@ uv sync --dev                    # Install dependencies
 mise trust                       # Load env (GH_TOKEN from .mise.local.toml)
 ```
 
-**Release**: Create `.mise.local.toml` from `.mise.local.toml.example` with GH_TOKEN.
+**Release**: Node.js semantic-release (`npm run release` / `npm run release:dry`). Requires GH_TOKEN in `.mise.local.toml` (copy from `.mise.local.toml.example`). CHANGELOG.md is auto-generated.
 
-**Commit trailers**: `SRED-Type:` and `SRED-Claim:` required (hook-enforced).
+**Commit trailers** (hook-enforced):
+
+```
+SRED-Type: experimental-development | applied-research | basic-research | support-work
+SRED-Claim: CKVD
+```
 
 ---
 

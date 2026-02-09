@@ -43,6 +43,11 @@ description = "Run FCP edge case tests (comprehensive real-world scenarios)"
 run = "uv run -p 3.13 pytest tests/fcp_pm/test_fcp_edge_cases.py -v"
 sources = ["src/**/*.py", "tests/fcp_pm/test_fcp_edge_cases.py"]
 
+[tasks."test:stress"]
+description = "Run stress tests (memory, concurrency, fault tolerance)"
+run = "uv run -p 3.13 pytest tests/stress/ -v"
+sources = ["src/**/*.py", "tests/stress/**/*.py"]
+
 [tasks."test:okx"]
 description = "Run OKX-specific tests"
 run = "uv run -p 3.13 pytest tests/okx/ -m okx -v"
@@ -149,22 +154,12 @@ git status --porcelain | grep -q . && echo "⚠️  Uncommitted changes detected
 """
 
 [tasks."release:dry"]
-description = "Dry run semantic-release"
-run = """
-echo "Semantic release dry run..."
-# Note: Requires semantic-release configuration
-# npx semantic-release --dry-run
-echo "Not configured - see docs/adr/2026-01-30-claude-code-infrastructure.md"
-"""
+description = "Dry run semantic-release (delegates to npm)"
+run = "npm run release:dry"
 
 [tasks."release:full"]
-description = "Full semantic-release"
-run = """
-echo "Running semantic-release..."
-# Note: Requires GH_TOKEN in .mise.local.toml
-# npx semantic-release
-echo "Not configured - see docs/adr/2026-01-30-claude-code-infrastructure.md"
-"""
+description = "Full semantic-release (delegates to npm, requires GH_TOKEN)"
+run = "npm run release"
 
 [tasks."release:pypi"]
 description = "Publish package to PyPI (requires 1Password)"
@@ -224,6 +219,6 @@ run = "uv run -p 3.13 python examples/quick_start.py"
 description = "Run logging demo"
 run = "uv run -p 3.13 python examples/ckvd_logging_demo.py"
 
-[tasks."demo:cli"]
-description = "Run CKVD CLI demo"
-run = "uv run -p 3.13 python examples/sync/ckvd_demo_cli.py"
+[tasks."demo:lazy"]
+description = "Run lazy initialization demo"
+run = "uv run -p 3.13 python examples/ckvd_lazy_initialization_demo.py"

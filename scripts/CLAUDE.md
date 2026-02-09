@@ -17,9 +17,10 @@ Utility scripts for development, maintenance, and deployment.
 
 ## Key Scripts
 
-| Script               | Purpose                          |
-| -------------------- | -------------------------------- |
-| `publish-to-pypi.sh` | PyPI publishing (use mise tasks) |
+| Script                   | Purpose                                   |
+| ------------------------ | ----------------------------------------- |
+| `publish-to-pypi.sh`     | PyPI publishing (use mise tasks)          |
+| `claude-code-migrate.sh` | Claude Code session migration for renames |
 
 ---
 
@@ -42,7 +43,7 @@ Most script functionality is available via mise tasks:
 # Instead of running scripts directly
 mise run test           # Run tests
 mise run check:all      # Lint + format + typecheck
-mise run release:full   # Full release workflow
+npm run release         # Full release (semantic-release)
 ```
 
 See `mise run help` for all available tasks.
