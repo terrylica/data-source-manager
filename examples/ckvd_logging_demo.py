@@ -1,193 +1,159 @@
 #!/usr/bin/env python3
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """
 CKVD Logging Control Demo
 
-This demo shows how to control CKVD logging levels for clean feature engineering workflows.
-It demonstrates the solution to the user's request for configurable logging levels.
+Demonstrates how to control CKVD logging levels for clean workflows.
+Emits structured NDJSON telemetry to examples/logs/events.jsonl.
 
 Usage:
     # Clean output for feature engineering (suppress CKVD logs)
-    CKVD_LOG_LEVEL=CRITICAL python examples/ckvd_logging_demo.py
+    CKVD_LOG_LEVEL=CRITICAL uv run -p 3.13 python examples/ckvd_logging_demo.py
 
     # Normal output with CKVD info logs
-    CKVD_LOG_LEVEL=INFO python examples/ckvd_logging_demo.py
-
-    # Detailed debugging output
-    CKVD_LOG_LEVEL=DEBUG python examples/ckvd_logging_demo.py
+    CKVD_LOG_LEVEL=INFO uv run -p 3.13 python examples/ckvd_logging_demo.py
 
     # Using command line options
-    python examples/ckvd_logging_demo.py --log-level CRITICAL
-    python examples/ckvd_logging_demo.py --log-level DEBUG --show-all
+    uv run -p 3.13 python examples/ckvd_logging_demo.py --log-level CRITICAL
+    uv run -p 3.13 python examples/ckvd_logging_demo.py --log-level DEBUG --show-all
 """
 
 import os
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import typer
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
-
-# Import CKVD components
-from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd import CryptoKlineVisionData, DataProvider, Interval, MarketType
 from ckvd.utils.loguru_setup import logger
-from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
 
-console = Console()
-
-
-def demonstrate_logging_levels():
-    """Show how different log levels affect CKVD output."""
-    console.print(Panel.fit("[bold blue]CKVD Logging Levels Demo[/bold blue]", border_style="blue"))
-
-    # Create a table showing log level effects
-    table = Table(title="CKVD Log Level Effects")
-    table.add_column("Log Level", style="cyan", no_wrap=True)
-    table.add_column("What You See", style="magenta")
-    table.add_column("Use Case", style="green")
-
-    table.add_row("CRITICAL", "Only critical errors (connection failures, data corruption)", "Feature engineering workflows - clean output")
-    table.add_row("ERROR", "Errors that don't stop execution + critical (DEFAULT)", "Production monitoring and normal usage")
-    table.add_row("WARNING", "Data quality warnings, cache misses + errors", "Development with some visibility")
-    table.add_row("INFO", "Basic operation info + warnings", "Detailed development and debugging")
-    table.add_row("DEBUG", "Detailed debugging info + all above", "Deep debugging and troubleshooting")
-
-    console.print(table)
-    console.print()
+from _telemetry import init_telemetry, timed_span
 
 
-def demonstrate_environment_control():
-    """Show environment variable control."""
-    console.print(Panel.fit("[bold green]Environment Variable Control[/bold green]", border_style="green"))
+def demonstrate_logging_levels(tlog):
+    """Document CKVD log level effects as structured data."""
+    levels = [
+        {"level": "CRITICAL", "shows": "Only critical errors", "use_case": "Feature engineering - clean output"},
+        {"level": "ERROR", "shows": "Errors + critical (DEFAULT)", "use_case": "Production monitoring"},
+        {"level": "WARNING", "shows": "Data quality warnings + errors", "use_case": "Development with visibility"},
+        {"level": "INFO", "shows": "Basic operation info + warnings", "use_case": "Detailed development"},
+        {"level": "DEBUG", "shows": "Detailed debugging + all above", "use_case": "Deep troubleshooting"},
+    ]
+    tlog.bind(
+        event_type="config_documented",
+        config_key="log_levels",
+        levels=levels,
+    ).info("CKVD log level reference documented")
 
-    console.print("[bold]Current environment:[/bold]")
+
+def demonstrate_environment_control(tlog):
+    """Document environment variable configuration state."""
     current_level = os.getenv("CKVD_LOG_LEVEL", "ERROR")
-    console.print(f"  CKVD_LOG_LEVEL = {current_level}")
-    console.print(f"  Effective level: {logger.getEffectiveLevel()}")
-    console.print()
+    effective_level = logger.getEffectiveLevel()
 
-    console.print("[bold]To control CKVD logging:[/bold]")
-    console.print("  [cyan]# Clean output for feature engineering[/cyan]")
-    console.print("  export CKVD_LOG_LEVEL=CRITICAL")
-    console.print()
-    console.print("  [cyan]# Normal development[/cyan]")
-    console.print("  export CKVD_LOG_LEVEL=INFO")
-    console.print()
-    console.print("  [cyan]# Default behavior (errors and critical only)[/cyan]")
-    console.print("  # No need to set anything - ERROR is the default")
-    console.print()
-    console.print("  [cyan]# Detailed debugging[/cyan]")
-    console.print("  export CKVD_LOG_LEVEL=DEBUG")
-    console.print()
+    tlog.bind(
+        event_type="config_state",
+        config_key="environment",
+        ckvd_log_level_env=current_level,
+        effective_level=effective_level,
+        ckvd_log_file=os.getenv("CKVD_LOG_FILE", "(not set)"),
+        ckvd_disable_colors=os.getenv("CKVD_DISABLE_COLORS", "(not set)"),
+    ).info(f"Environment state: CKVD_LOG_LEVEL={current_level}, effective={effective_level}")
 
-
-def demonstrate_programmatic_control():
-    """Show programmatic logging control."""
-    console.print(Panel.fit("[bold yellow]Programmatic Control[/bold yellow]", border_style="yellow"))
-
-    console.print("[bold]Option 1: Configure logger directly[/bold]")
-    console.print("```python")
-    console.print("from utils.loguru_setup import logger")
-    console.print("logger.configure_level('CRITICAL')  # Suppress CKVD logs")
-    console.print("```")
-    console.print()
-
-    console.print("[bold]Option 2: Set environment in code[/bold]")
-    console.print("```python")
-    console.print("import os")
-    console.print("os.environ['CKVD_LOG_LEVEL'] = 'CRITICAL'")
-    console.print("# Import CKVD after setting environment")
-    console.print("from core.sync.crypto_kline_vision_data import CryptoKlineVisionData")
-    console.print("```")
-    console.print()
+    control_methods = [
+        {"method": "env_var", "command": "export CKVD_LOG_LEVEL=CRITICAL", "scope": "global"},
+        {"method": "programmatic", "command": "logger.configure_level('CRITICAL')", "scope": "runtime"},
+        {"method": "default", "command": "(none needed)", "scope": "ERROR is default"},
+    ]
+    tlog.bind(
+        event_type="config_documented",
+        config_key="control_methods",
+        methods=control_methods,
+    ).info("Logging control methods documented")
 
 
-def demonstrate_feature_engineering_workflow():
-    """Show clean feature engineering workflow."""
-    console.print(Panel.fit("[bold magenta]Feature Engineering Workflow Example[/bold magenta]", border_style="magenta"))
-
-    console.print("[bold]Before (cluttered output):[/bold]")
-    console.print("[dim]2024-06-04 10:15:23 | INFO     | ckvd_cache_utils:get_from_cache:45 - Checking cache for SOLUSDT")
-    console.print("[dim]2024-06-04 10:15:23 | DEBUG    | ckvd_fcp_utils:process_cache_step:67 - Cache miss, fetching from source")
-    console.print("[dim]2024-06-04 10:15:23 | INFO     | ckvd_cache_utils:save_to_cache:123 - Storing data in cache")
-    console.print("[dim]... (hundreds of similar lines)")
-    console.print()
-
-    console.print("[bold]After (clean output with CKVD_LOG_LEVEL=CRITICAL):[/bold]")
-    console.print("[green]✓ Feature extraction started")
-    console.print("[green]✓ Processing SOLUSDT data...")
-    console.print("[green]✓ Feature engineering complete: 1440 records processed")
-    console.print()
-
-    console.print("[bold]Code example:[/bold]")
-    console.print("```python")
-    console.print("# Clean feature engineering code")
-    console.print("import os")
-    console.print("os.environ['CKVD_LOG_LEVEL'] = 'CRITICAL'")
-    console.print("")
-    console.print("from core.sync.crypto_kline_vision_data import CryptoKlineVisionData")
-    console.print("from utils.market_constraints import DataProvider, MarketType, Interval")
-    console.print("")
-    console.print("# No more logging boilerplate needed!")
-    console.print("ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)")
-    console.print("data = ckvd.get_data(")
-    console.print("    symbol='SOLUSDT',")
-    console.print("    start_time=start_time,")
-    console.print("    end_time=end_time,")
-    console.print("    interval=Interval.MINUTE_1,")
-    console.print(")")
-    console.print("# Clean output - only your feature engineering logs visible")
-    console.print("```")
-    console.print()
+def demonstrate_programmatic_control(tlog):
+    """Document programmatic logging control patterns."""
+    patterns = [
+        {
+            "option": "configure_logger",
+            "code": "from ckvd.utils.loguru_setup import logger; logger.configure_level('CRITICAL')",
+        },
+        {
+            "option": "env_before_import",
+            "code": "import os; os.environ['CKVD_LOG_LEVEL'] = 'CRITICAL'; from ckvd import CryptoKlineVisionData",
+        },
+    ]
+    tlog.bind(
+        event_type="config_documented",
+        config_key="programmatic_control",
+        patterns=patterns,
+    ).info("Programmatic logging control patterns documented")
 
 
-def test_actual_ckvd_logging(log_level: str):
+def demonstrate_feature_engineering_workflow(tlog):
+    """Document the before/after of CKVD logging suppression."""
+    tlog.bind(
+        event_type="config_documented",
+        config_key="feature_engineering_workflow",
+        before="15+ lines of logging boilerplate + cluttered output",
+        after="1 line: os.environ['CKVD_LOG_LEVEL'] = 'CRITICAL'",
+        suppressed_logs=["cache_checking", "fcp_steps", "dataframe_processing", "api_debug"],
+    ).info("Feature engineering workflow: CKVD_LOG_LEVEL=CRITICAL suppresses internal logs")
+
+
+def test_actual_ckvd_logging(tlog, log_level: str):
     """Test actual CKVD logging with the specified level."""
-    console.print(Panel.fit(f"[bold cyan]Testing CKVD with {log_level} Level[/bold cyan]", border_style="cyan"))
-
-    # Configure the logger to the specified level
     logger.configure_level(log_level)
-    console.print(f"[green]Set CKVD log level to: {log_level}[/green]")
-    console.print(f"[green]Effective level: {logger.getEffectiveLevel()}[/green]")
-    console.print()
+
+    tlog.bind(
+        event_type="config_state",
+        config_key="test_log_level",
+        log_level=log_level,
+        effective_level=logger.getEffectiveLevel(),
+    ).info(f"Set CKVD log level to: {log_level}")
 
     try:
-        # Create CKVD instance (this will generate some logs)
-        console.print("[yellow]Creating CryptoKlineVisionData...[/yellow]")
-        ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+        tlog.bind(event_type="manager_creating").info("Creating CryptoKlineVisionData manager...")
+        manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
-        # Try to get a small amount of recent data (this will generate logs)
-        console.print("[yellow]Fetching small data sample...[/yellow]")
+        tlog.bind(
+            event_type="manager_created",
+            venue="binance",
+            market_type="SPOT",
+        ).info("Manager created")
+
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(hours=1)
 
-        # This will demonstrate the logging behavior
-        df = ckvd.get_data(
-            symbol="BTCUSDT",
-            start_time=start_time,
-            end_time=end_time,
-            interval=Interval.MINUTE_1,
-        )
+        with timed_span(tlog, "fetch", symbol="BTCUSDT", interval="1m", venue="binance"):
+            df = manager.get_data(
+                symbol="BTCUSDT",
+                start_time=start_time,
+                end_time=end_time,
+                interval=Interval.MINUTE_1,
+            )
 
         if not df.empty:
-            console.print(f"[green]✓ Successfully retrieved {len(df)} records[/green]")
+            tlog.bind(
+                event_type="fetch_detail",
+                symbol="BTCUSDT",
+                rows_returned=len(df),
+            ).info(f"Retrieved {len(df)} records")
         else:
-            console.print("[yellow]⚠ No data retrieved (this is normal for demo)[/yellow]")
+            tlog.bind(
+                event_type="fetch_detail",
+                symbol="BTCUSDT",
+                rows_returned=0,
+            ).warning("No data retrieved")
 
-        ckvd.close()
+        manager.close()
 
-    except Exception as e:
-        console.print(f"[red]Error during CKVD test: {e}[/red]")
-        console.print("[yellow]This is expected for demo purposes[/yellow]")
-
-    console.print()
+    except (OSError, RuntimeError, ValueError) as e:
+        tlog.bind(
+            event_type="fetch_failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        ).error(f"Error during CKVD test: {e}")
 
 
 def main(
@@ -196,47 +162,43 @@ def main(
     test_ckvd: bool = typer.Option(False, "--test-ckvd", "-t", help="Test actual CKVD logging"),
 ):
     """Demonstrate CKVD logging control capabilities."""
+    tlog = init_telemetry("logging_demo")
 
-    console.print(
-        Panel.fit("[bold blue]CKVD Logging Control Demo[/bold blue]\nSolution for clean feature engineering workflows", border_style="blue")
-    )
-
-    # Show the benefits
-    console.print(
-        Panel.fit(
-            "[bold green]✅ Problem Solved![/bold green]\n\n"
-            "🎯 [bold]Easy Control:[/bold] CKVD_LOG_LEVEL=CRITICAL vs 15+ lines of boilerplate\n"
-            "🚀 [bold]Clean Output:[/bold] No more cluttered console logs in feature engineering\n"
-            "🔧 [bold]Configurable:[/bold] Different log levels for different use cases\n"
-            "📝 [bold]No Code Changes:[/bold] Existing CKVD code works unchanged",
-            border_style="green",
-        )
-    )
+    tlog.bind(
+        event_type="config_documented",
+        config_key="solution_summary",
+        benefits=[
+            "Easy Control: CKVD_LOG_LEVEL=CRITICAL vs 15+ lines of boilerplate",
+            "Clean Output: No more cluttered console logs in feature engineering",
+            "Configurable: Different log levels for different use cases",
+            "No Code Changes: Existing CKVD code works unchanged",
+        ],
+    ).info("CKVD Logging Control Demo — solution for clean feature engineering workflows")
 
     # Always show the main demonstrations
-    demonstrate_logging_levels()
-    demonstrate_environment_control()
+    demonstrate_logging_levels(tlog)
+    demonstrate_environment_control(tlog)
 
     if show_all:
-        demonstrate_programmatic_control()
-        demonstrate_feature_engineering_workflow()
+        demonstrate_programmatic_control(tlog)
+        demonstrate_feature_engineering_workflow(tlog)
 
     if test_ckvd:
-        test_actual_ckvd_logging(log_level)
+        test_actual_ckvd_logging(tlog, log_level)
 
-    # Show the solution summary
-    console.print(
-        Panel.fit(
-            "[bold magenta]Implementation Status[/bold magenta]\n\n"
-            "✅ [bold]Environment Variable Control:[/bold] CKVD_LOG_LEVEL already implemented\n"
-            "✅ [bold]Programmatic Control:[/bold] logger.configure_level() available\n"
-            "✅ [bold]All CKVD Components:[/bold] Use centralized loguru logger\n"
-            "✅ [bold]Cleaner Default:[/bold] Default ERROR level for quieter operation\n"
-            "✅ [bold]Feature Engineering Ready:[/bold] Set CKVD_LOG_LEVEL=CRITICAL for minimal output\n\n"
-            "[cyan]The requested logging control is already implemented and ready to use![/cyan]",
-            border_style="magenta",
-        )
-    )
+    tlog.bind(
+        event_type="config_documented",
+        config_key="implementation_status",
+        features={
+            "env_var_control": True,
+            "programmatic_control": True,
+            "centralized_loguru": True,
+            "cleaner_default": True,
+            "feature_engineering_ready": True,
+        },
+    ).info("Implementation status: all logging control features available")
+
+    tlog.bind(event_type="session_completed").info("logging_demo completed")
 
 
 if __name__ == "__main__":

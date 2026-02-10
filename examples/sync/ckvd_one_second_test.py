@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """One-second data retrieval test script.
 
-This script tests the Crypto Kline Vision Data's ability to handle one-second
-data intervals without any deprecation warnings related to frequency strings.
+Tests CKVD's ability to handle one-second data intervals without
+deprecation warnings related to frequency strings.
+
+Emits structured NDJSON telemetry to examples/logs/events.jsonl.
 """
 
 import sys
@@ -10,36 +13,30 @@ import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from rich.console import Console
-from rich.panel import Panel
+# Allow import of _telemetry from parent examples/ directory
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Add project root to path if needed
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
+from _telemetry import init_telemetry, timed_span
 
-# Project imports (after path setup)
-from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd import CryptoKlineVisionData, DataProvider, Interval, MarketType
 from ckvd.utils.dataframe_utils import verify_data_completeness
 from ckvd.utils.for_core.ckvd_utilities import safely_reindex_dataframe
-from ckvd.utils.loguru_setup import configure_session_logging, logger
-from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
-
-# Console for rich output
-console = Console()
 
 
 def main():
     """Test one-second data retrieval and processing."""
+    tlog = init_telemetry("one_second_test")
+
     # Filter out all warnings to see if our fixes worked
     warnings.filterwarnings("error")
 
-    # Configure logging
-    main_log, error_log, _ = configure_session_logging("ckvd_one_second_test", "INFO")
-    logger.info(f"Logs: {main_log} and {error_log}")
-
     # Create CKVD instance
     ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+    tlog.bind(
+        event_type="manager_created",
+        venue="binance",
+        market_type="SPOT",
+    ).info("Manager created")
 
     # Use one-second interval
     interval = Interval.SECOND_1
@@ -48,56 +45,80 @@ def main():
     end_time = datetime.now(timezone.utc).replace(microsecond=0)
     start_time = end_time - timedelta(minutes=2)
 
-    console.print(Panel(f"Testing one-second data retrieval from {start_time} to {end_time}", style="blue"))
-
     try:
         # Retrieve data
-        df = ckvd.get_data(
-            symbol="BTCUSDT",
-            start_time=start_time,
-            end_time=end_time,
-            interval=interval,
-        )
+        with timed_span(tlog, "fetch", symbol="BTCUSDT", interval="1s", venue="binance"):
+            df = ckvd.get_data(
+                symbol="BTCUSDT",
+                start_time=start_time,
+                end_time=end_time,
+                interval=interval,
+            )
 
-        console.print(f"[green]Successfully retrieved {len(df)} rows of one-second data[/green]")
+        tlog.bind(
+            event_type="fetch_detail",
+            symbol="BTCUSDT",
+            rows_returned=len(df),
+        ).info(f"Retrieved {len(df)} rows of one-second data")
 
         # Check data completeness
         is_complete, gaps = verify_data_completeness(df, start_time, end_time, interval="1s")
-        if is_complete:
-            console.print("[green]Data is complete - no gaps detected[/green]")
-        else:
-            console.print(f"[yellow]Found {len(gaps)} gaps in the data[/yellow]")
+        tlog.bind(
+            event_type="validation_result",
+            validation="data_completeness",
+            is_complete=is_complete,
+            gaps_count=len(gaps),
+        ).info(f"Data completeness: {'complete' if is_complete else f'{len(gaps)} gaps'}")
 
         # Test reindexing
-        console.print("\n[blue]Testing reindexing with one-second data[/blue]")
-        reindexed_df = safely_reindex_dataframe(
-            df,
-            start_time,
-            end_time,
-            interval="1s",
-            fill_method="ffill",
-        )
-        console.print(f"[green]Successfully reindexed to {len(reindexed_df)} rows[/green]")
+        with timed_span(tlog, "reindex", symbol="BTCUSDT", interval="1s"):
+            reindexed_df = safely_reindex_dataframe(
+                df,
+                start_time,
+                end_time,
+                interval="1s",
+                fill_method="ffill",
+            )
 
-        # Print some sample data
-        console.print("\n[blue]Sample of retrieved one-second data:[/blue]")
+        tlog.bind(
+            event_type="validation_result",
+            validation="reindex_result",
+            rows_after_reindex=len(reindexed_df),
+        ).info(f"Reindexed to {len(reindexed_df)} rows")
+
+        # Emit sample data
         if not df.empty:
-            # Format the first 5 rows for display
-            sample = df.head(5).copy()
-            if "open_time" in sample.columns:
-                sample["time"] = sample["open_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
-            else:
-                sample["time"] = sample.index.strftime("%Y-%m-%d %H:%M:%S")
+            sample_rows = []
+            for row in df.head(5).itertuples():
+                time_str = row.Index.strftime("%Y-%m-%d %H:%M:%S") if hasattr(row.Index, "strftime") else str(row.Index)
+                sample_rows.append({
+                    "time": time_str,
+                    "open": round(float(row.open), 2),
+                    "close": round(float(row.close), 2),
+                })
+            tlog.bind(
+                event_type="data_sample",
+                symbol="BTCUSDT",
+                sample_rows=sample_rows,
+                sample_size=len(sample_rows),
+            ).info(f"Sample: {len(sample_rows)} rows of one-second data")
 
-            for idx, row in enumerate(sample.itertuples()):
-                console.print(f"Row {idx}: {row.time} - Open: {row.open:.2f}, Close: {row.close:.2f}")
-
-        console.print("\n[green]✓ All tests completed successfully with no warnings![/green]")
+        tlog.bind(event_type="session_completed", success=True).info("one_second_test completed successfully with no warnings")
 
     except Warning as w:
-        console.print(f"[red]Warning occurred: {w}[/red]")
-    except Exception as e:
-        console.print(f"[red]Error occurred: {e}[/red]")
+        tlog.bind(
+            event_type="fetch_failed",
+            error=str(w),
+            error_type="Warning",
+        ).warning(f"Warning occurred: {w}")
+        tlog.bind(event_type="session_completed", success=False).info("one_second_test completed with warning")
+    except (OSError, RuntimeError, ValueError) as e:
+        tlog.bind(
+            event_type="fetch_failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        ).error(f"Error occurred: {e}")
+        tlog.bind(event_type="session_completed", success=False).info("one_second_test completed with error")
 
 
 if __name__ == "__main__":

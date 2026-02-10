@@ -6,10 +6,11 @@ Key terminology used in Crypto Kline Vision Data.
 
 | Term       | Definition                                                                                     |
 | ---------- | ---------------------------------------------------------------------------------------------- |
-| **CKVD**    | Crypto Kline Vision Data - the main orchestrator class for market data retrieval                    |
+| **CKVD**   | Crypto Kline Vision Data - the main orchestrator class for market data retrieval               |
 | **FCP**    | Failover Control Protocol - the priority-based data retrieval strategy (Cache → Vision → REST) |
 | **Klines** | Candlestick/OHLCV data (Open, High, Low, Close, Volume)                                        |
 | **OHLCV**  | Open, High, Low, Close, Volume - standard candlestick data columns                             |
+| **NDJSON** | Newline-Delimited JSON - structured telemetry format emitted by all examples to `events.jsonl` |
 
 ## Data Sources
 
@@ -72,11 +73,14 @@ Key terminology used in Crypto Kline Vision Data.
 
 ## Architecture
 
-| Term                 | Definition                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| **DataProvider**     | Enum for exchange sources (BINANCE, TRADESTATION, OKX)                             |
-| **MarketType**       | Enum for market categories (SPOT, FUTURES_USDT, FUTURES_COIN, FUTURES, OPTIONS)    |
-| **ChartType**        | Enum for chart data types (KLINES, FUNDING_RATE, OKX_CANDLES, OKX_HISTORY_CANDLES) |
-| **Interval**         | Enum for candle timeframes (1s to 1M)                                              |
-| **DataSource**       | Enum for FCP source selection (AUTO, CACHE, VISION, REST)                          |
-| **CKVDConfig** | Configuration dataclass for CKVD instances                                          |
+| Term                | Definition                                                                                    |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| **DataProvider**    | Enum for exchange sources (BINANCE, TRADESTATION, OKX)                                        |
+| **MarketType**      | Enum for market categories (SPOT, FUTURES_USDT, FUTURES_COIN, FUTURES, OPTIONS)               |
+| **ChartType**       | Enum for chart data types (KLINES, FUNDING_RATE, OKX_CANDLES, OKX_HISTORY_CANDLES)            |
+| **Interval**        | Enum for candle timeframes (1s to 1M)                                                         |
+| **DataSource**      | Enum for FCP source selection (AUTO, CACHE, VISION, REST)                                     |
+| **CKVDConfig**      | Configuration dataclass for CKVD instances                                                    |
+| **ResilientLogger** | Logger wrapper in `_telemetry.py` that auto-heals sinks destroyed by CKVD's `logger.remove()` |
+| **trace_id**        | 16-char hex correlation ID grouping all events from one example run                           |
+| **span_id**         | 8-char hex ID linking a `timed_span`'s start/complete/fail events                             |

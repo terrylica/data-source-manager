@@ -12,18 +12,19 @@ Navigation hub for Crypto Kline Vision Data documentation.
 | ------------------------------------------------ | ---------------------------------------- |
 | [api/](api/)                                     | API reference and endpoint documentation |
 | [core_architecture/](core_architecture/)         | System architecture and design           |
-| [ckvd/](ckvd/)     | CKVD class documentation                  |
+| [ckvd/](ckvd/)                                   | CKVD class documentation                 |
 | [data_client_interface/](data_client_interface/) | Provider interface specifications        |
 
 ---
 
 ## How-To Guides
 
-| Guide                    | Description                              |
-| ------------------------ | ---------------------------------------- |
-| [howto/](howto/)         | Step-by-step guides for common tasks     |
-| [debugging/](debugging/) | Debugging techniques and troubleshooting |
-| [testing/](testing/)     | Test writing and execution guides        |
+| Guide                                             | Description                              |
+| ------------------------------------------------- | ---------------------------------------- |
+| [howto/](howto/)                                  | Step-by-step guides for common tasks     |
+| [debugging/](debugging/)                          | Debugging techniques and troubleshooting |
+| [testing/](testing/)                              | Test writing and execution guides        |
+| [Telemetry](/examples/README.md#telemetry-output) | NDJSON event schema and parsing          |
 
 ---
 
@@ -92,9 +93,9 @@ Claude Code extensions for AI-assisted development. See [.claude/](/.claude/) di
 
 Progressive disclosure for detailed guidance. Each has a SKILL.md with YAML frontmatter.
 
-| Skill                                      | Purpose                              |
-| ------------------------------------------ | ------------------------------------ |
-| [ckvd-usage](skills/ckvd-usage/)             | CryptoKlineVisionData usage guide        |
+| Skill                                        | Purpose                              |
+| -------------------------------------------- | ------------------------------------ |
+| [ckvd-usage](skills/ckvd-usage/)             | CryptoKlineVisionData usage guide    |
 | [ckvd-testing](skills/ckvd-testing/)         | Testing patterns and pytest          |
 | [ckvd-research](skills/ckvd-research/)       | Codebase research (runs in subagent) |
 | [ckvd-fcp-monitor](skills/ckvd-fcp-monitor/) | FCP monitoring and diagnostics       |
@@ -107,7 +108,7 @@ Specialized subagents that Claude can delegate to:
 | --------------------- | -------------------------------------- |
 | api-reviewer          | Reviews code for API consistency       |
 | data-fetcher          | Fetches data with proper FCP handling  |
-| test-writer           | Writes tests following CKVD patterns    |
+| test-writer           | Writes tests following CKVD patterns   |
 | silent-failure-hunter | Finds silent failures and bare excepts |
 | fcp-debugger          | Diagnoses FCP issues                   |
 
@@ -119,7 +120,7 @@ Slash commands for common workflows:
 | -------------- | --------------------------------- |
 | /debug-fcp     | Debug FCP behavior for a symbol   |
 | /quick-test    | Run quick verification tests      |
-| /review-ckvd    | Review code against CKVD patterns  |
+| /review-ckvd   | Review code against CKVD patterns |
 | /fetch-data    | Fetch market data with validation |
 | /validate-data | Validate DataFrame structure      |
 | /feature-dev   | Guided feature development        |

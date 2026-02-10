@@ -17,7 +17,7 @@ Each directory has its own CLAUDE.md with domain-specific context, loaded on dem
 | `src/`        | [src/CLAUDE.md](src/CLAUDE.md)               | Package structure, code patterns, FCP impl |
 | `tests/`      | [tests/CLAUDE.md](tests/CLAUDE.md)           | Test commands, markers, fixtures, mocking  |
 | `docs/`       | [docs/CLAUDE.md](docs/CLAUDE.md)             | ADRs, skills, benchmarks, troubleshooting  |
-| `examples/`   | [examples/CLAUDE.md](examples/CLAUDE.md)     | Example conventions, common patterns       |
+| `examples/`   | [examples/CLAUDE.md](examples/CLAUDE.md)     | Example conventions, NDJSON telemetry      |
 | `scripts/`    | [scripts/CLAUDE.md](scripts/CLAUDE.md)       | Dev scripts, mise tasks, cache tools       |
 | `playground/` | [playground/CLAUDE.md](playground/CLAUDE.md) | Experimental prototypes (not production)   |
 

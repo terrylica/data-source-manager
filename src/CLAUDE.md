@@ -28,7 +28,7 @@ src/ckvd/
 │       └── okx/                     # OKX provider
 └── utils/
     ├── market_constraints.py    # Enums and validation (re-export)
-    ├── config.py                # Feature flags (USE_POLARS_OUTPUT, ENABLE_CACHE)
+    ├── config.py                # Feature flags (USE_POLARS_OUTPUT)
     ├── loguru_setup.py          # Logging configuration
     ├── market/                  # Enums and validation (source)
     │   ├── enums.py             # DataProvider, MarketType, Interval, ChartType

@@ -1,123 +1,121 @@
 #!/usr/bin/env python3
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """
 Clean Feature Engineering Example
 
-This example demonstrates how to use CKVD with suppressed logging for clean,
+Demonstrates how to use CKVD with suppressed logging for clean,
 professional output in feature engineering workflows.
 
 Before: 15+ lines of logging boilerplate + cluttered output
-After: 1 line of configuration + clean output
+After: 1 line of configuration + structured NDJSON telemetry
 
 Usage:
-    python examples/clean_feature_engineering_example.py
+    uv run -p 3.13 python examples/clean_feature_engineering_example.py
+
+Emits structured NDJSON telemetry to examples/logs/events.jsonl.
 """
 
 import os
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
-# ============================================================================
-# SOLUTION: Single line to suppress CKVD logging noise
-# ============================================================================
+# Suppress CKVD internal logging noise for clean pipeline output
 os.environ["CKVD_LOG_LEVEL"] = "CRITICAL"
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
+from ckvd import CryptoKlineVisionData, DataProvider, Interval, MarketType
 
-# Now import CKVD - no more logging boilerplate needed!
-from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
-from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
+from _telemetry import init_telemetry, timed_span
 
 
 def main():
     """Demonstrate clean feature engineering workflow."""
+    tlog = init_telemetry("feature_engineering")
 
-    print("🚀 Starting feature engineering workflow...")
-    print("=" * 50)
+    tlog.bind(
+        event_type="config_state",
+        config_key="ckvd_log_level",
+        ckvd_log_level="CRITICAL",
+        reason="Suppress internal CKVD logs for clean feature engineering output",
+    ).info("Feature engineering workflow starting with CKVD_LOG_LEVEL=CRITICAL")
 
-    # Create CKVD instance - minimal logging
-    print("📊 Initializing Crypto Kline Vision Data...")
-    ckvd = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+    # Create CKVD instance
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+    tlog.bind(
+        event_type="manager_created",
+        venue="binance",
+        market_type="SPOT",
+    ).info("Manager created")
 
     # Define time range for feature extraction
     end_time = datetime.now(timezone.utc)
-    start_time = end_time - timedelta(days=1)  # Last 24 hours
+    start_time = end_time - timedelta(days=1)
 
     symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
 
-    print(f"⏰ Time range: {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}")
-    print(f"🎯 Processing {len(symbols)} symbols...")
-    print()
+    tlog.bind(
+        event_type="config_documented",
+        config_key="pipeline_params",
+        start_time=str(start_time),
+        end_time=str(end_time),
+        symbols=symbols,
+        interval="1m",
+    ).info(f"Processing {len(symbols)} symbols for last 24 hours")
 
-    # Process each symbol with clean output
+    # Process each symbol with structured telemetry
     results = {}
 
-    for i, symbol in enumerate(symbols, 1):
-        print(f"[{i}/{len(symbols)}] Processing {symbol}...", end=" ")
-
+    for symbol in symbols:
         try:
-            # Fetch data - CKVD logs are suppressed, only our output shows
-            data = ckvd.get_data(
-                symbol=symbol,
-                start_time=start_time,
-                end_time=end_time,
-                interval=Interval.MINUTE_1,
-            )
+            with timed_span(tlog, "fetch", symbol=symbol, interval="1m", venue="binance"):
+                data = manager.get_data(
+                    symbol=symbol,
+                    start_time=start_time,
+                    end_time=end_time,
+                    interval=Interval.MINUTE_1,
+                )
 
             if not data.empty:
-                # Simple feature extraction example
                 features = {
                     "records": len(data),
-                    "avg_price": data["close"].mean() if "close" in data.columns else 0,
-                    "volatility": data["close"].std() if "close" in data.columns else 0,
-                    "volume_total": data["volume"].sum() if "volume" in data.columns else 0,
+                    "avg_price": round(float(data["close"].mean()), 2) if "close" in data.columns else 0,
+                    "volatility": round(float(data["close"].std()), 2) if "close" in data.columns else 0,
+                    "volume_total": round(float(data["volume"].sum()), 0) if "volume" in data.columns else 0,
                 }
                 results[symbol] = features
-                print(f"✅ {features['records']} records")
-            else:
-                print("⚠️  No data available")
-                results[symbol] = None
 
-        except Exception as e:
-            print(f"❌ Error: {str(e)[:50]}...")
+                tlog.bind(
+                    event_type="feature_computed",
+                    symbol=symbol,
+                    **features,
+                ).info(f"{symbol}: {features['records']} records, avg=${features['avg_price']}")
+            else:
+                results[symbol] = None
+                tlog.bind(
+                    event_type="fetch_result",
+                    symbol=symbol,
+                    rows_returned=0,
+                ).warning(f"{symbol}: No data available")
+
+        except (OSError, RuntimeError, ValueError) as e:
             results[symbol] = None
+            tlog.bind(
+                event_type="fetch_failed",
+                symbol=symbol,
+                error=str(e)[:100],
+                error_type=type(e).__name__,
+            ).error(f"{symbol}: Error: {e!s:.50s}")
 
     # Clean up resources
-    ckvd.close()
+    manager.close()
 
-    print()
-    print("📈 Feature Engineering Results:")
-    print("=" * 50)
-
-    # Display results in a clean format
-    for symbol, features in results.items():
-        if features:
-            print(
-                f"{symbol:>10}: {features['records']:>6} records | "
-                f"Avg: ${features['avg_price']:>8.2f} | "
-                f"Vol: {features['volatility']:>6.2f} | "
-                f"Total Volume: {features['volume_total']:>12,.0f}"
-            )
-        else:
-            print(f"{symbol:>10}: No data available")
-
-    print()
-    print("✅ Feature engineering workflow completed successfully!")
-    print("🎯 Notice: Clean output with no CKVD logging noise")
-
-    # Show the difference
-    print()
-    print("💡 What you DON'T see (thanks to CKVD_LOG_LEVEL=CRITICAL):")
-    print("   - Cache checking messages")
-    print("   - FCP step-by-step logs")
-    print("   - DataFrame processing details")
-    print("   - API call debugging info")
-    print("   - Hundreds of internal CKVD logs")
-    print()
-    print("🚀 Perfect for feature engineering pipelines!")
+    # Emit summary
+    successful = sum(1 for v in results.values() if v is not None)
+    tlog.bind(
+        event_type="session_completed",
+        symbols_processed=len(symbols),
+        symbols_successful=successful,
+        symbols_failed=len(symbols) - successful,
+        results={k: v for k, v in results.items() if v is not None},
+    ).info(f"Feature engineering completed: {successful}/{len(symbols)} symbols")
 
 
 if __name__ == "__main__":

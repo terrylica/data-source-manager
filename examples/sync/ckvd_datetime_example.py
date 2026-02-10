@@ -1,211 +1,198 @@
 #!/usr/bin/env python3
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """Example demonstrating proper datetime handling with Crypto Kline Vision Data.
 
-This example shows best practices for:
+Shows best practices for:
 1. Working with timezone-aware datetimes
 2. Checking data completeness
 3. Handling potential gaps in data
 4. Safe reindexing for analysis
+
+Emits structured NDJSON telemetry to examples/logs/events.jsonl.
 """
 
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import pandas as pd
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
+# Allow import of _telemetry from parent examples/ directory
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Add project root to path if needed
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.append(str(project_root))
+from _telemetry import init_telemetry, timed_span
 
-# Project imports (after path setup)
-from ckvd.core.sync.crypto_kline_vision_data import CryptoKlineVisionData
+from ckvd import CryptoKlineVisionData, DataProvider, Interval, MarketType
 from ckvd.utils.dataframe_utils import verify_data_completeness
 from ckvd.utils.for_core.ckvd_utilities import (
     check_window_data_completeness,
     safely_reindex_dataframe,
 )
-from ckvd.utils.loguru_setup import configure_session_logging, logger
-from ckvd.utils.market_constraints import DataProvider, Interval, MarketType
-
-# Console for rich output
-console = Console()
 
 
-def setup():
-    """Set up logging and environment."""
-    # Configure logging
-    main_log, error_log, _ = configure_session_logging("ckvd_datetime_example", "INFO")
-    logger.info(f"Logs: {main_log} and {error_log}")
+def setup(tlog):
+    """Set up CKVD manager."""
+    manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+    tlog.bind(
+        event_type="manager_created",
+        venue="binance",
+        market_type="SPOT",
+    ).info("Manager created for SPOT market")
+    return manager
 
-    # Create CKVD instance
-    return CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
 
-
-def example_timezone_aware_retrieval(ckvd):
+def example_timezone_aware_retrieval(tlog, ckvd, start_time, end_time):
     """Demonstrate retrieval with proper timezone handling."""
-    console.print(Panel("Example 1: Timezone-Aware DateTime Retrieval", style="green"))
+    tlog.bind(event_type="section_started", section="timezone_retrieval").info("Example 1: Timezone-Aware DateTime Retrieval")
 
-    # Always use timezone-aware datetimes
-    end_time = datetime.now(timezone.utc)
-    start_time = end_time - timedelta(days=3)
+    with timed_span(tlog, "fetch", symbol="BTCUSDT", interval="15m", venue="binance"):
+        df = ckvd.get_data(
+            symbol="BTCUSDT",
+            start_time=start_time,
+            end_time=end_time,
+            interval=Interval.MINUTE_15,
+        )
 
-    logger.info(f"Retrieving data from {start_time} to {end_time}")
+    # Emit structured result
+    result = {
+        "rows_returned": len(df),
+        "first_timestamp": str(df.index[0]) if len(df) > 0 else None,
+        "last_timestamp": str(df.index[-1]) if len(df) > 0 else None,
+        "index_tz": str(df.index.tz) if len(df) > 0 else None,
+    }
 
-    # Retrieve data
-    df = ckvd.get_data(
-        symbol="BTCUSDT",
-        start_time=start_time,
-        end_time=end_time,
-        interval=Interval.MINUTE_15,
-    )
-
-    # Print data information
-    console.print(f"Retrieved {len(df)} rows")
-    console.print(f"First timestamp: {df.index[0]}")
-    console.print(f"Last timestamp: {df.index[-1]}")
-    console.print(f"Timezone info: {df.index.tz}")
-
-    # Show data source info
+    # Track data source distribution
     if "_data_source" in df.columns:
         sources = df["_data_source"].value_counts().to_dict()
-        table = Table(title="Data Sources Used")
-        table.add_column("Source")
-        table.add_column("Count")
-        table.add_column("Percentage")
+        result["data_sources"] = {str(k): int(v) for k, v in sources.items()}
 
-        for source, count in sources.items():
-            percentage = (count / len(df)) * 100
-            table.add_row(source, str(count), f"{percentage:.1f}%")
-
-        console.print(table)
+    tlog.bind(
+        event_type="fetch_detail",
+        symbol="BTCUSDT",
+        **result,
+    ).info(f"Retrieved {len(df)} rows")
 
     return df
 
 
-def example_check_data_completeness(df, start_time, end_time):
+def example_check_data_completeness(tlog, df, start_time, end_time):
     """Demonstrate checking for data completeness."""
-    console.print(Panel("Example 2: Checking Data Completeness", style="green"))
+    tlog.bind(event_type="section_started", section="data_completeness").info("Example 2: Checking Data Completeness")
 
-    # Check for gaps in the data
     is_complete, gaps = verify_data_completeness(df, start_time, end_time, interval="15m")
 
-    if is_complete:
-        console.print("[green]Data is complete - no gaps detected[/green]")
-    else:
-        console.print(f"[yellow]Found {len(gaps)} gaps in the data[/yellow]")
-
-        # Show details of the gaps
-        table = Table(title="Data Gaps")
-        table.add_column("Start")
-        table.add_column("End")
-        table.add_column("Duration")
-
+    gap_details = []
+    if not is_complete:
         for start, end in gaps:
-            duration = end - start
-            hours = duration.total_seconds() / 3600
-            table.add_row(start.strftime("%Y-%m-%d %H:%M"), end.strftime("%Y-%m-%d %H:%M"), f"{hours:.1f} hours")
+            duration_hours = (end - start).total_seconds() / 3600
+            gap_details.append({
+                "start": str(start),
+                "end": str(end),
+                "duration_hours": round(duration_hours, 1),
+            })
 
-        console.print(table)
+    tlog.bind(
+        event_type="validation_result",
+        validation="data_completeness",
+        is_complete=is_complete,
+        gaps_count=len(gaps),
+        gaps=gap_details,
+    ).info(f"Data completeness: {'complete' if is_complete else f'{len(gaps)} gaps detected'}")
 
 
-def example_window_calculations(df):
+def example_window_calculations(tlog, df):
     """Demonstrate safe window-based calculations."""
-    console.print(Panel("Example 3: Window-Based Calculations", style="green"))
+    tlog.bind(event_type="section_started", section="window_calculations").info("Example 3: Window-Based Calculations")
 
-    # Check if we have enough data for calculations
     for window in [24, 48, 96]:
         has_enough, pct = check_window_data_completeness(df, window)
 
+        result = {
+            "window_size": window,
+            "has_enough_data": has_enough,
+            "data_completeness_pct": round(pct, 1),
+        }
+
         if has_enough:
-            console.print(f"[green]✓[/green] Enough data for {window}-period window ({pct:.1f}%)")
-
-            # Calculate moving average
             ma = df["close"].rolling(window).mean()
+            result["last_moving_average"] = round(float(ma.iloc[-1]), 2)
 
-            # Show last few values
-            console.print(f"Last {window}-period MA: {ma.iloc[-1]:.2f}")
-        else:
-            console.print(f"[red]✗[/red] Not enough data for {window}-period window (only {pct:.1f}%)")
+        tlog.bind(
+            event_type="feature_computed",
+            feature_name=f"MA_{window}",
+            **result,
+        ).info(f"Window {window}: {'sufficient' if has_enough else 'insufficient'} data ({pct:.1f}%)")
 
 
-def example_reindexing(df, start_time, end_time):
+def example_reindexing(tlog, df, end_time):
     """Demonstrate safe reindexing for analysis."""
-    console.print(Panel("Example 4: Safe Reindexing", style="green"))
+    tlog.bind(event_type="section_started", section="reindexing").info("Example 4: Safe Reindexing")
 
-    # Create a subset with potential gaps
     subset_end = end_time
     subset_start = subset_end - timedelta(hours=24)
 
     subset_df = df[(df.index >= subset_start) & (df.index < subset_end)].copy()
 
-    # Deliberately create some gaps for demonstration
+    # Create gaps for demonstration
+    rows_before = len(subset_df)
     if len(subset_df) > 10:
         indices_to_drop = subset_df.index[5:10]
         subset_df = subset_df.drop(indices_to_drop)
 
-        console.print(f"Created a subset with {len(subset_df)} rows (removed 5 rows)")
+    tlog.bind(
+        event_type="validation_result",
+        validation="reindex_input",
+        rows_before_drop=rows_before,
+        rows_after_drop=len(subset_df),
+        rows_removed=rows_before - len(subset_df),
+    ).info(f"Created subset with {len(subset_df)} rows (removed {rows_before - len(subset_df)} for demo)")
 
-    # Safely reindex to create a complete time series
+    # Safely reindex
     complete_df = safely_reindex_dataframe(
         subset_df,
         subset_start,
         subset_end,
         interval="15m",
-        fill_method="ffill",  # Forward fill missing values
+        fill_method="ffill",
     )
 
-    console.print(f"After reindexing: {len(complete_df)} rows")
-    console.print(f"Missing values before fill: {subset_df.isna().sum().sum()}")
-    console.print(f"Missing values after fill: {complete_df.isna().sum().sum()}")
+    missing_before = int(subset_df.isna().sum().sum())
+    missing_after = int(complete_df.isna().sum().sum())
 
-    # Show a simple chart of closing prices
-    if len(complete_df) > 0:
-        try:
-            from rich.chart import Chart
-
-            chart = Chart()
-            chart.add_item("Original", [x for x in subset_df["close"].to_numpy() if not pd.isna(x)])
-            chart.add_item("Reindexed", [x for x in complete_df["close"].to_numpy() if not pd.isna(x)])
-
-            console.print(chart)
-        except ImportError:
-            console.print("Chart rendering requires rich>=10.0.0")
+    tlog.bind(
+        event_type="validation_result",
+        validation="reindex_result",
+        rows_after_reindex=len(complete_df),
+        missing_values_before=missing_before,
+        missing_values_after=missing_after,
+    ).info(f"After reindexing: {len(complete_df)} rows, missing values: {missing_before} -> {missing_after}")
 
 
 def main():
     """Run the examples."""
+    tlog = init_telemetry("datetime_example")
+
     try:
-        # Setup
-        ckvd = setup()
+        ckvd = setup(tlog)
 
         # Always use timezone-aware datetimes
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(days=3)
 
-        # Example 1: Basic retrieval
-        df = example_timezone_aware_retrieval(ckvd)
+        df = example_timezone_aware_retrieval(tlog, ckvd, start_time, end_time)
+        example_check_data_completeness(tlog, df, start_time, end_time)
+        example_window_calculations(tlog, df)
+        example_reindexing(tlog, df, end_time)
 
-        # Example 2: Check data completeness
-        example_check_data_completeness(df, start_time, end_time)
+        ckvd.close()
 
-        # Example 3: Window calculations
-        example_window_calculations(df)
-
-        # Example 4: Reindexing
-        example_reindexing(df, start_time, end_time)
-
-    except Exception as e:
-        console.print(f"[bold red]Error: {e}[/bold red]")
-        import traceback
-
-        traceback.print_exc()
+    except (OSError, RuntimeError, ValueError) as e:
+        tlog.bind(
+            event_type="fetch_failed",
+            error=str(e),
+            error_type=type(e).__name__,
+        ).error(f"Error: {e}")
         return 1
 
+    tlog.bind(event_type="session_completed").info("datetime_example completed")
     return 0
 
 

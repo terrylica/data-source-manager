@@ -1,61 +1,47 @@
-# CKVD Demo Module
+# Library Module Examples
 
 ## Overview
 
-This module demonstrates the programmatic use of `src/ckvd/core/sync/ckvd_lib.py` functions to fetch historical market data from Binance.
+This directory previously contained a demo module (`ckvd_demo_module.py`) that was removed during the demo layer purge (GitHub #16).
 
-## Features
+## Current Recommended Usage
 
-- Backward data retrieval from specified end time
-- Configurable parameters (symbol, interval, time range)
-- Output visualization with rich formatting
-- Multiple retrieval examples
-
-## Usage
-
-```bash
-# Run the demo
-./examples/lib_module/ckvd_demo_module.py
-```
-
-## Example Code
+Use `fetch_market_data()` for a high-level programmatic interface:
 
 ```python
-from ckvd.ckvd.core.sync.ckvd_lib import (
-    setup_environment,
-    process_market_parameters,
-    fetch_market_data,
-)
+from ckvd import fetch_market_data, DataProvider, MarketType, Interval, ChartType
+from datetime import datetime, timezone
 
-# Configure parameters
-symbol = "BTCUSDT"
-end_time = "2025-04-14T15:59:59"
-interval = "1m"
-days = 10
-
-# Process market parameters
-provider_enum, market_type, chart_type_enum, symbol, interval_enum = (
-    process_market_parameters(
-        provider="binance",
-        market="spot",
-        chart_type="klines",
-        symbol=symbol,
-        interval=interval,
-    )
-)
-
-# Fetch data
 df, elapsed_time, records = fetch_market_data(
-    provider=provider_enum,
-    market_type=market_type,
-    chart_type=chart_type_enum,
-    symbol=symbol,
-    interval=interval_enum,
-    end_time=end_time,
-    days=days,
+    provider=DataProvider.BINANCE,
+    market_type=MarketType.SPOT,
+    chart_type=ChartType.KLINES,
+    symbol="BTCUSDT",
+    interval=Interval.MINUTE_1,
+    end_time=datetime(2025, 5, 15, 13, 45, 30, tzinfo=timezone.utc),
+    days=10,
 )
+
+print(f"Fetched {records} records in {elapsed_time:.2f}s")
 ```
 
-## Related Tools
+Or use `CryptoKlineVisionData` directly for more control:
 
-This module complements the CLI tool (`examples/sync/ckvd_demo_cli.py`) by providing a programmatic interface for the same functionality.
+```python
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
+from datetime import datetime, timedelta, timezone
+
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+end = datetime.now(timezone.utc)
+start = end - timedelta(days=7)
+
+df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1)
+print(f"Fetched {len(df)} bars")
+manager.close()
+```
+
+## Related
+
+- [quick_start.py](../quick_start.py) - Minimal usage example
+- [Cache control example](../ckvd_cache_control_example.py) - Cache toggle mechanisms
+- [docs/skills/ckvd-usage/SKILL.md](../../docs/skills/ckvd-usage/SKILL.md) - Full API guide

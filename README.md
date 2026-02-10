@@ -83,8 +83,7 @@ dependencies = [
 
 This will install Crypto Kline Vision Data into your Python environment's `site-packages` directory, keeping your project workspace clean.
 
-**Note on CLI Tools:**
-The installation process (through either method) automatically registers the CLI commands (`ckvd-demo-cli` and `ckvd-demo-module`) as executable scripts in your Python environment. These commands will be available in your terminal after successful installation.
+After installation, run examples directly with `uv run -p 3.13 python examples/quick_start.py` or via [mise](https://mise.jdx.dev/): `mise run demo:quickstart`. See [examples/](examples/) for the full list.
 
 ## Usage
 
@@ -151,40 +150,31 @@ futures_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.
 coin_manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_COIN)
 ```
 
-## Running the Demos
-
-Once installed, you can run the demos using the command-line tools:
-
-### CKVD Demo CLI
-
-The CLI demonstration provides an interactive way to explore the Failover Control Protocol:
+## Running the Examples
 
 ```bash
-# Run the CKVD Demo CLI with default parameters
-ckvd-demo-cli
+# Basic usage (BTCUSDT hourly data)
+uv run -p 3.13 python examples/quick_start.py
 
-# Run with specific parameters (get BTC data for a 10-day period)
-ckvd-demo-cli -s BTCUSDT -i 1m -d 10
+# Feature engineering pipeline
+uv run -p 3.13 python examples/clean_feature_engineering_example.py
 
-# Get help and see all available options
-ckvd-demo-cli --help
+# Cache control mechanisms
+uv run -p 3.13 python examples/ckvd_cache_control_example.py
+
+# Logging configuration
+CKVD_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/ckvd_logging_demo.py --test-ckvd
 ```
 
-The CLI tool will automatically:
+Or via [mise](https://mise.jdx.dev/) tasks: `mise run demo:quickstart`, `mise run demo:features`, `mise run demo:cache`, etc. Run `mise tasks | grep demo` to see all available demo tasks.
 
-1. Check for data in local cache
-2. Try to fetch missing data from Binance Vision API
-3. Fall back to REST API for data not available in cache or Vision API
-4. Save retrieved data to cache for future use
-
-### CKVD Demo Module
-
-The module demo provides a programmatic interface:
+All examples emit structured **NDJSON telemetry** to `examples/logs/events.jsonl`. Parse with `jq`:
 
 ```bash
-# Run the CKVD Demo Module to see examples
-ckvd-demo-module
+cat examples/logs/events.jsonl | jq 'select(.event_type == "fetch_completed")'
 ```
+
+See [examples/README.md](examples/README.md) for the full list and telemetry schema.
 
 ## Using as a Library
 
@@ -269,12 +259,11 @@ You can import `fetch_market_data` directly from the `ckvd` package. The necessa
 
 Refer to the source code of `ckvd.core.sync.ckvd_lib.fetch_market_data` and `ckvd.core.sync.crypto_kline_vision_data.CKVDConfig` for detailed parameter information and usage.
 
-## Crypto Kline Vision Data (CKVD) Demo
+## Examples and Demos
 
-### Quick Start
-
-- **[CKVD Demo CLI Documentation](examples/sync/)**: Interactive demonstration of the Failover Control Protocol mechanism, the core data retrieval strategy that ensures robust and efficient data collection from multiple sources.
-- **[CKVD Demo Module Documentation](examples/lib_module/)**: Programmatic interface to `src/ckvd/core/sync/ckvd_lib.py` functions, complementing the CLI tool by providing a library approach to implement the same data retrieval functionality in custom applications.
+- **[Examples](examples/)**: Runnable examples demonstrating FCP data retrieval, cache control, logging configuration, and feature engineering workflows
+- **[Synchronous patterns](examples/sync/)**: Timezone handling, gap detection, one-second intervals
+- **[Library integration](examples/lib_module/)**: Using `fetch_market_data()` and `CryptoKlineVisionData` as library APIs
 
 ### Understanding Data Sources
 

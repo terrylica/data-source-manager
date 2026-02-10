@@ -179,6 +179,102 @@ df = manager.get_data(
 manager.close()
 ```
 
+## Cache Toggle Issues
+
+### Cache Not Disabled by Environment Variable
+
+**Symptoms**: `CKVD_ENABLE_CACHE=false` set but cache still active.
+
+**Causes**:
+
+1. Env var set **after** importing CKVD
+2. Typo in variable name or value
+
+**Solutions**:
+
+```python
+# Set BEFORE importing CKVD
+import os
+os.environ["CKVD_ENABLE_CACHE"] = "false"
+
+from ckvd import CryptoKlineVisionData  # Now picks up env var
+
+# Accepted disable values (case-insensitive): "false", "0", "no"
+```
+
+### enforce_source=CACHE + use_cache=False Contradiction
+
+**Symptoms**: `RuntimeError: Cannot use enforce_source=DataSource.CACHE when use_cache=False`
+
+**Cause**: Requesting cache-only mode on a manager with cache disabled.
+
+**Solution**: Use a compatible combination:
+
+| `enforce_source` | `use_cache=False` | Result                       |
+| ---------------- | ----------------- | ---------------------------- |
+| `AUTO`           | Works             | Vision -> REST (skips cache) |
+| `VISION`         | Works             | Vision API only              |
+| `REST`           | Works             | REST API only                |
+| `CACHE`          | **RuntimeError**  | Logical contradiction        |
+
+### Cache Disabled Unexpectedly
+
+**Symptoms**: Data always fetched from API, no cache files created.
+
+**Diagnostic**:
+
+```python
+# Check if env var is set somewhere
+import os
+print(f"CKVD_ENABLE_CACHE = {os.environ.get('CKVD_ENABLE_CACHE', '(not set)')}")
+
+# Check manager state
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
+print(f"use_cache = {manager.use_cache}")
+manager.close()
+```
+
+See [Cache Control Guide](howto/ckvd_cache_control.md) for comprehensive usage.
+
+## Telemetry Issues
+
+### No events.jsonl File Created
+
+**Symptoms**: Running an example produces no `examples/logs/events.jsonl`.
+
+**Causes**:
+
+1. Example not using `_telemetry.py` (pre-telemetry example)
+2. File permission issue on `examples/logs/` directory
+
+**Solutions**:
+
+```bash
+# Verify telemetry output
+uv run -p 3.13 python examples/quick_start.py
+cat examples/logs/events.jsonl | jq . | head -5
+```
+
+### Telemetry Stops After CryptoKlineVisionData.create()
+
+**Symptoms**: Events stop appearing in `events.jsonl` after manager creation.
+
+**Cause**: CKVD's `loguru_setup.py` calls `logger.remove()` which destroys all sinks.
+
+**Solution**: This is handled automatically by `ResilientLogger` in `_telemetry.py`. Ensure you use `init_telemetry()` (not raw loguru) in examples. See [examples/CLAUDE.md](/examples/CLAUDE.md#resilientlogger) for details.
+
+### Correlating Events Across Runs
+
+Use `trace_id` to group events from a single run, and `span_id` to match fetch start/complete pairs:
+
+```bash
+# All events from one run
+cat examples/logs/events.jsonl | jq 'select(.trace_id == "YOUR_TRACE_ID")'
+
+# Match fetch spans
+cat examples/logs/events.jsonl | jq 'select(.span_id == "cb72ce8f")'
+```
+
 ## Getting Help
 
 1. Check [FCP Protocol Reference](skills/ckvd-usage/references/fcp-protocol.md)

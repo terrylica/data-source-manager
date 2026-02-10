@@ -222,3 +222,19 @@ run = "uv run -p 3.13 python examples/ckvd_logging_demo.py"
 [tasks."demo:lazy"]
 description = "Run lazy initialization demo"
 run = "uv run -p 3.13 python examples/ckvd_lazy_initialization_demo.py"
+
+[tasks."demo:cache"]
+description = "Run cache control example"
+run = "uv run -p 3.13 python examples/ckvd_cache_control_example.py"
+
+[tasks."demo:features"]
+description = "Run feature engineering example"
+run = "uv run -p 3.13 python examples/clean_feature_engineering_example.py"
+
+[tasks."demo:datetime"]
+description = "Run datetime handling example"
+run = "uv run -p 3.13 python examples/sync/ckvd_datetime_example.py"
+
+[tasks."demo:one-second"]
+description = "Run one-second interval test"
+run = "uv run -p 3.13 python examples/sync/ckvd_one_second_test.py"
