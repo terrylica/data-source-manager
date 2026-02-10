@@ -283,4 +283,4 @@ manager = CryptoKlineVisionData.create(
 - @docs/adr/2025-01-30-failover-control-protocol.md - FCP architecture
 - @docs/api/ - Detailed Binance API documentation
 - @docs/benchmarks/README.md - Performance benchmarks
-- @docs/howto/ckvd_cache_control.md - Cache control guide
+- @docs/TROUBLESHOOTING.md - Cache toggle and troubleshooting

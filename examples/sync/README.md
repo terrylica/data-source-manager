@@ -44,4 +44,4 @@ These examples demonstrate:
 
 - [Root examples/](../README.md) - All example categories
 - [Cache control](../ckvd_cache_control_example.py) - Cache toggle mechanisms
-- [docs/howto/](../../docs/howto/) - Step-by-step guides
+- [TROUBLESHOOTING.md](../../docs/TROUBLESHOOTING.md) - Common issues and solutions

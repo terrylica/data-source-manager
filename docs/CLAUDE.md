@@ -11,10 +11,7 @@ docs/
 ├── adr/                    ← Architecture Decision Records (MADR 4.0)
 ├── api/                    ← Binance API reference documentation
 ├── benchmarks/             ← Performance benchmarks (Polars vs Pandas, streaming)
-├── ckvd/                   ← CKVD class documentation
-├── data_client_interface/  ← Provider interface specifications
 ├── design/                 ← Implementation specifications (1:1 with ADRs)
-├── howto/                  ← Step-by-step guides (cache control, logging)
 ├── skills/                 ← Claude Code progressive disclosure skills
 ├── GLOSSARY.md             ← Domain terminology
 ├── INDEX.md                ← Navigation hub

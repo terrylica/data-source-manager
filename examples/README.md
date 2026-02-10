@@ -146,5 +146,4 @@ finally:
 
 - [CLAUDE.md](/CLAUDE.md) - Main project reference
 - [docs/skills/ckvd-usage/](/docs/skills/ckvd-usage/) - Usage skill with examples
-- [docs/howto/ckvd_cache_control.md](/docs/howto/ckvd_cache_control.md) - Cache control guide
-- [docs/TROUBLESHOOTING.md](/docs/TROUBLESHOOTING.md) - Common issues
+- [docs/TROUBLESHOOTING.md](/docs/TROUBLESHOOTING.md) - Common issues and cache control

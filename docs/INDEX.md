@@ -8,20 +8,10 @@ Navigation hub for Crypto Kline Vision Data documentation.
 
 ## Core Documentation
 
-| Directory                                        | Purpose                           |
-| ------------------------------------------------ | --------------------------------- |
-| [api/](api/)                                     | Binance API reference             |
-| [ckvd/](ckvd/)                                   | CKVD class documentation          |
-| [data_client_interface/](data_client_interface/) | Provider interface specifications |
-
----
-
-## How-To Guides
-
-| Guide                                             | Description                          |
-| ------------------------------------------------- | ------------------------------------ |
-| [howto/](howto/)                                  | Step-by-step guides for common tasks |
-| [Telemetry](/examples/README.md#telemetry-output) | NDJSON event schema and parsing      |
+| Directory                                | Purpose                             |
+| ---------------------------------------- | ----------------------------------- |
+| [api/](api/)                             | Binance API reference               |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Cache, logging, FCP troubleshooting |
 
 ---
 

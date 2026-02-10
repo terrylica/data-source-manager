@@ -234,7 +234,7 @@ print(f"use_cache = {manager.use_cache}")
 manager.close()
 ```
 
-See [Cache Control Guide](howto/ckvd_cache_control.md) for comprehensive usage.
+See the [README.md](/README.md#logging-control) for logging and cache environment variables.
 
 ## Telemetry Issues
 
