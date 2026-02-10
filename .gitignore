@@ -140,7 +140,6 @@ bun.lockb
 !.claude/settings.json
 !.claude/agents/
 !.claude/commands/
-!.claude/hooks/
 
 
 # Claude Code local settings (personal overrides, not committed)
@@ -154,6 +153,10 @@ CLAUDE.local.md
 .lycheecache
 .lychee-results.json
 .lychee-results.txt
+.link-check-results.md
+
+# Lint results (hook output)
+.lint-relative-paths-results.txt
 
 # Vale linting cache
 .vale-cache/

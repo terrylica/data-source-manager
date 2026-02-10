@@ -7,7 +7,7 @@ Human-readable documentation for CKVD Claude Code configuration.
 This project uses Claude Code extensions for AI-assisted development:
 
 - **5 Agents**: Specialized subagents for task delegation
-- **6 Commands**: Slash commands for common workflows
+- **2 Commands**: Slash commands for common workflows
 - **4 Skills**: Progressive disclosure documentation
 - **Domain context**: In nested CLAUDE.md spokes (see [src/CLAUDE.md](/src/CLAUDE.md))
 
@@ -25,16 +25,10 @@ This project uses Claude Code extensions for AI-assisted development:
 
 ### Commands
 
-| Command        | Side Effects | Description                  |
-| -------------- | ------------ | ---------------------------- |
-| /debug-fcp     | Yes          | Run FCP diagnostic scripts   |
-| /fetch-data    | Yes          | Fetch real market data       |
-| /quick-test    | Yes          | Run actual tests             |
-| /feature-dev   | No           | Guided feature development   |
-| /review-ckvd   | No           | Review code against patterns |
-| /validate-data | No           | Validate DataFrame structure |
-
-Commands with side effects have `disable-model-invocation: true`.
+| Command      | Side Effects | Description                  |
+| ------------ | ------------ | ---------------------------- |
+| /feature-dev | No           | Guided feature development   |
+| /review-ckvd | No           | Review code against patterns |
 
 ### Domain Context
 
@@ -49,63 +43,32 @@ Domain-specific rules (Binance API, exceptions, symbols, timestamps, caching, FC
 | ckvd-research    | fork    | Explore | (agent's tools)        | Codebase research (subagent)    |
 | ckvd-fcp-monitor | fork    | -       | Read, Bash, Grep, Glob | FCP monitoring and diagnostics  |
 
-## Hooks Configuration
+## Permissions
 
-Project hooks are in `.claude/hooks/hooks.json`:
+Configured in `settings.json`:
 
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      { "matcher": ".*", "hooks": [{ "command": "ckvd-skill-suggest.sh" }] }
-    ],
-    "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "command": "ckvd-bash-guard.sh" }] }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [{ "command": "ckvd-code-guard.sh" }]
-      }
-    ],
-    "Stop": [{ "hooks": [{ "command": "ckvd-final-check.sh" }] }]
-  }
-}
-```
+### Allow Rules
 
-### Skill Suggest (UserPromptSubmit)
+All standard tools are allowed: Bash, Edit, Write, Read, Grep, Glob, Task, WebFetch, WebSearch.
 
-The `ckvd-skill-suggest.sh` hook provides suggestions based on prompt keywords:
+### Deny Rules
 
-| Keyword             | Suggested Skill   |
-| ------------------- | ----------------- |
-| fetch, data, klines | /ckvd-usage       |
-| test, pytest, mock  | /ckvd-testing     |
-| FCP, cache miss     | /ckvd-fcp-monitor |
-| how does, explore   | /ckvd-research    |
-
-### Bash Guard (PreToolUse)
-
-The `ckvd-bash-guard.sh` blocks dangerous operations:
-
-| Blocked               | Reason                     |
-| --------------------- | -------------------------- |
-| Cache deletion        | Use `mise run cache:clear` |
-| Python version change | CKVD requires 3.13 ONLY    |
-| Force push to main    | Use feature branches       |
-| Direct pip install    | Use `uv add`               |
-
-### Code Guard (PostToolUse)
-
-The `ckvd-code-guard.sh` hook validates:
-
-| Check             | Pattern              | Severity |
-| ----------------- | -------------------- | -------- |
-| Bare except       | `except:`            | CRITICAL |
-| Generic Exception | `except Exception`   | HIGH     |
-| Silent pass       | `except: pass`       | CRITICAL |
-| Naive datetime    | `datetime.now()`     | HIGH     |
-| Missing timeout   | HTTP without timeout | HIGH     |
+| Rule                       | Reason                  |
+| -------------------------- | ----------------------- |
+| `Read(.env*)`              | Secret files            |
+| `Read(.mise.local.toml)`   | Secret files            |
+| `Read(**/*.key)`           | Key files               |
+| `Read(**/secrets/**)`      | Secret directories      |
+| `Read(**/*credential*)`    | Credential files        |
+| `Read(~/.ssh/id_*)`        | SSH keys                |
+| `Bash(rm -rf *)`           | Dangerous deletion      |
+| `Bash(sudo *)`             | Privilege escalation    |
+| `Bash(pip install *)`      | Use uv instead          |
+| `Bash(git push --force *)` | Use feature branches    |
+| `Bash(git reset --hard *)` | Dangerous git operation |
+| `Bash(python3.14 *)`       | Wrong Python version    |
+| `Bash(python3.12 *)`       | Wrong Python version    |
+| `Bash(python3.11 *)`       | Wrong Python version    |
 
 ## Verification
 
@@ -135,16 +98,9 @@ From [Anthropic best practices](https://platform.claude.com/docs/en/agents-and-t
 ### Structure
 
 - [x] CLAUDE.md under 300 lines (hub: 154, largest spoke: 286)
-- [x] Side-effect commands have `disable-model-invocation: true`
 - [x] Skills have `user-invocable: true` and `$ARGUMENTS`
 - [x] Agents have explicit `tools` field (prevents inheriting all tools)
 - [x] Domain-specific CLAUDE.md files (src/, docs/, examples/, tests/) for lazy loading
-- [x] 5 hooks: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop
-
-### Testing
-
-- [x] Unit tests pass (19/19)
-- [x] Infrastructure validation passes (23/23 checks)
 
 ## Related
 

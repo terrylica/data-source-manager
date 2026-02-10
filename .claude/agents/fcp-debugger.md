@@ -52,24 +52,25 @@ is_valid, suggestion = validate_symbol_for_market_type("BTCUSDT", MarketType.FUT
 **Diagnostics:**
 
 ```bash
-# Check cache exists
-ls -la ~/.cache/ckvd/
+# Check cache exists (macOS path via platformdirs)
+ls -la ~/Library/Caches/crypto-kline-vision-data/
 
 # Check structure
-tree ~/.cache/ckvd/binance/ -L 3
+tree ~/Library/Caches/crypto-kline-vision-data/data/ -L 4
 
-# Verify permissions
-ls -la ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/
+# Or use Python to find the path
+uv run -p 3.13 python -c "from ckvd.utils.app_paths import get_cache_dir; print(get_cache_dir())"
 ```
 
 **Expected path structure:**
 
 ```
-~/.cache/ckvd/
-└── binance/
-    ├── spot/klines/daily/{SYMBOL}/{INTERVAL}/{DATE}.arrow
-    ├── futures_usdt/klines/daily/{SYMBOL}/{INTERVAL}/{DATE}.arrow
-    └── futures_coin/klines/daily/{SYMBOL}/{INTERVAL}/{DATE}.arrow
+~/Library/Caches/crypto-kline-vision-data/
+└── data/
+    └── data/
+        ├── spot/daily/klines/{SYMBOL}/{INTERVAL}/{DATE}.arrow
+        ├── futures/um/daily/klines/{SYMBOL}/{INTERVAL}/{DATE}.arrow
+        └── futures/cm/daily/klines/{SYMBOL}/{INTERVAL}/{DATE}.arrow
 ```
 
 ### 3. Vision API Returns 403
@@ -140,35 +141,31 @@ from ckvd import CryptoKlineVisionData, DataProvider, MarketType
 For debugging, bypass FCP and force a specific source:
 
 ```python
-from ckvd.core.sync.crypto_kline_vision_data import DataSource
+from ckvd import CryptoKlineVisionData, DataProvider, MarketType, Interval
+from ckvd.core.sync.ckvd_types import DataSource
+from datetime import datetime, timedelta, timezone
 
-# Force Vision only (skip cache)
-manager = CryptoKlineVisionData.create(
-    DataProvider.BINANCE,
-    MarketType.FUTURES_USDT,
-    enforce_source=DataSource.VISION
-)
+manager = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.FUTURES_USDT)
+end = datetime.now(timezone.utc)
+start = end - timedelta(days=7)
+
+# Force Vision only (skip cache) — enforce_source is on get_data(), not create()
+df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, enforce_source=DataSource.VISION)
 
 # Force REST only
-manager = CryptoKlineVisionData.create(
-    DataProvider.BINANCE,
-    MarketType.SPOT,
-    enforce_source=DataSource.REST
-)
+df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, enforce_source=DataSource.REST)
 
 # Force cache only (offline mode)
-manager = CryptoKlineVisionData.create(
-    DataProvider.BINANCE,
-    MarketType.SPOT,
-    enforce_source=DataSource.CACHE
-)
+df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, enforce_source=DataSource.CACHE)
+
+manager.close()
 ```
 
 ## Key Files to Investigate
 
-| File                                                                   | Purpose           |
-| ---------------------------------------------------------------------- | ----------------- |
-| `src/ckvd/core/sync/crypto_kline_vision_data.py`             | FCP orchestration |
+| File                                                    | Purpose           |
+| ------------------------------------------------------- | ----------------- |
+| `src/ckvd/core/sync/crypto_kline_vision_data.py`        | FCP orchestration |
 | `src/ckvd/core/providers/binance/cache_manager.py`      | Cache read/write  |
 | `src/ckvd/core/providers/binance/vision_data_client.py` | Vision API        |
 | `src/ckvd/core/providers/binance/rest_data_client.py`   | REST API          |
@@ -180,13 +177,13 @@ manager = CryptoKlineVisionData.create(
 uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 
 # Check cache size
-du -sh ~/.cache/ckvd
+mise run cache:stats
 
 # Clear cache (nuclear option)
-rm -rf ~/.cache/ckvd
+mise run cache:clear
 
-# Run FCP debug command
-# /debug-fcp BTCUSDT
+# Run FCP diagnostic script
+uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h
 ```
 
 ## Output Format

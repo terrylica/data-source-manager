@@ -9,8 +9,7 @@ This directory contains Claude Code extensions for AI-assisted development of cr
 ├── settings.json    # Permission rules (team-shared)
 ├── settings.md      # Human-readable config documentation
 ├── agents/          # Specialized subagents
-├── commands/        # Slash commands
-└── hooks/           # Project-specific hooks
+└── commands/        # Slash commands
 ```
 
 ## Settings
@@ -57,44 +56,14 @@ Agents run in separate context windows for specialized tasks.
 
 Slash commands for common workflows.
 
-| Command        | Purpose                           |
-| -------------- | --------------------------------- |
-| /debug-fcp     | Debug FCP behavior for a symbol   |
-| /quick-test    | Run quick verification tests      |
-| /review-ckvd   | Review code against CKVD patterns |
-| /fetch-data    | Fetch market data with validation |
-| /validate-data | Validate DataFrame structure      |
-| /feature-dev   | Guided feature development        |
+| Command      | Purpose                           |
+| ------------ | --------------------------------- |
+| /review-ckvd | Review code against CKVD patterns |
+| /feature-dev | Guided feature development        |
 
 ## Domain Context
 
 Domain-specific rules (Binance API, exceptions, symbols, timestamps, caching, FCP) are in [src/CLAUDE.md](/src/CLAUDE.md) — loaded on demand when working with source code.
-
-## Hooks
-
-Project-specific hooks for code quality and safety (5 total).
-
-| Hook                  | Event            | Purpose                                    |
-| --------------------- | ---------------- | ------------------------------------------ |
-| ckvd-session-start.sh | SessionStart     | Load FCP context at session start          |
-| ckvd-skill-suggest.sh | UserPromptSubmit | Suggest relevant skills based on keywords  |
-| ckvd-bash-guard.sh    | PreToolUse       | Block dangerous commands before execution  |
-| ckvd-code-guard.sh    | PostToolUse      | Detect silent failure patterns (11 checks) |
-| ckvd-final-check.sh   | Stop             | Final validation at session end            |
-
-**Blocked by PreToolUse:**
-
-- Cache deletion (use `mise run cache:clear`)
-- Python version changes
-- Force push to main/master
-- Direct pip install (use uv)
-
-**Detected by PostToolUse:**
-
-- Bare except, except Exception, except: pass
-- Subprocess without check=True
-- Naive datetime, HTTP without timeout
-- CKVD-specific patterns (symbol format, DataFrame validation)
 
 ## Architecture Pattern
 
@@ -109,13 +78,9 @@ This infrastructure follows the **CKVD Claude Code Infrastructure Pattern**, whi
 ├── agents/                 # 5 specialized subagents
 │   ├── {name}.md           # YAML frontmatter + instructions
 │   └── ...
-├── commands/               # 6 slash commands
-│   ├── {name}.md           # YAML frontmatter + workflow
-│   └── ...
-└── hooks/                  # 5 lifecycle hooks
-    ├── hooks.json          # Configuration with descriptions
-    ├── {name}.sh           # Executable scripts
-    └── README.md           # Hook documentation
+└── commands/               # 2 slash commands
+    ├── {name}.md           # YAML frontmatter + workflow
+    └── ...
 ```
 
 Domain-specific context (Binance API, FCP, exceptions, symbols, timestamps, caching) lives in nested CLAUDE.md spokes — see [src/CLAUDE.md](/src/CLAUDE.md).
@@ -127,7 +92,6 @@ Domain-specific context (Binance API, FCP, exceptions, symbols, timestamps, cach
 | settings.json | Yes      | Team permission rules             |
 | agents/       | Optional | Specialized task delegation       |
 | commands/     | Optional | Repeatable workflows              |
-| hooks/        | Optional | Automation and guards             |
 | CLAUDE.md     | Yes      | Hub-and-spoke progressive context |
 
 ### Design Principles

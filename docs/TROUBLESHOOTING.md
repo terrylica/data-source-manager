@@ -280,4 +280,4 @@ cat examples/logs/events.jsonl | jq 'select(.span_id == "cb72ce8f")'
 1. Check [FCP Protocol Reference](skills/ckvd-usage/references/fcp-protocol.md)
 2. Review [Market Types](skills/ckvd-usage/references/market-types.md)
 3. Enable debug logging and check output
-4. Run `/debug-fcp SYMBOL` command in Claude Code
+4. Use the fcp-debugger agent or ckvd-fcp-monitor skill in Claude Code

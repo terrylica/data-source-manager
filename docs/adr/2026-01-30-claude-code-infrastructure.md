@@ -34,29 +34,17 @@ Chosen option: **Progressive Disclosure** with Claude Code infrastructure becaus
 
 ```
 .claude/
+├── settings.json     # Permission rules (team-shared)
+├── settings.md       # Human-readable config documentation
 ├── agents/           # Specialized subagents
 │   ├── api-reviewer.md
 │   ├── data-fetcher.md
 │   ├── fcp-debugger.md
 │   ├── silent-failure-hunter.md
 │   └── test-writer.md
-├── commands/         # Slash commands
-│   ├── debug-fcp.md
-│   ├── fetch-data.md
-│   ├── feature-dev.md
-│   ├── quick-test.md
-│   ├── review-ckvd.md
-│   └── validate-data.md
-├── hooks/            # Project-specific hooks
-│   └── ckvd-code-guard.sh
-└── rules/            # Context rules (loaded on demand)
-    ├── binance-api.md
-    ├── caching-patterns.md
-    ├── dataframe-operations.md
-    ├── error-handling.md
-    ├── fcp-protocol.md
-    ├── symbol-formats.md
-    └── timestamp-handling.md
+└── commands/         # Slash commands
+    ├── feature-dev.md
+    └── review-ckvd.md
 
 docs/skills/
 ├── ckvd-usage/        # CryptoKlineVisionData usage skill
@@ -130,11 +118,11 @@ user-invocable: true
 | Metric              | Value                                                                            |
 | ------------------- | -------------------------------------------------------------------------------- |
 | Agents              | 5 (api-reviewer, data-fetcher, fcp-debugger, silent-failure-hunter, test-writer) |
-| Commands            | 6 (debug-fcp, fetch-data, quick-test, review-ckvd, validate-data, feature-dev)   |
+| Commands            | 2 (review-ckvd, feature-dev)                                                     |
 | Skills              | 4 (ckvd-usage, ckvd-testing, ckvd-research, ckvd-fcp-monitor)                    |
-| Rules               | 7 (binance-api, caching, dataframe, error, fcp, symbols, timestamp)              |
-| Hooks               | 5 (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop)                |
-| CLAUDE.md hierarchy | 5 files (root, src/, tests/, docs/, examples/)                                   |
+| Rules               | Migrated to hub-and-spoke CLAUDE.md spokes (src/, tests/, docs/, etc.)           |
+| Hooks               | None (safety guards handled by global cc-skills itp-hooks)                       |
+| CLAUDE.md hierarchy | 7 files (root, src/, tests/, docs/, examples/, scripts/, playground/)            |
 
 **CKVD-specific patterns implemented**:
 
