@@ -4,6 +4,7 @@
 # Refactoring: Fix silent failure patterns (BLE001)
 """Client for Binance funding rate data."""
 
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -71,7 +72,11 @@ class BinanceFundingRateClient(DataClientInterface):
 
         # Set up cache if enabled
         self._use_cache = use_cache
-        if use_cache:
+        # Environment variable override: CKVD_ENABLE_CACHE=false disables cache
+        if self._use_cache and os.environ.get("CKVD_ENABLE_CACHE", "").lower() in ("false", "0", "no"):
+            self._use_cache = False
+            logger.info("[FundingRate] Cache disabled via CKVD_ENABLE_CACHE environment variable")
+        if self._use_cache:
             if cache_dir is None:
                 cache_dir = Path("./cache")
             self._cache_manager = UnifiedCacheManager(cache_dir=cache_dir)

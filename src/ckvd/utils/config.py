@@ -12,7 +12,7 @@ import os
 from datetime import timedelta, timezone
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 
 import attrs
 import pandas as pd
@@ -244,14 +244,12 @@ class FeatureFlags:
     Note: Internal Polars LazyFrame processing (PolarsDataPipeline) is always active.
     The USE_POLARS_PIPELINE flag was removed in v3.1.0.
 
+    Cache control is handled by CryptoKlineVisionData.__init__(use_cache=...) and
+    the CKVD_ENABLE_CACHE environment variable, not by FeatureFlags.
+
     Environment variables:
     - CKVD_USE_POLARS_OUTPUT=true/false
     """
-
-    ENABLE_CACHE: bool = attrs.field(default=True)
-    VALIDATE_CACHE_ON_READ: bool = attrs.field(default=True)
-    USE_VISION_FOR_LARGE_REQUESTS: bool = attrs.field(default=True)
-    VALIDATE_DATA_ON_WRITE: bool = attrs.field(default=True)
 
     # Zero-copy Polars output
     # When True AND return_polars=True, skips pandas conversion entirely
@@ -261,21 +259,6 @@ class FeatureFlags:
         default=True,
         converter=lambda x: _parse_bool_env("CKVD_USE_POLARS_OUTPUT", x),
     )
-
-    @classmethod
-    def update(cls, **kwargs: Any) -> None:
-        """Update feature flags.
-
-        Args:
-            **kwargs: Feature flags to update
-
-        Example:
-            FeatureFlags.update(ENABLE_CACHE=False)
-            FeatureFlags.update(USE_POLARS_OUTPUT=True)
-        """
-        for key, value in kwargs.items():
-            if hasattr(cls, key):
-                setattr(cls, key, value)
 
 
 # Feature flags for critical optimizations

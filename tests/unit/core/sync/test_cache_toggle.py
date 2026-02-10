@@ -338,7 +338,7 @@ class TestEnforceSourceInteraction:
         end = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
         # The ValueError is caught by FCP and re-raised as RuntimeError
-        with pytest.raises(RuntimeError, match="Cannot use enforce_source=DataSource.CACHE when use_cache=False"):
+        with pytest.raises(RuntimeError, match=r"Cannot use enforce_source=DataSource\.CACHE when use_cache=False"):
             mgr.get_data(
                 "BTCUSDT", start, end, Interval.HOUR_1,
                 enforce_source=DataSource.CACHE,
@@ -431,7 +431,7 @@ class TestFetchMarketDataPassthrough:
         mock_vision_step.return_value = (pd.DataFrame(), [(start, end)])
         mock_rest_step.return_value = df
 
-        result_df, elapsed, count = fetch_market_data(
+        result_df, elapsed, _count = fetch_market_data(
             provider=DataProvider.BINANCE,
             market_type=MarketType.SPOT,
             chart_type=ChartType.KLINES,
@@ -633,3 +633,299 @@ class TestEnvironmentVariableOverride:
             mgr = CryptoKlineVisionData.create(DataProvider.BINANCE, MarketType.SPOT)
             assert mgr.use_cache is True
             mgr.close()
+
+
+# ---------------------------------------------------------------------------
+# 11. BinanceFundingRateClient env var override (Gap 1 fix)
+# ---------------------------------------------------------------------------
+
+
+class TestFundingRateClientEnvVarOverride:
+    """BinanceFundingRateClient respects CKVD_ENABLE_CACHE env var."""
+
+    def test_env_var_false_disables_funding_rate_cache(self):
+        """CKVD_ENABLE_CACHE=false disables cache in BinanceFundingRateClient."""
+        from ckvd.core.providers.binance.binance_funding_rate_client import BinanceFundingRateClient
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "false"}):
+            client = BinanceFundingRateClient(
+                symbol="BTCUSDT",
+                market_type=MarketType.FUTURES_USDT,
+                use_cache=True,
+            )
+            assert client._use_cache is False
+            assert client._cache_manager is None
+
+    def test_env_var_zero_disables_funding_rate_cache(self):
+        """CKVD_ENABLE_CACHE=0 disables cache in BinanceFundingRateClient."""
+        from ckvd.core.providers.binance.binance_funding_rate_client import BinanceFundingRateClient
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "0"}):
+            client = BinanceFundingRateClient(
+                symbol="BTCUSDT",
+                market_type=MarketType.FUTURES_USDT,
+                use_cache=True,
+            )
+            assert client._use_cache is False
+
+    def test_env_var_no_disables_funding_rate_cache(self):
+        """CKVD_ENABLE_CACHE=no disables cache in BinanceFundingRateClient."""
+        from ckvd.core.providers.binance.binance_funding_rate_client import BinanceFundingRateClient
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "no"}):
+            client = BinanceFundingRateClient(
+                symbol="BTCUSDT",
+                market_type=MarketType.FUTURES_USDT,
+                use_cache=True,
+            )
+            assert client._use_cache is False
+
+    def test_env_var_not_set_preserves_default(self):
+        """Without CKVD_ENABLE_CACHE, use_cache=True is preserved."""
+        from ckvd.core.providers.binance.binance_funding_rate_client import BinanceFundingRateClient
+
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("CKVD_ENABLE_CACHE", None)
+            client = BinanceFundingRateClient(
+                symbol="BTCUSDT",
+                market_type=MarketType.FUTURES_USDT,
+                use_cache=True,
+            )
+            assert client._use_cache is True
+
+    def test_explicit_false_not_overridden_by_env(self):
+        """Explicit use_cache=False stays False regardless of env var value."""
+        from ckvd.core.providers.binance.binance_funding_rate_client import BinanceFundingRateClient
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "true"}):
+            client = BinanceFundingRateClient(
+                symbol="BTCUSDT",
+                market_type=MarketType.FUTURES_USDT,
+                use_cache=False,
+            )
+            assert client._use_cache is False
+
+
+# ---------------------------------------------------------------------------
+# 12. FeatureFlags dead code removal (Gap 2 fix)
+# ---------------------------------------------------------------------------
+
+
+class TestFeatureFlagsCleanup:
+    """FeatureFlags only contains USE_POLARS_OUTPUT (dead fields removed)."""
+
+    def test_enable_cache_removed(self):
+        """ENABLE_CACHE field no longer exists on FeatureFlags."""
+        from ckvd.utils.config import FeatureFlags
+
+        flags = FeatureFlags()
+        assert not hasattr(flags, "ENABLE_CACHE")
+
+    def test_validate_cache_on_read_removed(self):
+        """VALIDATE_CACHE_ON_READ field no longer exists."""
+        from ckvd.utils.config import FeatureFlags
+
+        flags = FeatureFlags()
+        assert not hasattr(flags, "VALIDATE_CACHE_ON_READ")
+
+    def test_use_vision_for_large_requests_removed(self):
+        """USE_VISION_FOR_LARGE_REQUESTS field no longer exists."""
+        from ckvd.utils.config import FeatureFlags
+
+        flags = FeatureFlags()
+        assert not hasattr(flags, "USE_VISION_FOR_LARGE_REQUESTS")
+
+    def test_validate_data_on_write_removed(self):
+        """VALIDATE_DATA_ON_WRITE field no longer exists."""
+        from ckvd.utils.config import FeatureFlags
+
+        flags = FeatureFlags()
+        assert not hasattr(flags, "VALIDATE_DATA_ON_WRITE")
+
+    def test_use_polars_output_still_exists(self):
+        """USE_POLARS_OUTPUT is the only remaining field and is functional."""
+        from ckvd.utils.config import FeatureFlags
+
+        flags = FeatureFlags()
+        assert hasattr(flags, "USE_POLARS_OUTPUT")
+        assert isinstance(flags.USE_POLARS_OUTPUT, bool)
+
+
+# ---------------------------------------------------------------------------
+# 13. CKVDConfig env var override (Gap 4 fix)
+# ---------------------------------------------------------------------------
+
+
+class TestCKVDConfigEnvVarOverride:
+    """CKVDConfig.use_cache respects CKVD_ENABLE_CACHE env var."""
+
+    def test_env_var_false_overrides_config(self):
+        """CKVD_ENABLE_CACHE=false overrides use_cache=True in CKVDConfig."""
+        from ckvd.core.sync.ckvd_types import CKVDConfig
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "false"}):
+            config = CKVDConfig.create(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.FUTURES_USDT,
+                use_cache=True,
+            )
+            assert config.use_cache is False
+
+    def test_env_var_zero_overrides_config(self):
+        """CKVD_ENABLE_CACHE=0 overrides use_cache=True in CKVDConfig."""
+        from ckvd.core.sync.ckvd_types import CKVDConfig
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "0"}):
+            config = CKVDConfig.create(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.SPOT,
+                use_cache=True,
+            )
+            assert config.use_cache is False
+
+    def test_env_var_no_overrides_config(self):
+        """CKVD_ENABLE_CACHE=no overrides use_cache=True in CKVDConfig."""
+        from ckvd.core.sync.ckvd_types import CKVDConfig
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "no"}):
+            config = CKVDConfig.create(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.SPOT,
+                use_cache=True,
+            )
+            assert config.use_cache is False
+
+    def test_explicit_false_preserved(self):
+        """Explicit use_cache=False stays False without env var."""
+        from ckvd.core.sync.ckvd_types import CKVDConfig
+
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("CKVD_ENABLE_CACHE", None)
+            config = CKVDConfig.create(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.SPOT,
+                use_cache=False,
+            )
+            assert config.use_cache is False
+
+    def test_env_var_not_set_preserves_default(self):
+        """Without CKVD_ENABLE_CACHE, use_cache defaults to True."""
+        from ckvd.core.sync.ckvd_types import CKVDConfig
+
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("CKVD_ENABLE_CACHE", None)
+            config = CKVDConfig.create(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.SPOT,
+            )
+            assert config.use_cache is True
+
+    def test_env_var_true_keeps_cache_on(self):
+        """CKVD_ENABLE_CACHE=true keeps cache enabled in CKVDConfig."""
+        from ckvd.core.sync.ckvd_types import CKVDConfig
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "true"}):
+            config = CKVDConfig.create(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.SPOT,
+                use_cache=True,
+            )
+            assert config.use_cache is True
+
+
+# ---------------------------------------------------------------------------
+# 14. fetch_market_data env var + enforce_source edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestFetchMarketDataEdgeCases:
+    """Edge cases for fetch_market_data() cache toggle behavior."""
+
+    @patch("ckvd.core.sync.crypto_kline_vision_data.process_rest_step")
+    @patch("ckvd.core.sync.crypto_kline_vision_data.process_vision_step")
+    @patch("ckvd.utils.validation.availability_data.is_symbol_available_at", return_value=(True, None))
+    def test_fetch_market_data_env_var_disables_cache(self, mock_avail, mock_vision_step, mock_rest_step):
+        """fetch_market_data() respects CKVD_ENABLE_CACHE=false env var."""
+        from ckvd import ChartType, fetch_market_data
+
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+
+        df = _make_ohlcv_df(start, 24)
+        df["_data_source"] = "REST"
+        mock_vision_step.return_value = (pd.DataFrame(), [(start, end)])
+        mock_rest_step.return_value = df
+
+        original_init = CryptoKlineVisionData.__init__
+        captured_use_cache = []
+
+        def spy_init(self_inner, *args, **kwargs):
+            captured_use_cache.append(kwargs.get("use_cache", True))
+            return original_init(self_inner, *args, **kwargs)
+
+        with patch.dict(os.environ, {"CKVD_ENABLE_CACHE": "false"}):
+            with patch.object(CryptoKlineVisionData, "__init__", spy_init):
+                fetch_market_data(
+                    provider=DataProvider.BINANCE,
+                    market_type=MarketType.SPOT,
+                    chart_type=ChartType.KLINES,
+                    symbol="BTCUSDT",
+                    interval=Interval.HOUR_1,
+                    start_time=start,
+                    end_time=end,
+                )
+
+        # The env var causes CryptoKlineVisionData.__init__ to override use_cache
+        assert len(captured_use_cache) == 1
+
+    @patch("ckvd.core.sync.crypto_kline_vision_data.process_rest_step")
+    @patch("ckvd.core.sync.crypto_kline_vision_data.process_vision_step")
+    @patch("ckvd.utils.validation.availability_data.is_symbol_available_at", return_value=(True, None))
+    def test_fetch_market_data_enforce_source_rest_with_cache_off(
+        self, mock_avail, mock_vision_step, mock_rest_step
+    ):
+        """fetch_market_data(use_cache=False, enforce_source='REST') works."""
+        from ckvd import ChartType, fetch_market_data
+
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+
+        df = _make_ohlcv_df(start, 24)
+        df["_data_source"] = "REST"
+        mock_vision_step.return_value = (pd.DataFrame(), [(start, end)])
+        mock_rest_step.return_value = df
+
+        result_df, elapsed, _count = fetch_market_data(
+            provider=DataProvider.BINANCE,
+            market_type=MarketType.SPOT,
+            chart_type=ChartType.KLINES,
+            symbol="BTCUSDT",
+            interval=Interval.HOUR_1,
+            start_time=start,
+            end_time=end,
+            use_cache=False,
+            enforce_source="REST",
+        )
+
+        assert result_df is not None
+        assert elapsed >= 0
+
+    def test_fetch_market_data_enforce_cache_with_cache_off_raises(self):
+        """fetch_market_data(use_cache=False, enforce_source='CACHE') raises RuntimeError."""
+        from ckvd import ChartType, fetch_market_data
+
+        start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        end = datetime(2024, 1, 2, tzinfo=timezone.utc)
+
+        with pytest.raises(RuntimeError, match=r"Cannot use enforce_source=DataSource\.CACHE"):
+            fetch_market_data(
+                provider=DataProvider.BINANCE,
+                market_type=MarketType.SPOT,
+                chart_type=ChartType.KLINES,
+                symbol="BTCUSDT",
+                interval=Interval.HOUR_1,
+                start_time=start,
+                end_time=end,
+                use_cache=False,
+                enforce_source="CACHE",
+            )

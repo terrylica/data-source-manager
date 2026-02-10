@@ -10,6 +10,7 @@ CryptoKlineVisionData, extracted for better modularity.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from enum import Enum, auto
 from pathlib import Path
@@ -124,6 +125,11 @@ class CKVDConfig:
         converter=lambda p: Path(p) if p is not None and not isinstance(p, Path) else p,  # type: ignore[arg-type]
     )
     use_cache: bool = attr.field(default=True, validator=attr.validators.instance_of(bool))
+
+    def __attrs_post_init__(self) -> None:
+        """Apply CKVD_ENABLE_CACHE env var override after initialization."""
+        if self.use_cache and os.environ.get("CKVD_ENABLE_CACHE", "").lower() in ("false", "0", "no"):
+            object.__setattr__(self, "use_cache", False)
     retry_count: int = attr.field(default=5, validator=[attr.validators.instance_of(int), lambda _, __, value: value >= 0])
 
     # New logging control parameters
