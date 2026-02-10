@@ -2,9 +2,10 @@
 
 Quick reference guides for common tasks in the codebase.
 
-## Cache Control
+## Guides
 
-- [Cache Control Guide](ckvd_cache_control.md) - Enable/disable caching, environment variable control
+- [Cache Control](ckvd_cache_control.md) - Enable/disable caching, environment variable control
+- [Logging Control](ckvd_logging_control.md) - Log level configuration, CKVD_LOG_LEVEL env var
 
 ## Testing
 

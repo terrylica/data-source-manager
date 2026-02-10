@@ -8,51 +8,20 @@ Navigation hub for Crypto Kline Vision Data documentation.
 
 ## Core Documentation
 
-| Directory                                        | Purpose                                  |
-| ------------------------------------------------ | ---------------------------------------- |
-| [api/](api/)                                     | API reference and endpoint documentation |
-| [core_architecture/](core_architecture/)         | System architecture and design           |
-| [ckvd/](ckvd/)                                   | CKVD class documentation                 |
-| [data_client_interface/](data_client_interface/) | Provider interface specifications        |
+| Directory                                        | Purpose                           |
+| ------------------------------------------------ | --------------------------------- |
+| [api/](api/)                                     | Binance API reference             |
+| [ckvd/](ckvd/)                                   | CKVD class documentation          |
+| [data_client_interface/](data_client_interface/) | Provider interface specifications |
 
 ---
 
 ## How-To Guides
 
-| Guide                                             | Description                              |
-| ------------------------------------------------- | ---------------------------------------- |
-| [howto/](howto/)                                  | Step-by-step guides for common tasks     |
-| [debugging/](debugging/)                          | Debugging techniques and troubleshooting |
-| [Telemetry](/examples/README.md#telemetry-output) | NDJSON event schema and parsing          |
-
----
-
-## Technical References
-
-| Document                                                                         | Description                                     |
-| -------------------------------------------------------------------------------- | ----------------------------------------------- |
-| [python_package_principles_guide.md](python_package_principles_guide.md)         | Python packaging standards used in this project |
-| [python_package_principles_checklist.md](python_package_principles_checklist.md) | Checklist for package compliance                |
-| [httpx_migration_guide.md](httpx_migration_guide.md)                             | Migration from requests to httpx                |
-| [http_client_benchmark_summary.md](http_client_benchmark_summary.md)             | HTTP client performance comparison              |
-
----
-
-## Utilities & Internals
-
-| Directory                                | Purpose                        |
-| ---------------------------------------- | ------------------------------ |
-| [utils/](utils/)                         | Utility module documentation   |
-| [cache_diagnostics/](cache_diagnostics/) | Cache debugging and validation |
-| [optimizations/](optimizations/)         | Performance optimization notes |
-
----
-
-## Project Planning
-
-| Directory            | Purpose                      |
-| -------------------- | ---------------------------- |
-| [roadmap/](roadmap/) | Feature roadmap and planning |
+| Guide                                             | Description                          |
+| ------------------------------------------------- | ------------------------------------ |
+| [howto/](howto/)                                  | Step-by-step guides for common tasks |
+| [Telemetry](/examples/README.md#telemetry-output) | NDJSON event schema and parsing      |
 
 ---
 

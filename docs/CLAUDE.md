@@ -9,27 +9,20 @@ Context for working with crypto-kline-vision-data documentation.
 ```
 docs/
 ├── adr/                    ← Architecture Decision Records (MADR 4.0)
-├── api/                    ← API reference documentation
+├── api/                    ← Binance API reference documentation
 ├── benchmarks/             ← Performance benchmarks (Polars vs Pandas, streaming)
-├── cache_diagnostics/      ← Cache debugging and validation
-├── core_architecture/      ← System architecture and design
-├── data_client_interface/  ← Provider interface specifications
 ├── ckvd/                   ← CKVD class documentation
-├── debugging/              ← Debugging techniques
+├── data_client_interface/  ← Provider interface specifications
 ├── design/                 ← Implementation specifications (1:1 with ADRs)
-├── howto/                  ← Step-by-step guides (cache control, AWS CLI, git operations)
-├── optimizations/          ← Performance optimization notes
-├── roadmap/                ← Feature roadmap and planning
+├── howto/                  ← Step-by-step guides (cache control, logging)
 ├── skills/                 ← Claude Code progressive disclosure skills
-├── utils/                  ← Utility module documentation (time_utils)
-├── research/               ← Research notes (git-ignored)
 ├── GLOSSARY.md             ← Domain terminology
 ├── INDEX.md                ← Navigation hub
 ├── RESUME.md               ← Session resume context
 └── TROUBLESHOOTING.md      ← Common issues and solutions
 ```
 
-**Local-only directories** (git-ignored): `complaints_to_binance/`, `journals/`, `sr&ed/`, `research/`
+**Local-only directories** (git-ignored): `complaints_to_binance/`, `journals/`, `sr&ed/`
 
 ## ADR Conventions
 
