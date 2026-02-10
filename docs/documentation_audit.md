@@ -20,19 +20,15 @@ This file tracks the progress of implementing Python package principles in the C
 - [x] `src/ckvd/utils/market_constraints.py` - Enhanced with comprehensive module, class, function and parameter documentation
 - [x] `src/ckvd/utils/time_utils.py` - Enhanced with comprehensive module and function documentation, including examples
 
-### CLI Tools
-
-- [x] `examples/sync/ckvd_demo_cli.py` - Enhanced CLI documentation with examples and better docstrings
-
 ### Example Modules
 
-- [x] `examples/lib_module/ckvd_demo_module.py` - Enhanced with comprehensive module and function documentation, including examples
+- [x] `examples/quick_start.py` - Basic CKVD usage with telemetry
+- [x] `examples/clean_feature_engineering_example.py` - Feature engineering patterns
 
 ## Modules to Complete
 
 ### Utility Modules
 
-- [ ] `src/ckvd/utils/logger_setup.py` - Logging setup needs better documentation
 - [ ] `src/ckvd/utils/app_paths.py` - Application paths need better documentation
 
 ## Implementation Notes

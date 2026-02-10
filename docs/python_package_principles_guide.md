@@ -17,8 +17,8 @@ Start by prioritizing modules for documentation enhancement:
    - `src/ckvd/utils/dataframe_types.py` (defines data types)
 
 3. **Example Modules**: Modules that demonstrate usage
-   - `examples/sync/ckvd_demo_cli.py`
-   - `examples/lib_module/ckvd_demo_module.py`
+   - `examples/quick_start.py`
+   - `examples/clean_feature_engineering_example.py`
 
 ### 2. Update Package-Level Documentation
 
@@ -299,9 +299,9 @@ def main(
 
     Example usage:
 
-        ckvd-demo-cli -s BTCUSDT -i 1m -d 10
+        uv run -p 3.13 python examples/quick_start.py
 
-        ckvd-demo-cli --symbol ETHUSDT --interval 1h --days 5 --no-cache
+        mise run demo:quickstart
     """
     # Command implementation...
 ```

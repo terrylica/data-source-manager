@@ -1,6 +1,6 @@
 # How to setup ruff: https://docs.astral.sh/ruff/settings/
 line-length = 140 # The maximum line length for code and comments
-target-version = "py310" # The target Python version for linting and formatting
+target-version = "py313" # The target Python version for linting and formatting
 preview = false # Whether to enable preview features (e.g. ruff-lsp)
 respect-gitignore = true # Whether to respect .gitignore when linting and formatting
 
@@ -42,6 +42,7 @@ ignore = [ # https://docs.astral.sh/ruff/rules/ for quick reference of rule code
     "PLR0912",   # Too many branches https://docs.astral.sh/ruff/rules/too-many-branches/
     "PLR0915",   # Too many statements https://docs.astral.sh/ruff/rules/too-many-statements/
     "PLW2901",   # Outer loop variable overwritten https://docs.astral.sh/ruff/rules/redefined-loop-name/
+    "PLW0603",   # Using the global statement is discouraged https://docs.astral.sh/ruff/rules/global-statement/
 ]
 
 # Allow autofix for all enabled rules
