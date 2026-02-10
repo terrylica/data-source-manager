@@ -83,14 +83,10 @@ Specialized subagents that Claude can delegate to:
 
 Slash commands for common workflows:
 
-| Command        | Purpose                           |
-| -------------- | --------------------------------- |
-| /debug-fcp     | Debug FCP behavior for a symbol   |
-| /quick-test    | Run quick verification tests      |
-| /review-ckvd   | Review code against CKVD patterns |
-| /fetch-data    | Fetch market data with validation |
-| /validate-data | Validate DataFrame structure      |
-| /feature-dev   | Guided feature development        |
+| Command      | Purpose                           |
+| ------------ | --------------------------------- |
+| /review-ckvd | Review code against CKVD patterns |
+| /feature-dev | Guided feature development        |
 
 ### Domain Context (migrated to hub-and-spoke)
 

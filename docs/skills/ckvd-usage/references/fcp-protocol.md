@@ -84,23 +84,27 @@ manager.close()
 
 ## Cache Structure
 
+Location: `~/Library/Caches/crypto-kline-vision-data/` (macOS, via platformdirs)
+
 ```
-~/.cache/ckvd/
-└── binance/
-    ├── spot/
-    │   └── klines/
-    │       └── daily/
-    │           └── BTCUSDT/
-    │               └── 1h/
-    │                   ├── 2024-01-01.arrow
-    │                   ├── 2024-01-02.arrow
-    │                   └── ...
-    └── futures_usdt/
-        └── klines/
-            └── daily/
-                └── BTCUSDT/
-                    └── 1h/
-                        └── ...
+~/Library/Caches/crypto-kline-vision-data/
+└── data/
+    └── data/
+        ├── spot/
+        │   └── daily/
+        │       └── klines/
+        │           └── BTCUSDT/
+        │               └── 1h/
+        │                   ├── BTCUSDT-1h-2024-01-01.arrow
+        │                   ├── BTCUSDT-1h-2024-01-02.arrow
+        │                   └── ...
+        └── futures/
+            └── um/
+                └── daily/
+                    └── klines/
+                        └── BTCUSDT/
+                            └── 1h/
+                                └── ...
 ```
 
 ## Performance Characteristics

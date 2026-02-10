@@ -171,17 +171,38 @@ run = "./scripts/publish-to-pypi.sh"
 [tasks."cache:clear"]
 description = "Clear local CKVD cache"
 run = """
-echo "Clearing CKVD cache..."
-rm -rf ~/.cache/ckvd
-echo "Cache cleared: ~/.cache/ckvd"
+uv run -p 3.13 python -c "
+from ckvd.utils.app_paths import get_cache_dir
+import shutil
+p = get_cache_dir()
+shutil.rmtree(p, ignore_errors=True)
+print(f'Cache cleared: {p}')
+"
 """
 
 [tasks."cache:stats"]
 description = "Show cache statistics"
 run = """
-echo "CKVD Cache Statistics:"
-du -sh ~/.cache/ckvd 2>/dev/null || echo "No cache found"
-find ~/.cache/ckvd -name "*.arrow" 2>/dev/null | wc -l | xargs echo "Arrow files:"
+uv run -p 3.13 python -c "
+from ckvd.utils.app_paths import get_cache_dir
+from pathlib import Path
+p = get_cache_dir()
+print('CKVD Cache Statistics:')
+print(f'  Location: {p}')
+if not p.exists():
+    print('  No cache found')
+else:
+    total = sum(f.stat().st_size for f in p.rglob('*') if f.is_file())
+    arrows = list(p.rglob('*.arrow'))
+    units = ['B', 'KB', 'MB', 'GB']
+    size = float(total)
+    for u in units:
+        if size < 1024:
+            print(f'  Size: {size:.1f} {u}')
+            break
+        size /= 1024
+    print(f'  Arrow files: {len(arrows)}')
+"
 """
 
 # -----------------------------------------------------------------------------

@@ -4,6 +4,20 @@ Reverse-chronological log of skill improvements.
 
 ---
 
+## 2026-02-10: Add scaffolding, fix cache paths, remove missing scripts
+
+**Trigger**: Alignment audit against skill-architecture standards
+
+**Changes**:
+
+- Added TodoWrite Task Templates section (3 templates)
+- Added Post-Change Checklist section
+- Fixed cache diagnostic paths (was `~/.cache/ckvd`, now platformdirs path)
+- Fixed cache_health.py to use platformdirs instead of hardcoded path
+- Removed fcp_stats.py and warm_cache.py references (scripts never existed)
+
+---
+
 ## 2026-01-30: Added adr field and evolution-log
 
 **Trigger**: Adopting cc-skills patterns for skill self-evolution

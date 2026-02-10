@@ -9,7 +9,7 @@ Common issues and solutions for Crypto Kline Vision Data.
 uv run -p 3.13 python -c "from ckvd import CryptoKlineVisionData; print('OK')"
 
 # Check cache status
-du -sh ~/.cache/ckvd
+mise run cache:stats
 
 # Enable debug logging
 CKVD_LOG_LEVEL=DEBUG uv run -p 3.13 python your_script.py
@@ -114,8 +114,8 @@ uv sync --dev
 # Clear cache
 mise run cache:clear
 
-# Or manually
-rm -rf ~/.cache/ckvd
+# Or manually (macOS path via platformdirs)
+rm -rf ~/Library/Caches/crypto-kline-vision-data
 ```
 
 ## Debug Mode

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ADR: docs/adr/2026-01-30-claude-code-infrastructure.md
 """Check cache directory health and statistics.
 
 Usage:
@@ -10,10 +11,12 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
+import platformdirs
+
 
 def get_cache_base() -> Path:
-    """Get the cache base directory."""
-    return Path.home() / ".cache" / "ckvd"
+    """Get the cache base directory using platformdirs (matches CKVD runtime)."""
+    return Path(platformdirs.user_cache_path("crypto-kline-vision-data", "eon-labs"))
 
 
 def format_size(size_bytes: int) -> str:

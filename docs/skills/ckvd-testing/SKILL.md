@@ -135,6 +135,52 @@ Quick test runner:
 ./docs/skills/ckvd-testing/scripts/run_quick_tests.sh test_timestamp
 ```
 
+## TodoWrite Task Templates
+
+### Template A: Run Quick Test
+
+```
+1. Run ruff lint check (uv run -p 3.13 ruff check --fix .)
+2. Run unit tests (uv run -p 3.13 pytest tests/unit/ -v)
+3. Verify package import works
+4. Report pass/fail summary
+```
+
+### Template B: Add Unit Test for Feature
+
+```
+1. Identify module and function under test
+2. Read existing test patterns in tests/unit/ for the module
+3. Write test class following Arrange/Act/Assert pattern
+4. Mock external services (FSSpecVisionHandler, UnifiedCacheManager)
+5. Add appropriate markers (@pytest.mark.integration if needed)
+6. Run new tests and verify they pass
+7. Check coverage for new code
+```
+
+### Template C: Check Coverage
+
+```
+1. Run unit tests with coverage (uv run -p 3.13 pytest tests/unit/ --cov=src/ckvd --cov-report=term-missing)
+2. Identify modules below target coverage
+3. Write tests for uncovered paths
+4. Re-run coverage to verify improvement
+```
+
+---
+
+## Post-Change Checklist
+
+After modifying this skill:
+
+- [ ] Test commands use `uv run -p 3.13` and correct paths
+- [ ] Test organization diagram matches actual directory structure
+- [ ] Mocking examples match actual import paths
+- [ ] @-links to references/ and examples/ resolve
+- [ ] Append changes to [evolution-log.md](./references/evolution-log.md)
+
+---
+
 ## Detailed References
 
 For deeper information, see:
@@ -143,3 +189,4 @@ For deeper information, see:
 - @references/coverage.md - Coverage configuration and thresholds
 - @references/mocking-patterns.md - CKVD-specific mocking patterns
 - @references/markers.md - Pytest markers and test categorization
+- @references/evolution-log.md - Skill change history

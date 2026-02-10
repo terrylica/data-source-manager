@@ -69,8 +69,11 @@ print(f"Now: {datetime.now(timezone.utc)}")
 **Diagnostic steps**:
 
 ```bash
-# Check cache directory
-ls -la ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/1h/
+# Check cache directory (macOS path via platformdirs)
+ls -la ~/Library/Caches/crypto-kline-vision-data/data/data/futures/um/daily/klines/BTCUSDT/1h/
+
+# Or use the cache health script
+uv run -p 3.13 python docs/skills/ckvd-fcp-monitor/scripts/cache_health.py --verbose
 
 # Run FCP diagnostic
 uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h

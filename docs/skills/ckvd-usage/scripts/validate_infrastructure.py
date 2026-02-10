@@ -6,7 +6,6 @@ Verifies that all Claude Code extensions are properly configured:
 - Agents have required frontmatter
 - Commands have appropriate settings
 - Skills have $ARGUMENTS placeholder
-- Rules exist and are linked
 """
 
 from pathlib import Path
@@ -68,7 +67,7 @@ def validate_commands(claude_dir: Path) -> tuple[int, int, list[str]]:
     passed = 0
 
     # Commands with side effects that need disable-model-invocation
-    side_effect_commands = {"quick-test.md", "fetch-data.md", "debug-fcp.md"}
+    side_effect_commands: set[str] = set()
 
     for cmd_file in commands_dir.glob("*.md"):
         total += 1
@@ -122,57 +121,6 @@ def validate_skills(docs_dir: Path) -> tuple[int, int, list[str]]:
             passed += 1
         else:
             issues.extend(file_issues)
-
-    return passed, total, issues
-
-
-def validate_rules(claude_dir: Path) -> tuple[int, int, list[str]]:
-    """Validate rules exist and have proper frontmatter."""
-    rules_dir = claude_dir / "rules"
-    if not rules_dir.exists():
-        return 0, 0, ["rules/ directory not found"]
-
-    expected_rules = [
-        "binance-api.md",
-        "caching-patterns.md",
-        "dataframe-operations.md",
-        "error-handling.md",
-        "fcp-protocol.md",
-        "symbol-formats.md",
-        "timestamp-handling.md",
-    ]
-
-    # Rules that should have ADR references (FCP-related)
-    rules_with_adr = {
-        "binance-api.md",
-        "caching-patterns.md",
-        "fcp-protocol.md",
-        "symbol-formats.md",
-    }
-
-    issues = []
-    passed = 0
-    total = len(expected_rules)
-
-    for rule in expected_rules:
-        rule_path = rules_dir / rule
-        if rule_path.exists():
-            # Check for paths: field
-            ok, file_issues = check_file_has_frontmatter(rule_path, ["paths"])
-            if not ok:
-                issues.extend(file_issues)
-                continue
-
-            # Check for adr: field in FCP-related rules
-            if rule in rules_with_adr:
-                content = rule_path.read_text()
-                if "adr:" not in content:
-                    issues.append(f"{rule} missing adr: field")
-                    continue
-
-            passed += 1
-        else:
-            issues.append(f"Missing rule: {rule}")
 
     return passed, total, issues
 
@@ -261,16 +209,6 @@ def main() -> int:
     else:
         all_issues.extend(issues)
         print(f"✗ Skills: {passed}/{total} valid")
-
-    # Validate rules
-    passed, total, issues = validate_rules(claude_dir)
-    total_passed += passed
-    total_checks += total
-    if passed == total:
-        print(f"✓ Rules: {passed}/{total} valid")
-    else:
-        all_issues.extend(issues)
-        print(f"✗ Rules: {passed}/{total} valid")
 
     print()
     print("-" * 60)

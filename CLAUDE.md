@@ -135,7 +135,7 @@ SRED-Claim: CKVD
 
 ### Commands (`.claude/commands/`)
 
-`/debug-fcp` | `/quick-test` | `/review-ckvd` | `/fetch-data` | `/validate-data` | `/feature-dev`
+`/review-ckvd` | `/feature-dev`
 
 ---
 

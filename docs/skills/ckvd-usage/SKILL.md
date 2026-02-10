@@ -88,6 +88,53 @@ uv run -p 3.13 python docs/skills/ckvd-usage/scripts/check_cache.py BTCUSDT futu
 uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT futures_usdt 1h --days 3
 ```
 
+## TodoWrite Task Templates
+
+### Template A: Fetch Data for Symbol
+
+```
+1. Determine market type from symbol format (BTCUSDT vs BTCUSD_PERP)
+2. Create CryptoKlineVisionData manager with correct MarketType
+3. Define UTC time range with datetime.now(timezone.utc)
+4. Call get_data() with symbol, interval, and time range
+5. Validate returned DataFrame (not empty, monotonic index)
+6. Close manager when done
+```
+
+### Template B: Debug Empty Results
+
+```
+1. Validate symbol format for market type (validate_symbol_for_market_type)
+2. Verify time range is in the past and UTC-aware
+3. Enable debug logging (CKVD_LOG_LEVEL=DEBUG)
+4. Test each FCP source individually with enforce_source
+5. Check cache directory exists and has data
+6. Document root cause and resolution
+```
+
+### Template C: Switch Market Type
+
+```
+1. Identify current market type and symbol format
+2. Map symbol to new market type format (e.g., BTCUSDT -> BTCUSD_PERP)
+3. Create new manager with target MarketType
+4. Verify data fetches correctly for new market type
+5. Update any dependent code with new symbol format
+```
+
+---
+
+## Post-Change Checklist
+
+After modifying this skill:
+
+- [ ] Quick Start code example still matches actual API
+- [ ] Helper script commands are correct and scripts exist
+- [ ] @-links to references/ and examples/ resolve
+- [ ] Append changes to [evolution-log.md](./references/evolution-log.md)
+
+---
+
 ## Detailed References
 
 For deeper information, see:
@@ -96,3 +143,4 @@ For deeper information, see:
 - @references/intervals.md - Complete interval reference
 - @references/fcp-protocol.md - FCP architecture and debugging
 - @references/debugging.md - Debugging techniques and troubleshooting
+- @references/evolution-log.md - Skill change history

@@ -20,9 +20,6 @@ uv run -p 3.13 python docs/skills/ckvd-usage/scripts/diagnose_fcp.py BTCUSDT fut
 
 # Check cache health
 uv run -p 3.13 python docs/skills/ckvd-fcp-monitor/scripts/cache_health.py
-
-# Monitor FCP source distribution
-uv run -p 3.13 python docs/skills/ckvd-fcp-monitor/scripts/fcp_stats.py --symbol BTCUSDT
 ```
 
 ## FCP Decision Flow
@@ -60,11 +57,11 @@ Raise DataSourceError
 **Diagnostics**:
 
 ```bash
-# Check cache directory exists and has data
-ls -la ~/.cache/ckvd/binance/futures_usdt/klines/daily/BTCUSDT/1h/
+# Check cache directory exists and has data (macOS path via platformdirs)
+ls -la ~/Library/Caches/crypto-kline-vision-data/data/binance/futures_usdt/daily/klines/BTCUSDT/1h/
 
-# Verify cache permissions
-stat ~/.cache/ckvd/
+# Or use the cache_health.py script for a full report
+uv run -p 3.13 python docs/skills/ckvd-fcp-monitor/scripts/cache_health.py --verbose
 ```
 
 **Solutions**:
@@ -140,11 +137,57 @@ with ThreadPoolExecutor(max_workers=3) as executor:
 
 ## Scripts
 
-| Script            | Purpose                         |
-| ----------------- | ------------------------------- |
-| `cache_health.py` | Check cache directory health    |
-| `fcp_stats.py`    | Monitor FCP source distribution |
-| `warm_cache.py`   | Pre-populate cache for symbols  |
+| Script            | Purpose                      |
+| ----------------- | ---------------------------- |
+| `cache_health.py` | Check cache directory health |
+
+---
+
+## TodoWrite Task Templates
+
+### Template A: Diagnose Slow Fetches
+
+```
+1. Enable debug logging (CKVD_LOG_LEVEL=DEBUG)
+2. Run fetch and check which FCP sources are hit
+3. Verify cache is populated (run cache_health.py)
+4. Check if Vision API is being skipped (data too recent)
+5. Check REST rate limit headers in debug output
+6. Document data source breakdown and latency
+```
+
+### Template B: Check Cache Health
+
+```
+1. Run cache_health.py with --verbose flag
+2. Verify cache directory exists and is writable
+3. Check for expected symbols and intervals
+4. Verify Arrow file sizes are reasonable (not zero-byte)
+5. Report cache coverage vs requested date ranges
+```
+
+### Template C: Debug Vision 403
+
+```
+1. Confirm data is older than 48h (Vision API delay)
+2. Check symbol exists on Binance Vision (S3)
+3. Enable debug logging and test Vision source directly
+4. Verify FCP falls back to REST correctly
+5. Document whether 403 is expected or anomalous
+```
+
+---
+
+## Post-Change Checklist
+
+After modifying this skill:
+
+- [ ] Script commands reference existing scripts
+- [ ] Cache paths match platformdirs output
+- [ ] FCP Decision Flow diagram matches actual implementation
+- [ ] Append changes to [evolution-log.md](./references/evolution-log.md)
+
+---
 
 ## Related
 
