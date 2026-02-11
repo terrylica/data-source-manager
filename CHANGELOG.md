@@ -1,3 +1,10 @@
+## [4.3.1](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.3.0...v4.3.1) (2026-02-11)
+
+
+### Performance Improvements
+
+* use Polars pipeline directly for return_polars=True output ([7de8ba8](https://github.com/terrylica/crypto-kline-vision-data/commit/7de8ba829e8d2df0b8f880fda16b79974dbeeafc))
+
 # [4.3.0](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.2.1...v4.3.0) (2026-02-11)
 
 
