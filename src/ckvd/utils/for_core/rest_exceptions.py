@@ -6,21 +6,36 @@
 This module defines specialized exceptions to provide more precise error handling
 for REST API requests. By using custom exceptions, calling code can catch specific
 error types and handle them appropriately.
+
+All exceptions carry a `.details` dict (default `{}`) for machine-parseable error
+context, enabling AI agents and downstream consumers to programmatically handle errors.
+GitHub Issue #23.
 """
+
+from __future__ import annotations
+
+from typing import Any
 
 from ckvd.utils.loguru_setup import logger
 
 
 class RestAPIError(Exception):
-    """Base exception for all REST API related errors."""
+    """Base exception for all REST API related errors.
 
-    def __init__(self, message="REST API error occurred") -> None:
+    Attributes:
+        message: Human-readable error message.
+        details: Machine-parseable error context (dict, default ``{}``).
+    """
+
+    def __init__(self, message="REST API error occurred", *, details: dict[str, Any] | None = None) -> None:
         """Initialize RestAPIError with an error message.
 
         Args:
             message: Error description.
+            details: Machine-parseable context (symbol, interval, source, etc.).
         """
         self.message = message
+        self.details = details or {}
         super().__init__(self.message)
         logger.error(f"RestAPIError: {message}")
 
@@ -28,79 +43,85 @@ class RestAPIError(Exception):
 class RateLimitError(RestAPIError):
     """Exception raised when rate limited by the REST API."""
 
-    def __init__(self, retry_after=None, message="Rate limited by REST API") -> None:
+    def __init__(self, retry_after=None, message="Rate limited by REST API", **kwargs: Any) -> None:
         """Initialize RateLimitError with retry information.
 
         Args:
             retry_after: Seconds to wait before retrying.
             message: Error description.
+            **kwargs: Passed to RestAPIError (e.g. ``details=...``).
         """
         self.retry_after = retry_after
         message_with_retry = f"{message} (retry after {retry_after}s)" if retry_after is not None else message
-        super().__init__(f"RateLimitError: {message_with_retry}")
+        super().__init__(f"RateLimitError: {message_with_retry}", **kwargs)
 
 
 class HTTPError(RestAPIError):
     """Exception raised when an HTTP error occurs."""
 
-    def __init__(self, status_code, message=None) -> None:
+    def __init__(self, status_code, message=None, **kwargs: Any) -> None:
         """Initialize HTTPError with status code.
 
         Args:
             status_code: HTTP status code.
             message: Error description.
+            **kwargs: Passed to RestAPIError (e.g. ``details=...``).
         """
         self.status_code = status_code
         message = message or f"HTTP error {status_code}"
-        super().__init__(f"HTTPError: {message}")
+        super().__init__(f"HTTPError: {message}", **kwargs)
 
 
 class APIError(RestAPIError):
     """Exception raised when the API returns an error code."""
 
-    def __init__(self, code, message=None) -> None:
+    def __init__(self, code, message=None, **kwargs: Any) -> None:
         """Initialize APIError with error code.
 
         Args:
             code: API error code.
             message: Error description.
+            **kwargs: Passed to RestAPIError (e.g. ``details=...``).
         """
         self.code = code
         message = message or f"API error code {code}"
-        super().__init__(f"APIError: {message}")
+        super().__init__(f"APIError: {message}", **kwargs)
 
 
 class NetworkError(RestAPIError):
     """Exception raised when a network error occurs during REST API requests."""
 
-    def __init__(self, message="Network error during REST API request") -> None:
+    def __init__(self, message="Network error during REST API request", **kwargs: Any) -> None:
         """Initialize NetworkError with error message.
 
         Args:
             message: Error description.
+            **kwargs: Passed to RestAPIError (e.g. ``details=...``).
         """
-        super().__init__(f"NetworkError: {message}")
+        super().__init__(f"NetworkError: {message}", **kwargs)
 
 
 class RestTimeoutError(RestAPIError):
     """Exception raised when a REST API request times out."""
 
-    def __init__(self, message="REST API request timed out") -> None:
+    def __init__(self, message="REST API request timed out", **kwargs: Any) -> None:
         """Initialize RestTimeoutError with error message.
 
         Args:
             message: Error description.
+            **kwargs: Passed to RestAPIError (e.g. ``details=...``).
         """
-        super().__init__(f"RestTimeoutError: {message}")
+        super().__init__(f"RestTimeoutError: {message}", **kwargs)
 
 
 class JSONDecodeError(RestAPIError):
     """Exception raised when unable to decode JSON response from REST API."""
 
-    def __init__(self, message="Failed to decode JSON response from REST API") -> None:
+    def __init__(self, message="Failed to decode JSON response from REST API", **kwargs: Any) -> None:
         """Initialize JSONDecodeError with error message.
 
         Args:
             message: Error description.
+            **kwargs: Passed to RestAPIError (e.g. ``details=...``).
         """
-        super().__init__(f"JSONDecodeError: {message}")
+        super().__init__(f"JSONDecodeError: {message}", **kwargs)
