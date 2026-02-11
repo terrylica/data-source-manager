@@ -12,14 +12,14 @@ High-performance market data integration with Failover Control Protocol (FCP).
 
 Each directory has its own CLAUDE.md with domain-specific context, loaded on demand.
 
-| Directory     | CLAUDE.md                                    | Owns                                                                 |
-| ------------- | -------------------------------------------- | -------------------------------------------------------------------- |
-| `src/`        | [src/CLAUDE.md](src/CLAUDE.md)               | Package structure, FCP, exceptions, Binance API, symbols, timestamps |
-| `tests/`      | [tests/CLAUDE.md](tests/CLAUDE.md)           | Test commands, markers, fixtures, mocking                            |
-| `docs/`       | [docs/CLAUDE.md](docs/CLAUDE.md)             | ADRs, skills, benchmarks, troubleshooting                            |
-| `examples/`   | [examples/CLAUDE.md](examples/CLAUDE.md)     | Example conventions, NDJSON telemetry                                |
-| `scripts/`    | [scripts/CLAUDE.md](scripts/CLAUDE.md)       | Dev scripts, mise tasks, cache tools                                 |
-| `playground/` | [playground/CLAUDE.md](playground/CLAUDE.md) | Experimental prototypes (not production)                             |
+| Directory     | CLAUDE.md                                    | Owns                                                                         |
+| ------------- | -------------------------------------------- | ---------------------------------------------------------------------------- |
+| `src/`        | [src/CLAUDE.md](src/CLAUDE.md)               | Package structure, FCP, exceptions, `__probe__`, symbol security, timestamps |
+| `tests/`      | [tests/CLAUDE.md](tests/CLAUDE.md)           | Test commands, markers, fixtures, mocking                                    |
+| `docs/`       | [docs/CLAUDE.md](docs/CLAUDE.md)             | ADRs, skills, benchmarks, troubleshooting                                    |
+| `examples/`   | [examples/CLAUDE.md](examples/CLAUDE.md)     | Example conventions, NDJSON telemetry                                        |
+| `scripts/`    | [scripts/CLAUDE.md](scripts/CLAUDE.md)       | Dev scripts, mise tasks, cache tools                                         |
+| `playground/` | [playground/CLAUDE.md](playground/CLAUDE.md) | Experimental prototypes (not production)                                     |
 
 **Also**: [.claude/settings.md](.claude/settings.md) | [docs/INDEX.md](docs/INDEX.md) | [docs/GLOSSARY.md](docs/GLOSSARY.md) | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
@@ -75,6 +75,18 @@ df = manager.get_data("BTCUSDT", start, end, Interval.HOUR_1, return_polars=True
 
 Internal processing always uses Polars (LazyFrames + streaming engine).
 
+### AI Agent Discovery
+
+```python
+from ckvd.__probe__ import discover_api, get_capabilities
+```
+
+Stateless JSON-serializable API introspection. See [src/CLAUDE.md](src/CLAUDE.md#ai-agent-introspection-__probe__py) for details.
+
+### Security
+
+Symbol inputs validated against `^[A-Z0-9_-]{1,30}$` — rejects path traversal, null bytes, slashes. See [src/CLAUDE.md](src/CLAUDE.md#symbol-formats).
+
 ### Code Style
 
 - **Imports**: Absolute with `ckvd.` prefix
@@ -101,7 +113,7 @@ uv sync --dev                    # Install dependencies
 mise trust                       # Load env (GH_TOKEN from .mise.local.toml)
 ```
 
-**Release**: semantic-release (global install, `mise run release:full` / `mise run release:dry`). Requires GH_TOKEN in `.mise.local.toml` (copy from `.mise.local.toml.example`). CHANGELOG.md is auto-generated.
+**Release**: semantic-release v25+ (global npm install, no per-repo node_modules). Config: `.releaserc.yml`. Run: `mise run release:full` / `mise run release:dry`. Requires GH_TOKEN in `.mise.local.toml`. CHANGELOG.md is auto-generated.
 
 **Commit trailers** (hook-enforced):
 

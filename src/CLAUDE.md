@@ -11,6 +11,7 @@ Context-specific instructions for working with CKVD source code.
 ```
 src/ckvd/
 ├── __init__.py              # Public API exports (lazy loading)
+├── __probe__.py             # AI agent API introspection (GitHub #22)
 ├── core/
 │   ├── sync/
 │   │   ├── crypto_kline_vision_data.py  # Main CKVD class with FCP
@@ -100,6 +101,25 @@ src/ckvd/
 
 ---
 
+## AI Agent Introspection (**probe**.py)
+
+Stateless API discovery module for AI agents (GitHub #22). No file I/O, no network, JSON-serializable output.
+
+```python
+from ckvd.__probe__ import discover_api, get_capabilities
+import json
+print(json.dumps(discover_api(), indent=2))
+```
+
+| Function             | Returns                                                              |
+| -------------------- | -------------------------------------------------------------------- |
+| `discover_api()`     | Complete API surface: classes, methods, functions, enums, exceptions |
+| `get_capabilities()` | Capability matrix: providers, market types, intervals, FCP, formats  |
+
+**Lazy import**: `from ckvd import __probe__` works via `importlib.import_module("ckvd.__probe__")` in `__init__.py` (not `from . import __probe__` — that causes infinite recursion with `__getattr__`).
+
+---
+
 ## FCP Implementation (core/sync/crypto_kline_vision_data.py)
 
 The Failover Control Protocol orchestrates data retrieval:
@@ -158,7 +178,7 @@ Key methods:
 
 ```
 REST API Exceptions (for_core/rest_exceptions.py):
-RestAPIError (base)
+RestAPIError (base)              # All carry .details dict (GitHub #23)
 ├── RateLimitError        # 429 — has retry_after attribute
 ├── HTTPError             # HTTP errors with status code
 ├── APIError              # API-specific error codes
@@ -167,13 +187,16 @@ RestAPIError (base)
 └── JSONDecodeError       # JSON parsing failures
 
 Vision API Exceptions (for_core/vision_exceptions.py):
-VisionAPIError (base)
+VisionAPIError (base)            # All carry .details dict (GitHub #23)
 ├── DataFreshnessError        # Data too recent for Vision API
 ├── ChecksumVerificationError # Checksum validation failed
-└── DownloadFailedError       # File download failed
+├── DownloadFailedError       # File download failed
+└── DataNotAvailableError     # Auto-populates .details from attributes
 
-UnsupportedIntervalError (ValueError)  # Interval not supported by market type
+UnsupportedIntervalError (ValueError)  # Also carries .details dict
 ```
+
+**Exception `.details` dict** (GitHub #23): All exception base classes accept `details: dict[str, Any] | None = None` keyword arg. Default is `{}` (never `None`). `DataNotAvailableError` auto-populates `.details` from its structured attributes (symbol, market_type, requested_start, earliest_available). Backward compatible — existing `raise RestAPIError("msg")` still works.
 
 **FCP error flow**: Cache miss → try Vision → `VisionAPIError` → try REST → `RestAPIError` → raise.
 
@@ -207,6 +230,8 @@ UnsupportedIntervalError (ValueError)  # Interval not supported by market type
 | FUTURES_COIN | `{BASE}USD_PERP` | BTCUSD_PERP |
 
 **Validation**: `validate_symbol_for_market_type(symbol, market_type)` returns `bool` and raises `ValueError` with suggestion on invalid input. `get_market_symbol_format(symbol, market_type)` auto-converts.
+
+**Security** (GitHub #21, CWE-22): Symbols are validated against allowlist regex `^[A-Z0-9_-]{1,30}$` before use in file paths or API URLs. Rejects path traversal (`../`), null bytes (`\x00`), slashes, empty strings, and symbols >30 chars. Defense-in-depth guard also in `get_data()` after `symbol.upper()`.
 
 **Wrong format = empty DataFrame**: `BTCUSDT` on `FUTURES_COIN` returns empty. Use `BTCUSD_PERP`.
 
@@ -245,6 +270,7 @@ except RateLimitError as e:
     time.sleep(e.retry_after or 60)
 except (RestAPIError, VisionAPIError) as e:
     logger.error(f"Data fetch failed: {e}")
+    logger.debug(f"Error details: {e.details}")  # Machine-parseable context
     raise
 ```
 

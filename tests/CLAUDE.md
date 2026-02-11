@@ -58,7 +58,10 @@ unit/
 ├── utils/
 │   ├── for_core/            # FCP utility tests
 │   ├── internal/            # Polars pipeline tests
-│   └── validation/          # Data validation tests
+│   ├── validation/          # Data validation tests
+│   ├── test_symbol_security.py      # 16 CWE-22 path traversal tests (GitHub #21)
+│   └── test_exception_details.py    # 37 exception .details dict tests (GitHub #23)
+├── test_probe.py                    # 28 __probe__.py introspection tests (GitHub #22)
 ├── test_timestamp_semantics.py
 └── test_ckvd_logging_improvements.py
 ```
