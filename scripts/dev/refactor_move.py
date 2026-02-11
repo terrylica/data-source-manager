@@ -8,12 +8,12 @@ and verifying the changes don't introduce import-related errors.
 
 import subprocess
 import sys
+import tomllib
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 import git  # Use GitPython instead of subprocess
-import tomli
 import typer
 
 # Import print from rich for consistent styling
@@ -52,7 +52,7 @@ def read_ruff_config() -> list[str]:
     pyproject_path = project_root / "pyproject.toml"
 
     with open(pyproject_path, "rb") as f:
-        pyproject_data = tomli.load(f)
+        pyproject_data = tomllib.load(f)
 
     # Get the lint.select value from the Ruff configuration
     ruff_config = pyproject_data.get("tool", {}).get("ruff", {})

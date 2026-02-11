@@ -17,35 +17,32 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "attrs>=25.0.0", # data classes and validation - latest versions
-    "pyarrow>=19.0.0,<21.0.0", # for local cache files in MMAP Array format
-    "polars>=1.30.0,<2.0.0", # resample and aggregate data faster than pandas
-    "pandas>=2.2.0,<3.0.0", # compatibility with existing code
-    "numpy>=1.26.0,<3.0.0", # compatible with Python 3.12+ and pandas requirements
-    "fsspec>=2024.6.0", # for downloading remote files and local file hierarchy matching
-    "requests>=2.32.0", # fsspec compatible HTTP client
+    "attrs>=25.0.0", # data classes and validation
+    "pyarrow>=19.0.0,<21.0.0", # Arrow IPC cache (MMAP)
+    "polars>=1.30.0,<2.0.0", # internal LazyFrame pipeline
+    "pandas>=2.2.0,<3.0.0", # API boundary output (default)
+    "numpy>=1.26.0,<3.0.0", # timestamp processing
+    "fsspec>=2024.6.0", # Vision API S3 file access
+    "requests>=2.32.0", # REST API client + fsspec backend
     "httpx>=0.28.0", # preferred HTTP client
-    "tenacity>=9.0.0", # for retrying operations
-    "colorlog>=6.8.0", # for colored logging
-    "typer>=0.16.0", # for CLI
-    "rich>=13.0.0", # for elegant logging and CLI output
-    "pendulum>=3.0.0", # for date and time operations
-    "platformdirs>=4.0.0", # for platform-specific directory paths
-    "loguru>=0.7.0", # for logging
+    "tenacity>=9.0.0", # retry with exponential backoff
+    "rich>=13.0.0", # formatted logging output
+    "pendulum>=3.0.0", # timezone-aware datetime ops
+    "platformdirs>=4.0.0", # cross-platform cache paths
+    "loguru>=0.7.0", # structured logging
 ]
 
 [project.optional-dependencies]
-dev = [ # development dependencies using latest versions
-    "build>=1.2.0", # build tool for creating distributions
-    "twine>=6.0.0", # for uploading the package to PyPI
-    "pytest>=8.0.0", # for testing
-    "pytest-xdist>=3.6.0", # for parallel testing
-    "pytest-cov>=6.0.0", # for coverage reporting
-    "pytest-profiling",
-    "pyupgrade>=3.20.0", # for upgrading Python code syntax
-    "ruff>=0.11.0", # for linting and formatting
-    "GitPython>=3.1.0", # for recmove CLI (git operations)
+dev = [
+    "build>=1.2.0", # package distribution builder
+    "twine>=6.0.0", # PyPI upload
+    "pytest>=8.0.0", # test framework
+    "pytest-cov>=6.0.0", # coverage reporting
+    "ruff>=0.11.0", # linting and formatting
     "import-linter>=2.0.0", # architectural contract enforcement
+    "typer>=0.16.0", # CLI for dev scripts (recmove)
+    "GitPython>=3.1.0", # git operations (recmove)
+    "rope>=1.0.0", # Python refactoring (recmove)
 ]
 # Command-line scripts defined here
 [project.scripts]
