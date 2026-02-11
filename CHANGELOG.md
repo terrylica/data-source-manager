@@ -1,3 +1,10 @@
+## [4.2.1](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.2.0...v4.2.1) (2026-02-11)
+
+
+### Bug Fixes
+
+* update release preflight to check global semantic-release ([a79ff16](https://github.com/terrylica/crypto-kline-vision-data/commit/a79ff1632ccede5ff2c2f4a3cefc13cd9da8f827))
+
 # [4.2.0](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.1.0...v4.2.0) (2026-02-10)
 
 
