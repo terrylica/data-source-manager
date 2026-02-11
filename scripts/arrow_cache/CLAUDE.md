@@ -299,26 +299,7 @@ Standard supported values:
 - Consider implementing batch download for very large date ranges
 - Add a data validation step after downloads to ensure integrity
 
-## Cache Metadata 01
-
-The cache metadata is stored in a SQLite database at `logs/cache_index.db` with the following structure:
-
-- `cache_metadata` table: Stores global metadata about the cache
-  - `key`: Metadata key (e.g., "last_update")
-  - `value`: Metadata value
-
-- `cache_entries` table: Stores information about each cached file
-  - `symbol`: Trading pair symbol (e.g., "BTCUSDT")
-  - `interval`: Time interval (e.g., "5m")
-  - `date`: Data date (YYYY-MM-DD)
-  - `file_size`: Size of the Arrow file in bytes
-  - `num_records`: Number of records in the file
-  - `last_updated`: Timestamp of last update
-  - `path`: Path to the Arrow file
-
-This database provides a comprehensive index of all cached data, including file sizes, record counts, and timestamps.
-
-## Cache Metadata 02
+## Cache Metadata
 
 The cache metadata is stored in a SQLite database at `logs/cache_index.db` with the following structure:
 
@@ -344,12 +325,12 @@ The ArrowCacheReader is designed to work seamlessly with the enums defined in `s
 Here's an example of how to use the ArrowCacheReader with proper enum values:
 
 ```python
-from ckvd.ckvd.utils.logger_setup import logger
+from ckvd.utils.loguru_setup import logger
 from rich import print
 from datetime import datetime
 
-from ckvd.ckvd.utils.market_constraints import DataProvider, MarketType, ChartType, Interval
-from ckvd.ckvd.utils.arrow_cache_reader import ArrowCacheReader
+from ckvd.utils.market_constraints import DataProvider, MarketType, ChartType, Interval
+from ckvd.utils.arrow_cache_reader import ArrowCacheReader
 
 # Initialize the reader
 reader = ArrowCacheReader()

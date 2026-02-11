@@ -43,7 +43,7 @@ uv run -p 3.13 pytest tests/stress/ -v
 | `fcp_pm/`               | FCP protocol matrix tests            | Yes              |
 | `stress/`               | Memory & fault tolerance             | Yes              |
 | `utils/`                | Test utilities (`data_integrity.py`) | No               |
-| `fixtures/`             | Golden datasets (`.parquet`)         | No               |
+| `fixtures/golden/`      | Golden datasets (`.parquet`)         | No               |
 
 ### Unit Test Subdirectories
 

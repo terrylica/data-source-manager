@@ -40,6 +40,9 @@ This test suite includes the following files:
     - **Timestamp Edge Cases:** Tests API behavior with timestamps that are in the far future, far past (before available data), or invalid combinations of `before` and `after`.
     - **Missing Required Parameters:** Checks if the API correctly returns errors when essential parameters like `instId` are omitted.
 
+- **`okx_discrepancy_test.py`**:
+  - **Purpose:** Tests for data discrepancies between OKX API endpoints, verifying consistency of returned data across different query methods and time ranges.
+
 - **`test_okx_1s_availability.py`**: **REMOVED**
   - This file has been removed because OKX REST API v5 does NOT support 1-second (`1s`) intervals.
   - Error code `51000` ("Parameter bar error") is returned for the `1s` interval.

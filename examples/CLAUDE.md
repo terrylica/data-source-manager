@@ -38,17 +38,17 @@ CKVD_LOG_LEVEL=DEBUG uv run -p 3.13 python examples/ckvd_logging_demo.py
 
 ### Synchronous Examples
 
-| Example                         | Description                          |
-| ------------------------------- | ------------------------------------ |
-| `sync/ckvd_datetime_example.py` | Timezone handling and gap detection  |
-| `sync/ckvd_one_second_test.py`  | One-second interval retrieval (SPOT) |
+| Example                         | Description                          | mise task         |
+| ------------------------------- | ------------------------------------ | ----------------- |
+| `sync/ckvd_datetime_example.py` | Timezone handling and gap detection  | `demo:datetime`   |
+| `sync/ckvd_one_second_test.py`  | One-second interval retrieval (SPOT) | `demo:one-second` |
 
 ### Support Files
 
 | File            | Purpose                                   |
 | --------------- | ----------------------------------------- |
 | `_telemetry.py` | Shared NDJSON telemetry (ResilientLogger) |
-| `lib_module/`   | Library integration guide (demo removed)  |
+| `__init__.py`   | Package marker (empty)                    |
 
 ---
 

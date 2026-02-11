@@ -263,7 +263,6 @@ Refer to the source code of `ckvd.core.sync.ckvd_lib.fetch_market_data` and `ckv
 
 - **[Examples](examples/)**: Runnable examples demonstrating FCP data retrieval, cache control, logging configuration, and feature engineering workflows
 - **[Synchronous patterns](examples/sync/)**: Timezone handling, gap detection, one-second intervals
-- **[Library integration](examples/lib_module/)**: Using `fetch_market_data()` and `CryptoKlineVisionData` as library APIs
 
 ### Understanding Data Sources
 

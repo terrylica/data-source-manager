@@ -40,10 +40,8 @@ After extensive benchmarking (20 runs with 10 warmup iterations per configuratio
 The benchmark requires the following packages:
 
 ```bash
-pip install fsspec httpx pandas rich typer pendulum psutil
+uv sync --dev  # All dependencies included in pyproject.toml
 ```
-
-Note: The `fsspec` library is already included in the project dependencies (as seen in the `.devcontainer/Dockerfile`).
 
 ## Usage
 

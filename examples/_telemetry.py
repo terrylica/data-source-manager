@@ -22,7 +22,7 @@ Usage:
     with timed_span(tlog, "fetch", symbol="BTCUSDT", interval="1h"):
         df = manager.get_data(...)
 
-Schema contract: See examples/README.md for the full NDJSON schema (v2).
+Schema contract: See examples/CLAUDE.md for the full NDJSON schema (v2).
 """
 
 import json
