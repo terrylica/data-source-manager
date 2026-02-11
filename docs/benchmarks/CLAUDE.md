@@ -18,7 +18,6 @@ Comprehensive performance benchmarks for Crypto Kline Vision Data v2.0+.
 Compares the new Polars-based FCP pipeline against the legacy Pandas path.
 
 **Script**: [scripts/benchmark_pandas_vs_polars.py](scripts/benchmark_pandas_vs_polars.py)
-**Results**: [results/benchmark_results.txt](results/benchmark_results.txt)
 
 | Scenario    | Rows  | Pandas Time | Polars Time | Speedup | Pandas Memory | Polars Memory |
 | ----------- | ----- | ----------- | ----------- | ------- | ------------- | ------------- |
@@ -39,7 +38,6 @@ Compares the new Polars-based FCP pipeline against the legacy Pandas path.
 Compares Polars `.collect(engine='streaming')` vs `.collect()` (in-memory).
 
 **Script**: [scripts/benchmark_streaming_real_data.py](scripts/benchmark_streaming_real_data.py)
-**Results**: [results/benchmark_streaming_complete.txt](results/benchmark_streaming_complete.txt)
 
 #### Part 1: Synthetic Data (Isolated Streaming Test)
 
@@ -119,4 +117,3 @@ uv run -p 3.13 python docs/benchmarks/scripts/benchmark_streaming_real_data.py
 
 - [Performance Summary](PERFORMANCE_SUMMARY.md) - Detailed executive summary
 - [FCP Protocol](/docs/adr/2025-01-30-failover-control-protocol.md) - Architecture decision record
-- [Memory Efficiency Plan](/.claude/plans/gleaming-frolicking-engelbart.md) - Implementation plan
