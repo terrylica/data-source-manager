@@ -51,7 +51,7 @@ dependencies = [
 
 This repository is optimized for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with a **hub-and-spoke CLAUDE.md architecture**. When Claude Code opens any directory, it automatically loads that directory's `CLAUDE.md` — giving it domain-specific context, conventions, and deep links to related documentation.
 
-**Start here**: [`CLAUDE.md`](CLAUDE.md) (root hub) — then Claude Code discovers everything else autonomously.
+**Start here**: [`CLAUDE.md`](https://github.com/terrylica/crypto-kline-vision-data/blob/main/CLAUDE.md) (root hub) — then Claude Code discovers everything else autonomously.
 
 ### Hub-and-Spoke Architecture
 
@@ -97,7 +97,7 @@ mise run demo:lazy                # Lazy initialization
 uv run -p 3.13 python examples/quick_start.py
 ```
 
-All examples emit **NDJSON telemetry** to `examples/logs/events.jsonl`. See [examples/CLAUDE.md](examples/CLAUDE.md) for schema and parsing.
+All examples emit **NDJSON telemetry** to `examples/logs/events.jsonl`. See [examples/CLAUDE.md](https://github.com/terrylica/crypto-kline-vision-data/blob/main/examples/CLAUDE.md) for schema and parsing.
 
 ## API Reference
 
@@ -169,19 +169,19 @@ uv run -p 3.13 pytest tests/unit/ -v   # Run tests (399 passing)
 uv run -p 3.13 ruff check --fix .      # Lint
 ```
 
-See [CLAUDE.md](CLAUDE.md) for full development conventions, commit trailers, and release workflow.
+See [CLAUDE.md](https://github.com/terrylica/crypto-kline-vision-data/blob/main/CLAUDE.md) for full development conventions, commit trailers, and release workflow.
 
 ## Documentation
 
-| Resource                                           | Purpose                                 |
-| -------------------------------------------------- | --------------------------------------- |
-| [CLAUDE.md](CLAUDE.md)                             | Root hub — start here for Claude Code   |
-| [docs/INDEX.md](docs/INDEX.md)                     | Documentation navigation                |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions             |
-| [docs/GLOSSARY.md](docs/GLOSSARY.md)               | Domain terminology                      |
-| [examples/](examples/)                             | Runnable examples with NDJSON telemetry |
-| [CHANGELOG.md](CHANGELOG.md)                       | Release history (auto-generated)        |
+| Resource                                                                                                           | Purpose                                 |
+| ------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| [CLAUDE.md](https://github.com/terrylica/crypto-kline-vision-data/blob/main/CLAUDE.md)                             | Root hub — start here for Claude Code   |
+| [docs/INDEX.md](https://github.com/terrylica/crypto-kline-vision-data/blob/main/docs/INDEX.md)                     | Documentation navigation                |
+| [docs/TROUBLESHOOTING.md](https://github.com/terrylica/crypto-kline-vision-data/blob/main/docs/TROUBLESHOOTING.md) | Common issues and solutions             |
+| [docs/GLOSSARY.md](https://github.com/terrylica/crypto-kline-vision-data/blob/main/docs/GLOSSARY.md)               | Domain terminology                      |
+| [examples/](https://github.com/terrylica/crypto-kline-vision-data/tree/main/examples)                              | Runnable examples with NDJSON telemetry |
+| [CHANGELOG.md](https://github.com/terrylica/crypto-kline-vision-data/blob/main/CHANGELOG.md)                       | Release history (auto-generated)        |
 
 ## License
 
-MIT License — See [LICENSE](LICENSE) file for details.
+MIT License — See [LICENSE](https://github.com/terrylica/crypto-kline-vision-data/blob/main/LICENSE) file for details.
