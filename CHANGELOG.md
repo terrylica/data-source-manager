@@ -1,3 +1,10 @@
+## [4.3.2](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.3.1...v4.3.2) (2026-02-12)
+
+
+### Bug Fixes
+
+* **gap-detector:** normalize datetime resolution before int64 conversion ([b316f62](https://github.com/terrylica/crypto-kline-vision-data/commit/b316f62f862013ff6c40ff036e7f960ab1731ec9))
+
 ## [4.3.1](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.3.0...v4.3.1) (2026-02-11)
 
 
