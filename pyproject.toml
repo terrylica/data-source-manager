@@ -48,6 +48,13 @@ dev = [
 [project.scripts]
 recmove = "scripts.dev.refactor_move:app"
 
+[project.urls]
+Homepage = "https://github.com/terrylica/crypto-kline-vision-data"
+Repository = "https://github.com/terrylica/crypto-kline-vision-data"
+Documentation = "https://github.com/terrylica/crypto-kline-vision-data/blob/main/CLAUDE.md"
+Changelog = "https://github.com/terrylica/crypto-kline-vision-data/blob/main/CHANGELOG.md"
+"Issue Tracker" = "https://github.com/terrylica/crypto-kline-vision-data/issues"
+
 # Using src-layout with proper package structure
 [tool.setuptools.packages.find]
 where = ["src"]
