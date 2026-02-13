@@ -281,15 +281,15 @@ echo "   Package: ${PACKAGE_NAME}"
 echo "   Version: v${CURRENT_VERSION}"
 
 # Step 1b: Transform README for PyPI (version-pinned absolute links)
-TRANSFORM_SCRIPT="$HOME/eon/fork-tools/transform-readme-for-pypi/transform_readme.py"
+TRANSFORM_SCRIPT="$HOME/fork-tools/transform-readme-for-pypi/transform_readme.py"
 if [[ -f "$TRANSFORM_SCRIPT" ]]; then
     echo -e "\n Step 1b: Transforming README.md links for PyPI..."
     python "$TRANSFORM_SCRIPT" --version "$CURRENT_VERSION"
-    trap 'python "$HOME/eon/fork-tools/transform-readme-for-pypi/transform_readme.py" --restore 2>/dev/null || true' EXIT
+    trap 'python "$HOME/fork-tools/transform-readme-for-pypi/transform_readme.py" --restore 2>/dev/null || true' EXIT
     echo "   README.md links transformed to version-pinned absolute URLs"
 else
     echo -e "\n Step 1b: Skipping README transform (script not found)"
-    echo "   Install: ~/eon/fork-tools/transform-readme-for-pypi/transform_readme.py"
+    echo "   Install: ~/fork-tools/transform-readme-for-pypi/transform_readme.py"
 fi
 
 # Step 2: Check for existing wheels or build
