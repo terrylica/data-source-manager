@@ -1,3 +1,10 @@
+## [4.3.3](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.3.2...v4.3.3) (2026-02-13)
+
+
+### Bug Fixes
+
+* correct fork-tools path from ~/eon/ to ~/ in publish script ([7933fdc](https://github.com/terrylica/crypto-kline-vision-data/commit/7933fdc3b298413c9633604320929f4e0cdf693a))
+
 ## [4.3.2](https://github.com/terrylica/crypto-kline-vision-data/compare/v4.3.1...v4.3.2) (2026-02-12)
 
 
